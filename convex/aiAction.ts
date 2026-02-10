@@ -159,29 +159,6 @@ const TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "create_brief_from_content",
-      description:
-        "Parse document/text content and create a brief with extracted information. Admin only. Use this when the user provides a document or describes a brief to create.",
-      parameters: {
-        type: "object",
-        properties: {
-          content: {
-            type: "string",
-            description:
-              "The text content from a document or user description to parse into a brief",
-          },
-          brandId: {
-            type: "string",
-            description: "Optional brand ID to associate with",
-          },
-        },
-        required: ["content"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "assign_teams_to_brief",
       description:
         "Assign one or more teams to a brief. Admin or assigned manager only. Provide the brief ID and an array of team IDs.",
@@ -473,32 +450,43 @@ export const sendMessage = action({
 });
 
 function buildSystemPrompt(userName: string, role: string): string {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
   return `You are the AI assistant for "The Orchestrator", a task tracking app. Be fast and direct.
 
 User: ${userName} (${role})
+Today's date: ${today}
 
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
 - ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
-- You can assign teams to briefs using assign_teams_to_brief. Use list_teams to find team IDs first.
-- You can create tasks, update statuses, assign managers -- use the appropriate tools.
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
 - At the end of a multi-step operation, summarize everything that was done.
 
-CRITICAL — Multi-step workflow rules:
+IMPORTANT — A "brand" and a "brief" are DIFFERENT things:
+- A BRAND is a client/company (e.g., "L&T Finance", "Nike"). Use create_brand to create one.
+- A BRIEF is a project/campaign for a brand (e.g., "Corporate Website Redesign"). Use create_brief to create one.
+- A brand can have many briefs. A brief belongs to one brand.
+- When the user says "create the brand", they mean use the create_brand tool. NEVER create a brand by calling create_brief.
+
+CRITICAL — When user attaches a document and asks to create a brief + brand:
+You MUST follow these steps IN THIS EXACT ORDER. Do NOT skip or combine steps.
+
+Step 1: Call list_brands to check existing brands.
+Step 2: If the brand doesn't exist, call create_brand with the brand name from the document. Save the returned brandId.
+Step 3: Call create_brief with the brief title, description, deadline (as Unix timestamp in ms — make sure the year is correct, e.g. 2025 not 2005), and the brandId from Step 2. Save the returned briefId.
+Step 4: Call list_teams to find the right team. Then call assign_teams_to_brief with the briefId from Step 3.
+Step 5: Call get_team_members to get member IDs. Then call create_task for EACH task, using the briefId from Step 3. DISTRIBUTE tasks across ALL team members using round-robin (not all to one person).
+
+Additional rules:
 - NEVER create the same resource twice. Each brief, brand, or task should be created exactly ONCE.
 - After creating a resource, SAVE its returned ID and reuse that SAME ID for all subsequent operations.
-- For complex requests (e.g., "create a brief with brand, assign teams, and create tasks"), follow this EXACT order:
-  1. First, list_brands to check if the brand already exists. If NOT, use create_brand to create it. Save the brandId.
-  2. Then create the brief (use create_brief or create_brief_from_content) with the brandId. Save the briefId.
-  3. Then list_teams to find the right team. Use assign_teams_to_brief with the saved briefId.
-  4. Then get_team_members to get team member IDs. Use create_task for each task with the saved briefId.
-- If a tool call fails, DO NOT retry the same operation blindly. Read the error, fix the issue, then try ONCE more.
-- NEVER call create_brief or create_brief_from_content more than once for the same brief.
-- When creating tasks from a document, extract meaningful task titles and DISTRIBUTE them evenly across ALL team members (round-robin), not just one person.
+- If a tool call fails, DO NOT retry blindly. Read the error, fix the issue, then try ONCE more.
+- NEVER call create_brief more than once for the same brief.
+- For deadlines: convert dates to Unix timestamp in milliseconds. Double-check the YEAR — if the document says "March 2025", the timestamp must be for year 2025, not 2005 or any other year.
 - When distributing tasks, if you have N tasks and M team members, assign approximately N/M tasks to each member.`;
 }
 
@@ -588,11 +576,21 @@ async function executeTool(
         // If no match found, skip brandId rather than passing an invalid value
       }
 
+      // Sanitize deadline — ensure it's a reasonable future-ish date (after year 2020)
+      let deadline = fnArgs.deadline;
+      if (deadline && typeof deadline === "number") {
+        const deadlineDate = new Date(deadline);
+        if (deadlineDate.getFullYear() < 2020) {
+          // AI probably computed the timestamp wrong — try to fix common errors
+          deadline = undefined; // drop it rather than store a wrong date
+        }
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const briefId = await ctx.runMutation(api.briefs.createBrief, {
         title: fnArgs.title,
         description: fnArgs.description,
-        deadline: fnArgs.deadline,
+        ...(deadline ? { deadline } : {}),
         ...(resolvedBrandId ? { brandId: resolvedBrandId } : {}),
       } as any);
       return JSON.stringify({
@@ -836,105 +834,6 @@ async function executeTool(
           role: m.role,
         }))
       );
-    }
-
-    case "create_brief_from_content": {
-      if (role !== "admin") {
-        return JSON.stringify({
-          error: "Only admins can create briefs",
-        });
-      }
-
-      // Use OpenAI to parse the content into brief structure
-      const openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-
-      // Get available brands for context
-      const brands = await ctx.runQuery(api.brands.listBrands, {});
-      const brandList = brands
-        .map(
-          (b: Record<string, unknown>) =>
-            `- ${b.name} (ID: ${b._id})`
-        )
-        .join("\n");
-
-      const parseResponse = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are a document parser. Extract brief information from the given content and return a JSON object with these fields:
-- title (string, required): A concise title for the brief
-- description (string, required): A comprehensive description summarizing the document
-- deadline (string or null): If a deadline is mentioned, return it as ISO date string, otherwise null
-
-Available brands (use the EXACT ID string, not the name):
-${brandList || "No brands available"}
-
-If the content mentions a brand that matches one above, include "brandId" with the EXACT ID value (the long alphanumeric string), NOT the brand name.
-If no brand matches, do NOT include brandId at all.
-
-Return ONLY valid JSON, no markdown or explanation.`,
-          },
-          { role: "user", content: fnArgs.content },
-        ],
-        max_tokens: 1024,
-      });
-
-      const parsed = parseResponse.choices[0]?.message?.content;
-      if (!parsed)
-        return JSON.stringify({ error: "Failed to parse content" });
-
-      let briefData;
-      try {
-        briefData = JSON.parse(parsed);
-      } catch {
-        return JSON.stringify({
-          error: "Failed to parse document content into brief format",
-        });
-      }
-
-      const briefArgs: {
-        title: string;
-        description: string;
-        deadline?: number;
-        brandId?: string;
-      } = {
-        title: briefData.title,
-        description: briefData.description,
-      };
-
-      if (briefData.deadline) {
-        briefArgs.deadline = new Date(briefData.deadline).getTime();
-      }
-
-      // Resolve brandId - validate it's a real Convex ID, otherwise try to match by name
-      const rawBrandId = fnArgs.brandId || briefData.brandId;
-      if (rawBrandId) {
-        // Check if it looks like a valid Convex document ID (they contain specific patterns)
-        const matchedBrand = brands.find(
-          (b: Record<string, unknown>) =>
-            b._id === rawBrandId ||
-            (b.name as string).toLowerCase() === rawBrandId.toLowerCase()
-        );
-        if (matchedBrand) {
-          briefArgs.brandId = matchedBrand._id as string;
-        }
-        // If no match found, skip brandId rather than passing an invalid value
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const briefId = await ctx.runMutation(api.briefs.createBrief, briefArgs as any);
-
-      return JSON.stringify({
-        success: true,
-        briefId,
-        title: briefArgs.title,
-        description: briefArgs.description,
-        brandLinked: !!briefArgs.brandId,
-        message: `Brief "${briefArgs.title}" created successfully. Use briefId "${briefId}" for all subsequent operations (assign teams, create tasks). Do NOT create another brief.`,
-      });
     }
 
     default:

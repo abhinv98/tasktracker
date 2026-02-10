@@ -107,6 +107,7 @@ const TOOL_LABELS: Record<string, string> = {
   create_brief_from_content: "Creating brief from document",
   list_brands: "Listing brands",
   get_brand_info: "Getting brand info",
+  create_brand: "Creating brand",
   list_teams: "Listing teams",
   get_team_members: "Getting team members",
   get_my_tasks: "Getting tasks",
