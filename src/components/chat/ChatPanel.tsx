@@ -20,6 +20,80 @@ interface ChatPanelProps {
   onClose: () => void;
 }
 
+// Simple markdown renderer for chat messages
+function renderMarkdown(text: string) {
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+
+    // Blank line = spacing
+    if (line.trim() === "") {
+      elements.push(<br key={`br-${i}`} />);
+      continue;
+    }
+
+    // Bullet points
+    const isBullet = /^[\s]*[-*]\s+/.test(line);
+    if (isBullet) {
+      line = line.replace(/^[\s]*[-*]\s+/, "");
+    }
+
+    // Process inline formatting: **bold** and *italic*
+    const parts: React.ReactNode[] = [];
+    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(line.slice(lastIndex, match.index));
+      }
+      if (match[2]) {
+        // **bold**
+        parts.push(
+          <strong key={`b-${i}-${match.index}`} className="font-semibold">
+            {match[2]}
+          </strong>
+        );
+      } else if (match[3]) {
+        // *italic*
+        parts.push(
+          <em key={`i-${i}-${match.index}`}>{match[3]}</em>
+        );
+      } else if (match[4]) {
+        // `code`
+        parts.push(
+          <code
+            key={`c-${i}-${match.index}`}
+            className="px-1 py-0.5 rounded bg-[var(--bg-hover)] text-[12px] font-mono"
+          >
+            {match[4]}
+          </code>
+        );
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < line.length) {
+      parts.push(line.slice(lastIndex));
+    }
+
+    if (isBullet) {
+      elements.push(
+        <div key={`line-${i}`} className="flex gap-1.5 pl-1">
+          <span className="shrink-0 mt-[7px] w-1 h-1 rounded-full bg-current opacity-50" />
+          <span>{parts}</span>
+        </div>
+      );
+    } else {
+      elements.push(<div key={`line-${i}`}>{parts}</div>);
+    }
+  }
+
+  return elements;
+}
+
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -263,12 +337,15 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
                 className={`max-w-[80%] rounded-xl px-3.5 py-2.5 ${
                   msg.role === "user"
                     ? "bg-[var(--accent-admin)] text-white"
-                    : "bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                    : "bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
                 }`}
               >
-                <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
-                  {msg.content}
-                </p>
+                <div className="text-[13px] leading-relaxed break-words space-y-0.5">
+                  {msg.role === "assistant"
+                    ? renderMarkdown(msg.content)
+                    : <span className="whitespace-pre-wrap">{msg.content}</span>
+                  }
+                </div>
               </div>
             </div>
           ))}

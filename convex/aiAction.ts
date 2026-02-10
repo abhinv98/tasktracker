@@ -196,9 +196,9 @@ export const sendMessage = action({
       fileName: args.fileName,
     });
 
-    // 4. Get recent chat history for context
+    // 4. Get recent chat history for context (limit for speed)
     const history = await ctx.runQuery(api.chat.getChatHistory);
-    const recentMessages = history.slice(-20);
+    const recentMessages = history.slice(-10);
 
     // 5. Build conversation messages
     const systemPrompt = buildSystemPrompt(user.name ?? user.email ?? "User", role);
@@ -232,14 +232,15 @@ export const sendMessage = action({
       messages,
       tools: TOOLS,
       tool_choice: "auto",
-      max_tokens: 2048,
+      max_tokens: 1024,
+      temperature: 0.3,
     });
 
     let assistantMessage = response.choices[0]?.message;
 
-    // 7. Handle tool calls in a loop (max 5 iterations)
+    // 7. Handle tool calls in a loop (max 3 iterations for speed)
     let iterations = 0;
-    while (assistantMessage?.tool_calls && iterations < 5) {
+    while (assistantMessage?.tool_calls && iterations < 3) {
       iterations++;
       messages.push(assistantMessage);
 
@@ -269,7 +270,8 @@ export const sendMessage = action({
         messages,
         tools: TOOLS,
         tool_choice: "auto",
-        max_tokens: 2048,
+        max_tokens: 1024,
+        temperature: 0.3,
       });
 
       assistantMessage = response.choices[0]?.message;
@@ -290,24 +292,17 @@ export const sendMessage = action({
 });
 
 function buildSystemPrompt(userName: string, role: string): string {
-  return `You are the AI assistant for "The Orchestrator", a task management and brief tracking application. You help users manage briefs, tasks, brands, and teams.
+  return `You are the AI assistant for "The Orchestrator", a task tracking app. Be fast and direct.
 
-Current user: ${userName}
-User role: ${role}
+User: ${userName} (${role})
 
-Role permissions:
-- admin: Can view everything, create/edit/delete briefs, manage brands, teams, users, and tasks.
-- manager: Can view assigned briefs and brands, create tasks within assigned briefs, manage team workflows.
-- employee: Can view assigned tasks, update task status, submit deliverables.
-
-Guidelines:
-- Be concise and helpful. Use the available tools to fetch real data before answering questions about briefs, tasks, or brands.
-- When the user asks about briefs, tasks, or stats, always use the appropriate tool to get current data.
-- When the user asks you to create a brief (or provides a document to create one from), use the create_brief or create_brief_from_content tool.
-- If the user's role doesn't have permission for an action, politely explain why.
-- Format responses cleanly. Use bullet points and brief summaries. Don't use markdown headers excessively.
-- When listing items, include relevant details like status, progress, and deadlines.
-- If you're uncertain, ask clarifying questions rather than guessing.`;
+Rules:
+- Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
+- Use tools to get real data. Never guess.
+- ${role === "admin" ? "This user can do everything: create briefs, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, create tasks in their briefs." : "This user can view their tasks and submit deliverables."}
+- For permissions the user doesn't have, say so briefly.
+- Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
+- Get straight to the answer. Don't repeat the question back.`;
 }
 
 async function executeTool(
