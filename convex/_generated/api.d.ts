@@ -9,9 +9,11 @@
  */
 
 import type * as activityLog from "../activityLog.js";
+import type * as aiAction from "../aiAction.js";
 import type * as auth from "../auth.js";
 import type * as brands from "../brands.js";
 import type * as briefs from "../briefs.js";
+import type * as chat from "../chat.js";
 import type * as deliverables from "../deliverables.js";
 import type * as http from "../http.js";
 import type * as notifications from "../notifications.js";
@@ -28,9 +30,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activityLog: typeof activityLog;
+  aiAction: typeof aiAction;
   auth: typeof auth;
   brands: typeof brands;
   briefs: typeof briefs;
+  chat: typeof chat;
   deliverables: typeof deliverables;
   http: typeof http;
   notifications: typeof notifications;

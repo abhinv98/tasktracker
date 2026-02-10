@@ -101,3 +101,17 @@ body {
   background: rgba(217, 119, 87, 0.15);
   color: #141413;
 }
+
+/* Chat bubble pulse animation */
+@keyframes subtle-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(217, 119, 87, 0.5);
+  }
+}
+
+.animate-subtle-pulse {
+  animation: subtle-pulse 2s ease-in-out 3;
+}

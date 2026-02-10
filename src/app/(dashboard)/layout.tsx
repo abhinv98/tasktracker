@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { ChatBubble } from "@/components/chat/ChatBubble";
+import { ChatPanel } from "@/components/chat/ChatPanel";
 
 const ADMIN_ONLY_ROUTES = ["/users"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive"];
@@ -20,6 +22,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -83,6 +86,10 @@ export default function DashboardLayout({
         <TopBar user={user} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+
+      {/* AI Chat */}
+      <ChatBubble isOpen={chatOpen} onClick={() => setChatOpen(!chatOpen)} />
+      <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

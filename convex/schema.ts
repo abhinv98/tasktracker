@@ -184,4 +184,14 @@ export default defineSchema({
   })
     .index("by_brand", ["brandId"])
     .index("by_manager", ["managerId"]),
+
+  // ─── CHAT MESSAGES ─────────────────────────
+  chatMessages: defineTable({
+    userId: v.id("users"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_user", ["userId", "createdAt"]),
 });
