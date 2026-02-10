@@ -1,0 +1,187 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+
+export default defineSchema({
+  ...authTables,
+
+  // ─── USERS (extends auth users with app fields) ──
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    role: v.optional(
+      v.union(
+        v.literal("admin"),
+        v.literal("manager"),
+        v.literal("employee")
+      )
+    ),
+    avatarUrl: v.optional(v.string()),
+    designation: v.optional(v.string()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"])
+    .index("by_role", ["role"]),
+
+  // ─── TEAMS ────────────────────────────────────
+  teams: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    leadId: v.id("users"),
+    color: v.string(),
+    createdBy: v.id("users"),
+  }).index("by_lead", ["leadId"]),
+
+  // ─── USER ↔ TEAM (Many-to-Many) ──────────────
+  userTeams: defineTable({
+    userId: v.id("users"),
+    teamId: v.id("teams"),
+    joinedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_team", ["teamId"])
+    .index("by_user_team", ["userId", "teamId"]),
+
+  // ─── BRIEFS ───────────────────────────────────
+  briefs: defineTable({
+    title: v.string(),
+    description: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("in-progress"),
+      v.literal("review"),
+      v.literal("completed"),
+      v.literal("archived")
+    ),
+    createdBy: v.id("users"),
+    assignedManagerId: v.optional(v.id("users")),
+    globalPriority: v.number(),
+    deadline: v.optional(v.number()),
+    archivedAt: v.optional(v.number()),
+    archivedBy: v.optional(v.id("users")),
+    brandId: v.optional(v.id("brands")),
+  })
+    .index("by_status", ["status"])
+    .index("by_manager", ["assignedManagerId"])
+    .index("by_priority", ["globalPriority"]),
+
+  // ─── BRIEF ↔ TEAM (Many-to-Many) ─────────────
+  briefTeams: defineTable({
+    briefId: v.id("briefs"),
+    teamId: v.id("teams"),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_team", ["teamId"]),
+
+  // ─── TASKS ────────────────────────────────────
+  tasks: defineTable({
+    briefId: v.id("briefs"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    assigneeId: v.id("users"),
+    assignedBy: v.id("users"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in-progress"),
+      v.literal("review"),
+      v.literal("done")
+    ),
+    sortOrder: v.number(),
+    duration: v.string(),
+    durationMinutes: v.number(),
+    deadline: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_assignee", ["assigneeId"])
+    .index("by_assignee_sort", ["assigneeId", "sortOrder"])
+    .index("by_brief_assignee", ["briefId", "assigneeId"]),
+
+  // ─── DELIVERABLES ────────────────────────────
+  deliverables: defineTable({
+    taskId: v.id("tasks"),
+    submittedBy: v.id("users"),
+    link: v.optional(v.string()),
+    message: v.string(),
+    submittedAt: v.number(),
+  }).index("by_task", ["taskId"]),
+
+  // ─── NOTIFICATIONS ────────────────────────────
+  notifications: defineTable({
+    recipientId: v.id("users"),
+    type: v.union(
+      v.literal("task_assigned"),
+      v.literal("task_status_changed"),
+      v.literal("brief_assigned"),
+      v.literal("deliverable_submitted"),
+      v.literal("priority_changed"),
+      v.literal("brief_completed"),
+      v.literal("team_added"),
+      v.literal("comment")
+    ),
+    title: v.string(),
+    message: v.string(),
+    briefId: v.optional(v.id("briefs")),
+    taskId: v.optional(v.id("tasks")),
+    triggeredBy: v.id("users"),
+    read: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_recipient", ["recipientId"])
+    .index("by_recipient_read", ["recipientId", "read"])
+    .index("by_recipient_time", ["recipientId", "createdAt"]),
+
+  // ─── ACTIVITY LOG ────────────────────────────
+  activityLog: defineTable({
+    briefId: v.id("briefs"),
+    taskId: v.optional(v.id("tasks")),
+    userId: v.id("users"),
+    action: v.string(),
+    details: v.optional(v.string()),
+    timestamp: v.number(),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_brief_time", ["briefId", "timestamp"]),
+
+  // ─── INVITES ─────────────────────────────────
+  invites: defineTable({
+    email: v.string(),
+    name: v.string(),
+    designation: v.optional(v.string()),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("manager"),
+      v.literal("employee")
+    ),
+    teamId: v.optional(v.id("teams")),
+    token: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    used: v.boolean(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
+
+  // ─── BRANDS ──────────────────────────────────
+  brands: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    color: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }),
+
+  // ─── BRAND ↔ MANAGER (Many-to-Many) ─────────
+  brandManagers: defineTable({
+    brandId: v.id("brands"),
+    managerId: v.id("users"),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_manager", ["managerId"]),
+});

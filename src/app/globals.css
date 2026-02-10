@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+/* ─── THE ORCHESTRATOR — Anthropic Brand ─── */
+/* Clean, warm, human-centric. Beside.com layout + Anthropic palette. */
+/* FORCE LIGHT MODE */
+
+@theme inline {
+  --color-background: #faf9f5;
+  --color-foreground: #141413;
+}
+
+:root {
+  color-scheme: light;
+
+  /* Backgrounds — Anthropic warm cream */
+  --bg-primary: #faf9f5;
+  --bg-secondary: #FFFFFF;
+  --bg-panel: #FFFFFF;
+  --bg-hover: #f3f1eb;
+  --bg-input: #f3f1eb;
+  --bg-elevated: #FFFFFF;
+
+  /* Text — Anthropic dark */
+  --text-primary: #141413;
+  --text-secondary: #6b6963;
+  --text-disabled: #b0aea5;
+  --text-muted: #b0aea5;
+
+  /* Borders — Anthropic warm gray */
+  --border: #e8e6dc;
+  --border-strong: #d5d3c9;
+  --border-subtle: #f0eee6;
+
+  /* Accents — Anthropic brand */
+  --accent-primary: #d97757;
+  --accent-admin: #d97757;
+  --accent-admin-dim: rgba(217, 119, 87, 0.12);
+  --accent-manager: #6a9bcc;
+  --accent-manager-dim: rgba(106, 155, 204, 0.12);
+  --accent-employee: #788c5d;
+  --accent-employee-dim: rgba(120, 140, 93, 0.12);
+
+  /* Surfaces */
+  --surface-light: #f3f1eb;
+  --surface-cream: #faf9f5;
+
+  /* Semantic */
+  --danger: #c0392b;
+  --danger-dim: rgba(192, 57, 43, 0.12);
+  --warning: #d97757;
+
+  /* Typography — Inter */
+  --font-heading: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", monospace;
+
+  /* Motion */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  color-scheme: light;
+}
+
+body {
+  background-color: #faf9f5;
+  color: #141413;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
+}
+
+/* ─── Scrollbars ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #faf9f5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d5d3c9;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b0aea5;
+}
+
+/* Selection — Anthropic orange tint */
+::selection {
+  background: rgba(217, 119, 87, 0.15);
+  color: #141413;
+}
