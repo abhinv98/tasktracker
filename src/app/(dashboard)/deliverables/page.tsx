@@ -68,7 +68,7 @@ export default function DeliverablesPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 max-w-[900px]">
+    <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="font-bold text-[20px] text-[var(--text-primary)] tracking-tight">
           Deliverables
