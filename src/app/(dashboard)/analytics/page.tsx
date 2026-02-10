@@ -18,7 +18,7 @@ export default function AnalyticsPage() {
   const maxVelocity = Math.max(...data.weeklyVelocity.map((w) => w.count), 1);
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-[1200px]">
+    <div className="p-4 sm:p-6 space-y-6">
       <h1 className="font-bold text-[20px] text-[var(--text-primary)] tracking-tight">
         Analytics
       </h1>
