@@ -115,3 +115,34 @@ body {
 .animate-subtle-pulse {
   animation: subtle-pulse 2s ease-in-out 3;
 }
+
+/* Print styles for PDF export */
+@media print {
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide non-essential UI */
+  nav, aside, header, button, .no-print,
+  [data-chat-bubble], [data-chat-panel] {
+    display: none !important;
+  }
+
+  /* Reset layout */
+  main {
+    margin: 0 !important;
+    padding: 1rem !important;
+    overflow: visible !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure cards and borders print */
+  * {
+    box-shadow: none !important;
+  }
+}

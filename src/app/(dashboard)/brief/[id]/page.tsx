@@ -6,7 +6,9 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, DatePicker, Input, Select, Textarea } from "@/components/ui";
-import { Trash2, Calendar } from "lucide-react";
+import { AttachmentList } from "@/components/ui/AttachmentList";
+import { CommentThread } from "@/components/comments/CommentThread";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save } from "lucide-react";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -50,6 +52,10 @@ export default function BriefPage() {
   const [taskDesc, setTaskDesc] = useState("");
   const [taskAssignee, setTaskAssignee] = useState<Id<"users"> | "">("");
   const [taskDuration, setTaskDuration] = useState("2h");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+
+  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const saveAsTemplate = useMutation(api.templates.saveAsTemplate);
 
   const employeesInBriefTeams =
     graphData?.teams.flatMap((t) => t.members.map((m) => m.user)) ?? [];
@@ -187,6 +193,30 @@ export default function BriefPage() {
                 Archive
               </Button>
             </>
+          )}
+          {/* PDF Export */}
+          <button
+            onClick={() => window.print()}
+            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all no-print"
+            title="Export PDF"
+          >
+            <FileDown className="h-4 w-4" />
+          </button>
+          {/* Save as template */}
+          {user?.role === "admin" && allTasks.length > 0 && (
+            <button
+              onClick={async () => {
+                const name = window.prompt("Template name:", brief.title);
+                if (name) {
+                  await saveAsTemplate({ briefId, name });
+                  alert("Saved as template!");
+                }
+              }}
+              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
+              title="Save as template"
+            >
+              <Save className="h-4 w-4" />
+            </button>
           )}
           {user?.role === "admin" && (
             <button
@@ -397,45 +427,141 @@ export default function BriefPage() {
               ))}
             </div>
 
-            {/* All tasks as board view */}
-            <h3 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
-              All Tasks
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {allTasks.map((task) => {
-                const statusInfo = STATUS_LABELS[task.status] ?? { label: task.status, color: "var(--text-secondary)" };
-                const assignee = tasksData?.byTeam
-                  ? Object.values(tasksData.byTeam).flat().find((t) => t.task._id === task._id)?.assignee
-                  : null;
-                return (
-                  <Card key={task._id} className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">
-                          {task.title}
-                        </p>
-                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                          {assignee?.name ?? assignee?.email ?? "Unassigned"} &middot; {task.duration}
-                        </p>
+            {/* View toggle */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-[13px] text-[var(--text-primary)]">
+                Tasks
+              </h3>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)]">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
+                  title="List view"
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode("kanban")}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === "kanban" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
+                  title="Kanban view"
+                >
+                  <Columns3 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {viewMode === "kanban" ? (
+              /* Kanban Board */
+              <div className="grid grid-cols-4 gap-3">
+                {(["pending", "in-progress", "review", "done"] as const).map((status) => {
+                  const info = STATUS_LABELS[status === "pending" ? "todo" : status] ?? STATUS_LABELS[status] ?? { label: status, color: "var(--text-secondary)" };
+                  const colTasks = allTasks.filter((t) => t.status === status);
+                  return (
+                    <div key={status} className="flex flex-col">
+                      <div className="flex items-center gap-2 mb-2 pb-2 border-b-2" style={{ borderColor: info.color }}>
+                        <span className="text-[11px] font-semibold text-[var(--text-primary)]">
+                          {info.label}
+                        </span>
+                        <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                          {colTasks.length}
+                        </span>
                       </div>
-                      <span
-                        className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium"
-                        style={{
-                          color: statusInfo.color,
-                          backgroundColor: `color-mix(in srgb, ${statusInfo.color} 12%, transparent)`,
-                        }}
-                      >
-                        {statusInfo.label}
-                      </span>
+                      <div className="flex flex-col gap-2 min-h-[100px]">
+                        {colTasks.map((task) => {
+                          const assignee = tasksData?.byTeam
+                            ? Object.values(tasksData.byTeam).flat().find((t) => t.task._id === task._id)?.assignee
+                            : null;
+                          const isBlocked = task.blockedBy && task.blockedBy.length > 0 &&
+                            task.blockedBy.some((bId: string) => {
+                              const blocker = allTasks.find((t) => t._id === bId);
+                              return blocker && blocker.status !== "done";
+                            });
+                          return (
+                            <div
+                              key={task._id}
+                              className={`p-2.5 rounded-lg border bg-white ${isBlocked ? "border-[var(--danger)] opacity-60" : "border-[var(--border-subtle)]"}`}
+                            >
+                              <div className="flex items-start gap-1.5">
+                                {isBlocked && <Lock className="h-3 w-3 text-[var(--danger)] shrink-0 mt-0.5" />}
+                                <p className="font-medium text-[11px] text-[var(--text-primary)] leading-tight">
+                                  {task.title}
+                                </p>
+                              </div>
+                              <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                                {assignee?.name ?? assignee?.email ?? "?"} &middot; {task.duration}
+                              </p>
+                              {/* Quick status change */}
+                              {isAdminOrManager && status !== "done" && !isBlocked && (
+                                <button
+                                  onClick={() => {
+                                    const next = status === "pending" ? "in-progress" : status === "in-progress" ? "review" : "done";
+                                    updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" });
+                                  }}
+                                  className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
+                                >
+                                  Move &rarr;
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </Card>
-                );
-              })}
-              {allTasks.length === 0 && (
-                <p className="text-[13px] text-[var(--text-muted)] col-span-2">
-                  No tasks created yet. Use the panel on the left to create tasks.
-                </p>
-              )}
+                  );
+                })}
+              </div>
+            ) : (
+              /* List View */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {allTasks.map((task) => {
+                  const statusInfo = STATUS_LABELS[task.status] ?? { label: task.status, color: "var(--text-secondary)" };
+                  const assignee = tasksData?.byTeam
+                    ? Object.values(tasksData.byTeam).flat().find((t) => t.task._id === task._id)?.assignee
+                    : null;
+                  const isBlocked = task.blockedBy && task.blockedBy.length > 0 &&
+                    task.blockedBy.some((bId: string) => {
+                      const blocker = allTasks.find((t) => t._id === bId);
+                      return blocker && blocker.status !== "done";
+                    });
+                  return (
+                    <Card key={task._id} className={`p-4 ${isBlocked ? "opacity-60 border-[var(--danger)]" : ""}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            {isBlocked && <Lock className="h-3 w-3 text-[var(--danger)] shrink-0" />}
+                            <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">
+                              {task.title}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                            {assignee?.name ?? assignee?.email ?? "Unassigned"} &middot; {task.duration}
+                          </p>
+                        </div>
+                        <span
+                          className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium"
+                          style={{
+                            color: statusInfo.color,
+                            backgroundColor: `color-mix(in srgb, ${statusInfo.color} 12%, transparent)`,
+                          }}
+                        >
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                    </Card>
+                  );
+                })}
+                {allTasks.length === 0 && (
+                  <p className="text-[13px] text-[var(--text-muted)] col-span-2">
+                    No tasks created yet. Use the panel on the left to create tasks.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Comments & Attachments */}
+            <div className="mt-6 space-y-6">
+              <AttachmentList parentType="brief" parentId={briefId} />
+              <CommentThread parentType="brief" parentId={briefId} />
             </div>
           </div>
         </div>

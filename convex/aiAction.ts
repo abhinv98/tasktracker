@@ -155,6 +155,149 @@ const TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "assign_teams_to_brief",
+      description:
+        "Assign one or more teams to a brief. Admin or assigned manager only. Provide the brief ID and an array of team IDs.",
+      parameters: {
+        type: "object",
+        properties: {
+          briefId: {
+            type: "string",
+            description: "The brief ID to assign teams to",
+          },
+          teamIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of team IDs to assign",
+          },
+        },
+        required: ["briefId", "teamIds"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "assign_manager_to_brief",
+      description:
+        "Assign a manager to a brief. Admin only. Provide the brief ID and the manager's user ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          briefId: {
+            type: "string",
+            description: "The brief ID",
+          },
+          managerId: {
+            type: "string",
+            description: "The user ID of the manager to assign",
+          },
+        },
+        required: ["briefId", "managerId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description:
+        "Create a new task within a brief. Admin or assigned manager only. Requires briefId, title, assigneeId, and duration.",
+      parameters: {
+        type: "object",
+        properties: {
+          briefId: {
+            type: "string",
+            description: "The brief ID to create the task in",
+          },
+          title: {
+            type: "string",
+            description: "Task title",
+          },
+          description: {
+            type: "string",
+            description: "Optional task description",
+          },
+          assigneeId: {
+            type: "string",
+            description: "The user ID of the employee to assign the task to",
+          },
+          duration: {
+            type: "string",
+            description: "Duration string like '2h', '30m', '1d'",
+          },
+        },
+        required: ["briefId", "title", "assigneeId", "duration"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_task_status",
+      description:
+        "Update the status of a task. Available statuses: pending, in-progress, review, done.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: {
+            type: "string",
+            description: "The task ID to update",
+          },
+          newStatus: {
+            type: "string",
+            enum: ["pending", "in-progress", "review", "done"],
+            description: "The new status",
+          },
+        },
+        required: ["taskId", "newStatus"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_brief_status",
+      description:
+        "Update the status of a brief. Admin or assigned manager only.",
+      parameters: {
+        type: "object",
+        properties: {
+          briefId: {
+            type: "string",
+            description: "The brief ID to update",
+          },
+          status: {
+            type: "string",
+            enum: ["draft", "active", "in-progress", "review", "completed"],
+            description: "The new status",
+          },
+        },
+        required: ["briefId", "status"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_team_members",
+      description:
+        "Get the members of a specific team by team ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          teamId: {
+            type: "string",
+            description: "The team ID to look up",
+          },
+        },
+        required: ["teamId"],
+      },
+    },
+  },
 ];
 
 export const sendMessage = action({
@@ -299,7 +442,9 @@ User: ${userName} (${role})
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, create tasks in their briefs." : "This user can view their tasks and submit deliverables."}
+- ${role === "admin" ? "This user can do everything: create briefs, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
+- You can assign teams to briefs using assign_teams_to_brief. Use list_teams to find team IDs first.
+- You can create tasks, update statuses, assign managers -- use the appropriate tools.
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.`;
@@ -503,6 +648,108 @@ async function executeTool(
         totalBrands: brands.length,
         totalTeams: teams.length,
       });
+    }
+
+    case "assign_teams_to_brief": {
+      if (role !== "admin" && role !== "manager") {
+        return JSON.stringify({ error: "Only admins and managers can assign teams to briefs" });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.briefs.assignTeamsToBrief, {
+        briefId: fnArgs.briefId,
+        teamIds: fnArgs.teamIds,
+      } as any);
+      return JSON.stringify({
+        success: true,
+        message: `Assigned ${fnArgs.teamIds.length} team(s) to brief`,
+      });
+    }
+
+    case "assign_manager_to_brief": {
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can assign managers" });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.briefs.updateBrief, {
+        briefId: fnArgs.briefId,
+        assignedManagerId: fnArgs.managerId,
+      } as any);
+      return JSON.stringify({
+        success: true,
+        message: `Manager assigned to brief`,
+      });
+    }
+
+    case "create_task": {
+      if (role !== "admin" && role !== "manager") {
+        return JSON.stringify({ error: "Only admins and managers can create tasks" });
+      }
+      const durationStr = fnArgs.duration as string;
+      const m = durationStr.match(/^(\d+)(m|h|d)$/i);
+      let durationMinutes = 120; // default 2h
+      if (m) {
+        const val = parseInt(m[1], 10);
+        const unit = m[2].toLowerCase();
+        if (unit === "m") durationMinutes = val;
+        else if (unit === "h") durationMinutes = val * 60;
+        else if (unit === "d") durationMinutes = val * 60 * 8;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const taskId = await ctx.runMutation(api.tasks.createTask, {
+        briefId: fnArgs.briefId,
+        title: fnArgs.title,
+        description: fnArgs.description,
+        assigneeId: fnArgs.assigneeId,
+        duration: fnArgs.duration,
+        durationMinutes,
+      } as any);
+      return JSON.stringify({
+        success: true,
+        taskId,
+        message: `Task "${fnArgs.title}" created`,
+      });
+    }
+
+    case "update_task_status": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.tasks.updateTaskStatus, {
+        taskId: fnArgs.taskId,
+        newStatus: fnArgs.newStatus,
+      } as any);
+      return JSON.stringify({
+        success: true,
+        message: `Task status updated to ${fnArgs.newStatus}`,
+      });
+    }
+
+    case "update_brief_status": {
+      if (role !== "admin" && role !== "manager") {
+        return JSON.stringify({ error: "Only admins and managers can update brief status" });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.briefs.updateBrief, {
+        briefId: fnArgs.briefId,
+        status: fnArgs.status,
+      } as any);
+      return JSON.stringify({
+        success: true,
+        message: `Brief status updated to ${fnArgs.status}`,
+      });
+    }
+
+    case "get_team_members": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const members = await ctx.runQuery(api.teams.getTeamMembers, {
+        teamId: fnArgs.teamId,
+      } as any);
+      return JSON.stringify(
+        (members ?? []).map((m: Record<string, unknown>) => ({
+          id: m._id,
+          name: m.name,
+          email: m.email,
+          role: m.role,
+        }))
+      );
     }
 
     case "create_brief_from_content": {

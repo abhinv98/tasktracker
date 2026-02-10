@@ -305,3 +305,55 @@ export const deleteTask = mutation({
     });
   },
 });
+
+export const bulkUpdateStatus = mutation({
+  args: {
+    taskIds: v.array(v.id("tasks")),
+    newStatus: v.union(
+      v.literal("pending"),
+      v.literal("in-progress"),
+      v.literal("review"),
+      v.literal("done")
+    ),
+  },
+  handler: async (ctx, { taskIds, newStatus }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+
+    for (const taskId of taskIds) {
+      const task = await ctx.db.get(taskId);
+      if (!task) continue;
+      const brief = await ctx.db.get(task.briefId);
+      const canUpdate =
+        task.assigneeId === userId ||
+        user?.role === "admin" ||
+        (user?.role === "manager" && brief?.assignedManagerId === userId);
+      if (!canUpdate) continue;
+
+      await ctx.db.patch(taskId, {
+        status: newStatus,
+        ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
+      });
+    }
+  },
+});
+
+export const updateTaskBlockers = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    blockedBy: v.array(v.id("tasks")),
+  },
+  handler: async (ctx, { taskId, blockedBy }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    const brief = await ctx.db.get(task.briefId);
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
+      throw new Error("Not authorized");
+    }
+    await ctx.db.patch(taskId, { blockedBy: blockedBy.length > 0 ? blockedBy : undefined });
+  },
+});

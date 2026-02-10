@@ -2,15 +2,16 @@
 
 import { useQuery } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { CommandPalette } from "@/components/layout/CommandPalette";
 
 const ADMIN_ONLY_ROUTES = ["/users"];
-const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive"];
+const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics"];
 
 export default function DashboardLayout({
   children,
@@ -23,6 +24,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -55,6 +57,42 @@ export default function DashboardLayout({
     }
   }, [user, pathname, router]);
 
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      // Don't trigger in input fields
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      // Cmd+K or Ctrl+K = search
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+        return;
+      }
+
+      // Escape = close panels
+      if (e.key === "Escape") {
+        if (searchOpen) setSearchOpen(false);
+        else if (chatOpen) setChatOpen(false);
+        return;
+      }
+
+      // "/" = open search
+      if (e.key === "/") {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+    },
+    [searchOpen, chatOpen]
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
   if (user === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
@@ -83,9 +121,16 @@ export default function DashboardLayout({
           collapsed ? "md:ml-[68px]" : "md:ml-60"
         }`}
       >
-        <TopBar user={user} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <TopBar
+          user={user}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          onSearchClick={() => setSearchOpen(true)}
+        />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* AI Chat */}
       <ChatBubble isOpen={chatOpen} onClick={() => setChatOpen(!chatOpen)} />

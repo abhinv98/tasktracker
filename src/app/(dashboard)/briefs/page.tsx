@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@/components/ui";
-import { Trash2, Calendar } from "lucide-react";
+import { Trash2, Calendar, Copy } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "var(--text-secondary)",
@@ -46,7 +46,22 @@ export default function BriefsPage() {
   const [brandId, setBrandId] = useState<string>("");
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
 
+  const templates = useQuery(api.templates.listTemplates);
+  const createFromTemplate = useMutation(api.templates.createFromTemplate);
+  const deleteTemplate = useMutation(api.templates.deleteTemplate);
+  const [showTemplates, setShowTemplates] = useState(false);
   const isAdmin = user?.role === "admin";
+
+  async function handleCreateFromTemplate(templateId: Id<"briefTemplates">) {
+    const name = window.prompt("Brief title:");
+    if (!name) return;
+    try {
+      const id = await createFromTemplate({ templateId, title: name });
+      router.push(`/brief/${id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed");
+    }
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -89,9 +104,50 @@ export default function BriefsPage() {
           </p>
         </div>
         {isAdmin && (
-          <Button variant="primary" onClick={() => setShowModal(true)}>
-            Create Brief
-          </Button>
+          <div className="flex items-center gap-2">
+            {(templates ?? []).length > 0 && (
+              <div className="relative">
+                <Button variant="secondary" onClick={() => setShowTemplates(!showTemplates)}>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  From Template
+                </Button>
+                {showTemplates && (
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl border border-[var(--border)] shadow-lg z-20 py-1">
+                    {templates?.map((t) => (
+                      <div key={t._id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-hover)]">
+                        <button
+                          onClick={() => {
+                            handleCreateFromTemplate(t._id);
+                            setShowTemplates(false);
+                          }}
+                          className="flex-1 text-left text-[13px] text-[var(--text-primary)]"
+                        >
+                          {t.name}
+                          <span className="block text-[11px] text-[var(--text-muted)]">
+                            {t.tasks.length} tasks
+                          </span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm("Delete this template?")) {
+                              deleteTemplate({ templateId: t._id });
+                            }
+                          }}
+                          className="text-[var(--text-muted)] hover:text-[var(--danger)] p-1"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <Button variant="primary" onClick={() => setShowModal(true)}>
+              Create Brief
+            </Button>
+          </div>
         )}
       </div>
 

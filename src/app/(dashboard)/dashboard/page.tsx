@@ -15,6 +15,32 @@ function getGreeting() {
   return "Good evening";
 }
 
+function ActivityFeed() {
+  const data = useQuery(api.analytics.getDashboardAnalytics);
+  if (!data) return <p className="text-[12px] text-[var(--text-muted)]">Loading...</p>;
+  const activity = data.recentActivity.slice(0, 8);
+  if (activity.length === 0) return <p className="text-[12px] text-[var(--text-muted)]">No recent activity.</p>;
+  return (
+    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+      {activity.map((log) => (
+        <div key={log._id} className="flex items-start gap-2 py-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-admin)] mt-1.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] text-[var(--text-primary)]">
+              <span className="font-medium">{log.userName}</span>{" "}
+              <span className="text-[var(--text-secondary)]">{log.action.replace(/_/g, " ")}</span>{" "}
+              on <span className="font-medium">{log.briefTitle}</span>
+            </p>
+            <p className="text-[10px] text-[var(--text-muted)]">
+              {new Date(log.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
   "in-progress": { color: "var(--accent-manager)", label: "In Progress", order: 1 },
   pending: { color: "var(--text-secondary)", label: "Pending", order: 2 },
@@ -224,6 +250,14 @@ export default function DashboardPage() {
             </div>
             <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
           </div>
+        </Card>
+
+        {/* Recent Activity Feed */}
+        <Card className="mb-6 sm:mb-8 p-4">
+          <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] uppercase tracking-wide mb-3">
+            Recent Activity
+          </h3>
+          <ActivityFeed />
         </Card>
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">

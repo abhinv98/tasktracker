@@ -4,7 +4,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery, useMutation } from "convex/react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Bell, Menu, X } from "lucide-react";
+import { Bell, Menu, X, Search } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui";
 interface TopBarProps {
   user: Doc<"users">;
   onMenuToggle: () => void;
+  onSearchClick?: () => void;
 }
 
 const PATH_TO_TITLE: Record<string, string> = {
@@ -25,6 +26,7 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/deliverables": "Deliverables",
   "/brands": "Brands",
   "/overview": "Brand Overview",
+  "/analytics": "Analytics",
 };
 
 function getPageTitle(pathname: string): string {
@@ -36,7 +38,7 @@ function getPageTitle(pathname: string): string {
   return "Overview";
 }
 
-export function TopBar({ user, onMenuToggle }: TopBarProps) {
+export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
   const { signOut } = useAuthActions();
   const pathname = usePathname();
   const unreadCount = useQuery(api.notifications.getUnreadCount);
@@ -88,6 +90,18 @@ export function TopBar({ user, onMenuToggle }: TopBarProps) {
         <span className="font-semibold text-[15px] text-[var(--text-primary)]">
           {pageTitle}
         </span>
+        {onSearchClick && (
+          <button
+            onClick={onSearchClick}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span>Search...</span>
+            <kbd className="ml-2 px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[9px] font-mono">
+              ⌘K
+            </kbd>
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

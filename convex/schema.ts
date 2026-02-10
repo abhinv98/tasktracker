@@ -97,6 +97,7 @@ export default defineSchema({
     durationMinutes: v.number(),
     deadline: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    blockedBy: v.optional(v.array(v.id("tasks"))),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -110,7 +111,67 @@ export default defineSchema({
     link: v.optional(v.string()),
     message: v.string(),
     submittedAt: v.number(),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected")
+      )
+    ),
+    reviewedBy: v.optional(v.id("users")),
+    reviewNote: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
   }).index("by_task", ["taskId"]),
+
+  // ─── COMMENTS ──────────────────────────────────
+  comments: defineTable({
+    parentType: v.union(v.literal("brief"), v.literal("task")),
+    parentId: v.string(),
+    userId: v.id("users"),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_parent", ["parentType", "parentId", "createdAt"]),
+
+  // ─── ATTACHMENTS ───────────────────────────────
+  attachments: defineTable({
+    parentType: v.union(v.literal("brief"), v.literal("task")),
+    parentId: v.string(),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileType: v.optional(v.string()),
+    uploadedBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_parent", ["parentType", "parentId"]),
+
+  // ─── TIME ENTRIES ──────────────────────────────
+  timeEntries: defineTable({
+    taskId: v.id("tasks"),
+    userId: v.id("users"),
+    startedAt: v.number(),
+    stoppedAt: v.optional(v.number()),
+    durationMinutes: v.optional(v.number()),
+    manual: v.boolean(),
+  })
+    .index("by_task", ["taskId"])
+    .index("by_user", ["userId"]),
+
+  // ─── BRIEF TEMPLATES ──────────────────────────
+  briefTemplates: defineTable({
+    name: v.string(),
+    description: v.string(),
+    tasks: v.array(
+      v.object({
+        title: v.string(),
+        description: v.optional(v.string()),
+        duration: v.string(),
+        durationMinutes: v.number(),
+      })
+    ),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }),
 
   // ─── NOTIFICATIONS ────────────────────────────
   notifications: defineTable({
@@ -123,7 +184,10 @@ export default defineSchema({
       v.literal("priority_changed"),
       v.literal("brief_completed"),
       v.literal("team_added"),
-      v.literal("comment")
+      v.literal("comment"),
+      v.literal("deadline_reminder"),
+      v.literal("deliverable_approved"),
+      v.literal("deliverable_rejected")
     ),
     title: v.string(),
     message: v.string(),
