@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, TaskDetailModal } from "@/components/ui";
 import { X, BarChart3, ArrowRight } from "lucide-react";
 
 function getGreeting() {
@@ -485,6 +485,15 @@ export default function DashboardPage() {
   // ═══════════════════════════════════════════
   // EMPLOYEE DASHBOARD
   // ═══════════════════════════════════════════
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+  const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
+    "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
+    "in-progress": { color: "#3B82F6", bg: "#EFF6FF" },
+    "review": { color: "#F59E0B", bg: "#FFFBEB" },
+    "done": { color: "var(--accent-employee)", bg: "var(--accent-employee-dim)" },
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6 sm:mb-8">
@@ -492,31 +501,55 @@ export default function DashboardPage() {
           {greeting}, {displayName}
         </h1>
         <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-          Here are your active tasks
+          Here are your active tasks &mdash; click a task for details
         </p>
       </div>
 
       <div className="flex flex-col gap-3">
-        {(tasks ?? []).map((task) => (
-          <Card
-            key={task._id}
-            className={task.status === "done" ? "opacity-60" : ""}
-            accent={task.status === "done" ? "employee" : undefined}
-          >
-            <div className="flex justify-between items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
-                  {task.title}
-                </h3>
-                <p className="text-[12px] text-[var(--text-secondary)] mt-1">
-                  {task.briefName} &middot; {task.duration}
-                </p>
+        {(tasks ?? []).map((task) => {
+          const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+          return (
+            <Card
+              key={task._id}
+              className={task.status === "done" ? "opacity-60" : ""}
+              accent={task.status === "done" ? "employee" : undefined}
+              onClick={() => setSelectedTaskId(task._id)}
+            >
+              <div className="flex justify-between items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
+                    {task.title}
+                  </h3>
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-1">
+                    {task.briefName} &middot; {task.duration}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium"
+                  style={{ color: sc.color, backgroundColor: sc.bg }}
+                >
+                  {task.status}
+                </span>
               </div>
-              <Badge variant="neutral">{task.status}</Badge>
-            </div>
+            </Card>
+          );
+        })}
+        {(tasks ?? []).length === 0 && (
+          <Card>
+            <p className="text-[13px] text-[var(--text-muted)] text-center py-4">
+              No tasks assigned to you yet.
+            </p>
           </Card>
-        ))}
+        )}
       </div>
+
+      {/* Task Detail Modal */}
+      {selectedTaskId && (
+        <TaskDetailModal
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -14,5 +14,6 @@ export {
   TableHeader,
   TableRow,
 } from "./Table";
+export { TaskDetailModal } from "./TaskDetailModal";
 export { Textarea } from "./Textarea";
 export { ToastProvider, useToast } from "./Toast";

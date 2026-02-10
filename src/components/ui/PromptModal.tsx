@@ -70,7 +70,8 @@ export function PromptModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-50 animate-fadeIn" onClick={!loading ? onCancel : undefined} />
-      <div className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[400px] bg-white rounded-xl shadow-2xl border border-[var(--border)] animate-scaleIn">
+      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+      <div className="w-[90vw] max-w-[400px] bg-white rounded-xl shadow-2xl border border-[var(--border)] animate-scaleIn pointer-events-auto">
         <form onSubmit={handleSubmit}>
           <div className="p-5">
             <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
@@ -108,6 +109,7 @@ export function PromptModal({
             </button>
           </div>
         </form>
+      </div>
       </div>
     </>
   );

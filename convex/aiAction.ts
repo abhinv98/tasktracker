@@ -395,12 +395,12 @@ export const sendMessage = action({
     });
 
     let response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages,
       tools: TOOLS,
       tool_choice: "auto",
-      max_tokens: 2048,
-      temperature: 0.3,
+      max_tokens: 4096,
+      temperature: 0.2,
     });
 
     let assistantMessage = response.choices[0]?.message;
@@ -445,12 +445,12 @@ export const sendMessage = action({
       }
 
       response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages,
         tools: TOOLS,
         tool_choice: "auto",
-        max_tokens: 2048,
-        temperature: 0.3,
+        max_tokens: 4096,
+        temperature: 0.2,
       });
 
       assistantMessage = response.choices[0]?.message;
@@ -572,15 +572,33 @@ async function executeTool(
           error: "Only admins can create briefs",
         });
       }
+
+      // Validate brandId — sanitize empty strings and resolve brand names
+      let resolvedBrandId: string | undefined = undefined;
+      if (fnArgs.brandId && typeof fnArgs.brandId === "string" && fnArgs.brandId.trim() !== "") {
+        const allBrands = await ctx.runQuery(api.brands.listBrands, {});
+        const matched = allBrands.find(
+          (b: Record<string, unknown>) =>
+            b._id === fnArgs.brandId ||
+            (b.name as string).toLowerCase() === fnArgs.brandId.toLowerCase()
+        );
+        if (matched) {
+          resolvedBrandId = matched._id as string;
+        }
+        // If no match found, skip brandId rather than passing an invalid value
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const briefId = await ctx.runMutation(api.briefs.createBrief, {
         title: fnArgs.title,
         description: fnArgs.description,
         deadline: fnArgs.deadline,
-        brandId: fnArgs.brandId,
-      });
+        ...(resolvedBrandId ? { brandId: resolvedBrandId } : {}),
+      } as any);
       return JSON.stringify({
         success: true,
         briefId,
+        brandLinked: !!resolvedBrandId,
         message: `Brief "${fnArgs.title}" created successfully. Use briefId "${briefId}" for all subsequent operations. Do NOT create another brief.`,
       });
     }
@@ -842,7 +860,7 @@ async function executeTool(
         .join("\n");
 
       const parseResponse = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
