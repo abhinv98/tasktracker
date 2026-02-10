@@ -305,6 +305,7 @@ export const sendMessage = action({
     message: v.string(),
     fileId: v.optional(v.id("_storage")),
     fileName: v.optional(v.string()),
+    conversationId: v.optional(v.id("chatConversations")),
   },
   handler: async (ctx, args) => {
     // 1. Get current user
@@ -327,12 +328,9 @@ export const sendMessage = action({
     }
 
     // 3. Store the user message
-    const userContent = args.fileName
-      ? `[Attached file: ${args.fileName}]\n${fileContent || args.message}`
-      : args.message;
-
     await ctx.runMutation(internal.chat.storeChatMessage, {
       userId: user._id,
+      conversationId: args.conversationId,
       role: "user",
       content: args.message + (args.fileName ? ` [File: ${args.fileName}]` : ""),
       fileId: args.fileId,
@@ -340,7 +338,9 @@ export const sendMessage = action({
     });
 
     // 4. Get recent chat history for context (limit for speed)
-    const history = await ctx.runQuery(api.chat.getChatHistory);
+    const history = await ctx.runQuery(api.chat.getChatHistory, {
+      conversationId: args.conversationId,
+    });
     const recentMessages = history.slice(-10);
 
     // 5. Build conversation messages
@@ -375,15 +375,17 @@ export const sendMessage = action({
       messages,
       tools: TOOLS,
       tool_choice: "auto",
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.3,
     });
 
     let assistantMessage = response.choices[0]?.message;
 
-    // 7. Handle tool calls in a loop (max 3 iterations for speed)
+    // 7. Handle tool calls in a loop (max 8 iterations for complex multi-step operations)
     let iterations = 0;
-    while (assistantMessage?.tool_calls && iterations < 3) {
+    const toolSteps: { tool: string; args: Record<string, unknown>; result: string; success: boolean }[] = [];
+
+    while (assistantMessage?.tool_calls && iterations < 8) {
       iterations++;
       messages.push(assistantMessage);
 
@@ -393,13 +395,23 @@ export const sendMessage = action({
         const fnName = tc.function.name as string;
         const fnArgs = JSON.parse(tc.function.arguments as string);
         let result: string;
+        let success = true;
 
         try {
           result = await executeTool(ctx, fnName, fnArgs, user, role);
         } catch (e: unknown) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           result = JSON.stringify({ error: errorMsg });
+          success = false;
         }
+
+        // Track the tool step
+        toolSteps.push({
+          tool: fnName,
+          args: fnArgs,
+          result: result.length > 500 ? result.slice(0, 500) + "..." : result,
+          success,
+        });
 
         messages.push({
           role: "tool",
@@ -413,7 +425,7 @@ export const sendMessage = action({
         messages,
         tools: TOOLS,
         tool_choice: "auto",
-        max_tokens: 1024,
+        max_tokens: 2048,
         temperature: 0.3,
       });
 
@@ -423,11 +435,13 @@ export const sendMessage = action({
     const aiReply =
       assistantMessage?.content ?? "I'm sorry, I couldn't generate a response.";
 
-    // 8. Store the AI response
+    // 8. Store the AI response with tool steps
     await ctx.runMutation(internal.chat.storeChatMessage, {
       userId: user._id,
+      conversationId: args.conversationId,
       role: "assistant",
       content: aiReply,
+      toolSteps: toolSteps.length > 0 ? JSON.stringify(toolSteps) : undefined,
     });
 
     return aiReply;
@@ -445,9 +459,12 @@ Rules:
 - ${role === "admin" ? "This user can do everything: create briefs, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
 - You can assign teams to briefs using assign_teams_to_brief. Use list_teams to find team IDs first.
 - You can create tasks, update statuses, assign managers -- use the appropriate tools.
+- For complex requests (e.g., "create a brief, assign teams, and create tasks"), execute ALL steps using tool calls. Don't stop halfway. Call multiple tools in sequence to complete the full request.
+- When creating tasks from a document, extract meaningful task titles and distribute them across team members.
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
-- Get straight to the answer. Don't repeat the question back.`;
+- Get straight to the answer. Don't repeat the question back.
+- At the end of a multi-step operation, summarize everything that was done.`;
 }
 
 async function executeTool(

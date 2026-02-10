@@ -249,13 +249,26 @@ export default defineSchema({
     .index("by_brand", ["brandId"])
     .index("by_manager", ["managerId"]),
 
+  // ─── CHAT CONVERSATIONS ────────────────────
+  chatConversations: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId", "updatedAt"]),
+
   // ─── CHAT MESSAGES ─────────────────────────
   chatMessages: defineTable({
     userId: v.id("users"),
+    conversationId: v.optional(v.id("chatConversations")),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
     fileId: v.optional(v.id("_storage")),
     fileName: v.optional(v.string()),
+    toolSteps: v.optional(v.string()),
     createdAt: v.number(),
-  }).index("by_user", ["userId", "createdAt"]),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_conversation", ["conversationId", "createdAt"]),
 });
