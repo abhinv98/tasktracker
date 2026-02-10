@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmModal,
   Input,
   Select,
   Table,
@@ -16,6 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  useToast,
 } from "@/components/ui";
 import { Trash2, UserPlus, Copy, X, Check, Link2 } from "lucide-react";
 
@@ -216,6 +218,8 @@ export default function UsersPage() {
   const deleteUser = useMutation(api.users.deleteUser);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<{ id: Id<"users">; name: string } | null>(null);
+  const { toast } = useToast();
 
   if (users === null) {
     return (
@@ -243,22 +247,21 @@ export default function UsersPage() {
   ) {
     try {
       await updateRole({ userId, newRole });
+      toast("success", "Role updated");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update role");
+      toast("error", err instanceof Error ? err.message : "Failed to update role");
     }
   }
 
-  async function handleDelete(userId: Id<"users">, userName: string) {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${userName}"? This action cannot be undone.`
-    );
-    if (!confirmed) return;
-
+  async function handleDelete() {
+    if (!deletingUser) return;
     try {
-      await deleteUser({ userId });
+      await deleteUser({ userId: deletingUser.id });
+      toast("success", "User deleted");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete user");
+      toast("error", err instanceof Error ? err.message : "Failed to delete user");
     }
+    setDeletingUser(null);
   }
 
   return (
@@ -336,7 +339,7 @@ export default function UsersPage() {
                 <TableCell className="w-[48px]">
                   <button
                     onClick={() =>
-                      handleDelete(user._id, user.name ?? user.email ?? "User")
+                      setDeletingUser({ id: user._id, name: user.name ?? user.email ?? "User" })
                     }
                     className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all duration-150"
                     title="Delete user"
@@ -354,6 +357,17 @@ export default function UsersPage() {
       {showCreateModal && (
         <CreateUserModal onClose={() => setShowCreateModal(false)} />
       )}
+
+      <ConfirmModal
+        open={!!deletingUser}
+        title="Delete User"
+        message={`Are you sure you want to delete "${deletingUser?.name}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeletingUser(null)}
+      />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, useToast } from "@/components/ui";
 import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase } from "lucide-react";
 
 export default function BrandDetailPage() {
@@ -21,6 +21,9 @@ export default function BrandDetailPage() {
   const deleteBrand = useMutation(api.brands.deleteBrand);
 
   const [addManagerId, setAddManagerId] = useState<string>("");
+  const [showDeleteBrand, setShowDeleteBrand] = useState(false);
+  const [removingManagerId, setRemovingManagerId] = useState<Id<"users"> | null>(null);
+  const { toast } = useToast();
 
   const isAdmin = user?.role === "admin";
 
@@ -49,28 +52,31 @@ export default function BrandDetailPage() {
     try {
       await assignManager({ brandId, managerId: addManagerId as Id<"users"> });
       setAddManagerId("");
+      toast("success", "Manager assigned");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to assign manager");
     }
   }
 
   async function handleRemoveManager(managerId: Id<"users">) {
-    if (!window.confirm("Remove this manager from the brand?")) return;
     try {
       await removeManager({ brandId, managerId });
+      toast("success", "Manager removed");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to remove manager");
     }
+    setRemovingManagerId(null);
   }
 
   async function handleDelete() {
-    if (!window.confirm("Are you sure you want to delete this brand? This cannot be undone.")) return;
     try {
       await deleteBrand({ brandId });
+      toast("success", "Brand deleted");
       router.push("/brands");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to delete brand");
     }
+    setShowDeleteBrand(false);
   }
 
   const STATUS_COLORS: Record<string, string> = {
@@ -107,7 +113,7 @@ export default function BrandDetailPage() {
           )}
         </div>
         {isAdmin && (
-          <Button variant="secondary" onClick={handleDelete}>
+          <Button variant="secondary" onClick={() => setShowDeleteBrand(true)}>
             <Trash2 className="h-4 w-4 mr-1.5" />
             Delete
           </Button>
@@ -168,7 +174,7 @@ export default function BrandDetailPage() {
                   </div>
                   {isAdmin && (
                     <button
-                      onClick={() => handleRemoveManager(manager._id as Id<"users">)}
+                      onClick={() => setRemovingManagerId(manager._id as Id<"users">)}
                       className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -298,6 +304,30 @@ export default function BrandDetailPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={showDeleteBrand}
+        title="Delete Brand"
+        message="Are you sure you want to delete this brand? This cannot be undone."
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteBrand(false)}
+      />
+
+      <ConfirmModal
+        open={!!removingManagerId}
+        title="Remove Manager"
+        message="Remove this manager from the brand?"
+        confirmLabel="Remove"
+        confirmingLabel="Removing..."
+        variant="danger"
+        onConfirm={async () => {
+          if (removingManagerId) await handleRemoveManager(removingManagerId);
+        }}
+        onCancel={() => setRemovingManagerId(null)}
+      />
     </div>
   );
 }

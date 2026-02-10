@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 import { Trash2, Calendar, Copy } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,18 +50,11 @@ export default function BriefsPage() {
   const createFromTemplate = useMutation(api.templates.createFromTemplate);
   const deleteTemplate = useMutation(api.templates.deleteTemplate);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [deletingBriefId, setDeletingBriefId] = useState<Id<"briefs"> | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<Id<"briefTemplates"> | null>(null);
+  const [templateForBrief, setTemplateForBrief] = useState<Id<"briefTemplates"> | null>(null);
+  const { toast } = useToast();
   const isAdmin = user?.role === "admin";
-
-  async function handleCreateFromTemplate(templateId: Id<"briefTemplates">) {
-    const name = window.prompt("Brief title:");
-    if (!name) return;
-    try {
-      const id = await createFromTemplate({ templateId, title: name });
-      router.push(`/brief/${id}`);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
-    }
-  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -77,18 +70,9 @@ export default function BriefsPage() {
       setDescription("");
       setBrandId("");
       setDeadline(undefined);
+      toast("success", "Brief created");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
-    }
-  }
-
-  async function handleDelete(e: React.MouseEvent, briefId: Id<"briefs">) {
-    e.stopPropagation();
-    if (!window.confirm("Are you sure you want to permanently delete this brief? This will also delete all its tasks, deliverables, and logs. This cannot be undone.")) return;
-    try {
-      await deleteBrief({ briefId });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete brief");
+      toast("error", err instanceof Error ? err.message : "Failed to create brief");
     }
   }
 
@@ -117,7 +101,7 @@ export default function BriefsPage() {
                       <div key={t._id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-hover)]">
                         <button
                           onClick={() => {
-                            handleCreateFromTemplate(t._id);
+                            setTemplateForBrief(t._id);
                             setShowTemplates(false);
                           }}
                           className="flex-1 text-left text-[13px] text-[var(--text-primary)]"
@@ -130,9 +114,8 @@ export default function BriefsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm("Delete this template?")) {
-                              deleteTemplate({ templateId: t._id });
-                            }
+                            setDeletingTemplateId(t._id);
+                            setShowTemplates(false);
                           }}
                           className="text-[var(--text-muted)] hover:text-[var(--danger)] p-1"
                         >
@@ -251,7 +234,10 @@ export default function BriefsPage() {
                     {isAdmin && (
                       <TableCell>
                         <button
-                          onClick={(e) => handleDelete(e, brief._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingBriefId(brief._id);
+                          }}
                           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
                           title="Delete brief"
                         >
@@ -327,6 +313,65 @@ export default function BriefsPage() {
           </Card>
         </div>
       )}
+
+      {/* Delete Brief Confirmation */}
+      <ConfirmModal
+        open={!!deletingBriefId}
+        title="Delete Brief"
+        message="Are you sure you want to permanently delete this brief? This will also delete all its tasks, deliverables, and logs. This cannot be undone."
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={async () => {
+          if (!deletingBriefId) return;
+          try {
+            await deleteBrief({ briefId: deletingBriefId });
+            toast("success", "Brief deleted");
+          } catch (err) {
+            toast("error", err instanceof Error ? err.message : "Failed to delete brief");
+          }
+          setDeletingBriefId(null);
+        }}
+        onCancel={() => setDeletingBriefId(null)}
+      />
+
+      {/* Delete Template Confirmation */}
+      <ConfirmModal
+        open={!!deletingTemplateId}
+        title="Delete Template"
+        message="Are you sure you want to delete this template?"
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={async () => {
+          if (!deletingTemplateId) return;
+          await deleteTemplate({ templateId: deletingTemplateId });
+          toast("success", "Template deleted");
+          setDeletingTemplateId(null);
+        }}
+        onCancel={() => setDeletingTemplateId(null)}
+      />
+
+      {/* Create from Template Prompt */}
+      <PromptModal
+        open={!!templateForBrief}
+        title="Create Brief from Template"
+        message="Enter a title for the new brief."
+        placeholder="Brief title"
+        confirmLabel="Create"
+        confirmingLabel="Creating..."
+        onConfirm={async (name) => {
+          if (!templateForBrief) return;
+          try {
+            const id = await createFromTemplate({ templateId: templateForBrief, title: name });
+            router.push(`/brief/${id}`);
+          } catch (err) {
+            toast("error", err instanceof Error ? err.message : "Failed");
+          }
+          setTemplateForBrief(null);
+        }}
+        onCancel={() => setTemplateForBrief(null)}
+      />
     </div>
   );
 }

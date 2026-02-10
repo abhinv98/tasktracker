@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { Badge, Button, Card, Input } from "@/components/ui";
+import { Badge, Button, Card, Input, useToast } from "@/components/ui";
 
 export default function ProfilePage() {
   const user = useQuery(api.users.getCurrentUser);
@@ -17,6 +17,8 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
+
+  const { toast } = useToast();
 
   if (user === undefined) {
     return (
@@ -40,8 +42,9 @@ export default function ProfilePage() {
       await updateProfile({ name: displayName });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      toast("success", "Profile updated");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to update profile");
     }
   }
 

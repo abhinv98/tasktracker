@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, DatePicker, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Select, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save } from "lucide-react";
@@ -53,7 +53,10 @@ export default function BriefPage() {
   const [taskAssignee, setTaskAssignee] = useState<Id<"users"> | "">("");
   const [taskDuration, setTaskDuration] = useState("2h");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
 
+  const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const saveAsTemplate = useMutation(api.templates.saveAsTemplate);
 
@@ -77,7 +80,7 @@ export default function BriefPage() {
     if (!taskAssignee) return;
     const durationMinutes = parseDuration(taskDuration);
     if (durationMinutes <= 0) {
-      alert("Invalid duration. Use format like 2h, 30m, 1d");
+      toast("error", "Invalid duration. Use format like 2h, 30m, 1d");
       return;
     }
     try {
@@ -93,27 +96,29 @@ export default function BriefPage() {
       setTaskDesc("");
       setTaskAssignee("");
       setTaskDuration("2h");
+      toast("success", "Task created");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to create task");
     }
   }
 
   async function handleArchive() {
     try {
       await archiveBrief({ briefId });
+      toast("success", "Brief archived");
       router.push("/briefs");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to archive");
     }
   }
 
   async function handleDelete() {
-    if (!window.confirm("Permanently delete this brief and all its tasks? This cannot be undone.")) return;
     try {
       await deleteBrief({ briefId });
+      toast("success", "Brief deleted");
       router.push("/briefs");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete brief");
+      toast("error", err instanceof Error ? err.message : "Failed to delete brief");
     }
   }
 
@@ -205,13 +210,7 @@ export default function BriefPage() {
           {/* Save as template */}
           {user?.role === "admin" && allTasks.length > 0 && (
             <button
-              onClick={async () => {
-                const name = window.prompt("Template name:", brief.title);
-                if (name) {
-                  await saveAsTemplate({ briefId, name });
-                  alert("Saved as template!");
-                }
-              }}
+              onClick={() => setShowTemplatePrompt(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
               title="Save as template"
             >
@@ -220,7 +219,7 @@ export default function BriefPage() {
           )}
           {user?.role === "admin" && (
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteConfirm(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
               title="Delete brief permanently"
             >
@@ -623,6 +622,38 @@ export default function BriefPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        open={showDeleteConfirm}
+        title="Delete Brief"
+        message="Permanently delete this brief and all its tasks? This cannot be undone."
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={async () => {
+          await handleDelete();
+          setShowDeleteConfirm(false);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Save as Template Prompt */}
+      <PromptModal
+        open={showTemplatePrompt}
+        title="Save as Template"
+        message="Enter a name for this template."
+        placeholder="Template name"
+        defaultValue={brief?.title ?? ""}
+        confirmLabel="Save"
+        confirmingLabel="Saving..."
+        onConfirm={async (name) => {
+          await saveAsTemplate({ briefId, name });
+          toast("success", "Saved as template");
+          setShowTemplatePrompt(false);
+        }}
+        onCancel={() => setShowTemplatePrompt(false)}
+      />
     </div>
   );
 }

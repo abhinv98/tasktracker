@@ -4,19 +4,22 @@ import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, useToast } from "@/components/ui";
 
 export default function ArchivePage() {
   const router = useRouter();
   const archived = useQuery(api.briefs.getArchivedBriefs);
   const restoreBrief = useMutation(api.briefs.restoreBrief);
 
+  const { toast } = useToast();
+
   async function handleRestore(briefId: Id<"briefs">) {
     try {
       await restoreBrief({ briefId });
+      toast("success", "Brief restored");
       router.push(`/brief/${briefId}`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to restore");
     }
   }
 

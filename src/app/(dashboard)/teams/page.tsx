@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Input, Select, Textarea, useToast } from "@/components/ui";
 import { X, UserPlus, Trash2 } from "lucide-react";
 
 const TEAM_COLORS = ["#d97757", "#6a9bcc", "#788c5d", "#b0aea5", "#c0392b"];
@@ -32,6 +32,8 @@ export default function TeamsPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<Id<"teams"> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [addMemberUserId, setAddMemberUserId] = useState<Id<"users"> | "">("");
+  const [removingMemberId, setRemovingMemberId] = useState<Id<"users"> | null>(null);
+  const { toast } = useToast();
 
   const selectedTeam = teams?.find((t) => t._id === selectedTeamId) ?? null;
   const teamMembers = useQuery(
@@ -80,27 +82,29 @@ export default function TeamsPage() {
     try {
       await addUserToTeam({ userId: addMemberUserId as Id<"users">, teamId: selectedTeamId });
       setAddMemberUserId("");
+      toast("success", "Member added");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to add member");
+      toast("error", err instanceof Error ? err.message : "Failed to add member");
     }
   }
 
   async function handleRemoveMember(userId: Id<"users">) {
     if (!selectedTeamId) return;
-    if (!confirm("Remove this member from the team?")) return;
     try {
       await removeUserFromTeam({ userId, teamId: selectedTeamId });
+      toast("success", "Member removed");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to remove member");
+      toast("error", err instanceof Error ? err.message : "Failed to remove member");
     }
+    setRemovingMemberId(null);
   }
 
   async function handleSeed() {
     try {
       const result = await seedTestData({});
-      alert(typeof result === "object" && result && "message" in result ? result.message : "Seed complete");
+      toast("success", typeof result === "object" && result && "message" in result ? String(result.message) : "Seed complete");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Seed failed");
+      toast("error", err instanceof Error ? err.message : "Seed failed");
     }
   }
 
@@ -114,8 +118,9 @@ export default function TeamsPage() {
       setDescription("");
       setLeadId("");
       setColor(TEAM_COLORS[0]);
+      toast("success", "Team created");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create team");
+      toast("error", err instanceof Error ? err.message : "Failed to create team");
     }
   }
 
@@ -374,7 +379,7 @@ export default function TeamsPage() {
                             </Badge>
                             {isAdmin && (
                               <button
-                                onClick={() => handleRemoveMember(member._id)}
+                                onClick={() => setRemovingMemberId(member._id)}
                                 className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-[var(--text-secondary)] hover:text-[var(--danger)] transition-all"
                                 title="Remove from team"
                               >
@@ -431,6 +436,19 @@ export default function TeamsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!removingMemberId}
+        title="Remove Member"
+        message="Remove this member from the team?"
+        confirmLabel="Remove"
+        confirmingLabel="Removing..."
+        variant="danger"
+        onConfirm={async () => {
+          if (removingMemberId) await handleRemoveMember(removingMemberId);
+        }}
+        onCancel={() => setRemovingMemberId(null)}
+      />
     </div>
   );
 }

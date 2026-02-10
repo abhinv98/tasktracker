@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Badge, Button, Card, Input, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Input, Textarea, useToast } from "@/components/ui";
 import { Plus, X, Tag } from "lucide-react";
 
 const BRAND_COLORS = [
@@ -23,6 +23,7 @@ export default function BrandsPage() {
   const [color, setColor] = useState(BRAND_COLORS[0]);
 
   const isAdmin = user?.role === "admin";
+  const { toast } = useToast();
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -32,9 +33,10 @@ export default function BrandsPage() {
       setName("");
       setDescription("");
       setColor(BRAND_COLORS[0]);
+      toast("success", "Brand created");
       router.push(`/brands/${brandId}`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create brand");
+      toast("error", err instanceof Error ? err.message : "Failed to create brand");
     }
   }
 
