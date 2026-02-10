@@ -108,6 +108,30 @@ const TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "create_brand",
+      description:
+        "Create a new brand. Admin only. Returns the new brand ID. Use this BEFORE create_brief when the user wants a new brand.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Brand name" },
+          description: {
+            type: "string",
+            description: "Optional brand description",
+          },
+          color: {
+            type: "string",
+            description:
+              "Brand color as hex code (e.g. '#3B82F6'). Pick a professional color if not specified.",
+          },
+        },
+        required: ["name", "color"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "list_teams",
       description:
         "List all teams with their lead name and member count.",
@@ -381,11 +405,11 @@ export const sendMessage = action({
 
     let assistantMessage = response.choices[0]?.message;
 
-    // 7. Handle tool calls in a loop (max 8 iterations for complex multi-step operations)
+    // 7. Handle tool calls in a loop (max 15 iterations for complex multi-step operations)
     let iterations = 0;
     const toolSteps: { tool: string; args: Record<string, unknown>; result: string; success: boolean }[] = [];
 
-    while (assistantMessage?.tool_calls && iterations < 8) {
+    while (assistantMessage?.tool_calls && iterations < 15) {
       iterations++;
       messages.push(assistantMessage);
 
@@ -456,15 +480,26 @@ User: ${userName} (${role})
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
+- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
 - You can assign teams to briefs using assign_teams_to_brief. Use list_teams to find team IDs first.
 - You can create tasks, update statuses, assign managers -- use the appropriate tools.
-- For complex requests (e.g., "create a brief, assign teams, and create tasks"), execute ALL steps using tool calls. Don't stop halfway. Call multiple tools in sequence to complete the full request.
-- When creating tasks from a document, extract meaningful task titles and distribute them across team members.
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
-- At the end of a multi-step operation, summarize everything that was done.`;
+- At the end of a multi-step operation, summarize everything that was done.
+
+CRITICAL — Multi-step workflow rules:
+- NEVER create the same resource twice. Each brief, brand, or task should be created exactly ONCE.
+- After creating a resource, SAVE its returned ID and reuse that SAME ID for all subsequent operations.
+- For complex requests (e.g., "create a brief with brand, assign teams, and create tasks"), follow this EXACT order:
+  1. First, list_brands to check if the brand already exists. If NOT, use create_brand to create it. Save the brandId.
+  2. Then create the brief (use create_brief or create_brief_from_content) with the brandId. Save the briefId.
+  3. Then list_teams to find the right team. Use assign_teams_to_brief with the saved briefId.
+  4. Then get_team_members to get team member IDs. Use create_task for each task with the saved briefId.
+- If a tool call fails, DO NOT retry the same operation blindly. Read the error, fix the issue, then try ONCE more.
+- NEVER call create_brief or create_brief_from_content more than once for the same brief.
+- When creating tasks from a document, extract meaningful task titles and DISTRIBUTE them evenly across ALL team members (round-robin), not just one person.
+- When distributing tasks, if you have N tasks and M team members, assign approximately N/M tasks to each member.`;
 }
 
 async function executeTool(
@@ -546,7 +581,7 @@ async function executeTool(
       return JSON.stringify({
         success: true,
         briefId,
-        message: `Brief "${fnArgs.title}" created successfully`,
+        message: `Brief "${fnArgs.title}" created successfully. Use briefId "${briefId}" for all subsequent operations. Do NOT create another brief.`,
       });
     }
 
@@ -594,6 +629,22 @@ async function executeTool(
             taskCount: b.taskCount,
           })
         ),
+      });
+    }
+
+    case "create_brand": {
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can create brands" });
+      }
+      const brandId = await ctx.runMutation(api.brands.createBrand, {
+        name: fnArgs.name,
+        description: fnArgs.description,
+        color: fnArgs.color ?? "#3B82F6",
+      });
+      return JSON.stringify({
+        success: true,
+        brandId,
+        message: `Brand "${fnArgs.name}" created successfully`,
       });
     }
 
@@ -797,13 +848,14 @@ async function executeTool(
             role: "system",
             content: `You are a document parser. Extract brief information from the given content and return a JSON object with these fields:
 - title (string, required): A concise title for the brief
-- description (string, required): A detailed description
+- description (string, required): A comprehensive description summarizing the document
 - deadline (string or null): If a deadline is mentioned, return it as ISO date string, otherwise null
 
-Available brands:
+Available brands (use the EXACT ID string, not the name):
 ${brandList || "No brands available"}
 
-If the content mentions a brand name, include "brandId" with the matching brand ID.
+If the content mentions a brand that matches one above, include "brandId" with the EXACT ID value (the long alphanumeric string), NOT the brand name.
+If no brand matches, do NOT include brandId at all.
 
 Return ONLY valid JSON, no markdown or explanation.`,
           },
@@ -838,8 +890,20 @@ Return ONLY valid JSON, no markdown or explanation.`,
       if (briefData.deadline) {
         briefArgs.deadline = new Date(briefData.deadline).getTime();
       }
-      if (briefData.brandId || fnArgs.brandId) {
-        briefArgs.brandId = briefData.brandId || fnArgs.brandId;
+
+      // Resolve brandId - validate it's a real Convex ID, otherwise try to match by name
+      const rawBrandId = fnArgs.brandId || briefData.brandId;
+      if (rawBrandId) {
+        // Check if it looks like a valid Convex document ID (they contain specific patterns)
+        const matchedBrand = brands.find(
+          (b: Record<string, unknown>) =>
+            b._id === rawBrandId ||
+            (b.name as string).toLowerCase() === rawBrandId.toLowerCase()
+        );
+        if (matchedBrand) {
+          briefArgs.brandId = matchedBrand._id as string;
+        }
+        // If no match found, skip brandId rather than passing an invalid value
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -850,7 +914,8 @@ Return ONLY valid JSON, no markdown or explanation.`,
         briefId,
         title: briefArgs.title,
         description: briefArgs.description,
-        message: `Brief "${briefArgs.title}" created from document`,
+        brandLinked: !!briefArgs.brandId,
+        message: `Brief "${briefArgs.title}" created successfully. Use briefId "${briefId}" for all subsequent operations (assign teams, create tasks). Do NOT create another brief.`,
       });
     }
 
