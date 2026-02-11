@@ -572,7 +572,13 @@ export default function BriefPage() {
             {/* Comments & Attachments */}
             <div className="mt-6 space-y-6">
               <AttachmentList parentType="brief" parentId={briefId} />
-              <CommentThread parentType="brief" parentId={briefId} />
+              <CommentThread
+                parentType="brief"
+                parentId={briefId}
+                briefId={briefId}
+                tasks={allTasks.map((t) => ({ _id: t._id, title: t.title }))}
+                members={uniqueEmployees.map((e) => ({ _id: e._id, name: e.name, email: e.email }))}
+              />
             </div>
           </div>
         </div>
