@@ -478,14 +478,39 @@ export default function PlannerPage() {
     return employees.filter((e) => e.name.toLowerCase().includes(q));
   }, [employees, searchQuery]);
 
+  // Dynamic grid range: expand beyond default working hours if blocks exist outside
+  const { gridStartHour, gridEndHour } = useMemo(() => {
+    let minHour = START_HOUR;
+    let maxHour = END_HOUR;
+    if (schedule && schedule.length > 0) {
+      for (const block of schedule) {
+        const blockStartHour = Math.floor(block.startTime / 60);
+        const blockEndHour = Math.ceil(block.endTime / 60);
+        if (blockStartHour < minHour) minHour = blockStartHour;
+        if (blockEndHour > maxHour) maxHour = blockEndHour;
+      }
+    }
+    return { gridStartHour: minHour, gridEndHour: maxHour };
+  }, [schedule]);
+
+  // Dynamic TIME_OPTIONS for the quick-add dialog based on grid range
+  const dynamicTimeOptions = useMemo(() => {
+    const opts: number[] = [];
+    for (let h = gridStartHour; h <= gridEndHour; h++) {
+      opts.push(h * 60);
+      if (h < gridEndHour) opts.push(h * 60 + 15, h * 60 + 30, h * 60 + 45);
+    }
+    return opts;
+  }, [gridStartHour, gridEndHour]);
+
   // Now line position
   const nowLineOffset = useMemo(() => {
     if (selectedDate !== todayStr()) return null;
     const now = new Date();
     const min = now.getHours() * 60 + now.getMinutes();
-    if (min < START_HOUR * 60 || min > END_HOUR * 60) return null;
-    return ((min - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-  }, [selectedDate]);
+    if (min < gridStartHour * 60 || min > gridEndHour * 60) return null;
+    return ((min - gridStartHour * 60) / 60) * HOUR_HEIGHT;
+  }, [selectedDate, gridStartHour, gridEndHour]);
 
   // Week dates
   const weekDates = useMemo(() => {
@@ -668,16 +693,16 @@ export default function PlannerPage() {
                 <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
               </div>
             )}
-            <div className="relative" style={{ height: (END_HOUR - START_HOUR) * HOUR_HEIGHT }}>
+            <div className="relative" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT }}>
               {/* Hour lines */}
-              {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (
+              {Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => (
                 <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: i * HOUR_HEIGHT }}>
-                  <span className="w-16 shrink-0 text-right pr-3 text-[10px] text-[var(--text-muted)] -translate-y-1.5 select-none">{formatMin((START_HOUR + i) * 60)}</span>
-                  <div className="flex-1 border-t border-[var(--border-subtle)]" />
+                  <span className={`w-16 shrink-0 text-right pr-3 text-[10px] -translate-y-1.5 select-none ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "text-amber-400" : "text-[var(--text-muted)]"}`}>{formatMin((gridStartHour + i) * 60)}</span>
+                  <div className={`flex-1 border-t ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "border-amber-200" : "border-[var(--border-subtle)]"}`} />
                 </div>
               ))}
               {/* Half-hour lines */}
-              {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
+              {Array.from({ length: gridEndHour - gridStartHour }, (_, i) => (
                 <div key={`half-${i}`} className="absolute left-16 right-0 border-t border-dotted border-[var(--border-subtle)] opacity-40" style={{ top: i * HOUR_HEIGHT + HOUR_HEIGHT / 2 }} />
               ))}
 
@@ -691,7 +716,7 @@ export default function PlannerPage() {
 
               {/* Schedule blocks */}
               {(schedule ?? []).map((block) => {
-                const top = ((block.startTime - START_HOUR * 60) / 60) * HOUR_HEIGHT;
+                const top = ((block.startTime - gridStartHour * 60) / 60) * HOUR_HEIGHT;
                 const height = ((block.endTime - block.startTime) / 60) * HOUR_HEIGHT;
                 const bgColor = block.type === "personal"
                   ? (block.color ?? PRESET_COLORS[0])
@@ -778,8 +803,8 @@ export default function PlannerPage() {
               })}
 
               {/* Clickable empty slots */}
-              {Array.from({ length: (END_HOUR - START_HOUR) * 2 }, (_, i) => {
-                const slotTime = START_HOUR * 60 + i * 30;
+              {Array.from({ length: (gridEndHour - gridStartHour) * 2 }, (_, i) => {
+                const slotTime = gridStartHour * 60 + i * 30;
                 return (
                   <div
                     key={`slot-${i}`}
@@ -920,13 +945,13 @@ export default function PlannerPage() {
               <div>
                 <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-1 block">Start</label>
                 <select value={quickAddTime} onChange={(e) => setQuickAddTime(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]">
-                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{formatMin(t)}</option>)}
+                  {dynamicTimeOptions.map((t) => <option key={t} value={t}>{formatMin(t)}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-1 block">End</label>
                 <select value={quickAddEndTime} onChange={(e) => setQuickAddEndTime(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]">
-                  {TIME_OPTIONS.filter((t) => t > quickAddTime).map((t) => <option key={t} value={t}>{formatMin(t)}</option>)}
+                  {dynamicTimeOptions.filter((t) => t > quickAddTime).map((t) => <option key={t} value={t}>{formatMin(t)}</option>)}
                 </select>
               </div>
             </div>
