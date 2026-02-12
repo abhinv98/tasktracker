@@ -523,7 +523,7 @@ export default function PlannerPage() {
   const availableTasks = unscheduledTasks ?? [];
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)]">
+    <div className="flex h-full bg-[var(--bg-primary)]">
       {/* LEFT PANEL */}
       <div className="w-72 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
         {/* Header */}
@@ -693,7 +693,7 @@ export default function PlannerPage() {
                 <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
               </div>
             )}
-            <div className="relative" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT }}>
+            <div className="relative pt-2 pb-4" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT + 24 }}>
               {/* Hour lines */}
               {Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => (
                 <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: i * HOUR_HEIGHT }}>
@@ -725,7 +725,7 @@ export default function PlannerPage() {
                 return (
                   <div
                     key={block._id}
-                    className={`absolute left-[72px] right-3 rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-md group ${block.completed ? "opacity-50" : ""}`}
+                    className={`absolute left-[72px] right-3 rounded-lg cursor-pointer transition-all hover:shadow-md group ${block.completed ? "opacity-50" : ""}`}
                     style={{
                       top,
                       height: Math.max(height, 24),
@@ -739,7 +739,7 @@ export default function PlannerPage() {
                     }}
                     onClick={() => { setShowBlockDetail(showBlockDetail === block._id ? null : block._id); setShowQuickAdd(false); }}
                   >
-                    <div className="px-2 py-1 h-full flex flex-col justify-center">
+                    <div className="px-2 py-1 h-full flex flex-col justify-center overflow-hidden rounded-lg">
                       <p className={`text-[11px] font-medium text-[var(--text-primary)] truncate pr-5 ${block.completed ? "line-through" : ""}`}>{block.title}</p>
                       {height >= 40 && (
                         <div className="flex items-center gap-1.5 mt-0.5">

@@ -118,7 +118,7 @@ export default function MessagesPage() {
   if (!user) return null;
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)]">
+    <div className="flex h-full bg-[var(--bg-primary)]">
       {/* LEFT PANEL — Contact List */}
       <div className="w-80 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
         {/* Header */}

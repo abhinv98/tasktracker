@@ -126,7 +126,7 @@ export default function DashboardLayout({
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
           onSearchClick={() => setSearchOpen(true)}
         />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto min-h-0">{children}</main>
       </div>
 
       {/* Command Palette */}
