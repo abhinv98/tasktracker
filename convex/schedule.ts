@@ -234,7 +234,7 @@ export const getDailySummary = query({
       blockCount: blocks.length,
       longestGapMinutes: longestGap,
       longestStretchMinutes: longestStretch,
-      utilizationPct: Math.round((totalMinutes / 480) * 100), // 8h = 480 min
+      utilizationPct: Math.round((totalMinutes / 540) * 100), // 9h workday (11 AM - 8 PM) = 540 min
     };
   },
 });

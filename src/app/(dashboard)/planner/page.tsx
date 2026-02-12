@@ -26,10 +26,11 @@ import {
 
 // ─── Helpers ────────────────────────────────
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function dateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function addDays(s: string, n: number) {
   const d = new Date(s + "T00:00:00");
@@ -59,14 +60,24 @@ function shortDay(s: string) {
 }
 
 const HOUR_HEIGHT = 60;
-const START_HOUR = 7;
-const END_HOUR = 20;
-const SLOT_COUNT = (END_HOUR - START_HOUR) * 2;
+const START_HOUR = 11; // 11 AM
+const END_HOUR = 20;   // 8 PM
+const WORK_HOURS = END_HOUR - START_HOUR; // 9 hours
+const WORK_MINUTES = WORK_HOURS * 60; // 540 minutes
 const PRESET_COLORS = ["#6a9bcc", "#788c5d", "#d97757", "#9b7dcf", "#cc6a8e", "#5da0a0"];
 const TIME_OPTIONS: number[] = [];
 for (let h = START_HOUR; h <= END_HOUR; h++) {
   TIME_OPTIONS.push(h * 60);
   if (h < END_HOUR) TIME_OPTIONS.push(h * 60 + 15, h * 60 + 30, h * 60 + 45);
+}
+function isWeekend(dateString: string) {
+  const d = new Date(dateString + "T00:00:00");
+  const day = d.getDay();
+  return day === 0 || day === 6; // Sunday or Saturday
+}
+function dayName(dateString: string) {
+  const d = new Date(dateString + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "long" });
 }
 
 export default function PlannerPage() {
@@ -189,17 +200,17 @@ export default function PlannerPage() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [schedule]);
 
-  function findNextFreeSlot(): number {
+  function findNextFreeSlot(duration = 60): number {
     const now = new Date();
     let startMin = selectedDate === todayStr()
-      ? Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30
+      ? Math.ceil((now.getHours() * 60 + now.getMinutes()) / 15) * 15
       : START_HOUR * 60;
     if (startMin < START_HOUR * 60) startMin = START_HOUR * 60;
     const blocks = schedule ?? [];
-    while (startMin < END_HOUR * 60) {
-      const conflict = blocks.some((b) => b.startTime < startMin + 60 && b.endTime > startMin);
+    while (startMin + duration <= END_HOUR * 60) {
+      const conflict = blocks.some((b) => b.startTime < startMin + duration && b.endTime > startMin);
       if (!conflict) return startMin;
-      startMin += 30;
+      startMin += 15;
     }
     return START_HOUR * 60;
   }
@@ -219,15 +230,42 @@ export default function PlannerPage() {
   function openQuickAddWithTask(taskId: string) {
     const task = (userTasks ?? []).find((t) => t._id === taskId);
     if (!task) return;
-    const startMin = findNextFreeSlot();
+    // Cap block duration to remaining work hours (max WORK_MINUTES)
+    const blockDuration = Math.min(task.durationMinutes, WORK_MINUTES);
+    const startMin = findNextFreeSlot(blockDuration);
     setQuickAddTime(startMin);
-    setQuickAddEndTime(Math.min(startMin + task.durationMinutes, END_HOUR * 60));
+    setQuickAddEndTime(Math.min(startMin + blockDuration, END_HOUR * 60));
     setQuickAddTab("brief_task");
     setQuickAddTitle(task.title);
     setQuickAddTaskId(task._id);
     setQuickAddDesc("");
     setShowQuickAdd(true);
     setShowBlockDetail(null);
+  }
+
+  // Quick-schedule: one-click add from unscheduled tray directly onto calendar
+  async function quickScheduleTask(taskId: string) {
+    if (!viewingUserId) return;
+    const task = (userTasks ?? []).find((t) => t._id === taskId);
+    if (!task) return;
+    const blockDuration = Math.min(task.durationMinutes, WORK_MINUTES);
+    const startMin = findNextFreeSlot(blockDuration);
+    const endMin = Math.min(startMin + blockDuration, END_HOUR * 60);
+    try {
+      await createBlock({
+        userId: viewingUserId,
+        date: selectedDate,
+        startTime: startMin,
+        endTime: endMin,
+        type: "brief_task",
+        taskId: task._id as Id<"tasks">,
+        briefId: task.briefId as Id<"briefs">,
+        title: task.title,
+      });
+      toast("success", `Scheduled "${task.title}" at ${formatMin(startMin)} - ${formatMin(endMin)}`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Time conflict — try manually");
+    }
   }
 
   async function handleCreateBlock() {
@@ -415,17 +453,27 @@ export default function PlannerPage() {
             <p className="px-3 py-4 text-[11px] text-[var(--text-disabled)] text-center">All tasks scheduled!</p>
           ) : (
             (unscheduledTasks ?? []).map((task) => (
-              <button
+              <div
                 key={task._id}
-                onClick={() => openQuickAddWithTask(task._id)}
-                className="w-full text-left px-3 py-2 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)]"
+                className="px-3 py-2 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)] group"
               >
-                <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium truncate max-w-[120px]">{task.briefName}</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">{task.duration}</span>
+                <div className="flex items-start justify-between gap-1">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openQuickAddWithTask(task._id)}>
+                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium truncate max-w-[100px]">{task.briefName}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">{task.duration}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => quickScheduleTask(task._id)}
+                    className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-[var(--accent-admin)] text-white text-[9px] font-medium hover:bg-[#c4684d] transition-all"
+                    title="Quick schedule on current day"
+                  >
+                    <Plus className="h-3 w-3 inline mr-0.5" />Add
+                  </button>
                 </div>
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -446,6 +494,7 @@ export default function PlannerPage() {
           </div>
           <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">{formatDateHeader(selectedDate)}</h2>
           {selectedDate === todayStr() && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--accent-admin)] text-white">Today</span>}
+          {isWeekend(selectedDate) && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Weekend</span>}
           <div className="ml-auto flex items-center gap-1">
             <button onClick={() => setShowCopyDay(true)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-muted)]" title="Copy from another day">
               <Copy className="h-3.5 w-3.5" />
@@ -484,8 +533,8 @@ export default function PlannerPage() {
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <div className="w-24 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden flex">
-                <div className="h-full bg-[var(--accent-admin)]" style={{ width: `${Math.min(100, (dailySummary.briefHours / 8) * 100)}%` }} />
-                <div className="h-full bg-[var(--accent-manager)]" style={{ width: `${Math.min(100 - (dailySummary.briefHours / 8) * 100, (dailySummary.personalHours / 8) * 100)}%` }} />
+                <div className="h-full bg-[var(--accent-admin)]" style={{ width: `${Math.min(100, (dailySummary.briefHours / WORK_HOURS) * 100)}%` }} />
+                <div className="h-full bg-[var(--accent-manager)]" style={{ width: `${Math.min(100 - (dailySummary.briefHours / WORK_HOURS) * 100, (dailySummary.personalHours / WORK_HOURS) * 100)}%` }} />
               </div>
               <span className="text-[10px] font-medium text-[var(--text-muted)] tabular-nums">{dailySummary.utilizationPct}%</span>
             </div>
@@ -495,6 +544,13 @@ export default function PlannerPage() {
         {/* Day View */}
         {viewMode === "day" ? (
           <div className="flex-1 overflow-auto relative" ref={gridRef}>
+            {/* Weekend notice */}
+            {isWeekend(selectedDate) && (
+              <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                <span className="text-[11px] font-medium">{dayName(selectedDate)} — Emergency / overtime work only.</span>
+                <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
+              </div>
+            )}
             <div className="relative" style={{ height: (END_HOUR - START_HOUR) * HOUR_HEIGHT }}>
               {/* Hour lines */}
               {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (

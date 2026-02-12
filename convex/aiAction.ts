@@ -299,6 +299,150 @@ const TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_all_users",
+      description:
+        "List all users in the system with their name, email, role, and user ID. Useful for finding a user by name.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_user_tasks",
+      description:
+        "Get all tasks assigned to a specific user by their user ID. Returns task ID, title, status, duration, brief name, sort order.",
+      parameters: {
+        type: "object",
+        properties: {
+          userId: {
+            type: "string",
+            description: "The user ID to get tasks for",
+          },
+        },
+        required: ["userId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_schedule_for_date",
+      description:
+        "Get all schedule blocks for a user on a specific date. Returns blocks with title, start/end time (minutes from midnight), type (brief_task or personal), brief title, and completion status.",
+      parameters: {
+        type: "object",
+        properties: {
+          userId: {
+            type: "string",
+            description: "The user ID",
+          },
+          date: {
+            type: "string",
+            description: "Date in YYYY-MM-DD format",
+          },
+        },
+        required: ["userId", "date"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_schedule_block",
+      description:
+        "Add a time block to a user's planner. Used to schedule a brief task or a personal task on a specific date and time. Start and end times are in minutes from midnight (e.g., 540 = 9:00 AM, 600 = 10:00 AM). Returns the new block ID or an error if it conflicts with an existing block.",
+      parameters: {
+        type: "object",
+        properties: {
+          userId: {
+            type: "string",
+            description: "The user ID to add the block for",
+          },
+          date: {
+            type: "string",
+            description: "Date in YYYY-MM-DD format",
+          },
+          startTime: {
+            type: "number",
+            description: "Start time in minutes from midnight (e.g., 540 = 9:00 AM)",
+          },
+          endTime: {
+            type: "number",
+            description: "End time in minutes from midnight (e.g., 600 = 10:00 AM)",
+          },
+          type: {
+            type: "string",
+            enum: ["brief_task", "personal"],
+            description: "Type of block",
+          },
+          title: {
+            type: "string",
+            description: "Block title",
+          },
+          taskId: {
+            type: "string",
+            description: "Task ID if this is a brief_task block",
+          },
+          briefId: {
+            type: "string",
+            description: "Brief ID if this is a brief_task block",
+          },
+          description: {
+            type: "string",
+            description: "Optional description",
+          },
+          color: {
+            type: "string",
+            description: "Optional color hex for personal blocks",
+          },
+        },
+        required: ["userId", "date", "startTime", "endTime", "type", "title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_schedule_block",
+      description:
+        "Delete a schedule block from a user's planner by block ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          blockId: {
+            type: "string",
+            description: "The schedule block ID to delete",
+          },
+        },
+        required: ["blockId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_unscheduled_tasks",
+      description:
+        "Get tasks assigned to a user that are NOT yet scheduled on a specific date. Useful to know which tasks still need to be added to the planner.",
+      parameters: {
+        type: "object",
+        properties: {
+          userId: {
+            type: "string",
+            description: "The user ID",
+          },
+          date: {
+            type: "string",
+            description: "Date in YYYY-MM-DD format",
+          },
+        },
+        required: ["userId", "date"],
+      },
+    },
+  },
 ];
 
 export const sendMessage = action({
@@ -460,7 +604,7 @@ Today's date: ${today}
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses." : "This user can view their tasks, update task status, and submit deliverables."}
+- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses, manage employee planners." : "This user can view their tasks, update task status, submit deliverables, and manage their own planner."}
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
@@ -487,7 +631,24 @@ Additional rules:
 - If a tool call fails, DO NOT retry blindly. Read the error, fix the issue, then try ONCE more.
 - NEVER call create_brief more than once for the same brief.
 - For deadlines: convert dates to Unix timestamp in milliseconds. Double-check the YEAR — if the document says "March 2025", the timestamp must be for year 2025, not 2005 or any other year.
-- When distributing tasks, if you have N tasks and M team members, assign approximately N/M tasks to each member.`;
+- When distributing tasks, if you have N tasks and M team members, assign approximately N/M tasks to each member.
+
+PLANNER — The app has a Planner/Calendar feature:
+- Each user has a daily planner with time blocks (schedule blocks).
+- Blocks have a startTime and endTime in minutes from midnight (e.g., 660 = 11:00 AM, 720 = 12:00 PM, 780 = 1:00 PM).
+- WORKING HOURS: 11:00 AM to 8:00 PM (660 to 1200), Monday to Friday. 9-hour workday.
+- Saturday/Sunday: emergency/overtime only. Blocks CAN be added on weekends but it is flagged.
+- Block types: "brief_task" (linked to a task in a brief — needs taskId and briefId) or "personal".
+- When asked to add tasks to someone's planner, follow these steps:
+  1. Use list_all_users to find the user by name and get their userId.
+  2. Use get_user_tasks (with that userId) to get their assigned tasks with IDs, durations, and briefIds.
+  3. Use get_schedule_for_date to check what's already scheduled for the target date.
+  4. Use add_schedule_block for each task, spacing them out sequentially (no overlaps). Start at 11:00 AM (660) by default. Use the task's durationMinutes for block length. Cap each block so it doesn't go past 8:00 PM (1200).
+  5. Each brief_task block needs: userId, date, startTime, endTime, type="brief_task", title (task title), taskId, briefId.
+- If a block conflicts, try the next available time slot.
+- If all slots on the current day are full, tell the user and suggest the next working day.
+- Common times: 11 AM=660, 12 PM=720, 1 PM=780, 2 PM=840, 3 PM=900, 4 PM=960, 5 PM=1020, 6 PM=1080, 7 PM=1140, 8 PM=1200.
+- For today's date, use the current date in YYYY-MM-DD format.`;
 }
 
 async function executeTool(
@@ -836,7 +997,125 @@ async function executeTool(
       );
     }
 
+    case "list_all_users": {
+      const users = await ctx.runQuery(api.users.listAllUsers, {});
+      return JSON.stringify(
+        users.map((u: Record<string, unknown>) => ({
+          id: u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+        }))
+      );
+    }
+
+    case "get_user_tasks": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tasks = await ctx.runQuery(api.tasks.listTasksForUser, {
+        userId: fnArgs.userId,
+      } as any);
+      return JSON.stringify(
+        tasks.map((t: Record<string, unknown>) => ({
+          id: t._id,
+          title: t.title,
+          status: t.status,
+          duration: t.duration,
+          durationMinutes: t.durationMinutes,
+          briefId: t.briefId,
+          briefName: t.briefName,
+          sortOrder: t.sortOrder,
+        }))
+      );
+    }
+
+    case "get_schedule_for_date": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blocks = await ctx.runQuery(api.schedule.getScheduleForDate, {
+        userId: fnArgs.userId,
+        date: fnArgs.date,
+      } as any);
+      return JSON.stringify(
+        (blocks ?? []).map((b: Record<string, unknown>) => ({
+          id: b._id,
+          title: b.title,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          type: b.type,
+          briefTitle: b.briefTitle,
+          taskStatus: b.taskStatus,
+          completed: b.completed,
+          startTimeFormatted: formatMinutesForAI(b.startTime as number),
+          endTimeFormatted: formatMinutesForAI(b.endTime as number),
+        }))
+      );
+    }
+
+    case "add_schedule_block": {
+      if (role !== "admin" && role !== "manager" && fnArgs.userId !== user._id) {
+        return JSON.stringify({ error: "Employees can only add blocks to their own planner" });
+      }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const blockId = await ctx.runMutation(api.schedule.createBlock, {
+          userId: fnArgs.userId,
+          date: fnArgs.date,
+          startTime: fnArgs.startTime,
+          endTime: fnArgs.endTime,
+          type: fnArgs.type,
+          title: fnArgs.title,
+          ...(fnArgs.taskId ? { taskId: fnArgs.taskId } : {}),
+          ...(fnArgs.briefId ? { briefId: fnArgs.briefId } : {}),
+          ...(fnArgs.description ? { description: fnArgs.description } : {}),
+          ...(fnArgs.color ? { color: fnArgs.color } : {}),
+        } as any);
+        return JSON.stringify({
+          success: true,
+          blockId,
+          message: `Scheduled "${fnArgs.title}" from ${formatMinutesForAI(fnArgs.startTime)} to ${formatMinutesForAI(fnArgs.endTime)}`,
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return JSON.stringify({ error: msg, hint: "There may be a time conflict. Try a different time slot." });
+      }
+    }
+
+    case "delete_schedule_block": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.schedule.deleteBlock, {
+        blockId: fnArgs.blockId,
+      } as any);
+      return JSON.stringify({ success: true, message: "Block deleted" });
+    }
+
+    case "get_unscheduled_tasks": {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tasks = await ctx.runQuery(api.schedule.getUnscheduledTasks, {
+        userId: fnArgs.userId,
+        date: fnArgs.date,
+      } as any);
+      return JSON.stringify(
+        (tasks ?? []).map((t: Record<string, unknown>) => ({
+          id: t._id,
+          title: t.title,
+          briefId: t.briefId,
+          briefName: t.briefName,
+          duration: t.duration,
+          durationMinutes: t.durationMinutes,
+          status: t.status,
+          sortOrder: t.sortOrder,
+        }))
+      );
+    }
+
     default:
       return JSON.stringify({ error: `Unknown tool: ${fnName}` });
   }
+}
+
+function formatMinutesForAI(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
 }
