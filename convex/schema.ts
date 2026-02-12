@@ -191,7 +191,8 @@ export default defineSchema({
       v.literal("comment"),
       v.literal("deadline_reminder"),
       v.literal("deliverable_approved"),
-      v.literal("deliverable_rejected")
+      v.literal("deliverable_rejected"),
+      v.literal("direct_message")
     ),
     title: v.string(),
     message: v.string(),
@@ -289,6 +290,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     color: v.optional(v.string()),
     completed: v.optional(v.boolean()),
+    createdBy: v.optional(v.id("users")),
     createdAt: v.number(),
   })
     .index("by_user_date", ["userId", "date"])
@@ -329,4 +331,16 @@ export default defineSchema({
   })
     .index("by_brief", ["briefId"])
     .index("by_user_brief", ["userId", "briefId"]),
+
+  // ─── DIRECT MESSAGES ────────────────────
+  directMessages: defineTable({
+    senderId: v.id("users"),
+    recipientId: v.id("users"),
+    content: v.string(),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_participants", ["senderId", "recipientId", "createdAt"])
+    .index("by_recipient", ["recipientId", "createdAt"])
+    .index("by_sender_recipient", ["senderId", "recipientId"]),
 });

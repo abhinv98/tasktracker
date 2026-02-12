@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import {
   LayoutGrid,
   Briefcase,
@@ -17,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   MessageCircle,
+  MessageSquare,
   CalendarDays,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +41,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/analytics": TrendingUp,
   "/discussions": MessageCircle,
   "/planner": CalendarDays,
+  "/messages": MessageSquare,
   "/teams": Users,
   "/users": Shield,
   "/archive": Archive,
@@ -50,6 +54,7 @@ const ADMIN_NAV = [
   { href: "/briefs", label: "Briefs" },
   { href: "/discussions", label: "Discussions" },
   { href: "/planner", label: "Planner" },
+  { href: "/messages", label: "Messages" },
   { href: "/brands", label: "Brands" },
   { href: "/overview", label: "Brand Overview" },
   { href: "/analytics", label: "Analytics" },
@@ -65,6 +70,7 @@ const MANAGER_NAV = [
   { href: "/briefs", label: "Briefs" },
   { href: "/discussions", label: "Discussions" },
   { href: "/planner", label: "Planner" },
+  { href: "/messages", label: "Messages" },
   { href: "/brands", label: "Brands" },
   { href: "/analytics", label: "Analytics" },
   { href: "/deliverables", label: "Deliverables" },
@@ -77,6 +83,7 @@ const EMPLOYEE_NAV = [
   { href: "/dashboard", label: "Queue" },
   { href: "/discussions", label: "Discussions" },
   { href: "/planner", label: "Planner" },
+  { href: "/messages", label: "Messages" },
   { href: "/deliverables", label: "Deliverables" },
   { href: "/profile", label: "Profile" },
 ];
@@ -88,6 +95,7 @@ function getIconForRoute(href: string): LucideIcon {
 export function Sidebar({ user, open, onClose, collapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const role = user.role ?? "employee";
+  const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
 
   const nav =
     role === "admin"
@@ -168,7 +176,7 @@ export function Sidebar({ user, open, onClose, collapsed, onToggleCollapse }: Si
                 onClick={onClose}
                 title={collapsed ? item.label : undefined}
                 className={`
-                  flex items-center rounded-lg transition-colors duration-150
+                  flex items-center rounded-lg transition-colors duration-150 relative
                   ${collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2"}
                   font-medium text-[13px]
                   ${
@@ -179,7 +187,15 @@ export function Sidebar({ user, open, onClose, collapsed, onToggleCollapse }: Si
                 `}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {!collapsed && item.href === "/messages" && unreadDmCount > 0 && (
+                  <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
+                    {unreadDmCount}
+                  </span>
+                )}
+                {collapsed && item.href === "/messages" && unreadDmCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500" />
+                )}
               </Link>
             );
           })}

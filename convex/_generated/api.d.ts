@@ -20,6 +20,7 @@ import type * as chat from "../chat.js";
 import type * as comments from "../comments.js";
 import type * as crons from "../crons.js";
 import type * as deliverables from "../deliverables.js";
+import type * as dm from "../dm.js";
 import type * as http from "../http.js";
 import type * as notifications from "../notifications.js";
 import type * as reminders from "../reminders.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   crons: typeof crons;
   deliverables: typeof deliverables;
+  dm: typeof dm;
   http: typeof http;
   notifications: typeof notifications;
   reminders: typeof reminders;

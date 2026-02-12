@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useToast } from "@/components/ui";
@@ -22,6 +23,8 @@ import {
   ArrowUp,
   ArrowDown,
   HelpCircle,
+  AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────
@@ -104,8 +107,33 @@ export default function PlannerPage() {
   const [showPriority, setShowPriority] = useState<string | null>(null);
   const [priorityReason, setPriorityReason] = useState("");
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [conflictModal, setConflictModal] = useState<{
+    conflicts: Array<{
+      _id: string;
+      title: string;
+      startTime: number;
+      endTime: number;
+      createdById: string | null;
+      createdByName: string | null;
+      employeeId: string;
+      employeeName: string;
+    }>;
+    pendingBlock: {
+      userId: Id<"users">;
+      date: string;
+      startTime: number;
+      endTime: number;
+      type: "brief_task" | "personal";
+      taskId?: Id<"tasks">;
+      briefId?: Id<"briefs">;
+      title: string;
+      description?: string;
+      color?: string;
+    };
+  } | null>(null);
 
   const gridRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const noteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAdmin = user?.role === "admin";
@@ -149,7 +177,7 @@ export default function PlannerPage() {
   // Mutations
   const createBlock = useMutation(api.schedule.createBlock);
   const updateBlock = useMutation(api.schedule.updateBlock);
-  const deleteBlock = useMutation(api.schedule.deleteBlock);
+  const deleteBlockMut = useMutation(api.schedule.deleteBlock);
   const copyDayMut = useMutation(api.schedule.copyDay);
   const saveDailyNote = useMutation(api.schedule.saveDailyNote);
   const reorderPriority = useMutation(api.schedule.reorderTaskPriority);
@@ -243,6 +271,62 @@ export default function PlannerPage() {
     setShowBlockDetail(null);
   }
 
+  // Helper: try creating a block, checking for cross-person conflicts first
+  async function tryCreateBlock(blockArgs: {
+    userId: Id<"users">;
+    date: string;
+    startTime: number;
+    endTime: number;
+    type: "brief_task" | "personal";
+    taskId?: Id<"tasks">;
+    briefId?: Id<"briefs">;
+    title: string;
+    description?: string;
+    color?: string;
+    force?: boolean;
+  }) {
+    // Check for same-user time conflicts (existing blocks on same date)
+    const existingBlocks = schedule ?? [];
+    const selfConflicts = existingBlocks.filter(
+      (b) => b.startTime < blockArgs.endTime && b.endTime > blockArgs.startTime
+    );
+
+    if (selfConflicts.length > 0 && !blockArgs.force) {
+      // Build conflict info with createdBy details
+      const conflictDetails = selfConflicts.map((b) => ({
+        _id: b._id,
+        title: b.title,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        createdById: (b as Record<string, unknown>).createdBy as string | null ?? null,
+        createdByName: null as string | null,
+        employeeId: blockArgs.userId as string,
+        employeeName: "",
+      }));
+
+      // Check if any conflicting block was created by a different person (cross-person conflict)
+      const hasCrossPersonConflict = selfConflicts.some(
+        (b) => (b as Record<string, unknown>).createdBy && (b as Record<string, unknown>).createdBy !== user?._id
+      );
+
+      if (hasCrossPersonConflict || !isViewingSelf) {
+        // Show the conflict modal for cross-person resolution
+        setConflictModal({
+          conflicts: conflictDetails,
+          pendingBlock: blockArgs,
+        });
+        return false;
+      } else {
+        // Simple self-conflict — just show error
+        toast("error", `Time conflict with "${selfConflicts[0].title}" (${formatMin(selfConflicts[0].startTime)} - ${formatMin(selfConflicts[0].endTime)})`);
+        return false;
+      }
+    }
+
+    await createBlock(blockArgs);
+    return true;
+  }
+
   // Quick-schedule: one-click add from unscheduled tray directly onto calendar
   async function quickScheduleTask(taskId: string) {
     if (!viewingUserId) return;
@@ -252,7 +336,7 @@ export default function PlannerPage() {
     const startMin = findNextFreeSlot(blockDuration);
     const endMin = Math.min(startMin + blockDuration, END_HOUR * 60);
     try {
-      await createBlock({
+      const ok = await tryCreateBlock({
         userId: viewingUserId,
         date: selectedDate,
         startTime: startMin,
@@ -262,7 +346,7 @@ export default function PlannerPage() {
         briefId: task.briefId as Id<"briefs">,
         title: task.title,
       });
-      toast("success", `Scheduled "${task.title}" at ${formatMin(startMin)} - ${formatMin(endMin)}`);
+      if (ok) toast("success", `Scheduled "${task.title}" at ${formatMin(startMin)} - ${formatMin(endMin)}`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Time conflict — try manually");
     }
@@ -271,9 +355,10 @@ export default function PlannerPage() {
   async function handleCreateBlock() {
     if (!viewingUserId) return;
     try {
+      let ok = false;
       if (quickAddTab === "brief_task" && quickAddTaskId) {
         const task = (userTasks ?? []).find((t) => t._id === quickAddTaskId);
-        await createBlock({
+        ok = await tryCreateBlock({
           userId: viewingUserId,
           date: selectedDate,
           startTime: quickAddTime,
@@ -284,7 +369,7 @@ export default function PlannerPage() {
           title: quickAddTitle || task?.title || "Task",
         });
       } else {
-        await createBlock({
+        ok = await tryCreateBlock({
           userId: viewingUserId,
           date: selectedDate,
           startTime: quickAddTime,
@@ -295,16 +380,38 @@ export default function PlannerPage() {
           color: quickAddColor,
         });
       }
-      setShowQuickAdd(false);
-      toast("success", "Block added");
+      if (ok) {
+        setShowQuickAdd(false);
+        toast("success", "Block added");
+      }
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create block");
     }
   }
 
+  async function handleForceCreate() {
+    if (!conflictModal) return;
+    try {
+      await createBlock({ ...conflictModal.pendingBlock, force: true });
+      setConflictModal(null);
+      setShowQuickAdd(false);
+      toast("success", "Block added (conflict overridden)");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to create block");
+    }
+  }
+
+  function handleConflictDm(recipientId: string, recipientName: string) {
+    const pending = conflictModal?.pendingBlock;
+    if (!pending) return;
+    const msg = `Schedule conflict: I need to schedule "${pending.title}" (${formatMin(pending.startTime)} - ${formatMin(pending.endTime)}) on ${formatDateHeader(pending.date)}, but it conflicts with an existing block. Can we coordinate?`;
+    router.push(`/messages?to=${recipientId}&msg=${encodeURIComponent(msg)}`);
+    setConflictModal(null);
+  }
+
   async function handleDeleteBlock(blockId: string) {
     try {
-      await deleteBlock({ blockId: blockId as Id<"scheduleBlocks"> });
+      await deleteBlockMut({ blockId: blockId as Id<"scheduleBlocks"> });
       setShowBlockDetail(null);
       toast("success", "Block removed");
     } catch (err) {
@@ -388,7 +495,7 @@ export default function PlannerPage() {
 
   if (!user) return null;
 
-  const availableTasks = (userTasks ?? []).filter((t) => t.status !== "done");
+  const availableTasks = unscheduledTasks ?? [];
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)]">
@@ -448,6 +555,7 @@ export default function PlannerPage() {
             <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
               Unscheduled ({unscheduledTasks?.length ?? 0})
             </p>
+            <span className="text-[8px] text-[var(--text-disabled)] italic">sorted by priority</span>
           </div>
           {(unscheduledTasks ?? []).length === 0 ? (
             <p className="px-3 py-4 text-[11px] text-[var(--text-disabled)] text-center">All tasks scheduled!</p>
@@ -459,8 +567,17 @@ export default function PlannerPage() {
               >
                 <div className="flex items-start justify-between gap-1">
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openQuickAddWithTask(task._id)}>
-                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded text-[8px] font-bold px-1 ${
+                        task.sortOrder <= 1000 ? "bg-red-100 text-red-700" :
+                        task.sortOrder <= 5000 ? "bg-amber-100 text-amber-700" :
+                        "bg-slate-100 text-slate-500"
+                      }`}>
+                        {task.sortOrder <= 1000 ? "H" : task.sortOrder <= 5000 ? "M" : "L"}
+                      </span>
+                      <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 ml-[26px]">
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium truncate max-w-[100px]">{task.briefName}</span>
                       <span className="text-[10px] text-[var(--text-muted)]">{task.duration}</span>
                     </div>
@@ -598,7 +715,7 @@ export default function PlannerPage() {
                     onClick={() => { setShowBlockDetail(showBlockDetail === block._id ? null : block._id); setShowQuickAdd(false); }}
                   >
                     <div className="px-2 py-1 h-full flex flex-col justify-center">
-                      <p className={`text-[11px] font-medium text-[var(--text-primary)] truncate ${block.completed ? "line-through" : ""}`}>{block.title}</p>
+                      <p className={`text-[11px] font-medium text-[var(--text-primary)] truncate pr-5 ${block.completed ? "line-through" : ""}`}>{block.title}</p>
                       {height >= 40 && (
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {block.briefTitle && (
@@ -611,6 +728,14 @@ export default function PlannerPage() {
                         </div>
                       )}
                     </div>
+                    {/* Hover-visible delete button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block._id); }}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-md bg-white/80 border border-[var(--border)] flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--danger)] hover:text-white hover:border-[var(--danger)] transition-all text-[var(--text-muted)]"
+                      title="Delete block"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
 
                     {/* Block detail popover */}
                     {showBlockDetail === block._id && (
@@ -851,6 +976,88 @@ export default function PlannerPage() {
               placeholder="Reason (optional)"
               className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Conflict Modal */}
+      {conflictModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConflictModal(null)}>
+          <div className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-[420px] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+              </div>
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Schedule Conflict</h3>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-[12px] text-amber-800 mb-2">
+                <strong>&quot;{conflictModal.pendingBlock.title}&quot;</strong> ({formatMin(conflictModal.pendingBlock.startTime)} - {formatMin(conflictModal.pendingBlock.endTime)}) conflicts with:
+              </p>
+              {conflictModal.conflicts.map((c) => (
+                <div key={c._id} className="flex items-center gap-2 py-1.5 border-t border-amber-200 first:border-t-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] font-medium text-amber-900">&quot;{c.title}&quot;</span>
+                    <span className="text-[10px] text-amber-700 ml-1">({formatMin(c.startTime)} - {formatMin(c.endTime)})</span>
+                    {c.createdByName && (
+                      <span className="text-[10px] text-amber-600 ml-1">scheduled by {c.createdByName}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {/* Message buttons for each unique conflict creator */}
+              {(() => {
+                const creators = conflictModal.conflicts
+                  .filter((c) => c.createdById && c.createdByName)
+                  .reduce((acc, c) => {
+                    if (c.createdById && !acc.find((a) => a.id === c.createdById)) {
+                      acc.push({ id: c.createdById, name: c.createdByName! });
+                    }
+                    return acc;
+                  }, [] as Array<{ id: string; name: string }>);
+
+                return creators.map((creator) => (
+                  <button
+                    key={creator.id}
+                    onClick={() => handleConflictDm(creator.id, creator.name)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+                    Message {creator.name}
+                  </button>
+                ));
+              })()}
+
+              {/* Message employee (if viewing someone else's calendar) */}
+              {!isViewingSelf && conflictModal.conflicts[0]?.employeeId && (
+                <button
+                  onClick={() => handleConflictDm(conflictModal.conflicts[0].employeeId, conflictModal.conflicts[0].employeeName)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-manager)]" />
+                  Message Employee
+                </button>
+              )}
+
+              <button
+                onClick={handleForceCreate}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:bg-[#c4684d] transition-colors"
+              >
+                Add Anyway
+              </button>
+
+              <button
+                onClick={() => setConflictModal(null)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

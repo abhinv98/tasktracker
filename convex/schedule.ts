@@ -161,12 +161,15 @@ export const getUnscheduledTasks = query({
       return brief && brief.status !== "archived";
     });
 
-    // Get blocks on this date for this user
-    const blocks = await ctx.db
-      .query("scheduleBlocks")
-      .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", date))
-      .collect();
-    const scheduledTaskIds = new Set(blocks.filter((b) => b.taskId).map((b) => b.taskId!));
+    // Check each active task: does it have ANY block on ANY date?
+    const scheduledTaskIds = new Set<string>();
+    for (const t of activeTasks) {
+      const hasBlock = await ctx.db
+        .query("scheduleBlocks")
+        .withIndex("by_task", (q) => q.eq("taskId", t._id))
+        .first();
+      if (hasBlock) scheduledTaskIds.add(t._id);
+    }
 
     return activeTasks
       .filter((t) => !scheduledTaskIds.has(t._id))
@@ -252,6 +255,65 @@ export const getDailyNote = query({
   },
 });
 
+/**
+ * Check for schedule conflicts before creating a block.
+ * Returns conflicting blocks with createdBy user info.
+ */
+export const checkConflicts = query({
+  args: {
+    userId: v.id("users"),
+    date: v.string(),
+    startTime: v.number(),
+    endTime: v.number(),
+  },
+  handler: async (ctx, { userId, date, startTime, endTime }) => {
+    const authId = await getAuthUserId(ctx);
+    if (!authId) return [];
+
+    const existing = await ctx.db
+      .query("scheduleBlocks")
+      .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", date))
+      .collect();
+
+    const conflicts: Array<{
+      _id: string;
+      title: string;
+      startTime: number;
+      endTime: number;
+      createdById: string | null;
+      createdByName: string | null;
+      employeeId: string;
+      employeeName: string;
+    }> = [];
+
+    const employee = await ctx.db.get(userId);
+    const employeeName = employee?.name ?? employee?.email ?? "Unknown";
+
+    for (const block of existing) {
+      if (overlaps({ startTime, endTime }, block)) {
+        let createdById: string | null = null;
+        let createdByName: string | null = null;
+        if (block.createdBy && block.createdBy !== authId) {
+          const creator = await ctx.db.get(block.createdBy);
+          createdById = block.createdBy;
+          createdByName = creator?.name ?? creator?.email ?? "Unknown";
+        }
+        conflicts.push({
+          _id: block._id,
+          title: block.title,
+          startTime: block.startTime,
+          endTime: block.endTime,
+          createdById,
+          createdByName,
+          employeeId: userId,
+          employeeName,
+        });
+      }
+    }
+    return conflicts;
+  },
+});
+
 // ─── Mutations ───────────────────────────────
 
 export const createBlock = mutation({
@@ -266,6 +328,7 @@ export const createBlock = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     color: v.optional(v.string()),
+    force: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const authId = await getAuthUserId(ctx);
@@ -283,17 +346,19 @@ export const createBlock = mutation({
     if (args.endTime <= args.startTime) throw new Error("End time must be after start time");
     if (args.startTime < 0 || args.endTime > 1440) throw new Error("Time must be between 00:00 and 24:00");
 
-    // Overlap check
-    const existing = await ctx.db
-      .query("scheduleBlocks")
-      .withIndex("by_user_date", (q) => q.eq("userId", targetUserId).eq("date", args.date))
-      .collect();
+    // Overlap check (skip if force=true)
+    if (!args.force) {
+      const existing = await ctx.db
+        .query("scheduleBlocks")
+        .withIndex("by_user_date", (q) => q.eq("userId", targetUserId).eq("date", args.date))
+        .collect();
 
-    for (const block of existing) {
-      if (overlaps({ startTime: args.startTime, endTime: args.endTime }, block)) {
-        throw new Error(
-          `Conflicts with "${block.title}" (${formatMinutes(block.startTime)} - ${formatMinutes(block.endTime)})`
-        );
+      for (const block of existing) {
+        if (overlaps({ startTime: args.startTime, endTime: args.endTime }, block)) {
+          throw new Error(
+            `Conflicts with "${block.title}" (${formatMinutes(block.startTime)} - ${formatMinutes(block.endTime)})`
+          );
+        }
       }
     }
 
@@ -308,6 +373,7 @@ export const createBlock = mutation({
       title: args.title,
       description: args.description,
       color: args.color,
+      createdBy: authId,
       createdAt: Date.now(),
     });
   },
@@ -375,7 +441,12 @@ export const deleteBlock = mutation({
     const block = await ctx.db.get(blockId);
     if (!block) throw new Error("Block not found");
     const authUser = await ctx.db.get(authId);
-    if (block.userId !== authId && authUser?.role !== "admin") {
+    // Allow: own blocks, admin always, manager if they created it
+    const isOwn = block.userId === authId;
+    const isAdmin = authUser?.role === "admin";
+    const isCreator = block.createdBy === authId;
+    const isManager = authUser?.role === "manager";
+    if (!isOwn && !isAdmin && !(isManager && isCreator)) {
       throw new Error("Not authorized");
     }
     await ctx.db.delete(blockId);
