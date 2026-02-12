@@ -130,6 +130,10 @@ export default defineSchema({
     userId: v.id("users"),
     content: v.string(),
     createdAt: v.number(),
+    pinned: v.optional(v.boolean()),
+    pinnedBy: v.optional(v.id("users")),
+    attachmentId: v.optional(v.id("_storage")),
+    attachmentName: v.optional(v.string()),
   })
     .index("by_parent", ["parentType", "parentId", "createdAt"]),
 
@@ -271,4 +275,58 @@ export default defineSchema({
   })
     .index("by_user", ["userId", "createdAt"])
     .index("by_conversation", ["conversationId", "createdAt"]),
+
+  // ─── SCHEDULE BLOCKS (Calendar Planner) ───
+  scheduleBlocks: defineTable({
+    userId: v.id("users"),
+    date: v.string(),
+    startTime: v.number(),
+    endTime: v.number(),
+    type: v.union(v.literal("brief_task"), v.literal("personal")),
+    taskId: v.optional(v.id("tasks")),
+    briefId: v.optional(v.id("briefs")),
+    title: v.string(),
+    description: v.optional(v.string()),
+    color: v.optional(v.string()),
+    completed: v.optional(v.boolean()),
+    createdAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_task", ["taskId"]),
+
+  // ─── DAILY NOTES (Calendar Planner) ───────
+  dailyNotes: defineTable({
+    userId: v.id("users"),
+    date: v.string(),
+    content: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"]),
+
+  // ─── COMMENT READ RECEIPTS ────────────────
+  commentReadReceipts: defineTable({
+    userId: v.id("users"),
+    briefId: v.id("briefs"),
+    lastReadAt: v.number(),
+  })
+    .index("by_user_brief", ["userId", "briefId"])
+    .index("by_user", ["userId"]),
+
+  // ─── COMMENT REACTIONS ────────────────────
+  commentReactions: defineTable({
+    commentId: v.id("comments"),
+    userId: v.id("users"),
+    emoji: v.string(),
+  })
+    .index("by_comment", ["commentId"])
+    .index("by_user_comment", ["userId", "commentId"]),
+
+  // ─── TYPING INDICATORS ────────────────────
+  typingIndicators: defineTable({
+    userId: v.id("users"),
+    briefId: v.id("briefs"),
+    lastTypedAt: v.number(),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_user_brief", ["userId", "briefId"]),
 });

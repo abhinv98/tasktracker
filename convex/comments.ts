@@ -21,16 +21,21 @@ export const getComments = query({
 
     const users = await ctx.db.query("users").collect();
 
-    return comments
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => {
-        const author = users.find((u) => u._id === c.userId);
-        return {
-          ...c,
-          authorName: author?.name ?? author?.email ?? "Unknown",
-          authorRole: author?.role ?? "employee",
-        };
+    const results = [];
+    for (const c of comments.sort((a, b) => a.createdAt - b.createdAt)) {
+      const author = users.find((u) => u._id === c.userId);
+      let attachmentUrl: string | null = null;
+      if (c.attachmentId) {
+        attachmentUrl = await ctx.storage.getUrl(c.attachmentId);
+      }
+      results.push({
+        ...c,
+        authorName: author?.name ?? author?.email ?? "Unknown",
+        authorRole: author?.role ?? "employee",
+        attachmentUrl,
       });
+    }
+    return results;
   },
 });
 
@@ -73,20 +78,25 @@ export const getCommentsForBrief = query({
     const allComments = [...briefComments, ...taskComments];
     const users = await ctx.db.query("users").collect();
 
-    return allComments
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((c) => {
-        const author = users.find((u) => u._id === c.userId);
-        const taskName =
-          c.parentType === "task" ? (taskMap.get(c.parentId as Id<"tasks">) ?? null) : null;
-        return {
-          ...c,
-          authorName: author?.name ?? author?.email ?? "Unknown",
-          authorRole: author?.role ?? "employee",
-          taskName,
-          taskId: c.parentType === "task" ? c.parentId : null,
-        };
+    const results = [];
+    for (const c of allComments.sort((a, b) => a.createdAt - b.createdAt)) {
+      const author = users.find((u) => u._id === c.userId);
+      const taskName =
+        c.parentType === "task" ? (taskMap.get(c.parentId as Id<"tasks">) ?? null) : null;
+      let attachmentUrl: string | null = null;
+      if (c.attachmentId) {
+        attachmentUrl = await ctx.storage.getUrl(c.attachmentId);
+      }
+      results.push({
+        ...c,
+        authorName: author?.name ?? author?.email ?? "Unknown",
+        authorRole: author?.role ?? "employee",
+        taskName,
+        taskId: c.parentType === "task" ? c.parentId : null,
+        attachmentUrl,
       });
+    }
+    return results;
   },
 });
 
@@ -95,15 +105,21 @@ export const addComment = mutation({
     parentType: v.union(v.literal("brief"), v.literal("task")),
     parentId: v.string(),
     content: v.string(),
+    attachmentId: v.optional(v.id("_storage")),
+    attachmentName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const commentId = await ctx.db.insert("comments", {
-      ...args,
+      parentType: args.parentType,
+      parentId: args.parentId,
+      content: args.content,
       userId,
       createdAt: Date.now(),
+      ...(args.attachmentId ? { attachmentId: args.attachmentId } : {}),
+      ...(args.attachmentName ? { attachmentName: args.attachmentName } : {}),
     });
 
     const user = await ctx.db.get(userId);
@@ -185,5 +201,191 @@ export const deleteComment = mutation({
       throw new Error("Not authorized");
     }
     await ctx.db.delete(commentId);
+  },
+});
+
+// ─── UNREAD COUNTS ───────────────────────────
+
+export const getUnreadCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return {};
+
+    const receipts = await ctx.db
+      .query("commentReadReceipts")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const receiptMap = new Map(receipts.map((r) => [r.briefId, r.lastReadAt]));
+
+    // Get all briefs user has access to
+    const user = await ctx.db.get(userId);
+    let briefs = await ctx.db.query("briefs").collect();
+    if (user?.role === "manager") {
+      briefs = briefs.filter((b) => b.assignedManagerId === userId);
+    } else if (user?.role === "employee") {
+      const tasks = await ctx.db.query("tasks").withIndex("by_assignee", (q) => q.eq("assigneeId", userId)).collect();
+      const briefIds = new Set(tasks.map((t) => t.briefId));
+      briefs = briefs.filter((b) => briefIds.has(b._id));
+    }
+
+    const counts: Record<string, number> = {};
+    for (const brief of briefs) {
+      if (brief.status === "archived") continue;
+      const lastRead = receiptMap.get(brief._id) ?? 0;
+      const comments = await ctx.db
+        .query("comments")
+        .withIndex("by_parent", (q) => q.eq("parentType", "brief").eq("parentId", brief._id))
+        .collect();
+      const unread = comments.filter((c) => c.createdAt > lastRead && c.userId !== userId).length;
+      if (unread > 0) counts[brief._id] = unread;
+    }
+    return counts;
+  },
+});
+
+export const markBriefRead = mutation({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const existing = await ctx.db
+      .query("commentReadReceipts")
+      .withIndex("by_user_brief", (q) => q.eq("userId", userId).eq("briefId", briefId))
+      .collect();
+
+    if (existing.length > 0) {
+      await ctx.db.patch(existing[0]._id, { lastReadAt: Date.now() });
+    } else {
+      await ctx.db.insert("commentReadReceipts", {
+        userId,
+        briefId,
+        lastReadAt: Date.now(),
+      });
+    }
+  },
+});
+
+// ─── PINNED MESSAGES ─────────────────────────
+
+export const pinComment = mutation({
+  args: { commentId: v.id("comments") },
+  handler: async (ctx, { commentId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can pin messages");
+    }
+    await ctx.db.patch(commentId, { pinned: true, pinnedBy: userId });
+  },
+});
+
+export const unpinComment = mutation({
+  args: { commentId: v.id("comments") },
+  handler: async (ctx, { commentId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can unpin messages");
+    }
+    await ctx.db.patch(commentId, { pinned: false, pinnedBy: undefined });
+  },
+});
+
+// ─── REACTIONS ───────────────────────────────
+
+export const toggleReaction = mutation({
+  args: {
+    commentId: v.id("comments"),
+    emoji: v.string(),
+  },
+  handler: async (ctx, { commentId, emoji }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const existing = await ctx.db
+      .query("commentReactions")
+      .withIndex("by_user_comment", (q) => q.eq("userId", userId).eq("commentId", commentId))
+      .collect();
+
+    const match = existing.find((r) => r.emoji === emoji);
+    if (match) {
+      await ctx.db.delete(match._id);
+    } else {
+      await ctx.db.insert("commentReactions", { commentId, userId, emoji });
+    }
+  },
+});
+
+export const getReactionsForComments = query({
+  args: { commentIds: v.array(v.id("comments")) },
+  handler: async (ctx, { commentIds }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return {};
+
+    const result: Record<string, Array<{ emoji: string; count: number; myReaction: boolean }>> = {};
+    for (const commentId of commentIds) {
+      const reactions = await ctx.db
+        .query("commentReactions")
+        .withIndex("by_comment", (q) => q.eq("commentId", commentId))
+        .collect();
+
+      // Group by emoji
+      const emojiMap: Record<string, { count: number; myReaction: boolean }> = {};
+      for (const r of reactions) {
+        if (!emojiMap[r.emoji]) emojiMap[r.emoji] = { count: 0, myReaction: false };
+        emojiMap[r.emoji].count++;
+        if (r.userId === userId) emojiMap[r.emoji].myReaction = true;
+      }
+      const entries = Object.entries(emojiMap).map(([emoji, data]) => ({ emoji, ...data }));
+      if (entries.length > 0) result[commentId] = entries;
+    }
+    return result;
+  },
+});
+
+// ─── TYPING INDICATORS ──────────────────────
+
+export const setTyping = mutation({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return;
+
+    const existing = await ctx.db
+      .query("typingIndicators")
+      .withIndex("by_user_brief", (q) => q.eq("userId", userId).eq("briefId", briefId))
+      .collect();
+
+    if (existing.length > 0) {
+      await ctx.db.patch(existing[0]._id, { lastTypedAt: Date.now() });
+    } else {
+      await ctx.db.insert("typingIndicators", { userId, briefId, lastTypedAt: Date.now() });
+    }
+  },
+});
+
+export const getTypingUsers = query({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const cutoff = Date.now() - 4000; // 4 seconds
+    const indicators = await ctx.db
+      .query("typingIndicators")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+
+    const active = indicators.filter((i) => i.lastTypedAt > cutoff && i.userId !== userId);
+    const users = await ctx.db.query("users").collect();
+
+    return active.map((i) => {
+      const user = users.find((u) => u._id === i.userId);
+      return { userId: i.userId, name: user?.name ?? user?.email ?? "Someone" };
+    });
   },
 });

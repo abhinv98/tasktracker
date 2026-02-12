@@ -7,8 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Select, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
-import { CommentThread } from "@/components/comments/CommentThread";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle } from "lucide-react";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -569,16 +568,22 @@ export default function BriefPage() {
               </div>
             )}
 
-            {/* Comments & Attachments */}
+            {/* Attachments */}
             <div className="mt-6 space-y-6">
               <AttachmentList parentType="brief" parentId={briefId} />
-              <CommentThread
-                parentType="brief"
-                parentId={briefId}
-                briefId={briefId}
-                tasks={allTasks.map((t) => ({ _id: t._id, title: t.title }))}
-                members={uniqueEmployees.map((e) => ({ _id: e._id, name: e.name, email: e.email }))}
-              />
+              {/* Link to Discussions */}
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+                <MessageCircle className="h-4 w-4 text-[var(--accent-admin)]" />
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                  Discussions have moved!
+                </span>
+                <a
+                  href="/discussions"
+                  className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline ml-auto"
+                >
+                  Open Discussions &rarr;
+                </a>
+              </div>
             </div>
           </div>
         </div>

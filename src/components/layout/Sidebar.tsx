@@ -16,6 +16,8 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  MessageCircle,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -34,6 +36,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/brands": Tag,
   "/overview": BarChart3,
   "/analytics": TrendingUp,
+  "/discussions": MessageCircle,
+  "/planner": CalendarDays,
   "/teams": Users,
   "/users": Shield,
   "/archive": Archive,
@@ -44,6 +48,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
 const ADMIN_NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/briefs", label: "Briefs" },
+  { href: "/discussions", label: "Discussions" },
+  { href: "/planner", label: "Planner" },
   { href: "/brands", label: "Brands" },
   { href: "/overview", label: "Brand Overview" },
   { href: "/analytics", label: "Analytics" },
@@ -57,6 +63,8 @@ const ADMIN_NAV = [
 const MANAGER_NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/briefs", label: "Briefs" },
+  { href: "/discussions", label: "Discussions" },
+  { href: "/planner", label: "Planner" },
   { href: "/brands", label: "Brands" },
   { href: "/analytics", label: "Analytics" },
   { href: "/deliverables", label: "Deliverables" },
@@ -67,6 +75,8 @@ const MANAGER_NAV = [
 
 const EMPLOYEE_NAV = [
   { href: "/dashboard", label: "Queue" },
+  { href: "/discussions", label: "Discussions" },
+  { href: "/planner", label: "Planner" },
   { href: "/deliverables", label: "Deliverables" },
   { href: "/profile", label: "Profile" },
 ];

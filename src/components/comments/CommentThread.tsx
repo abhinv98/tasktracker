@@ -4,7 +4,16 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Send, Trash2, AtSign, User, CheckSquare } from "lucide-react";
+import { Send, Trash2, AtSign, User, CheckSquare, Pin, SmilePlus, ChevronDown, Paperclip, FileText, Image as ImageIcon, X } from "lucide-react";
+
+const EMOJI_PRESETS = [
+  { emoji: "👍", label: "thumbsup" },
+  { emoji: "✅", label: "check" },
+  { emoji: "👀", label: "eyes" },
+  { emoji: "❤️", label: "heart" },
+  { emoji: "🔥", label: "fire" },
+];
+const EMOJI_MAP: Record<string, string> = { thumbsup: "👍", check: "✅", eyes: "👀", heart: "❤️", fire: "🔥" };
 
 interface MentionableTask {
   _id: string;
@@ -26,6 +35,8 @@ interface CommentThreadProps {
   tasks?: MentionableTask[];
   /** Members assigned to the brief, for @mention autocomplete */
   members?: MentionableMember[];
+  /** When true, the thread fills the full available height (for standalone discussions page) */
+  fullPage?: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -35,7 +46,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 // Parse @[user:id:name] and @[task:id:title] tokens into React elements
-function renderContent(content: string): React.ReactNode[] {
+function renderContent(content: string, isOwnMessage?: boolean): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const regex = /@\[(user|task):([^:]+):([^\]]*)\]/g;
   let lastIndex = 0;
@@ -47,18 +58,31 @@ function renderContent(content: string): React.ReactNode[] {
       parts.push(content.slice(lastIndex, match.index));
     }
     const [, type, , displayName] = match;
-    parts.push(
-      <span
-        key={match.index}
-        className={`font-semibold ${
-          type === "user"
-            ? "text-[var(--accent-manager)]"
-            : "text-[var(--accent-admin)]"
-        }`}
-      >
-        @{displayName}
-      </span>
-    );
+
+    if (isOwnMessage) {
+      // High contrast on colored bubble: white with underline
+      parts.push(
+        <span
+          key={match.index}
+          className="font-bold underline decoration-white/50 text-white"
+        >
+          @{displayName}
+        </span>
+      );
+    } else {
+      parts.push(
+        <span
+          key={match.index}
+          className={`font-semibold ${
+            type === "user"
+              ? "text-[var(--accent-manager)]"
+              : "text-[var(--accent-admin)]"
+          }`}
+        >
+          @{displayName}
+        </span>
+      );
+    }
     lastIndex = match.index + match[0].length;
   }
 
@@ -76,6 +100,7 @@ export function CommentThread({
   briefId,
   tasks,
   members,
+  fullPage,
 }: CommentThreadProps) {
   const isUnifiedMode = !!briefId;
 
@@ -92,7 +117,38 @@ export function CommentThread({
 
   const addComment = useMutation(api.comments.addComment);
   const deleteComment = useMutation(api.comments.deleteComment);
+  const pinComment = useMutation(api.comments.pinComment);
+  const unpinComment = useMutation(api.comments.unpinComment);
+  const toggleReaction = useMutation(api.comments.toggleReaction);
+  const setTypingMut = useMutation(api.comments.setTyping);
   const user = useQuery(api.users.getCurrentUser);
+
+  // Reactions for all visible comments
+  const commentIds = useMemo(() => (comments ?? []).map((c) => c._id), [comments]);
+  const reactions = useQuery(
+    api.comments.getReactionsForComments,
+    commentIds.length > 0 ? { commentIds: commentIds as Id<"comments">[] } : "skip"
+  );
+
+  // Typing indicators
+  const typingUsers = useQuery(
+    api.comments.getTypingUsers,
+    isUnifiedMode && briefId ? { briefId: briefId as Id<"briefs"> } : "skip"
+  );
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
+
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showPinnedSection, setShowPinnedSection] = useState(true);
+  const [pendingFile, setPendingFile] = useState<{ file: File; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const pinnedComments = useMemo(
+    () => (comments ?? []).filter((c) => (c as { pinned?: boolean }).pinned),
+    [comments]
+  );
 
   const [text, setText] = useState("");
   const [postTarget, setPostTarget] = useState<{ type: "brief" | "task"; id: string; label: string }>({
@@ -203,16 +259,41 @@ export function CommentThread({
 
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() && !pendingFile) return;
     setShowMentions(false);
-    await addComment({
-      parentType: postTarget.type,
-      parentId: postTarget.id,
-      content: text.trim(),
-    });
-    setText("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+
+    try {
+      let attachmentId: string | undefined;
+      let attachmentName: string | undefined;
+
+      if (pendingFile) {
+        setUploading(true);
+        const uploadUrl = await generateUploadUrl();
+        const resp = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": pendingFile.file.type },
+          body: pendingFile.file,
+        });
+        const { storageId } = await resp.json();
+        attachmentId = storageId;
+        attachmentName = pendingFile.name;
+      }
+
+      await addComment({
+        parentType: postTarget.type,
+        parentId: postTarget.id,
+        content: text.trim() || (attachmentName ? `📎 ${attachmentName}` : ""),
+        ...(attachmentId ? { attachmentId: attachmentId as Id<"_storage"> } : {}),
+        ...(attachmentName ? { attachmentName } : {}),
+      });
+      setText("");
+      setPendingFile(null);
+      setUploading(false);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+    } catch {
+      setUploading(false);
     }
   }
 
@@ -220,6 +301,15 @@ export function CommentThread({
     const value = e.target.value;
     setText(value);
     handleTextareaResize();
+
+    // Fire typing indicator (debounced)
+    if (isUnifiedMode && briefId) {
+      if (!typingTimerRef.current) {
+        setTypingMut({ briefId: briefId as Id<"briefs"> });
+      }
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => { typingTimerRef.current = null; }, 2000);
+    }
 
     // Detect @ trigger
     const cursorPos = e.target.selectionStart;
@@ -295,15 +385,44 @@ export function CommentThread({
   }
 
   return (
-    <div className="flex flex-col">
-      <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide mb-2">
-        Discussion ({comments?.length ?? 0})
-      </h4>
+    <div className={`flex flex-col ${fullPage ? "h-full" : ""}`}>
+      {!fullPage && (
+        <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide mb-2">
+          Discussion ({comments?.length ?? 0})
+        </h4>
+      )}
+
+      {/* Pinned messages section */}
+      {pinnedComments.length > 0 && (
+        <div className="mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+          <button
+            onClick={() => setShowPinnedSection(!showPinnedSection)}
+            className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide hover:bg-[var(--bg-hover)] rounded-t-lg transition-colors"
+          >
+            <Pin className="h-3 w-3 text-[var(--accent-admin)]" />
+            Pinned ({pinnedComments.length})
+            <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${showPinnedSection ? "" : "-rotate-90"}`} />
+          </button>
+          {showPinnedSection && (
+            <div className="px-3 pb-2 space-y-1">
+              {pinnedComments.map((c) => (
+                <div key={`pin-${c._id}`} className="flex items-start gap-2 px-2 py-1.5 rounded-md bg-white border border-[var(--border-subtle)]">
+                  <Pin className="h-3 w-3 text-[var(--accent-admin)] shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-semibold text-[var(--text-primary)]">{c.authorName}: </span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">{c.content.slice(0, 120)}{c.content.length > 120 ? "..." : ""}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages area */}
       <div
         ref={scrollRef}
-        className="flex flex-col gap-0.5 max-h-[400px] overflow-y-auto mb-3 scroll-smooth"
+        className={`flex flex-col gap-0.5 overflow-y-auto mb-3 scroll-smooth ${fullPage ? "flex-1 min-h-0" : "max-h-[400px]"}`}
       >
         {comments?.map((c, i) => {
           const isMe = c.userId === user?._id;
@@ -315,6 +434,8 @@ export function CommentThread({
 
           // Task context label (unified mode only)
           const taskName = "taskName" in c ? (c as { taskName?: string | null }).taskName : null;
+          const isPinned = (c as { pinned?: boolean }).pinned;
+          const commentReactions = reactions?.[c._id] ?? [];
 
           return (
             <div
@@ -344,6 +465,7 @@ export function CommentThread({
                     <span className="text-[11px] font-semibold text-[var(--text-primary)]">
                       {isMe ? "You" : c.authorName}
                     </span>
+                    {isPinned && <Pin className="h-2.5 w-2.5 text-[var(--accent-admin)]" />}
                     {taskName && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium">
                         on: {taskName}
@@ -362,19 +484,100 @@ export function CommentThread({
                   }`}
                 >
                   <span className="whitespace-pre-wrap break-words">
-                    {renderContent(c.content)}
+                    {renderContent(c.content, isMe)}
                   </span>
 
-                  {/* Delete button */}
-                  {(c.userId === user?._id || user?.role === "admin") && (
+                  {/* Inline attachment */}
+                  {(c as { attachmentUrl?: string | null }).attachmentUrl && (
+                    <div className="mt-1.5">
+                      {(c as { attachmentName?: string }).attachmentName?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        <a href={(c as { attachmentUrl: string }).attachmentUrl} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={(c as { attachmentUrl: string }).attachmentUrl}
+                            alt={(c as { attachmentName?: string }).attachmentName ?? "image"}
+                            className="max-w-[280px] rounded-lg border border-white/20 cursor-pointer hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          href={(c as { attachmentUrl: string }).attachmentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                            isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--border)]"
+                          }`}
+                        >
+                          <FileText className="h-3 w-3" />
+                          {(c as { attachmentName?: string }).attachmentName ?? "Download"}
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Action buttons on hover */}
+                  <div className={`absolute -top-1 ${isMe ? "-left-16" : "-right-16"} opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-all`}>
+                    {/* Reaction button */}
                     <button
-                      onClick={() => deleteComment({ commentId: c._id })}
-                      className={`absolute -top-1 ${isMe ? "-left-5" : "-right-5"} opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-all`}
+                      onClick={() => setShowEmojiPicker(showEmojiPicker === c._id ? null : c._id)}
+                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)] transition-colors"
                     >
-                      <Trash2 className="h-2.5 w-2.5" />
+                      <SmilePlus className="h-3 w-3" />
                     </button>
+                    {/* Pin button (admin/manager only) */}
+                    {(user?.role === "admin" || user?.role === "manager") && (
+                      <button
+                        onClick={() => isPinned ? unpinComment({ commentId: c._id }) : pinComment({ commentId: c._id })}
+                        className={`p-0.5 rounded transition-colors ${isPinned ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)] hover:text-[var(--accent-admin)]"}`}
+                      >
+                        <Pin className="h-3 w-3" />
+                      </button>
+                    )}
+                    {/* Delete button */}
+                    {(c.userId === user?._id || user?.role === "admin") && (
+                      <button
+                        onClick={() => deleteComment({ commentId: c._id })}
+                        className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Emoji picker */}
+                  {showEmojiPicker === c._id && (
+                    <div className={`absolute ${isMe ? "left-0" : "right-0"} -bottom-8 flex items-center gap-0.5 bg-white border border-[var(--border)] rounded-full shadow-lg px-1.5 py-0.5 z-20`}>
+                      {EMOJI_PRESETS.map((ep) => (
+                        <button
+                          key={ep.label}
+                          onClick={() => { toggleReaction({ commentId: c._id, emoji: ep.label }); setShowEmojiPicker(null); }}
+                          className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)] text-[14px] transition-colors"
+                        >
+                          {ep.emoji}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
+
+                {/* Reactions display */}
+                {commentReactions.length > 0 && (
+                  <div className={`flex flex-wrap gap-1 mt-0.5 ${isMe ? "justify-end" : ""}`}>
+                    {commentReactions.map((r) => (
+                      <button
+                        key={r.emoji}
+                        onClick={() => toggleReaction({ commentId: c._id, emoji: r.emoji })}
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] border transition-colors ${
+                          r.myReaction
+                            ? "bg-[var(--accent-admin-dim)] border-[var(--accent-admin)] text-[var(--accent-admin)]"
+                            : "bg-white border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-admin)]"
+                        }`}
+                      >
+                        <span>{EMOJI_MAP[r.emoji] ?? r.emoji}</span>
+                        <span className="font-medium">{r.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -385,6 +588,20 @@ export function CommentThread({
             <p className="text-[12px] text-[var(--text-muted)]">
               No messages yet. Start the conversation!
             </p>
+          </div>
+        )}
+
+        {/* Typing indicator */}
+        {typingUsers && typingUsers.length > 0 && (
+          <div className="flex items-center gap-2 px-2 py-1 mt-1">
+            <div className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+            <span className="text-[10px] text-[var(--text-muted)] italic">
+              {typingUsers.map((u) => u.name).join(" and ")} {typingUsers.length === 1 ? "is" : "are"} typing...
+            </span>
           </div>
         )}
       </div>
@@ -458,8 +675,39 @@ export function CommentThread({
           </div>
         )}
 
+        {/* Pending file preview */}
+        {pendingFile && (
+          <div className="flex items-center gap-2 px-3 py-1.5 mb-1.5 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+            <Paperclip className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
+            <span className="text-[11px] text-[var(--text-primary)] truncate flex-1">{pendingFile.name}</span>
+            <button onClick={() => setPendingFile(null)} className="text-[var(--text-muted)] hover:text-[var(--danger)]">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
         {/* Input row */}
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
+          {/* File upload button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="shrink-0 p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+            title="Attach a file"
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setPendingFile({ file, name: file.name });
+              e.target.value = "";
+            }}
+          />
+
           {/* @ button */}
           {(members?.length || tasks?.length) ? (
             <button
@@ -503,10 +751,14 @@ export function CommentThread({
           />
           <button
             type="submit"
-            disabled={!text.trim()}
+            disabled={(!text.trim() && !pendingFile) || uploading}
             className="shrink-0 p-2 rounded-xl bg-[var(--accent-admin)] text-white disabled:opacity-30 hover:bg-[#c4684d] transition-colors"
           >
-            <Send className="h-3.5 w-3.5" />
+            {uploading ? (
+              <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
           </button>
         </form>
       </div>
