@@ -63,6 +63,7 @@ function shortDay(s: string) {
 }
 
 const HOUR_HEIGHT = 60;
+const GRID_PAD_TOP = 16; // px buffer at top so first hour label isn't clipped
 const START_HOUR = 11; // 11 AM
 const END_HOUR = 20;   // 8 PM
 const WORK_HOURS = END_HOUR - START_HOUR; // 9 hours
@@ -693,22 +694,22 @@ export default function PlannerPage() {
                 <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
               </div>
             )}
-            <div className="relative pt-2 pb-4" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT + 24 }}>
+            <div className="relative" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT + GRID_PAD_TOP + 16 }}>
               {/* Hour lines */}
               {Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => (
-                <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: i * HOUR_HEIGHT }}>
+                <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: GRID_PAD_TOP + i * HOUR_HEIGHT }}>
                   <span className={`w-16 shrink-0 text-right pr-3 text-[10px] -translate-y-1.5 select-none ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "text-amber-400" : "text-[var(--text-muted)]"}`}>{formatMin((gridStartHour + i) * 60)}</span>
                   <div className={`flex-1 border-t ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "border-amber-200" : "border-[var(--border-subtle)]"}`} />
                 </div>
               ))}
               {/* Half-hour lines */}
               {Array.from({ length: gridEndHour - gridStartHour }, (_, i) => (
-                <div key={`half-${i}`} className="absolute left-16 right-0 border-t border-dotted border-[var(--border-subtle)] opacity-40" style={{ top: i * HOUR_HEIGHT + HOUR_HEIGHT / 2 }} />
+                <div key={`half-${i}`} className="absolute left-16 right-0 border-t border-dotted border-[var(--border-subtle)] opacity-40" style={{ top: GRID_PAD_TOP + i * HOUR_HEIGHT + HOUR_HEIGHT / 2 }} />
               ))}
 
               {/* Now line */}
               {nowLineOffset !== null && (
-                <div className="absolute left-14 right-0 z-10 flex items-center pointer-events-none" style={{ top: nowLineOffset }}>
+                <div className="absolute left-14 right-0 z-10 flex items-center pointer-events-none" style={{ top: GRID_PAD_TOP + nowLineOffset }}>
                   <div className="w-2 h-2 rounded-full bg-[var(--accent-admin)] -ml-1" />
                   <div className="flex-1 border-t-2 border-[var(--accent-admin)]" />
                 </div>
@@ -716,7 +717,7 @@ export default function PlannerPage() {
 
               {/* Schedule blocks */}
               {(schedule ?? []).map((block) => {
-                const top = ((block.startTime - gridStartHour * 60) / 60) * HOUR_HEIGHT;
+                const top = GRID_PAD_TOP + ((block.startTime - gridStartHour * 60) / 60) * HOUR_HEIGHT;
                 const height = ((block.endTime - block.startTime) / 60) * HOUR_HEIGHT;
                 const bgColor = block.type === "personal"
                   ? (block.color ?? PRESET_COLORS[0])
@@ -809,7 +810,7 @@ export default function PlannerPage() {
                   <div
                     key={`slot-${i}`}
                     className="absolute left-[72px] right-3 cursor-pointer hover:bg-[var(--accent-admin-dim)] rounded transition-colors opacity-0 hover:opacity-100"
-                    style={{ top: (i * HOUR_HEIGHT) / 2, height: HOUR_HEIGHT / 2 }}
+                    style={{ top: GRID_PAD_TOP + (i * HOUR_HEIGHT) / 2, height: HOUR_HEIGHT / 2 }}
                     onClick={() => openQuickAdd(slotTime)}
                   >
                     <div className="flex items-center justify-center h-full">
