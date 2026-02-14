@@ -84,6 +84,69 @@ function dayName(dateString: string) {
   return d.toLocaleDateString("en-US", { weekday: "long" });
 }
 
+const GRID_LEFT = 72;  // px – width of the hour-label column
+const GRID_RIGHT = 12; // px – right margin
+
+/**
+ * Assign overlapping blocks to side-by-side columns (Google Calendar style).
+ * Returns a Map of blockId -> { col, totalCols } for positioning.
+ */
+function layoutBlocks(blocks: Array<{ startTime: number; endTime: number; _id: string }>) {
+  if (blocks.length === 0) return new Map<string, { col: number; totalCols: number }>();
+
+  const sorted = [...blocks].sort(
+    (a, b) => a.startTime - b.startTime || (b.endTime - b.startTime) - (a.endTime - a.startTime)
+  );
+
+  // Step 1: group blocks into connected overlap clusters
+  const clusters: Array<typeof sorted> = [];
+  let currentCluster: typeof sorted = [sorted[0]];
+  let clusterEnd = sorted[0].endTime;
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].startTime < clusterEnd) {
+      // overlaps with current cluster
+      currentCluster.push(sorted[i]);
+      clusterEnd = Math.max(clusterEnd, sorted[i].endTime);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [sorted[i]];
+      clusterEnd = sorted[i].endTime;
+    }
+  }
+  clusters.push(currentCluster);
+
+  // Step 2: within each cluster, assign column indices
+  const result = new Map<string, { col: number; totalCols: number }>();
+
+  for (const cluster of clusters) {
+    const columns: Array<Array<(typeof cluster)[number]>> = [];
+    for (const block of cluster) {
+      let placed = false;
+      for (let c = 0; c < columns.length; c++) {
+        const lastInCol = columns[c][columns[c].length - 1];
+        if (lastInCol.endTime <= block.startTime) {
+          columns[c].push(block);
+          result.set(block._id, { col: c, totalCols: 0 });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push([block]);
+        result.set(block._id, { col: columns.length - 1, totalCols: 0 });
+      }
+    }
+    const totalCols = columns.length;
+    for (const block of cluster) {
+      const entry = result.get(block._id);
+      if (entry) entry.totalCols = totalCols;
+    }
+  }
+
+  return result;
+}
+
 export default function PlannerPage() {
   const user = useQuery(api.users.getCurrentUser);
   const { toast } = useToast();
@@ -504,6 +567,12 @@ export default function PlannerPage() {
     return opts;
   }, [gridStartHour, gridEndHour]);
 
+  // Column layout for overlapping blocks
+  const blockLayout = useMemo(() => {
+    if (!schedule || schedule.length === 0) return new Map<string, { col: number; totalCols: number }>();
+    return layoutBlocks(schedule);
+  }, [schedule]);
+
   // Now line position
   const nowLineOffset = useMemo(() => {
     if (selectedDate !== todayStr()) return null;
@@ -715,7 +784,24 @@ export default function PlannerPage() {
                 </div>
               )}
 
-              {/* Schedule blocks */}
+              {/* Clickable empty slots — rendered BEFORE blocks so blocks sit on top */}
+              {Array.from({ length: (gridEndHour - gridStartHour) * 2 }, (_, i) => {
+                const slotTime = gridStartHour * 60 + i * 30;
+                return (
+                  <div
+                    key={`slot-${i}`}
+                    className="absolute left-[72px] right-3 cursor-pointer hover:bg-[var(--accent-admin-dim)] rounded transition-colors opacity-0 hover:opacity-100"
+                    style={{ top: GRID_PAD_TOP + (i * HOUR_HEIGHT) / 2, height: HOUR_HEIGHT / 2, zIndex: 1 }}
+                    onClick={() => openQuickAdd(slotTime)}
+                  >
+                    <div className="flex items-center justify-center h-full">
+                      <Plus className="h-3 w-3 text-[var(--accent-admin)]" />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Schedule blocks — rendered AFTER slots so they sit on top and are interactive */}
               {(schedule ?? []).map((block) => {
                 const top = GRID_PAD_TOP + ((block.startTime - gridStartHour * 60) / 60) * HOUR_HEIGHT;
                 const height = ((block.endTime - block.startTime) / 60) * HOUR_HEIGHT;
@@ -723,13 +809,23 @@ export default function PlannerPage() {
                   ? (block.color ?? PRESET_COLORS[0])
                   : (block.teamColor ?? "var(--accent-admin)");
 
+                // Column layout for overlapping blocks
+                const layout = blockLayout.get(block._id);
+                const col = layout?.col ?? 0;
+                const totalCols = layout?.totalCols ?? 1;
+                const leftPct = (col / totalCols) * 100;
+                const widthPct = (1 / totalCols) * 100;
+
                 return (
                   <div
                     key={block._id}
-                    className={`absolute left-[72px] right-3 rounded-lg cursor-pointer transition-all hover:shadow-md group ${block.completed ? "opacity-50" : ""}`}
+                    className={`absolute rounded-lg cursor-pointer transition-all hover:shadow-md group ${block.completed ? "opacity-50" : ""}`}
                     style={{
                       top,
-                      height: Math.max(height, 24),
+                      height: Math.max(height, 28),
+                      left: `calc(${GRID_LEFT}px + (100% - ${GRID_LEFT + GRID_RIGHT}px) * ${leftPct / 100})`,
+                      width: `calc((100% - ${GRID_LEFT + GRID_RIGHT}px) * ${widthPct / 100} - ${totalCols > 1 ? 2 : 0}px)`,
+                      zIndex: 5,
                       backgroundColor: block.type === "personal"
                         ? `color-mix(in srgb, ${bgColor} 12%, white)`
                         : "white",
@@ -754,10 +850,10 @@ export default function PlannerPage() {
                         </div>
                       )}
                     </div>
-                    {/* Hover-visible delete button */}
+                    {/* Delete button — always semi-visible, full on hover */}
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteBlock(block._id); }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-md bg-white/80 border border-[var(--border)] flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-[var(--danger)] hover:text-white hover:border-[var(--danger)] transition-all text-[var(--text-muted)]"
+                      className="absolute top-1 right-1 w-5 h-5 rounded-md bg-white/80 border border-[var(--border)] flex items-center justify-center opacity-40 group-hover:opacity-100 hover:bg-[var(--danger)] hover:text-white hover:border-[var(--danger)] transition-all text-[var(--text-muted)]"
                       title="Delete block"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -765,7 +861,7 @@ export default function PlannerPage() {
 
                     {/* Block detail popover */}
                     {showBlockDetail === block._id && (
-                      <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-[var(--border)] rounded-lg shadow-lg z-20 p-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-[var(--border)] rounded-lg shadow-lg p-3" style={{ zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
                         <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">{block.title}</p>
                         {block.briefTitle && <p className="text-[11px] text-[var(--accent-admin)] mb-1">Brief: {block.briefTitle}</p>}
                         <p className="text-[11px] text-[var(--text-secondary)] mb-2">{formatMin(block.startTime)} - {formatMin(block.endTime)}</p>
@@ -799,23 +895,6 @@ export default function PlannerPage() {
                         )}
                       </div>
                     )}
-                  </div>
-                );
-              })}
-
-              {/* Clickable empty slots */}
-              {Array.from({ length: (gridEndHour - gridStartHour) * 2 }, (_, i) => {
-                const slotTime = gridStartHour * 60 + i * 30;
-                return (
-                  <div
-                    key={`slot-${i}`}
-                    className="absolute left-[72px] right-3 cursor-pointer hover:bg-[var(--accent-admin-dim)] rounded transition-colors opacity-0 hover:opacity-100"
-                    style={{ top: GRID_PAD_TOP + (i * HOUR_HEIGHT) / 2, height: HOUR_HEIGHT / 2 }}
-                    onClick={() => openQuickAdd(slotTime)}
-                  >
-                    <div className="flex items-center justify-center h-full">
-                      <Plus className="h-3 w-3 text-[var(--accent-admin)]" />
-                    </div>
                   </div>
                 );
               })}
