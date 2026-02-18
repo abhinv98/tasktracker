@@ -442,9 +442,12 @@ export default function DashboardPage() {
   // MANAGER DASHBOARD
   // ═══════════════════════════════════════════
   if (role === "manager") {
-    const myBriefs = (briefs ?? []).filter(
-      (b) => b.assignedManagerId === user?._id
-    );
+    const myBriefs = briefs ?? [];
+    const myActiveBriefs = myBriefs.filter((b) => !["archived", "completed"].includes(b.status));
+    const totalTasks = myBriefs.reduce((acc, b) => acc + (b.taskCount ?? 0), 0);
+    const doneTasks = myBriefs.reduce((acc, b) => acc + (b.doneCount ?? 0), 0);
+    const openTasks = totalTasks - doneTasks;
+    const overallProgress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
     return (
       <div className="p-4 sm:p-6 lg:p-8">
@@ -453,31 +456,182 @@ export default function DashboardPage() {
             {greeting}, {displayName}
           </h1>
           <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-            Your briefs and team status
+            Your briefs and team overview
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {myBriefs.map((brief) => (
-            <Card
-              key={brief._id}
-              onClick={() => router.push(`/brief/${brief._id}`)}
-              accent="manager"
-              hover
-            >
-              <h3 className="font-semibold text-[14px] sm:text-[15px] text-[var(--text-primary)]">
-                {brief.title}
-              </h3>
-              <Badge variant="neutral" className="mt-2">
-                {brief.status}
-              </Badge>
-              <p className="text-[12px] text-[var(--text-secondary)] mt-2">
-                {(brief as { doneCount?: number }).doneCount ?? 0}/
-                {(brief as { taskCount?: number }).taskCount ?? 0} tasks done
-              </p>
-            </Card>
-          ))}
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card accent="manager">
+            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
+              My Briefs
+            </p>
+            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
+              {myActiveBriefs.length}
+            </p>
+          </Card>
+          <Card accent="admin">
+            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
+              Open Tasks
+            </p>
+            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
+              {openTasks}
+            </p>
+          </Card>
+          <Card accent="employee">
+            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
+              Completed
+            </p>
+            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
+              {doneTasks}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
+              Progress
+            </p>
+            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
+              {overallProgress}%
+            </p>
+          </Card>
         </div>
+
+        {/* Recent Activity Feed */}
+        <Card className="mb-6 sm:mb-8 p-4">
+          <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] uppercase tracking-wide mb-3">
+            Recent Activity
+          </h3>
+          <ActivityFeed />
+        </Card>
+
+        {/* Briefs */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+          <h2 className="font-semibold text-[14px] text-[var(--text-secondary)]">
+            My Briefs
+          </h2>
+          <Button variant="primary" onClick={() => router.push("/briefs")}>
+            Create Brief
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {myBriefs
+            .filter((b) => b.status !== "archived")
+            .sort((a, b) => a.globalPriority - b.globalPriority)
+            .map((brief) => (
+              <Card
+                key={brief._id}
+                onClick={() => openBriefPanel(brief._id)}
+                hover
+                accent={brief.status === "active" ? "employee" : brief.status === "draft" ? undefined : "manager"}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)] truncate flex-1">
+                    {brief.title}
+                  </h3>
+                  <Badge variant="neutral">{brief.status}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[var(--accent-employee)]"
+                      style={{ width: `${brief.progress ?? 0}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                    {brief.doneCount ?? 0}/{brief.taskCount ?? 0}
+                  </span>
+                </div>
+                {(brief.teamNames?.length ?? 0) > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-2">
+                    {brief.teamNames?.filter((name): name is string => !!name).map((name) => (
+                      <Badge key={name} variant="neutral">{name}</Badge>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            ))}
+          {myBriefs.filter((b) => b.status !== "archived").length === 0 && (
+            <p className="text-[13px] text-[var(--text-muted)] col-span-full">
+              No briefs assigned to you yet. Create one to get started.
+            </p>
+          )}
+        </div>
+
+        {/* ═══ Brief Slide-in Panel ═══ */}
+        {selectedBriefId && (
+          <>
+            <div
+              className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-200 ${
+                panelOpen ? "opacity-100" : "opacity-0"
+              }`}
+              onClick={closeBriefPanel}
+            />
+            <div
+              ref={panelRef}
+              className={`fixed right-0 top-0 h-full w-full sm:w-[420px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
+                panelOpen ? "translate-x-0" : "translate-x-full"
+              }`}
+            >
+              <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--border)] shrink-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[var(--accent-manager)]" />
+                  <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
+                    {selectedBrief?.title ?? "Loading..."}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {selectedBrief && <Badge variant="neutral">{selectedBrief.status}</Badge>}
+                  <button onClick={closeBriefPanel} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-5">
+                {selectedBrief === undefined ? (
+                  <p className="text-[13px] text-[var(--text-muted)]">Loading brief data...</p>
+                ) : selectedBrief === null ? (
+                  <p className="text-[13px] text-[var(--text-muted)]">Brief not found.</p>
+                ) : (
+                  <>
+                    {selectedBrief.description && (
+                      <p className="text-[13px] text-[var(--text-secondary)] mb-4 leading-relaxed">
+                        {selectedBrief.description}
+                      </p>
+                    )}
+                    <div className="mb-5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[12px] font-medium text-[var(--text-secondary)]">Progress</span>
+                        <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">
+                          {Math.round(selectedBrief.progress)}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+                        <div className="h-full rounded-full bg-[var(--accent-employee)] transition-all" style={{ width: `${selectedBrief.progress}%` }} />
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                        {selectedBrief.doneCount}/{selectedBrief.taskCount} tasks completed
+                      </p>
+                    </div>
+                    <div className="mb-4">
+                      <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] mb-3 uppercase tracking-wider">Task Structure</h3>
+                      <div className="bg-[var(--bg-hover)] rounded-lg p-4 overflow-x-auto">
+                        <div className="font-mono text-[13px] text-[var(--text-primary)] mb-2 font-semibold">{selectedBrief.title}</div>
+                        {renderTaskTree()}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="px-5 py-4 border-t border-[var(--border)] shrink-0">
+                <Button variant="primary" className="w-full" onClick={() => { closeBriefPanel(); router.push(`/brief/${selectedBriefId}`); }}>
+                  View Complete Brief
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }

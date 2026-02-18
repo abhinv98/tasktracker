@@ -668,7 +668,7 @@ Today's date: ${today}
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner, delete briefs/brands, and create/invite new users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses, manage employee planners." : "This user can ONLY view their tasks, update task status, submit deliverables, and manage their own planner. They CANNOT create, delete, or modify briefs, brands, tasks, or users."}
+- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner, delete briefs/brands, create/invite new users, create/delete teams, and assign team leads." : role === "manager" ? "This user can create briefs, create brands, assign teams to briefs, create tasks, assign employees to teams, update statuses, and manage employee planners. MANAGERS CANNOT: create/delete users, create/delete teams, or assign team leads — these are admin-only. Admin assignments take priority — managers cannot override admin-made assignments." : "This user can ONLY view their tasks, update task status, submit deliverables, and manage their own planner. They CANNOT create, delete, or modify briefs, brands, tasks, or users."}
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
@@ -687,39 +687,44 @@ Please ask your manager or admin to perform this action.
 Is there anything else I can help you with?
 
 Do NOT attempt to call any mutation tools for employees. Only use read-only query tools (list_briefs, get_brief_details, get_my_tasks, get_dashboard_stats, list_brands, get_brand_info, list_teams, get_team_members, list_all_users, get_user_tasks, get_schedule_for_date, get_unscheduled_tasks). Employees CAN update their own task status and manage their own schedule.` : ""}
-${role === "admin" ? `
+${(role === "admin" || role === "manager") ? `
 INTERACTIVE FORMS — The chat UI supports inline forms. Use these markers to show forms instead of calling tools directly:
 
+ASSIGN USER TO TEAM:
+- When asked to assign/add a user or employee to a team, respond with a short message followed by [[FORM:ASSIGN_TEAM]]
+- Example response: "Select the user and team:\n\n[[FORM:ASSIGN_TEAM]]"
+- The form has dropdowns for user and team selection.` : ""}
+${role === "admin" ? `
 CREATE USER:
-- When the admin asks to create, invite, or add a new user, respond with a short message followed by [[FORM:CREATE_USER]]
+- When asked to create, invite, or add a new user, respond with a short message followed by [[FORM:CREATE_USER]]
 - Example response: "Here's a form to create a new user:\n\n[[FORM:CREATE_USER]]"
 - Do NOT call the create_user tool. The form handles user creation and displays the signup link automatically.
 - Only use the create_user tool as a fallback if the user provides ALL details in a single message (name, email, role).
 
 DELETE BRIEF:
-- When the admin asks to delete a brief, respond with a short message followed by [[FORM:DELETE_BRIEF]]
+- When asked to delete a brief, respond with a short message followed by [[FORM:DELETE_BRIEF]]
 - Example response: "Select the brand and brief you want to delete:\n\n[[FORM:DELETE_BRIEF]]"
 - Do NOT call the delete_brief tool. The form lets the admin pick a brand, then a brief, and handles deletion.
 - Only use the delete_brief tool as a fallback if the user specifies the exact brief name/ID to delete.
 
 DELETE USER:
-- When the admin asks to delete or remove a user, respond with a short message followed by [[FORM:DELETE_USER]]
+- When asked to delete or remove a user, respond with a short message followed by [[FORM:DELETE_USER]]
 - Example response: "Select the user you want to delete:\n\n[[FORM:DELETE_USER]]"
 - The form shows a dropdown of all users and handles deletion directly.
 
 DELETE TEAM:
-- When the admin asks to delete a team, respond with a short message followed by [[FORM:DELETE_TEAM]]
+- When asked to delete a team, respond with a short message followed by [[FORM:DELETE_TEAM]]
 - Example response: "Select the team you want to delete:\n\n[[FORM:DELETE_TEAM]]"
 - The form shows a dropdown of all teams with member counts and handles deletion.
 
-ASSIGN USER TO TEAM:
-- When the admin asks to assign/add a user or employee to a team, respond with a short message followed by [[FORM:ASSIGN_TEAM]]
-- Example response: "Select the user and team:\n\n[[FORM:ASSIGN_TEAM]]"
-- The form has dropdowns for user and team selection.
-
 DELETE BRAND:
 - Use delete_brand tool to delete a brand. The brand must have no active briefs. Requires brandId. Admin only.
-- Before deleting, confirm with the user by showing what will be deleted.` : ""}
+- Before deleting, confirm with the user by showing what will be deleted.
+
+ASSIGN TEAM LEAD:
+- When asked to assign or change a team lead, respond with a short message followed by [[FORM:ASSIGN_TEAM_LEAD]]
+- Example response: "Select the team and new lead:\n\n[[FORM:ASSIGN_TEAM_LEAD]]"
+- Only managers and admins can be team leads. The form filters eligible users.` : ""}
 
 IMPORTANT — A "brand" and a "brief" are DIFFERENT things:
 - A BRAND is a client/company (e.g., "L&T Finance", "Nike"). Use create_brand to create one.
@@ -830,9 +835,9 @@ async function executeTool(
       if (role === "employee") {
         return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create briefs. Please ask a manager or admin." });
       }
-      if (role !== "admin") {
+      if (role !== "admin" && role !== "manager") {
         return JSON.stringify({
-          error: "Only admins can create briefs",
+          error: "Only admins and managers can create briefs",
         });
       }
 
@@ -927,8 +932,8 @@ async function executeTool(
       if (role === "employee") {
         return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create brands. Please ask a manager or admin." });
       }
-      if (role !== "admin") {
-        return JSON.stringify({ error: "Only admins can create brands" });
+      if (role !== "admin" && role !== "manager") {
+        return JSON.stringify({ error: "Only admins and managers can create brands" });
       }
       const brandId = await ctx.runMutation(api.brands.createBrand, {
         name: fnArgs.name,

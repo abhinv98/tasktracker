@@ -188,8 +188,8 @@ export const createBrand = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can create brands");
+    if (!user || (user.role !== "admin" && user.role !== "manager"))
+      throw new Error("Only admins and managers can create brands");
 
     return await ctx.db.insert("brands", {
       ...args,

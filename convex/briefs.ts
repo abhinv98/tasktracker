@@ -15,10 +15,15 @@ export const listBriefs = query({
 
     let briefs = await ctx.db.query("briefs").collect();
     if (user.role === "manager") {
-      briefs = await ctx.db
+      const assignedBriefs = await ctx.db
         .query("briefs")
         .withIndex("by_manager", (q) => q.eq("assignedManagerId", userId))
         .collect();
+      const allBriefs = await ctx.db.query("briefs").collect();
+      const createdBriefs = allBriefs.filter((b) => b.createdBy === userId);
+      const briefMap = new Map<string, typeof assignedBriefs[number]>();
+      for (const b of [...assignedBriefs, ...createdBriefs]) briefMap.set(b._id, b);
+      briefs = [...briefMap.values()];
     } else if (user.role === "employee") {
       const tasks = await ctx.db
         .query("tasks")
@@ -109,15 +114,19 @@ export const createBrief = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can create briefs");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can create briefs");
     }
 
     const count = await ctx.db.query("briefs").collect();
     const globalPriority = count.length + 1;
 
+    // Auto-assign manager as the brief's manager when they create it
+    const assignedManagerId = args.assignedManagerId ?? (user.role === "manager" ? userId : undefined);
+
     const briefId = await ctx.db.insert("briefs", {
       ...args,
+      ...(assignedManagerId ? { assignedManagerId } : {}),
       status: "draft",
       createdBy: userId,
       globalPriority,

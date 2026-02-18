@@ -27,7 +27,7 @@ import {
   Clock,
   ShieldAlert,
 } from "lucide-react";
-import { CreateUserForm, DeleteBriefForm, DeleteUserForm, DeleteTeamForm, AssignTeamForm, CopyableLink } from "./ChatForms";
+import { CreateUserForm, DeleteBriefForm, DeleteUserForm, DeleteTeamForm, AssignTeamForm, AssignTeamLeadForm, CopyableLink } from "./ChatForms";
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -150,7 +150,7 @@ function renderMarkdown(text: string) {
   return elements;
 }
 
-const SPECIAL_BLOCK_REGEX = /\[\[FORM:(CREATE_USER|DELETE_BRIEF|DELETE_USER|DELETE_TEAM|ASSIGN_TEAM)\]\]|(https?:\/\/[^\s]+\/sign-up\?invite=[a-zA-Z0-9_-]+)/g;
+const SPECIAL_BLOCK_REGEX = /\[\[FORM:(CREATE_USER|DELETE_BRIEF|DELETE_USER|DELETE_TEAM|ASSIGN_TEAM|ASSIGN_TEAM_LEAD)\]\]|(https?:\/\/[^\s]+\/sign-up\?invite=[a-zA-Z0-9_-]+)/g;
 
 const FORM_COMPONENTS: Record<string, React.FC> = {
   CREATE_USER: CreateUserForm,
@@ -158,6 +158,7 @@ const FORM_COMPONENTS: Record<string, React.FC> = {
   DELETE_USER: DeleteUserForm,
   DELETE_TEAM: DeleteTeamForm,
   ASSIGN_TEAM: AssignTeamForm,
+  ASSIGN_TEAM_LEAD: AssignTeamLeadForm,
 };
 
 function renderMessageContent(text: string): React.ReactNode[] {

@@ -83,8 +83,8 @@ export const addUserToTeam = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const user = await ctx.db.get(currentUserId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can add users to teams");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can add users to teams");
     }
     const existing = await ctx.db
       .query("userTeams")

@@ -667,6 +667,151 @@ export function DeleteTeamForm() {
   );
 }
 
+// ─── Assign Team Lead Form ──────────────────
+export function AssignTeamLeadForm() {
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<{ userName: string; teamName: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const teams = useQuery(api.teams.listTeams) ?? [];
+  const allUsers = useQuery(api.users.listAllUsers) ?? [];
+  const updateTeam = useMutation(api.teams.updateTeam);
+
+  const eligibleLeads = allUsers.filter((u) => u.role === "manager" || u.role === "admin");
+
+  function handleClear() {
+    setSelectedTeamId("");
+    setSelectedUserId("");
+    setError(null);
+    setResult(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTeamId || !selectedUserId) return;
+
+    const team = teams.find((t) => t._id === selectedTeamId);
+    const user = allUsers.find((u) => u._id === selectedUserId);
+    if (!team || !user) return;
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await updateTeam({
+        teamId: selectedTeamId as Id<"teams">,
+        leadId: selectedUserId as Id<"users">,
+      });
+      setResult({ userName: user.name ?? user.email ?? "User", teamName: team.name });
+      setSelectedTeamId("");
+      setSelectedUserId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to assign team lead");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+        <div className="flex items-center gap-2">
+          <Check className="h-4 w-4 text-emerald-600" />
+          <span className="text-[12px] font-semibold text-emerald-800">
+            {result.userName} assigned as lead of &quot;{result.teamName}&quot;
+          </span>
+        </div>
+        <button
+          onClick={handleClear}
+          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+        >
+          Assign another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <Users className="h-4 w-4 text-[var(--accent-admin)]" />
+        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+          Assign Team Lead
+        </span>
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+          Select Team *
+        </label>
+        <div className="relative">
+          <select
+            value={selectedTeamId}
+            onChange={(e) => { setSelectedTeamId(e.target.value); setError(null); }}
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+          >
+            <option value="">Choose a team...</option>
+            {teams.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name} (Lead: {t.leadName})
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+          New Team Lead *
+        </label>
+        <div className="relative">
+          <select
+            value={selectedUserId}
+            onChange={(e) => { setSelectedUserId(e.target.value); setError(null); }}
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+          >
+            <option value="">Choose a team lead...</option>
+            {eligibleLeads.map((u) => (
+              <option key={u._id} value={u._id}>
+                {u.name ?? u.email} ({u.role})
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">{error}</p>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={isSubmitting || !selectedTeamId || !selectedUserId}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
+          {isSubmitting ? "Assigning..." : "Assign Lead"}
+        </button>
+        <button
+          type="button"
+          onClick={handleClear}
+          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Assign User to Team Form ───────────────
 export function AssignTeamForm() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
