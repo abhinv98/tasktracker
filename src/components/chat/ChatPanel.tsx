@@ -25,6 +25,8 @@ import {
   MoreHorizontal,
   Pencil,
   Clock,
+  ShieldAlert,
+  Link as LinkIcon,
 } from "lucide-react";
 
 interface ChatPanelProps {
@@ -32,8 +34,69 @@ interface ChatPanelProps {
   onClose: () => void;
 }
 
+// Detect and render special blocks within AI messages
+function renderSpecialBlocks(text: string): React.ReactNode[] | null {
+  const blocks: React.ReactNode[] = [];
+
+  // Detect "Access Restricted" block
+  const accessMatch = text.match(/\*\*Access Restricted\*\*\s*\n+User:\s*(.+?)\s*\|\s*Role:\s*(\w+)/);
+  if (accessMatch) {
+    const userName = accessMatch[1].trim();
+    const userRole = accessMatch[2].trim();
+
+    // Extract the message after the user/role line
+    const afterRole = text.slice(text.indexOf(accessMatch[0]) + accessMatch[0].length).trim();
+    const messageLines = afterRole.split("\n").filter((l) => l.trim());
+
+    blocks.push(
+      <div key="access-block" className="rounded-lg border border-amber-200 bg-amber-50 p-3 my-1">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
+            <ShieldAlert className="h-4 w-4 text-amber-600" />
+          </div>
+          <span className="font-semibold text-[13px] text-amber-800">Access Restricted</span>
+        </div>
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100/80 text-[11px] font-medium text-amber-700">
+            <User className="h-3 w-3" />
+            {userName}
+          </div>
+          <div className="px-2 py-1 rounded-md bg-amber-100/80 text-[11px] font-medium text-amber-700 capitalize">
+            {userRole}
+          </div>
+        </div>
+        <div className="text-[12px] text-amber-700 leading-relaxed space-y-1 px-1">
+          {messageLines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+      </div>
+    );
+    return blocks;
+  }
+
+  // Detect signup link block from create_user
+  const signupMatch = text.match(/\/sign-up\?invite=([a-zA-Z0-9_-]+)/);
+  if (signupMatch && (text.includes("invite") || text.includes("signup") || text.includes("sign-up") || text.includes("created"))) {
+    // Extract user info from surrounding text
+    const nameMatch = text.match(/(?:name|Name|user|User)[:\s]*\*?\*?([A-Z][a-z]+ [A-Z][a-z]+)/i) ??
+                      text.match(/\*\*(.+?)\*\*/);
+    const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
+    const linkPath = signupMatch[0];
+
+    // Render the full message using normal markdown, but also add a special card for the invite
+    return null; // Fall through to normal rendering, the link itself will be rendered inline
+  }
+
+  return null;
+}
+
 // Simple markdown renderer for chat messages
 function renderMarkdown(text: string) {
+  // Check for special blocks first
+  const specialBlocks = renderSpecialBlocks(text);
+  if (specialBlocks) return specialBlocks;
+
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
 
@@ -51,7 +114,8 @@ function renderMarkdown(text: string) {
     }
 
     const parts: React.ReactNode[] = [];
-    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+    // Extended regex: also detect /sign-up?invite=... links
+    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|(\/sign-up\?invite=[a-zA-Z0-9_-]+))/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
@@ -77,6 +141,18 @@ function renderMarkdown(text: string) {
           >
             {match[4]}
           </code>
+        );
+      } else if (match[5]) {
+        parts.push(
+          <span
+            key={`link-${i}-${match.index}`}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-mono cursor-pointer hover:bg-blue-100 transition-colors"
+            onClick={() => navigator.clipboard.writeText(window.location.origin + match![5])}
+            title="Click to copy link"
+          >
+            <LinkIcon className="h-3 w-3" />
+            {match[5]}
+          </span>
         );
       }
       lastIndex = match.index + match[0].length;
@@ -117,6 +193,15 @@ const TOOL_LABELS: Record<string, string> = {
   create_task: "Creating task",
   update_task_status: "Updating task status",
   update_brief_status: "Updating brief status",
+  delete_brief: "Deleting brief",
+  delete_brand: "Deleting brand",
+  create_user: "Creating user invite",
+  list_all_users: "Listing users",
+  get_user_tasks: "Getting user tasks",
+  get_schedule_for_date: "Getting schedule",
+  add_schedule_block: "Adding schedule block",
+  delete_schedule_block: "Deleting schedule block",
+  get_unscheduled_tasks: "Getting unscheduled tasks",
 };
 
 interface ToolStep {

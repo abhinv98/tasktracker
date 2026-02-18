@@ -443,6 +443,70 @@ const TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "delete_brief",
+      description: "Delete a brief and all its tasks. Admin only.",
+      parameters: {
+        type: "object",
+        properties: {
+          briefId: {
+            type: "string",
+            description: "The ID of the brief to delete",
+          },
+        },
+        required: ["briefId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_brand",
+      description: "Delete a brand. Must have no active briefs. Admin only.",
+      parameters: {
+        type: "object",
+        properties: {
+          brandId: {
+            type: "string",
+            description: "The ID of the brand to delete",
+          },
+        },
+        required: ["brandId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_user",
+      description: "Create/invite a new user. Returns a signup link to share. Admin only.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Full name of the new user",
+          },
+          email: {
+            type: "string",
+            description: "Email address of the new user",
+          },
+          role: {
+            type: "string",
+            enum: ["admin", "manager", "employee"],
+            description: "Role to assign",
+          },
+          designation: {
+            type: "string",
+            description: "Job title/designation (optional)",
+          },
+        },
+        required: ["name", "email", "role"],
+      },
+    },
+  },
 ];
 
 export const sendMessage = action({
@@ -604,11 +668,35 @@ Today's date: ${today}
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses, manage employee planners." : "This user can view their tasks, update task status, submit deliverables, and manage their own planner."}
+- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner, delete briefs/brands, and create/invite new users." : role === "manager" ? "This user can view assigned briefs/brands, assign teams to their briefs, create tasks in their briefs, update statuses, manage employee planners." : "This user can ONLY view their tasks, update task status, submit deliverables, and manage their own planner. They CANNOT create, delete, or modify briefs, brands, tasks, or users."}
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
 - At the end of a multi-step operation, summarize everything that was done.
+${role === "employee" ? `
+IMPORTANT — EMPLOYEE RESTRICTIONS:
+Employees CANNOT create, delete, or modify briefs, brands, tasks, or users.
+If an employee asks to create, delete, or modify anything, you MUST respond with EXACTLY this format:
+
+**Access Restricted**
+User: ${userName} | Role: Employee
+
+Creating, deleting, or modifying resources requires Manager or Admin access.
+Please ask your manager or admin to perform this action.
+
+Is there anything else I can help you with?
+
+Do NOT attempt to call any mutation tools for employees. Only use read-only query tools (list_briefs, get_brief_details, get_my_tasks, get_dashboard_stats, list_brands, get_brand_info, list_teams, get_team_members, list_all_users, get_user_tasks, get_schedule_for_date, get_unscheduled_tasks). Employees CAN update their own task status and manage their own schedule.` : ""}
+${role === "admin" ? `
+DELETE TOOLS:
+- Use delete_brief to delete a brief and all its tasks. Requires briefId. Admin only.
+- Use delete_brand to delete a brand. The brand must have no active briefs. Requires brandId. Admin only.
+- Before deleting, confirm with the user by showing what will be deleted.
+
+CREATE USER TOOL:
+- Use create_user to invite a new user. Requires name, email, role. Optional: designation.
+- After creating the invite, share the returned signup link in your response so the admin can send it to the employee.
+- Format the signup link clearly so it can be copied.` : ""}
 
 IMPORTANT — A "brand" and a "brief" are DIFFERENT things:
 - A BRAND is a client/company (e.g., "L&T Finance", "Nike"). Use create_brand to create one.
@@ -716,6 +804,9 @@ async function executeTool(
     }
 
     case "create_brief": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create briefs. Please ask a manager or admin." });
+      }
       if (role !== "admin") {
         return JSON.stringify({
           error: "Only admins can create briefs",
@@ -810,6 +901,9 @@ async function executeTool(
     }
 
     case "create_brand": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create brands. Please ask a manager or admin." });
+      }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can create brands" });
       }
@@ -896,6 +990,9 @@ async function executeTool(
     }
 
     case "assign_teams_to_brief": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign teams to briefs. Please ask a manager or admin." });
+      }
       if (role !== "admin" && role !== "manager") {
         return JSON.stringify({ error: "Only admins and managers can assign teams to briefs" });
       }
@@ -911,6 +1008,9 @@ async function executeTool(
     }
 
     case "assign_manager_to_brief": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign managers. Please ask a manager or admin." });
+      }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can assign managers" });
       }
@@ -926,6 +1026,9 @@ async function executeTool(
     }
 
     case "create_task": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create tasks. Please ask a manager or admin." });
+      }
       if (role !== "admin" && role !== "manager") {
         return JSON.stringify({ error: "Only admins and managers can create tasks" });
       }
@@ -968,6 +1071,9 @@ async function executeTool(
     }
 
     case "update_brief_status": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot update brief status. Please ask a manager or admin." });
+      }
       if (role !== "admin" && role !== "manager") {
         return JSON.stringify({ error: "Only admins and managers can update brief status" });
       }
@@ -1105,6 +1211,69 @@ async function executeTool(
           sortOrder: t.sortOrder,
         }))
       );
+    }
+
+    case "delete_brief": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete briefs. Please ask a manager or admin." });
+      }
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can delete briefs" });
+      }
+      // Get brief name before deleting
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const briefToDelete = await ctx.runQuery(api.briefs.getBrief, { briefId: fnArgs.briefId } as any);
+      const briefName = (briefToDelete as Record<string, unknown>)?.title ?? "Unknown";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.briefs.deleteBrief, { briefId: fnArgs.briefId } as any);
+      return JSON.stringify({ success: true, message: `Brief "${briefName}" and all its tasks have been deleted.` });
+    }
+
+    case "delete_brand": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete brands. Please ask a manager or admin." });
+      }
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can delete brands" });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allBrandsForDel = await ctx.runQuery(api.brands.listBrands, {} as any);
+      const brandToDelete = (allBrandsForDel as Array<Record<string, unknown>>).find(
+        (b) => b._id === fnArgs.brandId
+      );
+      const brandName = (brandToDelete?.name as string) ?? "Unknown";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await ctx.runMutation(api.brands.deleteBrand, { brandId: fnArgs.brandId } as any);
+      return JSON.stringify({ success: true, message: `Brand "${brandName}" has been deleted.` });
+    }
+
+    case "create_user": {
+      if (role === "employee") {
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create users. Please ask a manager or admin." });
+      }
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can create/invite users" });
+      }
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await ctx.runMutation(api.users.createInvite, {
+          name: fnArgs.name,
+          email: fnArgs.email,
+          role: fnArgs.role,
+          ...(fnArgs.designation ? { designation: fnArgs.designation } : {}),
+        } as any) as { inviteId: string; token: string };
+        const signupLink = `/sign-up?invite=${result.token}`;
+        return JSON.stringify({
+          success: true,
+          name: fnArgs.name,
+          email: fnArgs.email,
+          role: fnArgs.role,
+          signupLink,
+          message: `User invite created. Share this signup link with ${fnArgs.name}: ${signupLink}`,
+        });
+      } catch (e: unknown) {
+        return JSON.stringify({ error: e instanceof Error ? e.message : String(e) });
+      }
     }
 
     default:
