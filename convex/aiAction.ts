@@ -702,6 +702,21 @@ DELETE BRIEF:
 - Do NOT call the delete_brief tool. The form lets the admin pick a brand, then a brief, and handles deletion.
 - Only use the delete_brief tool as a fallback if the user specifies the exact brief name/ID to delete.
 
+DELETE USER:
+- When the admin asks to delete or remove a user, respond with a short message followed by [[FORM:DELETE_USER]]
+- Example response: "Select the user you want to delete:\n\n[[FORM:DELETE_USER]]"
+- The form shows a dropdown of all users and handles deletion directly.
+
+DELETE TEAM:
+- When the admin asks to delete a team, respond with a short message followed by [[FORM:DELETE_TEAM]]
+- Example response: "Select the team you want to delete:\n\n[[FORM:DELETE_TEAM]]"
+- The form shows a dropdown of all teams with member counts and handles deletion.
+
+ASSIGN USER TO TEAM:
+- When the admin asks to assign/add a user or employee to a team, respond with a short message followed by [[FORM:ASSIGN_TEAM]]
+- Example response: "Select the user and team:\n\n[[FORM:ASSIGN_TEAM]]"
+- The form has dropdowns for user and team selection.
+
 DELETE BRAND:
 - Use delete_brand tool to delete a brand. The brand must have no active briefs. Requires brandId. Admin only.
 - Before deleting, confirm with the user by showing what will be deleted.` : ""}

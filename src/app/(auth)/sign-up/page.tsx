@@ -30,6 +30,14 @@ function SignUpForm() {
     const formData = new FormData(form);
     formData.set("flow", "signUp");
 
+    // When signing up via invite, enforce the invite email
+    if (invite?.email) {
+      formData.set("email", invite.email);
+    }
+    if (invite?.name) {
+      formData.set("name", invite.name);
+    }
+
     try {
       await signIn("password", formData);
       router.push("/");
@@ -71,9 +79,10 @@ function SignUpForm() {
           type="text"
           placeholder="Your name"
           required
-          defaultValue={invite?.name ?? ""}
-          readOnly={!!invite?.name}
-          className={invite?.name ? "bg-[var(--bg-secondary)] cursor-not-allowed" : ""}
+          {...(invite?.name
+            ? { value: invite.name, readOnly: true, className: "bg-[var(--bg-secondary)] cursor-not-allowed" }
+            : {}
+          )}
         />
         <Input
           label="Email"
@@ -81,9 +90,10 @@ function SignUpForm() {
           type="email"
           placeholder="you@example.com"
           required
-          defaultValue={invite?.email ?? ""}
-          readOnly={!!invite?.email}
-          className={invite?.email ? "bg-[var(--bg-secondary)] cursor-not-allowed" : ""}
+          {...(invite?.email
+            ? { value: invite.email, readOnly: true, className: "bg-[var(--bg-secondary)] cursor-not-allowed" }
+            : {}
+          )}
         />
         <div className="flex flex-col gap-1.5">
           <label

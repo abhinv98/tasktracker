@@ -27,7 +27,7 @@ import {
   Clock,
   ShieldAlert,
 } from "lucide-react";
-import { CreateUserForm, DeleteBriefForm, CopyableLink } from "./ChatForms";
+import { CreateUserForm, DeleteBriefForm, DeleteUserForm, DeleteTeamForm, AssignTeamForm, CopyableLink } from "./ChatForms";
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -150,7 +150,15 @@ function renderMarkdown(text: string) {
   return elements;
 }
 
-const SPECIAL_BLOCK_REGEX = /\[\[FORM:(CREATE_USER|DELETE_BRIEF)\]\]|(https?:\/\/[^\s]+\/sign-up\?invite=[a-zA-Z0-9_-]+)/g;
+const SPECIAL_BLOCK_REGEX = /\[\[FORM:(CREATE_USER|DELETE_BRIEF|DELETE_USER|DELETE_TEAM|ASSIGN_TEAM)\]\]|(https?:\/\/[^\s]+\/sign-up\?invite=[a-zA-Z0-9_-]+)/g;
+
+const FORM_COMPONENTS: Record<string, React.FC> = {
+  CREATE_USER: CreateUserForm,
+  DELETE_BRIEF: DeleteBriefForm,
+  DELETE_USER: DeleteUserForm,
+  DELETE_TEAM: DeleteTeamForm,
+  ASSIGN_TEAM: AssignTeamForm,
+};
 
 function renderMessageContent(text: string): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
@@ -167,10 +175,9 @@ function renderMessageContent(text: string): React.ReactNode[] {
       );
     }
 
-    if (match[1] === "CREATE_USER") {
-      elements.push(<CreateUserForm key={`form-cu-${match.index}`} />);
-    } else if (match[1] === "DELETE_BRIEF") {
-      elements.push(<DeleteBriefForm key={`form-db-${match.index}`} />);
+    if (match[1] && FORM_COMPONENTS[match[1]]) {
+      const FormComponent = FORM_COMPONENTS[match[1]];
+      elements.push(<FormComponent key={`form-${match[1]}-${match.index}`} />);
     } else if (match[2]) {
       elements.push(<CopyableLink key={`link-${match.index}`} url={match[2]} />);
     }
@@ -336,7 +343,7 @@ function ConversationList({
   }, [renaming]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* New chat button */}
       <div className="px-3 pt-3 pb-2">
         <button
@@ -596,9 +603,9 @@ function ChatView({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Sub-header with back button and convo title */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 shrink-0">
         <button
           onClick={onBack}
           className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"

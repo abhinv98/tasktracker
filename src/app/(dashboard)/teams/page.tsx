@@ -14,7 +14,7 @@ export default function TeamsPage() {
   const teams = useQuery(api.teams.listTeams, {});
   const managers = useQuery(api.users.listManagers, {});
   const allUsers = useQuery(api.users.listAllUsers, {});
-  const seedTestData = useMutation(api.seed.seedTestData);
+  
   const leadOptions = (allUsers ?? [])
     .filter((u) => u.role === "admin" || u.role === "manager")
     .map((u) => ({ value: u._id, label: (u.name ?? u.email ?? "Unknown") as string }));
@@ -99,15 +99,6 @@ export default function TeamsPage() {
     setRemovingMemberId(null);
   }
 
-  async function handleSeed() {
-    try {
-      const result = await seedTestData({});
-      toast("success", typeof result === "object" && result && "message" in result ? String(result.message) : "Seed complete");
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Seed failed");
-    }
-  }
-
   async function handleCreateTeam(e: React.FormEvent) {
     e.preventDefault();
     if (!leadId) return;
@@ -138,11 +129,6 @@ export default function TeamsPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
-          {isAdmin && (
-            <Button variant="ghost" onClick={handleSeed}>
-              Seed test data
-            </Button>
-          )}
           <Button variant="primary" onClick={() => setShowModal(true)}>
             Create Team
           </Button>
