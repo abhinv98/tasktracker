@@ -688,15 +688,23 @@ Is there anything else I can help you with?
 
 Do NOT attempt to call any mutation tools for employees. Only use read-only query tools (list_briefs, get_brief_details, get_my_tasks, get_dashboard_stats, list_brands, get_brand_info, list_teams, get_team_members, list_all_users, get_user_tasks, get_schedule_for_date, get_unscheduled_tasks). Employees CAN update their own task status and manage their own schedule.` : ""}
 ${role === "admin" ? `
-DELETE TOOLS:
-- Use delete_brief to delete a brief and all its tasks. Requires briefId. Admin only.
-- Use delete_brand to delete a brand. The brand must have no active briefs. Requires brandId. Admin only.
-- Before deleting, confirm with the user by showing what will be deleted.
+INTERACTIVE FORMS — The chat UI supports inline forms. Use these markers to show forms instead of calling tools directly:
 
-CREATE USER TOOL:
-- Use create_user to invite a new user. Requires name, email, role. Optional: designation.
-- After creating the invite, share the returned signup link in your response so the admin can send it to the employee.
-- Format the signup link clearly so it can be copied.` : ""}
+CREATE USER:
+- When the admin asks to create, invite, or add a new user, respond with a short message followed by [[FORM:CREATE_USER]]
+- Example response: "Here's a form to create a new user:\n\n[[FORM:CREATE_USER]]"
+- Do NOT call the create_user tool. The form handles user creation and displays the signup link automatically.
+- Only use the create_user tool as a fallback if the user provides ALL details in a single message (name, email, role).
+
+DELETE BRIEF:
+- When the admin asks to delete a brief, respond with a short message followed by [[FORM:DELETE_BRIEF]]
+- Example response: "Select the brand and brief you want to delete:\n\n[[FORM:DELETE_BRIEF]]"
+- Do NOT call the delete_brief tool. The form lets the admin pick a brand, then a brief, and handles deletion.
+- Only use the delete_brief tool as a fallback if the user specifies the exact brief name/ID to delete.
+
+DELETE BRAND:
+- Use delete_brand tool to delete a brand. The brand must have no active briefs. Requires brandId. Admin only.
+- Before deleting, confirm with the user by showing what will be deleted.` : ""}
 
 IMPORTANT — A "brand" and a "brief" are DIFFERENT things:
 - A BRAND is a client/company (e.g., "L&T Finance", "Nike"). Use create_brand to create one.
@@ -1262,7 +1270,7 @@ async function executeTool(
           role: fnArgs.role,
           ...(fnArgs.designation ? { designation: fnArgs.designation } : {}),
         } as any) as { inviteId: string; token: string };
-        const signupLink = `/sign-up?invite=${result.token}`;
+        const signupLink = `https://tasktracker-gilt-tau.vercel.app/sign-up?invite=${result.token}`;
         return JSON.stringify({
           success: true,
           name: fnArgs.name,

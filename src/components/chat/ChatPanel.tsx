@@ -26,8 +26,8 @@ import {
   Pencil,
   Clock,
   ShieldAlert,
-  Link as LinkIcon,
 } from "lucide-react";
+import { CreateUserForm, DeleteBriefForm, CopyableLink } from "./ChatForms";
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -75,19 +75,6 @@ function renderSpecialBlocks(text: string): React.ReactNode[] | null {
     return blocks;
   }
 
-  // Detect signup link block from create_user
-  const signupMatch = text.match(/\/sign-up\?invite=([a-zA-Z0-9_-]+)/);
-  if (signupMatch && (text.includes("invite") || text.includes("signup") || text.includes("sign-up") || text.includes("created"))) {
-    // Extract user info from surrounding text
-    const nameMatch = text.match(/(?:name|Name|user|User)[:\s]*\*?\*?([A-Z][a-z]+ [A-Z][a-z]+)/i) ??
-                      text.match(/\*\*(.+?)\*\*/);
-    const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/);
-    const linkPath = signupMatch[0];
-
-    // Render the full message using normal markdown, but also add a special card for the invite
-    return null; // Fall through to normal rendering, the link itself will be rendered inline
-  }
-
   return null;
 }
 
@@ -114,8 +101,7 @@ function renderMarkdown(text: string) {
     }
 
     const parts: React.ReactNode[] = [];
-    // Extended regex: also detect /sign-up?invite=... links
-    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|(\/sign-up\?invite=[a-zA-Z0-9_-]+))/g;
+    const regex = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
@@ -142,18 +128,6 @@ function renderMarkdown(text: string) {
             {match[4]}
           </code>
         );
-      } else if (match[5]) {
-        parts.push(
-          <span
-            key={`link-${i}-${match.index}`}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-mono cursor-pointer hover:bg-blue-100 transition-colors"
-            onClick={() => navigator.clipboard.writeText(window.location.origin + match![5])}
-            title="Click to copy link"
-          >
-            <LinkIcon className="h-3 w-3" />
-            {match[5]}
-          </span>
-        );
       }
       lastIndex = match.index + match[0].length;
     }
@@ -171,6 +145,48 @@ function renderMarkdown(text: string) {
     } else {
       elements.push(<div key={`line-${i}`}>{parts}</div>);
     }
+  }
+
+  return elements;
+}
+
+const SPECIAL_BLOCK_REGEX = /\[\[FORM:(CREATE_USER|DELETE_BRIEF)\]\]|(https?:\/\/[^\s]+\/sign-up\?invite=[a-zA-Z0-9_-]+)/g;
+
+function renderMessageContent(text: string): React.ReactNode[] {
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  SPECIAL_BLOCK_REGEX.lastIndex = 0;
+
+  while ((match = SPECIAL_BLOCK_REGEX.exec(text)) !== null) {
+    const before = text.slice(lastIndex, match.index).trim();
+    if (before) {
+      elements.push(
+        <div key={`text-${match.index}`}>{renderMarkdown(before)}</div>
+      );
+    }
+
+    if (match[1] === "CREATE_USER") {
+      elements.push(<CreateUserForm key={`form-cu-${match.index}`} />);
+    } else if (match[1] === "DELETE_BRIEF") {
+      elements.push(<DeleteBriefForm key={`form-db-${match.index}`} />);
+    } else if (match[2]) {
+      elements.push(<CopyableLink key={`link-${match.index}`} url={match[2]} />);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  const remaining = text.slice(lastIndex).trim();
+  if (remaining) {
+    elements.push(
+      <div key="text-remaining">{renderMarkdown(remaining)}</div>
+    );
+  }
+
+  if (elements.length === 0) {
+    return renderMarkdown(text);
   }
 
   return elements;
@@ -660,7 +676,7 @@ function ChatView({
               )}
               <div className="text-[13px] leading-relaxed break-words space-y-0.5">
                 {msg.role === "assistant"
-                  ? renderMarkdown(msg.content)
+                  ? renderMessageContent(msg.content)
                   : <span className="whitespace-pre-wrap">{msg.content}</span>
                 }
               </div>
