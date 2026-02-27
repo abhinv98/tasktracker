@@ -23,9 +23,10 @@ import {
   Paperclip,
   FileText,
   Image as ImageIcon,
-  Download,
+  Eye,
   Pencil,
 } from "lucide-react";
+import { FilePreviewModal } from "./FilePreviewModal";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -123,6 +124,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const [deliverableFiles, setDeliverableFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
 
   // Escape to close
   const handleKey = useCallback(
@@ -536,17 +538,16 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                         {(d as any).files.map((file: { name: string; url: string }, idx: number) => {
                           const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
                           return (
-                            <a
+                            <button
                               key={idx}
-                              href={file.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => setPreviewFile(file)}
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin)] transition-colors"
                             >
                               {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
                               <span className="max-w-[120px] truncate">{file.name}</span>
-                              <Download className="h-3 w-3 shrink-0" />
-                            </a>
+                              <Eye className="h-3 w-3 shrink-0" />
+                            </button>
                           );
                         })}
                       </div>
@@ -707,6 +708,10 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
             </div>
           </div>
         </>
+      )}
+
+      {previewFile && (
+        <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
     </>
   );
