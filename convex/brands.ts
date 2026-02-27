@@ -229,41 +229,179 @@ export const updateBrand = mutation({
   },
 });
 
-// Delete brand (admin only, if no active briefs)
+// Delete brand and all associated data (admin only)
 export const deleteBrand = mutation({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can delete brands");
+    if (!user) throw new Error("Not authenticated");
 
-    const briefs = await ctx.db.query("briefs").collect();
-    const activeBriefs = briefs.filter(
-      (b) =>
-        b.brandId === brandId &&
-        !["archived", "completed"].includes(b.status)
-    );
-    if (activeBriefs.length > 0) {
-      throw new Error(
-        `Cannot delete brand with ${activeBriefs.length} active brief(s). Archive or complete them first.`
-      );
-    }
-
-    // Remove brand manager assignments
     const managers = await ctx.db
       .query("brandManagers")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
+
+    const isAssignedManager =
+      user.role === "manager" && managers.some((m) => m.managerId === userId);
+
+    if (user.role !== "admin" && !isAssignedManager)
+      throw new Error("Only admins or the assigned manager can delete this brand");
+
     for (const m of managers) {
       await ctx.db.delete(m._id);
     }
 
-    // Unlink briefs
+    // Cascade delete all briefs and their associated data
+    const briefs = await ctx.db.query("briefs").collect();
     const brandBriefs = briefs.filter((b) => b.brandId === brandId);
-    for (const b of brandBriefs) {
-      await ctx.db.patch(b._id, { brandId: undefined });
+
+    for (const brief of brandBriefs) {
+      // Delete tasks and their associated data
+      const tasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+
+      for (const task of tasks) {
+        // Delete deliverables (and their stored files)
+        const deliverables = await ctx.db
+          .query("deliverables")
+          .withIndex("by_task", (q) => q.eq("taskId", task._id))
+          .collect();
+        for (const d of deliverables) {
+          if (d.fileIds) {
+            for (const fid of d.fileIds) {
+              await ctx.storage.delete(fid);
+            }
+          }
+          await ctx.db.delete(d._id);
+        }
+
+        // Delete time entries
+        const timeEntries = await ctx.db
+          .query("timeEntries")
+          .withIndex("by_task", (q) => q.eq("taskId", task._id))
+          .collect();
+        for (const te of timeEntries) {
+          await ctx.db.delete(te._id);
+        }
+
+        // Delete task comments and their reactions
+        const taskComments = await ctx.db
+          .query("comments")
+          .withIndex("by_parent", (q) =>
+            q.eq("parentType", "task").eq("parentId", task._id)
+          )
+          .collect();
+        for (const c of taskComments) {
+          const reactions = await ctx.db
+            .query("commentReactions")
+            .withIndex("by_comment", (q) => q.eq("commentId", c._id))
+            .collect();
+          for (const r of reactions) await ctx.db.delete(r._id);
+          if (c.attachmentId) await ctx.storage.delete(c.attachmentId);
+          await ctx.db.delete(c._id);
+        }
+
+        // Delete task attachments
+        const taskAttachments = await ctx.db
+          .query("attachments")
+          .withIndex("by_parent", (q) =>
+            q.eq("parentType", "task").eq("parentId", task._id)
+          )
+          .collect();
+        for (const a of taskAttachments) {
+          await ctx.storage.delete(a.fileId);
+          await ctx.db.delete(a._id);
+        }
+
+        // Delete planner items linked to this task
+        const plannerItems = await ctx.db
+          .query("plannerItems")
+          .withIndex("by_task", (q) => q.eq("taskId", task._id))
+          .collect();
+        for (const pi of plannerItems) {
+          await ctx.db.delete(pi._id);
+        }
+
+        await ctx.db.delete(task._id);
+      }
+
+      // Delete brief team assignments
+      const briefTeams = await ctx.db
+        .query("briefTeams")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+      for (const bt of briefTeams) {
+        await ctx.db.delete(bt._id);
+      }
+
+      // Delete brief comments and their reactions
+      const briefComments = await ctx.db
+        .query("comments")
+        .withIndex("by_parent", (q) =>
+          q.eq("parentType", "brief").eq("parentId", brief._id)
+        )
+        .collect();
+      for (const c of briefComments) {
+        const reactions = await ctx.db
+          .query("commentReactions")
+          .withIndex("by_comment", (q) => q.eq("commentId", c._id))
+          .collect();
+        for (const r of reactions) await ctx.db.delete(r._id);
+        if (c.attachmentId) await ctx.storage.delete(c.attachmentId);
+        await ctx.db.delete(c._id);
+      }
+
+      // Delete brief attachments
+      const briefAttachments = await ctx.db
+        .query("attachments")
+        .withIndex("by_parent", (q) =>
+          q.eq("parentType", "brief").eq("parentId", brief._id)
+        )
+        .collect();
+      for (const a of briefAttachments) {
+        await ctx.storage.delete(a.fileId);
+        await ctx.db.delete(a._id);
+      }
+
+      // Delete activity log entries
+      const activityLogs = await ctx.db
+        .query("activityLog")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+      for (const log of activityLogs) {
+        await ctx.db.delete(log._id);
+      }
+
+      // Delete notifications linked to this brief
+      const notifications = await ctx.db.query("notifications").collect();
+      for (const n of notifications) {
+        if (n.briefId === brief._id) {
+          await ctx.db.delete(n._id);
+        }
+      }
+
+      // Delete comment read receipts for this brief
+      const allReceipts = await ctx.db.query("commentReadReceipts").collect();
+      for (const r of allReceipts) {
+        if (r.briefId === brief._id) {
+          await ctx.db.delete(r._id);
+        }
+      }
+
+      // Delete typing indicators for this brief
+      const typingIndicators = await ctx.db
+        .query("typingIndicators")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+      for (const ti of typingIndicators) {
+        await ctx.db.delete(ti._id);
+      }
+
+      await ctx.db.delete(brief._id);
     }
 
     await ctx.db.delete(brandId);
