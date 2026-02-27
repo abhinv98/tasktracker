@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft } from "lucide-react";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -158,9 +158,9 @@ export default function BriefPage() {
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={() => router.push("/briefs")}
-            className="text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin)] hover:text-white transition-all shrink-0"
           >
-            &larr; Briefs
+            <ArrowLeft className="h-3.5 w-3.5" /> Briefs
           </button>
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" aria-hidden />
           <h1 className="font-semibold text-[15px] sm:text-[16px] text-[var(--text-primary)] truncate">
@@ -248,9 +248,9 @@ export default function BriefPage() {
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
         {/* Column 1 - Create Task + Task List */}
-        <div className="lg:col-span-3 flex flex-col border-r border-[var(--border)] overflow-hidden bg-white">
-          <div className="flex-1 overflow-auto">
-          <div className="p-4 border-b border-[var(--border)]">
+        <div className="lg:col-span-3 border-r border-[var(--border)] overflow-auto bg-white">
+          <div>
+          <div className="p-4">
             <h2 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
               Create Task
             </h2>
@@ -314,7 +314,7 @@ export default function BriefPage() {
 
             {/* Create task form */}
             {isAdminOrManager && brief.status !== "archived" ? (
-              <form onSubmit={handleCreateTask} className="flex flex-col gap-2.5">
+              <form onSubmit={handleCreateTask} className="flex flex-col gap-2">
                 <Input
                   label="Title"
                   value={taskTitle}
@@ -327,67 +327,63 @@ export default function BriefPage() {
                   onChange={(e) => setTaskDesc(e.target.value)}
                   className="min-h-[48px]"
                 />
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Team</label>
-                    <select
-                      value={taskTeamFilter}
-                      onChange={(e) => { setTaskTeamFilter(e.target.value); setTaskAssignee(""); }}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="">All teams</option>
-                      {briefTeamsList.map((t) => (
-                        <option key={t.team._id} value={t.team._id}>{t.team.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignee</label>
-                    <select
-                      value={taskAssignee}
-                      onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="">{teamsForBrief?.length ? "Select" : "Assign teams"}</option>
-                      {filteredEmployees.map((e) => (
-                        <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Team</label>
+                  <select
+                    value={taskTeamFilter}
+                    onChange={(e) => { setTaskTeamFilter(e.target.value); setTaskAssignee(""); }}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">All teams</option>
+                    {briefTeamsList.map((t) => (
+                      <option key={t.team._id} value={t.team._id}>{t.team.name}</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Duration</label>
-                    <div className="flex gap-1">
-                      <input
-                        type="number"
-                        min="1"
-                        value={taskDurationValue}
-                        onChange={(e) => setTaskDurationValue(e.target.value)}
-                        className="w-14 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                        required
-                      />
-                      <select
-                        value={taskDurationUnit}
-                        onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
-                        className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      >
-                        <option value="m">Min</option>
-                        <option value="h">Hrs</option>
-                        <option value="d">Days</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>
-                    <DatePicker
-                      value={taskDeadline}
-                      onChange={setTaskDeadline}
-                      placeholder="Set date"
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignee</label>
+                  <select
+                    value={taskAssignee}
+                    onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">{teamsForBrief?.length ? "Select employee" : "Assign teams first"}</option>
+                    {filteredEmployees.map((e) => (
+                      <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Duration</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      value={taskDurationValue}
+                      onChange={(e) => setTaskDurationValue(e.target.value)}
+                      className="w-16 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      required
                     />
+                    <select
+                      value={taskDurationUnit}
+                      onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
+                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="m">Minutes</option>
+                      <option value="h">Hours</option>
+                      <option value="d">Days</option>
+                    </select>
                   </div>
                 </div>
-                <Button type="submit" variant="primary">
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>
+                  <DatePicker
+                    value={taskDeadline}
+                    onChange={setTaskDeadline}
+                    placeholder="Set date"
+                  />
+                </div>
+                <Button type="submit" variant="primary" className="mt-2">
                   Assign Task
                 </Button>
               </form>
@@ -398,40 +394,6 @@ export default function BriefPage() {
             )}
           </div>
 
-          {/* Task manifest */}
-          <div className="p-4">
-            <h3 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide mb-3">
-              Task Manifest
-            </h3>
-            {tasksData?.byTeam &&
-              Object.entries(tasksData.byTeam).map(([teamName, items]) => (
-                <div key={teamName} className="mb-4">
-                  <h4 className="font-medium text-[12px] text-[var(--text-secondary)] mb-2 pl-2 border-l-2 border-[var(--border-strong)]">
-                    {teamName}
-                  </h4>
-                  {items.map(({ task, assignee }) => (
-                    <div
-                      key={task._id}
-                      className="py-2 px-2 border-b border-[var(--border-subtle)]"
-                    >
-                      <div className="font-medium text-[13px] text-[var(--text-primary)]">
-                        {task.title}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                        {assignee?.name ?? assignee?.email} &middot;{" "}
-                        <span style={{ color: STATUS_LABELS[task.status]?.color ?? "var(--text-secondary)" }}>
-                          {STATUS_LABELS[task.status]?.label ?? task.status}
-                        </span>{" "}
-                        &middot; {task.duration}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            {(!tasksData?.byTeam || Object.keys(tasksData.byTeam).length === 0) && (
-              <p className="text-[12px] text-[var(--text-muted)]">No tasks yet.</p>
-            )}
-          </div>
           </div>
         </div>
 
