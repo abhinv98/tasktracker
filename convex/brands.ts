@@ -317,15 +317,6 @@ export const deleteBrand = mutation({
           await ctx.db.delete(a._id);
         }
 
-        // Delete planner items linked to this task
-        const plannerItems = await ctx.db
-          .query("plannerItems")
-          .withIndex("by_task", (q) => q.eq("taskId", task._id))
-          .collect();
-        for (const pi of plannerItems) {
-          await ctx.db.delete(pi._id);
-        }
-
         await ctx.db.delete(task._id);
       }
 
