@@ -38,12 +38,14 @@ export default function BriefsPage() {
   const briefs = useQuery(api.briefs.listBriefs, {});
   const brands = useQuery(api.brands.listBrands);
   const user = useQuery(api.users.getCurrentUser);
+  const managers = useQuery(api.users.listManagers);
   const createBrief = useMutation(api.briefs.createBrief);
   const deleteBrief = useMutation(api.briefs.deleteBrief);
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [brandId, setBrandId] = useState<string>("");
+  const [managerId, setManagerId] = useState<string>("");
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
 
   const templates = useQuery(api.templates.listTemplates);
@@ -64,12 +66,14 @@ export default function BriefsPage() {
         title,
         description,
         ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
+        ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(deadline !== undefined ? { deadline } : {}),
       });
       setShowModal(false);
       setTitle("");
       setDescription("");
       setBrandId("");
+      setManagerId("");
       setDeadline(undefined);
       toast("success", "Brief created");
     } catch (err) {
@@ -298,6 +302,23 @@ export default function BriefsPage() {
                   ))}
                 </select>
               </div>
+              {isAdmin && (
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                    Assign Manager (optional)
+                  </label>
+                  <select
+                    value={managerId}
+                    onChange={(e) => setManagerId(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">No manager</option>
+                    {(managers ?? []).map((m: any) => (
+                      <option key={m._id} value={m._id}>{m.name ?? m.email}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button type="submit" variant="primary">
                   Create

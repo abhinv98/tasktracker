@@ -50,7 +50,9 @@ export default function BriefPage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
   const [taskAssignee, setTaskAssignee] = useState<Id<"users"> | "">("");
-  const [taskDuration, setTaskDuration] = useState("2h");
+  const [taskDurationValue, setTaskDurationValue] = useState("2");
+  const [taskDurationUnit, setTaskDurationUnit] = useState<"m" | "h" | "d">("h");
+  const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
@@ -77,11 +79,13 @@ export default function BriefPage() {
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault();
     if (!taskAssignee) return;
-    const durationMinutes = parseDuration(taskDuration);
-    if (durationMinutes <= 0) {
-      toast("error", "Invalid duration. Use format like 2h, 30m, 1d");
+    const numVal = parseInt(taskDurationValue, 10);
+    if (!numVal || numVal <= 0) {
+      toast("error", "Please enter a valid duration");
       return;
     }
+    const taskDuration = `${numVal}${taskDurationUnit}`;
+    const durationMinutes = parseDuration(taskDuration);
     try {
       await createTask({
         briefId,
@@ -90,11 +94,14 @@ export default function BriefPage() {
         assigneeId: taskAssignee as Id<"users">,
         duration: taskDuration,
         durationMinutes,
+        ...(taskDeadline !== undefined ? { deadline: taskDeadline } : {}),
       });
       setTaskTitle("");
       setTaskDesc("");
       setTaskAssignee("");
-      setTaskDuration("2h");
+      setTaskDurationValue("2");
+      setTaskDurationUnit("h");
+      setTaskDeadline(undefined);
       toast("success", "Task created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create task");
@@ -322,12 +329,40 @@ export default function BriefPage() {
                       : "Assign teams first"
                   }
                 />
-                <Input
-                  label="Duration"
-                  value={taskDuration}
-                  onChange={(e) => setTaskDuration(e.target.value)}
-                  placeholder="2h, 30m, 1d"
-                />
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                    Estimated Duration
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={taskDurationValue}
+                      onChange={(e) => setTaskDurationValue(e.target.value)}
+                      className="w-20 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      required
+                    />
+                    <select
+                      value={taskDurationUnit}
+                      onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
+                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="m">Minutes</option>
+                      <option value="h">Hours</option>
+                      <option value="d">Days</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                    Deadline (optional)
+                  </label>
+                  <DatePicker
+                    value={taskDeadline}
+                    onChange={setTaskDeadline}
+                    placeholder="Set task deadline"
+                  />
+                </div>
                 <Button type="submit" variant="primary">
                   Assign Task
                 </Button>

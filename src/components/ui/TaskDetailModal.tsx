@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AttachmentList } from "./AttachmentList";
 import { CommentThread } from "../comments/CommentThread";
+import { DatePicker } from "./DatePicker";
 import {
   X,
   Clock,
@@ -23,7 +24,19 @@ import {
   FileText,
   Image as ImageIcon,
   Download,
+  Pencil,
 } from "lucide-react";
+
+function parseDuration(str: string): number {
+  const m = str.match(/^(\d+)(m|h|d)$/i);
+  if (!m) return 0;
+  const value = parseInt(m[1], 10);
+  const unit = m[2].toLowerCase();
+  if (unit === "m") return value;
+  if (unit === "h") return value * 60;
+  if (unit === "d") return value * 60 * 8;
+  return 0;
+}
 
 interface TaskDetailModalProps {
   taskId: string;
@@ -74,6 +87,17 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   });
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
+  const updateTask = useMutation(api.tasks.updateTask);
+  const employees = useQuery(api.users.listEmployees);
+
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editAssignee, setEditAssignee] = useState("");
+  const [editDurationValue, setEditDurationValue] = useState("");
+  const [editDurationUnit, setEditDurationUnit] = useState<"m" | "h" | "d">("h");
+  const [editDeadline, setEditDeadline] = useState<number | undefined>(undefined);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [showDeliverableForm, setShowDeliverableForm] = useState(false);
   const [deliverableMessage, setDeliverableMessage] = useState("");
@@ -174,6 +198,42 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     }
   }
 
+  function openEditForm() {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditDesc(task.description ?? "");
+    setEditAssignee(task.assigneeId);
+    const durMatch = task.duration.match(/^(\d+)(m|h|d)$/i);
+    setEditDurationValue(durMatch ? durMatch[1] : "2");
+    setEditDurationUnit((durMatch ? durMatch[2].toLowerCase() : "h") as "m" | "h" | "d");
+    setEditDeadline(task.deadline);
+    setShowEditForm(true);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (isSavingEdit || !task) return;
+    const numVal = parseInt(editDurationValue, 10);
+    if (!numVal || numVal <= 0) return;
+    setIsSavingEdit(true);
+    try {
+      const duration = `${numVal}${editDurationUnit}`;
+      const durationMinutes = parseDuration(duration);
+      await updateTask({
+        taskId: taskId as Id<"tasks">,
+        title: editTitle,
+        description: editDesc || undefined,
+        assigneeId: editAssignee as Id<"users">,
+        duration,
+        durationMinutes,
+        ...(editDeadline !== undefined ? { deadline: editDeadline } : { clearDeadline: true }),
+      });
+      setShowEditForm(false);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
   const DELIVERABLE_STATUS: Record<
     string,
     { label: string; color: string; bg: string }
@@ -215,12 +275,23 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
               {brief?.title ?? "Unknown brief"}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          >
-            <X className="h-4.5 w-4.5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {isAdminOrManager && (
+              <button
+                onClick={openEditForm}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                title="Edit task"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable content */}
@@ -500,6 +571,110 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
           </div>
         </div>
       </div>
+
+      {/* Edit Task Modal */}
+      {showEditForm && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-[60]"
+            onClick={() => setShowEditForm(false)}
+          />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-xl border border-[var(--border)] shadow-2xl">
+              <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
+                <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Edit Task</h3>
+                <button
+                  onClick={() => setShowEditForm(false)}
+                  className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <form onSubmit={handleSaveEdit} className="p-5 flex flex-col gap-4">
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Title</label>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
+                </div>
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Description</label>
+                  <textarea
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
+                </div>
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Assignee</label>
+                  <select
+                    value={editAssignee}
+                    onChange={(e) => setEditAssignee(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    {(employees ?? []).map((emp) => (
+                      <option key={emp._id} value={emp._id}>
+                        {emp.name ?? emp.email ?? "Unknown"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Estimated Duration</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      value={editDurationValue}
+                      onChange={(e) => setEditDurationValue(e.target.value)}
+                      required
+                      className="w-20 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    />
+                    <select
+                      value={editDurationUnit}
+                      onChange={(e) => setEditDurationUnit(e.target.value as "m" | "h" | "d")}
+                      className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="m">Minutes</option>
+                      <option value="h">Hours</option>
+                      <option value="d">Days</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Deadline</label>
+                  <DatePicker
+                    value={editDeadline}
+                    onChange={setEditDeadline}
+                    placeholder="Set task deadline"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-60"
+                  >
+                    {isSavingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    {isSavingEdit ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowEditForm(false)}
+                    className="px-4 py-2 rounded-lg text-[13px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

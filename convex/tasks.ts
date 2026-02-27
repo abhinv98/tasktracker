@@ -82,6 +82,7 @@ export const createTask = mutation({
     assigneeId: v.id("users"),
     duration: v.string(),
     durationMinutes: v.number(),
+    deadline: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -131,6 +132,76 @@ export const createTask = mutation({
     });
 
     return taskId;
+  },
+});
+
+export const updateTask = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    assigneeId: v.optional(v.id("users")),
+    duration: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
+    deadline: v.optional(v.number()),
+    clearDeadline: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { taskId, clearDeadline, ...fields }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    const brief = await ctx.db.get(task.briefId);
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
+      throw new Error("Only admins or assigned managers can edit tasks");
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (fields.title !== undefined) updates.title = fields.title;
+    if (fields.description !== undefined) updates.description = fields.description;
+    if (fields.duration !== undefined) updates.duration = fields.duration;
+    if (fields.durationMinutes !== undefined) updates.durationMinutes = fields.durationMinutes;
+    if (fields.deadline !== undefined) updates.deadline = fields.deadline;
+    if (clearDeadline) updates.deadline = undefined;
+
+    if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
+      updates.assigneeId = fields.assigneeId;
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "task_status_changed",
+        title: "Task reassigned",
+        message: `Task "${task.title}" was reassigned`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("notifications", {
+        recipientId: fields.assigneeId,
+        type: "task_assigned",
+        title: "Task assigned",
+        message: `You were assigned: ${fields.title ?? task.title}`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await ctx.db.patch(taskId, updates);
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId,
+        userId,
+        action: "updated_task",
+        details: JSON.stringify(Object.keys(updates)),
+        timestamp: Date.now(),
+      });
+    }
   },
 });
 

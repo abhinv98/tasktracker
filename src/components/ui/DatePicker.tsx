@@ -53,6 +53,7 @@ export function DatePicker({
   id,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [viewDate, setViewDate] = useState(() => {
     const base = value ? new Date(value) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
@@ -68,6 +69,13 @@ export function DatePicker({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setDropUp(spaceBelow < 380);
   }, [open]);
 
   const displayLabel = value
@@ -111,7 +119,7 @@ export function DatePicker({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-[280px] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden">
+        <div className={`absolute right-0 z-50 w-[280px] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
             <span className="font-semibold text-[14px] text-[var(--text-primary)]">
