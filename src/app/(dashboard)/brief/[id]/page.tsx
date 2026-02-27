@@ -5,8 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Select, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
+import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
 import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle } from "lucide-react";
 
 function parseDuration(str: string): number {
@@ -49,11 +50,13 @@ export default function BriefPage() {
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
+  const [taskTeamFilter, setTaskTeamFilter] = useState<string>("");
   const [taskAssignee, setTaskAssignee] = useState<Id<"users"> | "">("");
   const [taskDurationValue, setTaskDurationValue] = useState("2");
   const [taskDurationUnit, setTaskDurationUnit] = useState<"m" | "h" | "d">("h");
   const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
 
@@ -61,9 +64,16 @@ export default function BriefPage() {
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const saveAsTemplate = useMutation(api.templates.saveAsTemplate);
 
+  const briefTeamsList = graphData?.teams ?? [];
   const employeesInBriefTeams =
-    graphData?.teams.flatMap((t) => t.members.map((m) => m.user)) ?? [];
+    briefTeamsList.flatMap((t) => t.members.map((m) => m.user)) ?? [];
   const uniqueEmployees = [...new Map(employeesInBriefTeams.map((e) => [e._id, e])).values()];
+
+  const filteredEmployees = taskTeamFilter
+    ? briefTeamsList
+        .find((t) => t.team._id === taskTeamFilter)
+        ?.members.map((m) => m.user) ?? []
+    : uniqueEmployees;
 
   const allTasks = tasksData?.tasks ?? [];
   const tasksByStatus = {
@@ -98,6 +108,7 @@ export default function BriefPage() {
       });
       setTaskTitle("");
       setTaskDesc("");
+      setTaskTeamFilter("");
       setTaskAssignee("");
       setTaskDurationValue("2");
       setTaskDurationUnit("h");
@@ -238,6 +249,7 @@ export default function BriefPage() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
         {/* Column 1 - Create Task + Task List */}
         <div className="lg:col-span-3 flex flex-col border-r border-[var(--border)] overflow-hidden bg-white">
+          <div className="flex-1 overflow-auto">
           <div className="p-4 border-b border-[var(--border)]">
             <h2 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
               Create Task
@@ -302,7 +314,7 @@ export default function BriefPage() {
 
             {/* Create task form */}
             {isAdminOrManager && brief.status !== "archived" ? (
-              <form onSubmit={handleCreateTask} className="flex flex-col gap-3">
+              <form onSubmit={handleCreateTask} className="flex flex-col gap-2.5">
                 <Input
                   label="Title"
                   value={taskTitle}
@@ -313,55 +325,67 @@ export default function BriefPage() {
                   label="Description"
                   value={taskDesc}
                   onChange={(e) => setTaskDesc(e.target.value)}
-                  className="min-h-[60px]"
+                  className="min-h-[48px]"
                 />
-                <Select
-                  label="Assignee"
-                  options={uniqueEmployees.map((e) => ({
-                    value: e._id,
-                    label: (e.name ?? e.email ?? "Unknown") as string,
-                  }))}
-                  value={taskAssignee}
-                  onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
-                  placeholder={
-                    teamsForBrief?.length
-                      ? "Select employee"
-                      : "Assign teams first"
-                  }
-                />
-                <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                    Estimated Duration
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={taskDurationValue}
-                      onChange={(e) => setTaskDurationValue(e.target.value)}
-                      className="w-20 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      required
-                    />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Team</label>
                     <select
-                      value={taskDurationUnit}
-                      onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
-                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      value={taskTeamFilter}
+                      onChange={(e) => { setTaskTeamFilter(e.target.value); setTaskAssignee(""); }}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                     >
-                      <option value="m">Minutes</option>
-                      <option value="h">Hours</option>
-                      <option value="d">Days</option>
+                      <option value="">All teams</option>
+                      {briefTeamsList.map((t) => (
+                        <option key={t.team._id} value={t.team._id}>{t.team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignee</label>
+                    <select
+                      value={taskAssignee}
+                      onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="">{teamsForBrief?.length ? "Select" : "Assign teams"}</option>
+                      {filteredEmployees.map((e) => (
+                        <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                    Deadline (optional)
-                  </label>
-                  <DatePicker
-                    value={taskDeadline}
-                    onChange={setTaskDeadline}
-                    placeholder="Set task deadline"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Duration</label>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        value={taskDurationValue}
+                        onChange={(e) => setTaskDurationValue(e.target.value)}
+                        className="w-14 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        required
+                      />
+                      <select
+                        value={taskDurationUnit}
+                        onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
+                        className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      >
+                        <option value="m">Min</option>
+                        <option value="h">Hrs</option>
+                        <option value="d">Days</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>
+                    <DatePicker
+                      value={taskDeadline}
+                      onChange={setTaskDeadline}
+                      placeholder="Set date"
+                    />
+                  </div>
                 </div>
                 <Button type="submit" variant="primary">
                   Assign Task
@@ -375,7 +399,7 @@ export default function BriefPage() {
           </div>
 
           {/* Task manifest */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="p-4">
             <h3 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide mb-3">
               Task Manifest
             </h3>
@@ -407,6 +431,7 @@ export default function BriefPage() {
             {(!tasksData?.byTeam || Object.keys(tasksData.byTeam).length === 0) && (
               <p className="text-[12px] text-[var(--text-muted)]">No tasks yet.</p>
             )}
+          </div>
           </div>
         </div>
 
@@ -512,7 +537,8 @@ export default function BriefPage() {
                           return (
                             <div
                               key={task._id}
-                              className={`p-2.5 rounded-lg border bg-white ${isBlocked ? "border-[var(--danger)] opacity-60" : "border-[var(--border-subtle)]"}`}
+                              onClick={() => setSelectedTaskId(task._id)}
+                              className={`p-2.5 rounded-lg border bg-white cursor-pointer hover:shadow-sm transition-shadow ${isBlocked ? "border-[var(--danger)] opacity-60" : "border-[var(--border-subtle)]"}`}
                             >
                               <div className="flex items-start gap-1.5">
                                 {isBlocked && <Lock className="h-3 w-3 text-[var(--danger)] shrink-0 mt-0.5" />}
@@ -532,7 +558,7 @@ export default function BriefPage() {
                                 if (!isAdminOrManager && task.assigneeId !== user?._id) return null;
                                 return (
                                   <button
-                                    onClick={() => updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" })}
+                                    onClick={(e) => { e.stopPropagation(); updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" }); }}
                                     className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
                                   >
                                     Move &rarr;
@@ -561,7 +587,7 @@ export default function BriefPage() {
                       return blocker && blocker.status !== "done";
                     });
                   return (
-                    <Card key={task._id} className={`p-4 ${isBlocked ? "opacity-60 border-[var(--danger)]" : ""}`}>
+                    <Card key={task._id} className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${isBlocked ? "opacity-60 border-[var(--danger)]" : ""}`} onClick={() => setSelectedTaskId(task._id)}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -583,7 +609,7 @@ export default function BriefPage() {
                             const label = next === "in-progress" ? "In Progress" : next === "review" ? "Review" : "Done";
                             return (
                               <button
-                                onClick={() => updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" })}
+                                onClick={(e) => { e.stopPropagation(); updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" }); }}
                                 className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
                               >
                                 Move to {label} &rarr;
@@ -721,6 +747,13 @@ export default function BriefPage() {
         }}
         onCancel={() => setShowTemplatePrompt(false)}
       />
+
+      {selectedTaskId && (
+        <TaskDetailModal
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+        />
+      )}
     </div>
   );
 }

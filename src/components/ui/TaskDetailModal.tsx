@@ -88,16 +88,34 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
   const updateTask = useMutation(api.tasks.updateTask);
-  const employees = useQuery(api.users.listEmployees);
+  const briefId = detail?.task?.briefId;
+  const graphData = useQuery(
+    api.briefs.getBriefGraphData,
+    briefId ? { briefId } : "skip"
+  );
+
+  const editBriefTeams = graphData?.teams ?? [];
+  const editAllMembers = [
+    ...new Map(
+      editBriefTeams.flatMap((t) => t.members.map((m) => [m.user._id, m.user]))
+    ).values(),
+  ];
 
   const [showEditForm, setShowEditForm] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editTeamFilter, setEditTeamFilter] = useState("");
   const [editAssignee, setEditAssignee] = useState("");
   const [editDurationValue, setEditDurationValue] = useState("");
   const [editDurationUnit, setEditDurationUnit] = useState<"m" | "h" | "d">("h");
   const [editDeadline, setEditDeadline] = useState<number | undefined>(undefined);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const editFilteredEmployees = editTeamFilter
+    ? editBriefTeams
+        .find((t) => t.team._id === editTeamFilter)
+        ?.members.map((m) => m.user) ?? []
+    : editAllMembers;
 
   const [showDeliverableForm, setShowDeliverableForm] = useState(false);
   const [deliverableMessage, setDeliverableMessage] = useState("");
@@ -202,6 +220,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     if (!task) return;
     setEditTitle(task.title);
     setEditDesc(task.description ?? "");
+    setEditTeamFilter("");
     setEditAssignee(task.assigneeId);
     const durMatch = task.duration.match(/^(\d+)(m|h|d)$/i);
     setEditDurationValue(durMatch ? durMatch[1] : "2");
@@ -610,15 +629,29 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                   />
                 </div>
                 <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Team</label>
+                  <select
+                    value={editTeamFilter}
+                    onChange={(e) => { setEditTeamFilter(e.target.value); setEditAssignee(""); }}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">All teams</option>
+                    {editBriefTeams.map((t) => (
+                      <option key={t.team._id} value={t.team._id}>{t.team.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Assignee</label>
                   <select
                     value={editAssignee}
                     onChange={(e) => setEditAssignee(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
-                    {(employees ?? []).map((emp) => (
+                    <option value="">Select employee</option>
+                    {editFilteredEmployees.map((emp) => (
                       <option key={emp._id} value={emp._id}>
-                        {emp.name ?? emp.email ?? "Unknown"}
+                        {(emp.name ?? emp.email ?? "Unknown") as string}
                       </option>
                     ))}
                   </select>
