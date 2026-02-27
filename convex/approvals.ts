@@ -22,20 +22,39 @@ export const listDeliverables = query({
     const tasks = await ctx.db.query("tasks").collect();
     const briefs = await ctx.db.query("briefs").collect();
 
-    return deliverables.map((d) => {
-      const submitter = users.find((u) => u._id === d.submittedBy);
-      const reviewer = d.reviewedBy ? users.find((u) => u._id === d.reviewedBy) : null;
-      const task = tasks.find((t) => t._id === d.taskId);
-      const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
-      return {
-        ...d,
-        submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
-        reviewerName: reviewer?.name ?? reviewer?.email,
-        taskTitle: task?.title ?? "Unknown",
-        briefTitle: brief?.title ?? "Unknown",
-        briefId: brief?._id,
-      };
-    });
+    const results = await Promise.all(
+      deliverables.map(async (d) => {
+        const submitter = users.find((u) => u._id === d.submittedBy);
+        const reviewer = d.reviewedBy ? users.find((u) => u._id === d.reviewedBy) : null;
+        const task = tasks.find((t) => t._id === d.taskId);
+        const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+
+        let files: { name: string; url: string }[] = [];
+        if (d.fileIds && d.fileIds.length > 0) {
+          files = await Promise.all(
+            d.fileIds.map(async (fileId, idx) => {
+              const url = await ctx.storage.getUrl(fileId);
+              return {
+                name: d.fileNames?.[idx] ?? "file",
+                url: url ?? "",
+              };
+            })
+          );
+          files = files.filter((f) => f.url);
+        }
+
+        return {
+          ...d,
+          submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          reviewerName: reviewer?.name ?? reviewer?.email,
+          taskTitle: task?.title ?? "Unknown",
+          briefTitle: brief?.title ?? "Unknown",
+          briefId: brief?._id,
+          files,
+        };
+      })
+    );
+    return results;
   },
 });
 
@@ -44,8 +63,10 @@ export const submitDeliverable = mutation({
     taskId: v.id("tasks"),
     message: v.string(),
     link: v.optional(v.string()),
+    fileIds: v.optional(v.array(v.id("_storage"))),
+    fileNames: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { taskId, message, link }) => {
+  handler: async (ctx, { taskId, message, link, fileIds, fileNames }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -59,6 +80,8 @@ export const submitDeliverable = mutation({
       link,
       submittedAt: Date.now(),
       status: "pending",
+      ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
+      ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
     });
 
     // Notify the assigner

@@ -111,6 +111,11 @@ export default function BrandDetailPage() {
           {brand.description && (
             <p className="text-[14px] text-[var(--text-secondary)]">{brand.description}</p>
           )}
+          {(brand as any).creatorName && (
+            <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+              Created by {(brand as any).creatorName}
+            </p>
+          )}
         </div>
         {isAdmin && (
           <Button variant="secondary" onClick={() => setShowDeleteBrand(true)}>

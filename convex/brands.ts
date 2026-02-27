@@ -89,8 +89,11 @@ export const getBrand = query({
       done: brandTasks.filter((t) => t.status === "done").length,
     };
 
+    const creator = users.find((u) => u._id === brand.createdBy);
+
     return {
       ...brand,
+      creatorName: creator?.name ?? creator?.email ?? "Unknown",
       managers,
       briefs: brandBriefs.map((b) => {
         const briefTasks = tasks.filter((t) => t.briefId === b._id);

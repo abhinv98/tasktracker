@@ -121,6 +121,8 @@ export default defineSchema({
     reviewedBy: v.optional(v.id("users")),
     reviewNote: v.optional(v.string()),
     reviewedAt: v.optional(v.number()),
+    fileIds: v.optional(v.array(v.id("_storage"))),
+    fileNames: v.optional(v.array(v.string())),
   }).index("by_task", ["taskId"]),
 
   // ─── COMMENTS ──────────────────────────────────

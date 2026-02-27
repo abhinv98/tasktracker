@@ -488,18 +488,22 @@ export default function BriefPage() {
                               <p className="text-[10px] text-[var(--text-muted)] mt-1">
                                 {assignee?.name ?? assignee?.email ?? "?"} &middot; {task.duration}
                               </p>
-                              {/* Quick status change — admin/manager or task assignee */}
-                              {(isAdminOrManager || task.assigneeId === user?._id) && status !== "done" && !isBlocked && (
-                                <button
-                                  onClick={() => {
-                                    const next = status === "pending" ? "in-progress" : status === "in-progress" ? "review" : "done";
-                                    updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" });
-                                  }}
-                                  className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
-                                >
-                                  Move &rarr;
-                                </button>
-                              )}
+                              {/* Quick status change — admin/manager or task assignee (employees capped at review) */}
+                              {(() => {
+                                const rawNext = status === "pending" ? "in-progress" : status === "in-progress" ? "review" : "done";
+                                const canMoveDone = isAdminOrManager;
+                                const next = rawNext === "done" && !canMoveDone ? null : rawNext;
+                                if (!next || status === "done" || isBlocked) return null;
+                                if (!isAdminOrManager && task.assigneeId !== user?._id) return null;
+                                return (
+                                  <button
+                                    onClick={() => updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" })}
+                                    className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
+                                  >
+                                    Move &rarr;
+                                  </button>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -534,18 +538,23 @@ export default function BriefPage() {
                           <p className="text-[11px] text-[var(--text-secondary)] mt-1">
                             {assignee?.name ?? assignee?.email ?? "Unassigned"} &middot; {task.duration}
                           </p>
-                          {/* Quick status change — admin/manager or task assignee */}
-                          {(isAdminOrManager || task.assigneeId === user?._id) && task.status !== "done" && !isBlocked && (
-                            <button
-                              onClick={() => {
-                                const next = task.status === "pending" ? "in-progress" : task.status === "in-progress" ? "review" : "done";
-                                updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" });
-                              }}
-                              className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
-                            >
-                              Move to {task.status === "pending" ? "In Progress" : task.status === "in-progress" ? "Review" : "Done"} &rarr;
-                            </button>
-                          )}
+                          {/* Quick status change — admin/manager or task assignee (employees capped at review) */}
+                          {(() => {
+                            const rawNext = task.status === "pending" ? "in-progress" : task.status === "in-progress" ? "review" : "done";
+                            const canMoveDone = isAdminOrManager;
+                            const next = rawNext === "done" && !canMoveDone ? null : rawNext;
+                            if (!next || task.status === "done" || isBlocked) return null;
+                            if (!isAdminOrManager && task.assigneeId !== user?._id) return null;
+                            const label = next === "in-progress" ? "In Progress" : next === "review" ? "Review" : "Done";
+                            return (
+                              <button
+                                onClick={() => updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" })}
+                                className="mt-1.5 text-[9px] font-medium text-[var(--accent-admin)] hover:underline"
+                              >
+                                Move to {label} &rarr;
+                              </button>
+                            );
+                          })()}
                         </div>
                         <span
                           className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium"

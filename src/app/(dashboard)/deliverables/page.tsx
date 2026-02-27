@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, Badge, Button } from "@/components/ui";
-import { Check, X, MessageSquare, ExternalLink } from "lucide-react";
+import { Check, X, MessageSquare, ExternalLink, Paperclip, FileText, Image as ImageIcon, Download } from "lucide-react";
+import type { Id } from "@/convex/_generated/dataModel";
 
 export default function DeliverablesPage() {
   const user = useQuery(api.users.getCurrentUser);
@@ -16,11 +17,14 @@ export default function DeliverablesPage() {
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
 
+  const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
+
   // Submit form state
   const [showSubmit, setShowSubmit] = useState(false);
   const [submitTaskId, setSubmitTaskId] = useState("");
   const [submitMessage, setSubmitMessage] = useState("");
   const [submitLink, setSubmitLink] = useState("");
+  const [submitFiles, setSubmitFiles] = useState<File[]>([]);
 
   const role = user?.role ?? "employee";
   const isManagerOrAdmin = role === "admin" || role === "manager";
@@ -53,12 +57,31 @@ export default function DeliverablesPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!submitTaskId || !submitMessage.trim()) return;
+
+    let fileIds: Id<"_storage">[] = [];
+    let fileNames: string[] = [];
+    if (submitFiles.length > 0) {
+      for (const file of submitFiles) {
+        const url = await generateUploadUrl();
+        const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+        const { storageId } = await res.json();
+        fileIds.push(storageId);
+        fileNames.push(file.name);
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await submitDeliverable({ taskId: submitTaskId as any, message: submitMessage.trim(), link: submitLink || undefined });
+    await submitDeliverable({
+      taskId: submitTaskId as any,
+      message: submitMessage.trim(),
+      link: submitLink || undefined,
+      ...(fileIds.length > 0 ? { fileIds, fileNames } : {}),
+    });
     setShowSubmit(false);
     setSubmitTaskId("");
     setSubmitMessage("");
     setSubmitLink("");
+    setSubmitFiles([]);
   }
 
   const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
@@ -110,6 +133,39 @@ export default function DeliverablesPage() {
               placeholder="Link (optional)"
               className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
+            <div>
+              <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                <Paperclip className="h-3.5 w-3.5" />
+                Attach files (images, PDFs, etc.)
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      setSubmitFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+                    }
+                  }}
+                />
+              </label>
+              {submitFiles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {submitFiles.map((f, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[12px] text-[var(--text-secondary)]">
+                      {f.type.startsWith("image/") ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                      <span className="max-w-[150px] truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSubmitFiles((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
               <Button type="submit" variant="primary">Submit</Button>
               <Button type="button" variant="secondary" onClick={() => setShowSubmit(false)}>Cancel</Button>
@@ -158,6 +214,27 @@ export default function DeliverablesPage() {
                   <ExternalLink className="h-3 w-3" />
                   {d.link}
                 </a>
+              )}
+
+              {(d as any).files?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(d as any).files.map((file: { name: string; url: string }, idx: number) => {
+                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                    return (
+                      <a
+                        key={idx}
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin)] transition-colors"
+                      >
+                        {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+                        <span className="max-w-[150px] truncate">{file.name}</span>
+                        <Download className="h-3 w-3 shrink-0" />
+                      </a>
+                    );
+                  })}
+                </div>
               )}
 
               {d.reviewNote && (

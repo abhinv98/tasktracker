@@ -158,6 +158,10 @@ export const updateTaskStatus = mutation({
       (user?.role === "manager" && brief?.assignedManagerId === userId);
     if (!canUpdate) throw new Error("Not authorized");
 
+    if (newStatus === "done" && user?.role !== "admin" && user?.role !== "manager") {
+      throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
+    }
+
     await ctx.db.patch(taskId, {
       status: newStatus,
       ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
@@ -330,6 +334,10 @@ export const bulkUpdateStatus = mutation({
         user?.role === "admin" ||
         (user?.role === "manager" && brief?.assignedManagerId === userId);
       if (!canUpdate) continue;
+
+      if (newStatus === "done" && user?.role !== "admin" && user?.role !== "manager") {
+        continue;
+      }
 
       await ctx.db.patch(taskId, {
         status: newStatus,

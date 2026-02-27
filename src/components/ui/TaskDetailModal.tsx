@@ -19,6 +19,10 @@ import {
   Loader2,
   Check,
   XCircle,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Download,
 } from "lucide-react";
 
 interface TaskDetailModalProps {
@@ -69,9 +73,12 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     taskId: taskId as Id<"tasks">,
   });
 
+  const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
+
   const [showDeliverableForm, setShowDeliverableForm] = useState(false);
   const [deliverableMessage, setDeliverableMessage] = useState("");
   const [deliverableLink, setDeliverableLink] = useState("");
+  const [deliverableFiles, setDeliverableFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
@@ -115,9 +122,11 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
 
   const status = task.status;
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
-  const nextStatus = STATUS_FLOW[status];
   const isAssignee = user._id === task.assigneeId;
-  const canUpdateStatus = isAssignee || user.role === "admin" || user.role === "manager";
+  const isAdminOrManager = user.role === "admin" || user.role === "manager";
+  const canUpdateStatus = isAssignee || isAdminOrManager;
+  const rawNext = STATUS_FLOW[status];
+  const nextStatus = (rawNext === "done" && !isAdminOrManager) ? null : rawNext;
 
   async function handleStatusUpdate() {
     if (!nextStatus || isUpdatingStatus) return;
@@ -137,13 +146,28 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     if (!deliverableMessage.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
+      let fileIds: Id<"_storage">[] = [];
+      let fileNames: string[] = [];
+
+      if (deliverableFiles.length > 0) {
+        for (const file of deliverableFiles) {
+          const url = await generateUploadUrl();
+          const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+          const { storageId } = await res.json();
+          fileIds.push(storageId);
+          fileNames.push(file.name);
+        }
+      }
+
       await submitDeliverable({
         taskId: taskId as Id<"tasks">,
         message: deliverableMessage.trim(),
         link: deliverableLink.trim() || undefined,
+        ...(fileIds.length > 0 ? { fileIds, fileNames } : {}),
       });
       setDeliverableMessage("");
       setDeliverableLink("");
+      setDeliverableFiles([]);
       setShowDeliverableForm(false);
     } finally {
       setIsSubmitting(false);
@@ -224,6 +248,11 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                   )}
                   Move to {STATUS_CONFIG[nextStatus]?.label}
                 </button>
+              )}
+              {isAssignee && !isAdminOrManager && status === "review" && (
+                <span className="text-[11px] text-[var(--text-muted)] italic">
+                  Submit a deliverable for approval
+                </span>
               )}
             </div>
 
@@ -315,6 +344,39 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                     className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
                   />
                 </div>
+                <div>
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                    <Paperclip className="h-3 w-3" />
+                    Attach files
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          setDeliverableFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
+                        }
+                      }}
+                    />
+                  </label>
+                  {deliverableFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {deliverableFiles.map((f, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)]">
+                          {f.type.startsWith("image/") ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          <span className="max-w-[120px] truncate">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setDeliverableFiles((prev) => prev.filter((_, j) => j !== i))}
+                            className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -378,6 +440,26 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                         <ExternalLink className="h-3 w-3" />
                         {d.link}
                       </a>
+                    )}
+                    {(d as any).files?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(d as any).files.map((file: { name: string; url: string }, idx: number) => {
+                          const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name);
+                          return (
+                            <a
+                              key={idx}
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin)] transition-colors"
+                            >
+                              {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+                              <span className="max-w-[120px] truncate">{file.name}</span>
+                              <Download className="h-3 w-3 shrink-0" />
+                            </a>
+                          );
+                        })}
+                      </div>
                     )}
                     {d.reviewNote && (
                       <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-white border border-[var(--border-subtle)]">
