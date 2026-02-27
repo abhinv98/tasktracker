@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Download, FileText } from "lucide-react";
 
 interface FilePreviewModalProps {
@@ -38,13 +39,13 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
   const pdf = isPdfFile(file.name);
   const canPreview = image || video || pdf;
 
-  return (
+  return createPortal(
     <>
       <div
-        className="fixed inset-0 bg-black/60 z-[70] animate-fadeIn"
+        className="fixed inset-0 bg-black/60 z-[100] animate-fadeIn"
         onClick={onClose}
       />
-      <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
         <div
           className="relative w-full max-w-3xl max-h-[85vh] bg-white rounded-xl border border-[var(--border)] shadow-2xl flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
@@ -120,6 +121,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
