@@ -28,6 +28,7 @@ export const getAttachments = query({
         ...att,
         url,
         uploaderName: uploader?.name ?? uploader?.email ?? "Unknown",
+        uploaderDesignation: uploader?.designation ?? "",
       });
     }
     return result;

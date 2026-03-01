@@ -46,6 +46,10 @@ export default function BriefsPage() {
   const [description, setDescription] = useState("");
   const [brandId, setBrandId] = useState<string>("");
   const [managerId, setManagerId] = useState<string>("");
+  const brandManagerIds = useQuery(
+    api.brands.getManagersForBrand,
+    brandId ? { brandId: brandId as Id<"brands"> } : "skip"
+  );
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
   const [briefType, setBriefType] = useState<string>("");
 
@@ -323,7 +327,7 @@ export default function BriefsPage() {
                 </label>
                 <select
                   value={brandId}
-                  onChange={(e) => setBrandId(e.target.value)}
+                  onChange={(e) => { setBrandId(e.target.value); setManagerId(""); }}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 >
                   <option value="">No brand</option>
@@ -343,10 +347,17 @@ export default function BriefsPage() {
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
                     <option value="">No manager</option>
-                    {(managers ?? []).map((m: any) => (
-                      <option key={m._id} value={m._id}>{m.name ?? m.email}</option>
-                    ))}
+                    {(managers ?? [])
+                      .filter((m: any) => !brandId || !brandManagerIds || brandManagerIds.includes(m._id))
+                      .map((m: any) => (
+                        <option key={m._id} value={m._id}>{m.name ?? m.email}</option>
+                      ))}
                   </select>
+                  {brandId && brandManagerIds && brandManagerIds.length === 0 && (
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                      No managers assigned to this brand yet.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="flex gap-2">

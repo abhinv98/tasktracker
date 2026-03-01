@@ -2,6 +2,19 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+export const getManagersForBrand = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const bms = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .collect();
+    return bms.map((bm) => bm.managerId);
+  },
+});
+
 // List all brands (admin sees all, managers see their assigned brands)
 export const listBrands = query({
   args: {},

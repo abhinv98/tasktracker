@@ -83,6 +83,9 @@ export const createTask = mutation({
     duration: v.string(),
     durationMinutes: v.number(),
     deadline: v.optional(v.number()),
+    platform: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    postDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -145,6 +148,9 @@ export const updateTask = mutation({
     durationMinutes: v.optional(v.number()),
     deadline: v.optional(v.number()),
     clearDeadline: v.optional(v.boolean()),
+    platform: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    postDate: v.optional(v.string()),
   },
   handler: async (ctx, { taskId, clearDeadline, ...fields }) => {
     const userId = await getAuthUserId(ctx);
@@ -164,6 +170,9 @@ export const updateTask = mutation({
     if (fields.durationMinutes !== undefined) updates.durationMinutes = fields.durationMinutes;
     if (fields.deadline !== undefined) updates.deadline = fields.deadline;
     if (clearDeadline) updates.deadline = undefined;
+    if (fields.platform !== undefined) updates.platform = fields.platform;
+    if (fields.contentType !== undefined) updates.contentType = fields.contentType;
+    if (fields.postDate !== undefined) updates.postDate = fields.postDate;
 
     if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
       updates.assigneeId = fields.assigneeId;

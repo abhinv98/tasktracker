@@ -2,128 +2,211 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const listForBrief = query({
-  args: {
-    briefId: v.id("briefs"),
-    month: v.optional(v.string()), // "YYYY-MM"
-  },
-  handler: async (ctx, { briefId, month }) => {
+// ─── SHEET MANAGEMENT ───────────────────────────
+
+export const listSheets = query({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-
-    let items = await ctx.db
-      .query("contentCalendarItems")
+    return await ctx.db
+      .query("contentCalendarSheets")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
-      .collect();
-
-    if (month) {
-      items = items.filter((item) => item.date.startsWith(month));
-    }
-
-    const users = await ctx.db.query("users").collect();
-    return items.map((item) => {
-      const assignee = item.assigneeId
-        ? users.find((u) => u._id === item.assigneeId)
-        : null;
-      return {
-        ...item,
-        assigneeName: assignee?.name ?? assignee?.email ?? undefined,
-      };
-    });
+      .collect()
+      .then((sheets) => sheets.sort((a, b) => a.sortOrder - b.sortOrder));
   },
 });
 
-export const createItem = mutation({
+export const createSheet = mutation({
   args: {
     briefId: v.id("briefs"),
-    date: v.string(),
-    platform: v.string(),
-    contentType: v.string(),
-    caption: v.optional(v.string()),
-    status: v.optional(
-      v.union(
-        v.literal("planned"),
-        v.literal("in_progress"),
-        v.literal("review"),
-        v.literal("approved"),
-        v.literal("published")
-      )
-    ),
-    assigneeId: v.optional(v.id("users")),
-    notes: v.optional(v.string()),
+    month: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { briefId, month }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
     if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can manage content calendar");
+      throw new Error("Only admins and managers can manage sheets");
 
-    const brief = await ctx.db.get(args.briefId);
-    if (!brief) throw new Error("Brief not found");
-    if (!brief.brandId) throw new Error("Brief must be associated with a brand");
+    const existing = await ctx.db
+      .query("contentCalendarSheets")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
 
-    return await ctx.db.insert("contentCalendarItems", {
-      briefId: args.briefId,
-      brandId: brief.brandId,
-      date: args.date,
-      platform: args.platform,
-      contentType: args.contentType,
-      caption: args.caption,
-      status: args.status ?? "planned",
-      assigneeId: args.assigneeId,
-      notes: args.notes,
+    const duplicate = existing.find((s) => s.month === month);
+    if (duplicate) throw new Error(`Sheet for ${month} already exists`);
+
+    const maxOrder = existing.length
+      ? Math.max(...existing.map((s) => s.sortOrder))
+      : 0;
+
+    return await ctx.db.insert("contentCalendarSheets", {
+      briefId,
+      month,
+      sortOrder: maxOrder + 1,
       createdBy: userId,
       createdAt: Date.now(),
     });
   },
 });
 
-export const updateItem = mutation({
-  args: {
-    itemId: v.id("contentCalendarItems"),
-    date: v.optional(v.string()),
-    platform: v.optional(v.string()),
-    contentType: v.optional(v.string()),
-    caption: v.optional(v.string()),
-    status: v.optional(
-      v.union(
-        v.literal("planned"),
-        v.literal("in_progress"),
-        v.literal("review"),
-        v.literal("approved"),
-        v.literal("published")
-      )
-    ),
-    assigneeId: v.optional(v.id("users")),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, { itemId, ...fields }) => {
+export const deleteSheet = mutation({
+  args: { sheetId: v.id("contentCalendarSheets") },
+  handler: async (ctx, { sheetId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
     if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Not authorized");
+      throw new Error("Only admins and managers can delete sheets");
 
-    const updates: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(fields)) {
-      if (val !== undefined) updates[k] = val;
+    const sheet = await ctx.db.get(sheetId);
+    if (!sheet) throw new Error("Sheet not found");
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", sheet.briefId))
+      .collect();
+
+    const monthTasks = tasks.filter(
+      (t) => t.postDate && t.postDate.startsWith(sheet.month)
+    );
+    for (const task of monthTasks) {
+      await ctx.db.delete(task._id);
     }
-    if (Object.keys(updates).length > 0) {
-      await ctx.db.patch(itemId, updates);
-    }
+
+    await ctx.db.delete(sheetId);
   },
 });
 
-export const deleteItem = mutation({
-  args: { itemId: v.id("contentCalendarItems") },
-  handler: async (ctx, { itemId }) => {
+// ─── CONTENT CALENDAR TASK QUERIES ──────────────
+
+export const listTasksForSheet = query({
+  args: {
+    briefId: v.id("briefs"),
+    month: v.string(),
+  },
+  handler: async (ctx, { briefId, month }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+
+    const monthTasks = tasks.filter(
+      (t) => t.postDate && t.postDate.startsWith(month)
+    );
+
+    const users = await ctx.db.query("users").collect();
+
+    const attachmentCounts: Record<string, number> = {};
+    for (const task of monthTasks) {
+      const atts = await ctx.db
+        .query("attachments")
+        .withIndex("by_parent", (q) =>
+          q.eq("parentType", "task").eq("parentId", task._id)
+        )
+        .collect();
+      attachmentCounts[task._id] = atts.length;
+    }
+
+    return monthTasks
+      .sort((a, b) => {
+        if (a.postDate && b.postDate) return a.postDate.localeCompare(b.postDate);
+        return a.sortOrder - b.sortOrder;
+      })
+      .map((task) => {
+        const assignee = users.find((u) => u._id === task.assigneeId);
+        return {
+          ...task,
+          assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+          assigneeDesignation: assignee?.designation ?? "",
+          attachmentCount: attachmentCounts[task._id] ?? 0,
+        };
+      });
+  },
+});
+
+export const createCalendarEntry = mutation({
+  args: {
+    briefId: v.id("briefs"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    assigneeId: v.id("users"),
+    platform: v.string(),
+    contentType: v.string(),
+    postDate: v.string(),
+    deadline: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
     if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Not authorized");
+      throw new Error("Only admins and managers can create calendar entries");
 
-    await ctx.db.delete(itemId);
+    const brief = await ctx.db.get(args.briefId);
+    if (!brief) throw new Error("Brief not found");
+
+    const month = args.postDate.substring(0, 7);
+    const sheets = await ctx.db
+      .query("contentCalendarSheets")
+      .withIndex("by_brief", (q) => q.eq("briefId", args.briefId))
+      .collect();
+    const sheetExists = sheets.some((s) => s.month === month);
+    if (!sheetExists) throw new Error(`No sheet for month ${month}. Create a sheet tab first.`);
+
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", args.assigneeId))
+      .collect();
+    const maxOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t) => t.sortOrder))
+      : 0;
+
+    const taskId = await ctx.db.insert("tasks", {
+      briefId: args.briefId,
+      title: args.title,
+      description: args.description,
+      assigneeId: args.assigneeId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxOrder + 1000,
+      duration: "1d",
+      durationMinutes: 480,
+      deadline: args.deadline,
+      platform: args.platform,
+      contentType: args.contentType,
+      postDate: args.postDate,
+    });
+
+    await ctx.db.insert("notifications", {
+      recipientId: args.assigneeId,
+      type: "task_assigned",
+      title: "Content calendar task assigned",
+      message: `You were assigned: ${args.title}`,
+      briefId: args.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("activityLog", {
+      briefId: args.briefId,
+      taskId,
+      userId,
+      action: "created_task",
+      details: JSON.stringify({
+        title: args.title,
+        platform: args.platform,
+        postDate: args.postDate,
+      }),
+      timestamp: Date.now(),
+    });
+
+    return taskId;
   },
 });

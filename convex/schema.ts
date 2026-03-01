@@ -106,6 +106,10 @@ export default defineSchema({
     deadline: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     blockedBy: v.optional(v.array(v.id("tasks"))),
+    // Content calendar metadata (only set for tasks in content_calendar briefs)
+    platform: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    postDate: v.optional(v.string()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -383,29 +387,16 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_brand", ["brandId"]),
 
-  // ─── CONTENT CALENDAR ITEMS ───────────
-  contentCalendarItems: defineTable({
+  // ─── CONTENT CALENDAR SHEETS (month tabs) ───
+  contentCalendarSheets: defineTable({
     briefId: v.id("briefs"),
-    brandId: v.id("brands"),
-    date: v.string(),
-    platform: v.string(),
-    contentType: v.string(),
-    caption: v.optional(v.string()),
-    status: v.union(
-      v.literal("planned"),
-      v.literal("in_progress"),
-      v.literal("review"),
-      v.literal("approved"),
-      v.literal("published")
-    ),
-    assigneeId: v.optional(v.id("users")),
-    notes: v.optional(v.string()),
+    month: v.string(),
+    label: v.optional(v.string()),
+    sortOrder: v.number(),
     createdBy: v.id("users"),
     createdAt: v.number(),
   })
-    .index("by_brief", ["briefId"])
-    .index("by_brief_date", ["briefId", "date"])
-    .index("by_brand", ["brandId"]),
+    .index("by_brief", ["briefId"]),
 
   // ─── JSR LINKS ────────────────────────
   jsrLinks: defineTable({

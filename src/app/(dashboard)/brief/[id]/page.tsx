@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, CalendarDays } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 
 function parseDuration(str: string): number {
@@ -57,7 +57,6 @@ export default function BriefPage() {
   const [taskDurationUnit, setTaskDurationUnit] = useState<"m" | "h" | "d">("h");
   const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
-  const [briefViewTab, setBriefViewTab] = useState<"tasks" | "calendar">("tasks");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
@@ -256,6 +255,12 @@ export default function BriefPage() {
         </div>
       </header>
 
+      {/* Content Calendar briefs get a full-width spreadsheet layout */}
+      {brief.briefType === "content_calendar" ? (
+        <div className="flex-1 overflow-hidden">
+          <ContentCalendarView briefId={briefId} isEditable={!!isAdminOrManager} />
+        </div>
+      ) : (
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
         {/* Column 1 - Create Task + Task List */}
         <div className="lg:col-span-3 border-r border-[var(--border)] overflow-auto bg-white">
@@ -457,29 +462,6 @@ export default function BriefPage() {
               ))}
             </div>
 
-            {/* Content Calendar Tab (for content_calendar briefs) */}
-            {brief.briefType === "content_calendar" && (
-              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] mb-4 w-fit">
-                <button
-                  onClick={() => setBriefViewTab("tasks")}
-                  className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${briefViewTab === "tasks" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
-                >
-                  Tasks
-                </button>
-                <button
-                  onClick={() => setBriefViewTab("calendar")}
-                  className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors flex items-center gap-1.5 ${briefViewTab === "calendar" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
-                >
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  Content Calendar
-                </button>
-              </div>
-            )}
-
-            {briefViewTab === "calendar" && brief.briefType === "content_calendar" ? (
-              <ContentCalendarView briefId={briefId} isEditable={!!isAdminOrManager} />
-            ) : (
-            <>
             {/* View toggle */}
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-[13px] text-[var(--text-primary)]">
@@ -544,7 +526,6 @@ export default function BriefPage() {
                               <p className="text-[10px] text-[var(--text-muted)] mt-1">
                                 {assignee?.name ?? assignee?.email ?? "?"} &middot; {task.duration}
                               </p>
-                              {/* Quick status change — admin/manager or task assignee (employees capped at review) */}
                               {(() => {
                                 const rawNext = status === "pending" ? "in-progress" : status === "in-progress" ? "review" : "done";
                                 const canMoveDone = isAdminOrManager;
@@ -594,7 +575,6 @@ export default function BriefPage() {
                           <p className="text-[11px] text-[var(--text-secondary)] mt-1">
                             {assignee?.name ?? assignee?.email ?? "Unassigned"} &middot; {task.duration}
                           </p>
-                          {/* Quick status change — admin/manager or task assignee (employees capped at review) */}
                           {(() => {
                             const rawNext = task.status === "pending" ? "in-progress" : task.status === "in-progress" ? "review" : "done";
                             const canMoveDone = isAdminOrManager;
@@ -631,9 +611,6 @@ export default function BriefPage() {
                   </p>
                 )}
               </div>
-            )}
-
-            </>
             )}
 
             {/* Attachments */}
@@ -713,6 +690,7 @@ export default function BriefPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
