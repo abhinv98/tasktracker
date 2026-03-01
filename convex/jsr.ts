@@ -110,15 +110,26 @@ export const getJsrByToken = query({
       internalDeadline,
     };
 
-    // Task list for client view — title + status only, no assignee
+    // Tasks grouped by brief for client view — title + status only, no assignee
+    const briefGroups: Record<string, { briefTitle: string; briefStatus: string; tasks: { _id: string; title: string; status: string }[] }> = {};
+    for (const t of regularTasks) {
+      const brief = brandBriefs.find((b) => b._id === t.briefId);
+      const key = t.briefId;
+      if (!briefGroups[key]) {
+        briefGroups[key] = {
+          briefTitle: brief?.title ?? "Untitled",
+          briefStatus: brief?.status ?? "active",
+          tasks: [],
+        };
+      }
+      briefGroups[key].tasks.push({ _id: t._id, title: t.title, status: t.status });
+    }
+    const tasksByBrief = Object.values(briefGroups);
+
+    // Flat task list (for backward compat)
     const taskList = regularTasks.map((t) => {
       const brief = brandBriefs.find((b) => b._id === t.briefId);
-      return {
-        _id: t._id,
-        title: t.title,
-        status: t.status,
-        briefTitle: brief?.title ?? "",
-      };
+      return { _id: t._id, title: t.title, status: t.status, briefTitle: brief?.title ?? "" };
     });
 
     // Content calendar entries — title, platform, postDate, status
@@ -131,20 +142,49 @@ export const getJsrByToken = query({
       status: t.status,
     }));
 
+    // Recent activity — last 5 status changes across brand briefs
+    const briefIds = brandBriefs.map((b) => b._id);
+    const allActivity = await ctx.db.query("activityLog").collect();
+    const brandActivity = allActivity
+      .filter((a) => briefIds.includes(a.briefId))
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 6);
+
+    const recentActivity = brandActivity.map((a) => {
+      const brief = brandBriefs.find((b) => b._id === a.briefId);
+      let label = a.action;
+      if (a.action === "changed_status" && a.details) {
+        try { const d = JSON.parse(a.details); label = `Status → ${d.status}`; } catch {}
+      } else if (a.action === "created_task") {
+        try { const d = JSON.parse(a.details!); label = `Task created: ${d.title}`; } catch { label = "Task created"; }
+      } else if (a.action === "reassigned_task") {
+        label = "Task reassigned";
+      } else if (a.action === "updated_task") {
+        label = "Task updated";
+      } else if (a.action === "deleted_task") {
+        label = "Task removed";
+      }
+      return {
+        label,
+        briefTitle: brief?.title ?? "",
+        timestamp: a.timestamp,
+      };
+    });
+
+    const lastUpdated = brandActivity.length > 0 ? brandActivity[0].timestamp : null;
+
     // Client-added tasks
     const clientTasks = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLink._id))
       .collect();
 
-    // Client tasks deadline = latest finalDeadline among client tasks
     const clientDeadlines = clientTasks
       .map((t) => t.finalDeadline)
       .filter((d): d is number => d !== undefined);
     const clientTasksDeadline =
       clientDeadlines.length > 0 ? Math.max(...clientDeadlines) : null;
 
-    // Overall deadline = latest of internal deadline and client tasks deadline
     const allDeadlines = [internalDeadline, clientTasksDeadline].filter(
       (d): d is number => d !== null
     );
@@ -154,8 +194,11 @@ export const getJsrByToken = query({
     return {
       brand: { name: brand.name, color: brand.color, description: brand.description },
       internalSummary,
+      tasksByBrief,
       taskList,
       calendarList,
+      recentActivity,
+      lastUpdated,
       clientTasks: clientTasks.map((t) => ({
         _id: t._id,
         title: t.title,
