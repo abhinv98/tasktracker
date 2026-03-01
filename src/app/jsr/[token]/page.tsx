@@ -98,6 +98,32 @@ export default function JsrPublicPage() {
   const [requestsExpanded, setRequestsExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
 
+  const calendarList = jsr?.calendarList ?? [];
+
+  const calendarByMonth: Record<string, typeof calendarList> = {};
+  for (const entry of calendarList) {
+    const month = entry.postDate ? entry.postDate.substring(0, 7) : "unscheduled";
+    if (!calendarByMonth[month]) calendarByMonth[month] = [];
+    calendarByMonth[month].push(entry);
+  }
+  const sortedMonths = Object.keys(calendarByMonth).sort();
+  const calendarGridMonth = sortedMonths[0];
+
+  const calendarGrid = useMemo(() => {
+    if (!calendarGridMonth || calendarGridMonth === "unscheduled") return null;
+    const [y, m] = calendarGridMonth.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDayOfWeek = new Date(y, m - 1, 1).getDay();
+    const entriesByDay: Record<number, { platform: string; status: string }[]> = {};
+    for (const entry of calendarList) {
+      if (!entry.postDate?.startsWith(calendarGridMonth)) continue;
+      const day = parseInt(entry.postDate.split("-")[2], 10);
+      if (!entriesByDay[day]) entriesByDay[day] = [];
+      entriesByDay[day].push({ platform: entry.platform, status: entry.status });
+    }
+    return { year: y, month: m, daysInMonth, firstDayOfWeek, entriesByDay };
+  }, [calendarGridMonth, calendarList]);
+
   if (jsr === undefined) {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -153,40 +179,14 @@ export default function JsrPublicPage() {
     : 0;
 
   const tasksByBrief = jsr.tasksByBrief ?? [];
-  const calendarList = jsr.calendarList ?? [];
   const hasCalendar = calendarList.length > 0;
   const recentActivity = jsr.recentActivity ?? [];
-
-  const calendarByMonth: Record<string, typeof calendarList> = {};
-  for (const entry of calendarList) {
-    const month = entry.postDate ? entry.postDate.substring(0, 7) : "unscheduled";
-    if (!calendarByMonth[month]) calendarByMonth[month] = [];
-    calendarByMonth[month].push(entry);
-  }
-  const sortedMonths = Object.keys(calendarByMonth).sort();
 
   function monthLabelStr(m: string) {
     if (m === "unscheduled") return "Unscheduled";
     const [y, mo] = m.split("-").map(Number);
     return new Date(y, mo - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   }
-
-  // Mini calendar: build day grid for the active calendar month
-  const calendarGridMonth = sortedMonths[0];
-  const calendarGrid = useMemo(() => {
-    if (!calendarGridMonth || calendarGridMonth === "unscheduled") return null;
-    const [y, m] = calendarGridMonth.split("-").map(Number);
-    const daysInMonth = new Date(y, m, 0).getDate();
-    const firstDayOfWeek = new Date(y, m - 1, 1).getDay();
-    const entriesByDay: Record<number, { platform: string; status: string }[]> = {};
-    for (const entry of calendarList) {
-      if (!entry.postDate?.startsWith(calendarGridMonth)) continue;
-      const day = parseInt(entry.postDate.split("-")[2], 10);
-      if (!entriesByDay[day]) entriesByDay[day] = [];
-      entriesByDay[day].push({ platform: entry.platform, status: entry.status });
-    }
-    return { year: y, month: m, daysInMonth, firstDayOfWeek, entriesByDay };
-  }, [calendarGridMonth, calendarList]);
 
   const deadlineInfo = jsr.overallDeadline ? daysUntil(jsr.overallDeadline) : null;
 
@@ -205,11 +205,19 @@ export default function JsrPublicPage() {
         <div style={{ background: `linear-gradient(135deg, ${bc}, ${bc}dd)` }}>
           <div className="max-w-3xl mx-auto px-6 py-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <span className="font-bold text-[20px] text-white">
-                  {jsr.brand.name[0]}
-                </span>
-              </div>
+              {jsr.brand.logoUrl ? (
+                <img
+                  src={jsr.brand.logoUrl}
+                  alt={jsr.brand.name}
+                  className="w-12 h-12 rounded-2xl object-cover border-2 border-white/20"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <span className="font-bold text-[20px] text-white">
+                    {jsr.brand.name[0]}
+                  </span>
+                </div>
+              )}
               <div className="flex-1">
                 <h1 className="font-bold text-[20px] text-white tracking-tight">
                   {jsr.brand.name}

@@ -257,6 +257,7 @@ export default defineSchema({
     name: v.string(),
     description: v.optional(v.string()),
     color: v.string(),
+    logoId: v.optional(v.id("_storage")),
     createdBy: v.id("users"),
     createdAt: v.number(),
   }),

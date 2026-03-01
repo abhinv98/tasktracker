@@ -192,7 +192,12 @@ export const getJsrByToken = query({
       allDeadlines.length > 0 ? Math.max(...allDeadlines) : null;
 
     return {
-      brand: { name: brand.name, color: brand.color, description: brand.description },
+      brand: {
+        name: brand.name,
+        color: brand.color,
+        description: brand.description,
+        logoUrl: brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null,
+      },
       internalSummary,
       tasksByBrief,
       taskList,

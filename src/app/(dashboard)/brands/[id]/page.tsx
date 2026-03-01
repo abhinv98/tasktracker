@@ -6,7 +6,7 @@ import { useState, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
-import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X } from "lucide-react";
 
 export default function BrandDetailPage() {
   const params = useParams();
@@ -50,6 +50,13 @@ export default function BrandDetailPage() {
   const [credNotes, setCredNotes] = useState("");
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [deletingCredId, setDeletingCredId] = useState<Id<"brandCredentials"> | null>(null);
+
+  // Brand Logo
+  const generateLogoUrl = useMutation(api.brands.generateLogoUploadUrl);
+  const updateBrandLogo = useMutation(api.brands.updateBrandLogo);
+  const removeBrandLogo = useMutation(api.brands.removeBrandLogo);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // JSR Links
   const jsrLinks = useQuery(api.jsr.listJsrLinks, { brandId });
@@ -110,6 +117,40 @@ export default function BrandDetailPage() {
       toast("error", err instanceof Error ? err.message : "Failed to delete brand");
     }
     setShowDeleteBrand(false);
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("error", "Please upload an image file");
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const uploadUrl = await generateLogoUrl();
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await result.json();
+      await updateBrandLogo({ brandId, logoId: storageId });
+      toast("success", "Brand logo updated");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Logo upload failed");
+    }
+    setUploadingLogo(false);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  }
+
+  async function handleRemoveLogo() {
+    try {
+      await removeBrandLogo({ brandId });
+      toast("success", "Logo removed");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to remove logo");
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -198,18 +239,69 @@ export default function BrandDetailPage() {
   return (
     <div className="p-8">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-4 mb-8">
         <button
           onClick={() => router.push("/brands")}
           className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: brand.color + "20" }}
-        >
-          <Tag className="h-5 w-5" style={{ color: brand.color }} />
+        <div className="relative group">
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleLogoUpload}
+            className="hidden"
+          />
+          {(brand as any).logoUrl ? (
+            <div className="relative">
+              <img
+                src={(brand as any).logoUrl}
+                alt={brand.name}
+                className="w-14 h-14 rounded-xl object-cover border border-[var(--border-primary)]"
+              />
+              {(isAdmin || user?.role === "manager") && (
+                <div className="absolute inset-0 rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    className="p-1 rounded bg-white/20 hover:bg-white/30 transition-colors"
+                    title="Change logo"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5 text-white" />
+                  </button>
+                  <button
+                    onClick={handleRemoveLogo}
+                    className="p-1 rounded bg-white/20 hover:bg-white/30 transition-colors"
+                    title="Remove logo"
+                  >
+                    <X className="h-3.5 w-3.5 text-white" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (isAdmin || user?.role === "manager") logoInputRef.current?.click();
+              }}
+              disabled={uploadingLogo}
+              className="w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 border-dashed transition-colors"
+              style={{
+                borderColor: brand.color + "40",
+                backgroundColor: brand.color + "08",
+              }}
+              title={isAdmin || user?.role === "manager" ? "Upload brand logo" : brand.name}
+            >
+              {uploadingLogo ? (
+                <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: brand.color + "30", borderTopColor: brand.color }} />
+              ) : (isAdmin || user?.role === "manager") ? (
+                <ImagePlus className="h-5 w-5" style={{ color: brand.color + "80" }} />
+              ) : (
+                <Tag className="h-5 w-5" style={{ color: brand.color }} />
+              )}
+            </button>
+          )}
         </div>
         <div className="flex-1">
           <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight">

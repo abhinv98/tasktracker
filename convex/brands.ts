@@ -103,9 +103,11 @@ export const getBrand = query({
     };
 
     const creator = users.find((u) => u._id === brand.createdBy);
+    const logoUrl = brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null;
 
     return {
       ...brand,
+      logoUrl,
       creatorName: creator?.name ?? creator?.email ?? "Unknown",
       managers,
       briefs: brandBriefs.map((b) => {
@@ -409,6 +411,59 @@ export const deleteBrand = mutation({
     }
 
     await ctx.db.delete(brandId);
+  },
+});
+
+// Generate upload URL for brand logo
+export const generateLogoUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Update brand logo
+export const updateBrandLogo = mutation({
+  args: {
+    brandId: v.id("brands"),
+    logoId: v.id("_storage"),
+  },
+  handler: async (ctx, { brandId, logoId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager"))
+      throw new Error("Only admins and managers can update brand logo");
+
+    const brand = await ctx.db.get(brandId);
+    if (!brand) throw new Error("Brand not found");
+
+    if (brand.logoId) {
+      await ctx.storage.delete(brand.logoId);
+    }
+    await ctx.db.patch(brandId, { logoId });
+  },
+});
+
+// Remove brand logo
+export const removeBrandLogo = mutation({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager"))
+      throw new Error("Only admins and managers can update brand logo");
+
+    const brand = await ctx.db.get(brandId);
+    if (!brand) throw new Error("Brand not found");
+
+    if (brand.logoId) {
+      await ctx.storage.delete(brand.logoId);
+      await ctx.db.patch(brandId, { logoId: undefined });
+    }
   },
 });
 
