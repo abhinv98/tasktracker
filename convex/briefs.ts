@@ -109,6 +109,14 @@ export const createBrief = mutation({
     assignedManagerId: v.optional(v.id("users")),
     deadline: v.optional(v.number()),
     brandId: v.optional(v.id("brands")),
+    briefType: v.optional(
+      v.union(
+        v.literal("developmental"),
+        v.literal("designing"),
+        v.literal("video_editing"),
+        v.literal("content_calendar")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -152,6 +160,14 @@ export const updateBrief = mutation({
     status: v.optional(v.string()),
     assignedManagerId: v.optional(v.id("users")),
     deadline: v.optional(v.number()),
+    briefType: v.optional(
+      v.union(
+        v.literal("developmental"),
+        v.literal("designing"),
+        v.literal("video_editing"),
+        v.literal("content_calendar")
+      )
+    ),
   },
   handler: async (ctx, { briefId, ...fields }) => {
     const userId = await getAuthUserId(ctx);
@@ -174,6 +190,7 @@ export const updateBrief = mutation({
     if (fields.assignedManagerId !== undefined)
       updates.assignedManagerId = fields.assignedManagerId;
     if (fields.deadline !== undefined) updates.deadline = fields.deadline;
+    if (fields.briefType !== undefined) updates.briefType = fields.briefType;
 
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(briefId, updates);

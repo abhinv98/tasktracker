@@ -14,14 +14,18 @@ import type * as analytics from "../analytics.js";
 import type * as approvals from "../approvals.js";
 import type * as attachments from "../attachments.js";
 import type * as auth from "../auth.js";
+import type * as brandCredentials from "../brandCredentials.js";
+import type * as brandDocuments from "../brandDocuments.js";
 import type * as brands from "../brands.js";
 import type * as briefs from "../briefs.js";
 import type * as chat from "../chat.js";
 import type * as comments from "../comments.js";
+import type * as contentCalendar from "../contentCalendar.js";
 import type * as crons from "../crons.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
 import type * as http from "../http.js";
+import type * as jsr from "../jsr.js";
 import type * as notifications from "../notifications.js";
 import type * as reminders from "../reminders.js";
 import type * as schedule from "../schedule.js";
@@ -32,6 +36,7 @@ import type * as teams from "../teams.js";
 import type * as templates from "../templates.js";
 import type * as timeTracking from "../timeTracking.js";
 import type * as users from "../users.js";
+import type * as worklog from "../worklog.js";
 
 import type {
   ApiFromModules,
@@ -46,14 +51,18 @@ declare const fullApi: ApiFromModules<{
   approvals: typeof approvals;
   attachments: typeof attachments;
   auth: typeof auth;
+  brandCredentials: typeof brandCredentials;
+  brandDocuments: typeof brandDocuments;
   brands: typeof brands;
   briefs: typeof briefs;
   chat: typeof chat;
   comments: typeof comments;
+  contentCalendar: typeof contentCalendar;
   crons: typeof crons;
   deliverables: typeof deliverables;
   dm: typeof dm;
   http: typeof http;
+  jsr: typeof jsr;
   notifications: typeof notifications;
   reminders: typeof reminders;
   schedule: typeof schedule;
@@ -64,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   templates: typeof templates;
   timeTracking: typeof timeTracking;
   users: typeof users;
+  worklog: typeof worklog;
 }>;
 
 /**

@@ -10,7 +10,7 @@ import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
-const ADMIN_ONLY_ROUTES = ["/users"];
+const ADMIN_ONLY_ROUTES = ["/users", "/worklog"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics"];
 
 export default function DashboardLayout({

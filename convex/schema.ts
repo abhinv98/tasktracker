@@ -59,6 +59,14 @@ export default defineSchema({
       v.literal("completed"),
       v.literal("archived")
     ),
+    briefType: v.optional(
+      v.union(
+        v.literal("developmental"),
+        v.literal("designing"),
+        v.literal("video_editing"),
+        v.literal("content_calendar")
+      )
+    ),
     createdBy: v.id("users"),
     assignedManagerId: v.optional(v.id("users")),
     globalPriority: v.number(),
@@ -194,7 +202,8 @@ export default defineSchema({
       v.literal("deadline_reminder"),
       v.literal("deliverable_approved"),
       v.literal("deliverable_rejected"),
-      v.literal("direct_message")
+      v.literal("direct_message"),
+      v.literal("jsr_task_added")
     ),
     title: v.string(),
     message: v.string(),
@@ -345,4 +354,91 @@ export default defineSchema({
     .index("by_participants", ["senderId", "recipientId", "createdAt"])
     .index("by_recipient", ["recipientId", "createdAt"])
     .index("by_sender_recipient", ["senderId", "recipientId"]),
+
+  // ─── BRAND DOCUMENTS ──────────────────
+  brandDocuments: defineTable({
+    brandId: v.id("brands"),
+    fileId: v.id("_storage"),
+    fileName: v.string(),
+    fileType: v.optional(v.string()),
+    visibility: v.union(v.literal("all"), v.literal("admin_only")),
+    category: v.optional(v.string()),
+    uploadedBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_brand_visibility", ["brandId", "visibility"]),
+
+  // ─── BRAND CREDENTIALS ────────────────
+  brandCredentials: defineTable({
+    brandId: v.id("brands"),
+    platform: v.string(),
+    label: v.optional(v.string()),
+    username: v.optional(v.string()),
+    password: v.optional(v.string()),
+    url: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_brand", ["brandId"]),
+
+  // ─── CONTENT CALENDAR ITEMS ───────────
+  contentCalendarItems: defineTable({
+    briefId: v.id("briefs"),
+    brandId: v.id("brands"),
+    date: v.string(),
+    platform: v.string(),
+    contentType: v.string(),
+    caption: v.optional(v.string()),
+    status: v.union(
+      v.literal("planned"),
+      v.literal("in_progress"),
+      v.literal("review"),
+      v.literal("approved"),
+      v.literal("published")
+    ),
+    assigneeId: v.optional(v.id("users")),
+    notes: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_brief_date", ["briefId", "date"])
+    .index("by_brand", ["brandId"]),
+
+  // ─── JSR LINKS ────────────────────────
+  jsrLinks: defineTable({
+    brandId: v.id("brands"),
+    token: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    isActive: v.boolean(),
+    label: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_brand", ["brandId"]),
+
+  // ─── JSR CLIENT TASKS ─────────────────
+  jsrClientTasks: defineTable({
+    brandId: v.id("brands"),
+    jsrLinkId: v.id("jsrLinks"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    proposedDeadline: v.optional(v.number()),
+    finalDeadline: v.optional(v.number()),
+    cumulativeDeadline: v.optional(v.number()),
+    status: v.union(
+      v.literal("pending_review"),
+      v.literal("accepted"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("declined")
+    ),
+    internalNotes: v.optional(v.string()),
+    clientName: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_jsr_link", ["jsrLinkId"]),
 });

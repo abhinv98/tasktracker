@@ -47,6 +47,7 @@ export default function BriefsPage() {
   const [brandId, setBrandId] = useState<string>("");
   const [managerId, setManagerId] = useState<string>("");
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
+  const [briefType, setBriefType] = useState<string>("");
 
   const templates = useQuery(api.templates.listTemplates);
   const createFromTemplate = useMutation(api.templates.createFromTemplate);
@@ -68,6 +69,7 @@ export default function BriefsPage() {
         ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(deadline !== undefined ? { deadline } : {}),
+        ...(briefType ? { briefType: briefType as "developmental" | "designing" | "video_editing" | "content_calendar" } : {}),
       });
       setShowModal(false);
       setTitle("");
@@ -75,6 +77,7 @@ export default function BriefsPage() {
       setBrandId("");
       setManagerId("");
       setDeadline(undefined);
+      setBriefType("");
       toast("success", "Brief created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
@@ -147,6 +150,7 @@ export default function BriefsPage() {
             <TableHead className="hidden md:table-cell">Manager</TableHead>
             <TableHead className="hidden lg:table-cell">Teams</TableHead>
             <TableHead className="hidden lg:table-cell">Brand</TableHead>
+            <TableHead className="hidden xl:table-cell">Type</TableHead>
             <TableHead>Deadline</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="hidden sm:table-cell">Progress</TableHead>
@@ -196,6 +200,16 @@ export default function BriefsPage() {
                       {(brief as any).brandId ? (
                         <Badge variant="neutral">
                           {(brands ?? []).find((b: any) => b._id === (brief as any).brandId)?.name ?? "—"}
+                        </Badge>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="hidden xl:table-cell">
+                      {(brief as any).briefType ? (
+                        <Badge variant="neutral">
+                          {(brief as any).briefType === "content_calendar" ? "Content Calendar" :
+                           (brief as any).briefType === "video_editing" ? "Video Editing" :
+                           (brief as any).briefType === "developmental" ? "Developmental" :
+                           (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
                         </Badge>
                       ) : "—"}
                     </TableCell>
@@ -277,6 +291,22 @@ export default function BriefsPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief description"
               />
+              <div>
+                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                  Brief Type (optional)
+                </label>
+                <select
+                  value={briefType}
+                  onChange={(e) => setBriefType(e.target.value)}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                >
+                  <option value="">No specific type</option>
+                  <option value="developmental">Developmental</option>
+                  <option value="designing">Designing</option>
+                  <option value="video_editing">Video Editing</option>
+                  <option value="content_calendar">Content Calendar</option>
+                </select>
+              </div>
               <div>
                 <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
                   Deadline (optional)

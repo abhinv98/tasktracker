@@ -22,6 +22,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -46,6 +47,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/archive": Archive,
   "/profile": UserCircle,
   "/deliverables": FileCheck,
+  "/worklog": ClipboardList,
 };
 
 interface NavCategory {
@@ -81,6 +83,7 @@ const ADMIN_NAV: NavCategory[] = [
     category: "Management",
     items: [
       { href: "/deliverables", label: "Deliverables" },
+      { href: "/worklog", label: "Work Log" },
       { href: "/teams", label: "Teams" },
       { href: "/users", label: "Users & Roles" },
       { href: "/archive", label: "Archive" },
