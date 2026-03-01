@@ -179,6 +179,47 @@ export const getJsrByToken = query({
       .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLink._id))
       .collect();
 
+    // Accepted client tasks contribute to overall progress
+    const activeClientTasks = clientTasks.filter(
+      (t) => t.status === "accepted" || t.status === "in_progress" || t.status === "completed"
+    );
+
+    // Map client task statuses → internal statuses for counting
+    function clientStatusToInternal(s: string) {
+      if (s === "accepted") return "pending";
+      if (s === "in_progress") return "in-progress";
+      if (s === "completed") return "done";
+      return "pending";
+    }
+
+    // Merge accepted client tasks into summary counts
+    const combinedTotal = internalTasks.length + activeClientTasks.length;
+    const combinedPending = internalSummary.pending + activeClientTasks.filter((t) => t.status === "accepted").length;
+    const combinedInProgress = internalSummary.inProgress + activeClientTasks.filter((t) => t.status === "in_progress").length;
+    const combinedDone = internalSummary.done + activeClientTasks.filter((t) => t.status === "completed").length;
+
+    const combinedSummary = {
+      total: combinedTotal,
+      pending: combinedPending,
+      inProgress: combinedInProgress,
+      review: internalSummary.review,
+      done: combinedDone,
+      internalDeadline,
+    };
+
+    // Add accepted client tasks as a group in tasksByBrief
+    if (activeClientTasks.length > 0) {
+      tasksByBrief.push({
+        briefTitle: "Client Requests",
+        briefStatus: "active",
+        tasks: activeClientTasks.map((t) => ({
+          _id: t._id,
+          title: t.title,
+          status: clientStatusToInternal(t.status),
+        })),
+      });
+    }
+
     const clientDeadlines = clientTasks
       .map((t) => t.finalDeadline)
       .filter((d): d is number => d !== undefined);
@@ -198,7 +239,7 @@ export const getJsrByToken = query({
         description: brand.description,
         logoUrl: brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null,
       },
-      internalSummary,
+      internalSummary: combinedSummary,
       tasksByBrief,
       taskList,
       calendarList,
