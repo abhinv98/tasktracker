@@ -76,12 +76,20 @@ export default function OverviewPage() {
           <Card key={brand._id} className="!p-0 overflow-hidden">
             {/* Brand Header */}
             <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                style={{ backgroundColor: brand.color + "20" }}
-              >
-                <Tag className="h-5 w-5" style={{ color: brand.color }} />
-              </div>
+              {brand.logoUrl ? (
+                <img
+                  src={brand.logoUrl}
+                  alt={brand.name}
+                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border-primary)]"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: brand.color + "20" }}
+                >
+                  <Tag className="h-5 w-5" style={{ color: brand.color }} />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <h2 className="font-semibold text-[16px] text-[var(--text-primary)]">
                   {brand.name}

@@ -76,12 +76,20 @@ export default function BrandsPage() {
             hover
           >
             <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                style={{ backgroundColor: brand.color + "20" }}
-              >
-                <Tag className="h-5 w-5" style={{ color: brand.color }} />
-              </div>
+              {brand.logoUrl ? (
+                <img
+                  src={brand.logoUrl}
+                  alt={brand.name}
+                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border-primary)]"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: brand.color + "20" }}
+                >
+                  <Tag className="h-5 w-5" style={{ color: brand.color }} />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                   {brand.name}

@@ -42,14 +42,16 @@ export const listBrands = query({
     const briefs = await ctx.db.query("briefs").collect();
     const users = await ctx.db.query("users").collect();
 
-    return brands.map((brand) => {
+    return Promise.all(brands.map(async (brand) => {
       const managers = brandManagers
         .filter((bm) => bm.brandId === brand._id)
         .map((bm) => users.find((u) => u._id === bm.managerId))
         .filter(Boolean);
       const brandBriefs = briefs.filter((b) => b.brandId === brand._id);
+      const logoUrl = brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null;
       return {
         ...brand,
+        logoUrl,
         managerCount: managers.length,
         managerNames: managers.map(
           (m) => m!.name ?? m!.email ?? "Unknown"
@@ -59,7 +61,7 @@ export const listBrands = query({
           (b) => !["archived", "completed"].includes(b.status)
         ).length,
       };
-    });
+    }));
   },
 });
 
@@ -148,7 +150,7 @@ export const getBrandOverview = query({
     const briefs = await ctx.db.query("briefs").collect();
     const tasks = await ctx.db.query("tasks").collect();
 
-    return brands.map((brand) => {
+    return Promise.all(brands.map(async (brand) => {
       const managers = brandManagers
         .filter((bm) => bm.brandId === brand._id)
         .map((bm) => users.find((u) => u._id === bm.managerId))
@@ -163,8 +165,11 @@ export const getBrandOverview = query({
         .map((id) => users.find((u) => u._id === id))
         .filter(Boolean);
 
+      const logoUrl = brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null;
+
       return {
         ...brand,
+        logoUrl,
         managers: managers.map((m) => ({
           _id: m!._id,
           name: m!.name,
@@ -191,7 +196,7 @@ export const getBrandOverview = query({
               100
             : 0,
       };
-    });
+    }));
   },
 });
 
