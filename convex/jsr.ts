@@ -77,21 +77,28 @@ export const getJsrByToken = query({
     const brand = await ctx.db.get(jsrLink.brandId);
     if (!brand) return null;
 
-    // Get internal tasks from briefs for this brand
     const briefs = await ctx.db.query("briefs").collect();
     const brandBriefs = briefs.filter(
       (b) => b.brandId === jsrLink.brandId && b.status !== "archived"
     );
+
     const allTasks = await ctx.db.query("tasks").collect();
     const internalTasks = allTasks.filter((t) =>
       brandBriefs.some((b) => b._id === t.briefId)
     );
 
-    // Cumulative deadline = the latest deadline among all internal tasks
+    // Split tasks: regular tasks vs content calendar tasks
+    const ccBriefIds = new Set(
+      brandBriefs.filter((b) => b.briefType === "content_calendar").map((b) => b._id)
+    );
+    const regularTasks = internalTasks.filter((t) => !ccBriefIds.has(t.briefId));
+    const calendarTasks = internalTasks.filter((t) => ccBriefIds.has(t.briefId));
+
+    // Cumulative deadline = latest deadline among ALL internal tasks
     const taskDeadlines = internalTasks
       .map((t) => t.deadline)
       .filter((d): d is number => d !== undefined);
-    const cumulativeDeadline =
+    const internalDeadline =
       taskDeadlines.length > 0 ? Math.max(...taskDeadlines) : null;
 
     const internalSummary = {
@@ -100,18 +107,55 @@ export const getJsrByToken = query({
       inProgress: internalTasks.filter((t) => t.status === "in-progress").length,
       review: internalTasks.filter((t) => t.status === "review").length,
       done: internalTasks.filter((t) => t.status === "done").length,
-      cumulativeDeadline,
+      internalDeadline,
     };
 
-    // Get client-added tasks for this JSR link
+    // Task list for client view — title + status only, no assignee
+    const taskList = regularTasks.map((t) => {
+      const brief = brandBriefs.find((b) => b._id === t.briefId);
+      return {
+        _id: t._id,
+        title: t.title,
+        status: t.status,
+        briefTitle: brief?.title ?? "",
+      };
+    });
+
+    // Content calendar entries — title, platform, postDate, status
+    const calendarList = calendarTasks.map((t) => ({
+      _id: t._id,
+      title: t.title,
+      platform: t.platform ?? "",
+      contentType: t.contentType ?? "",
+      postDate: t.postDate ?? "",
+      status: t.status,
+    }));
+
+    // Client-added tasks
     const clientTasks = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLink._id))
       .collect();
 
+    // Client tasks deadline = latest finalDeadline among client tasks
+    const clientDeadlines = clientTasks
+      .map((t) => t.finalDeadline)
+      .filter((d): d is number => d !== undefined);
+    const clientTasksDeadline =
+      clientDeadlines.length > 0 ? Math.max(...clientDeadlines) : null;
+
+    // Overall deadline = latest of internal deadline and client tasks deadline
+    const allDeadlines = [internalDeadline, clientTasksDeadline].filter(
+      (d): d is number => d !== null
+    );
+    const overallDeadline =
+      allDeadlines.length > 0 ? Math.max(...allDeadlines) : null;
+
     return {
       brand: { name: brand.name, color: brand.color, description: brand.description },
       internalSummary,
+      taskList,
+      calendarList,
       clientTasks: clientTasks.map((t) => ({
         _id: t._id,
         title: t.title,
@@ -122,6 +166,8 @@ export const getJsrByToken = query({
         clientName: t.clientName,
         createdAt: t.createdAt,
       })),
+      clientTasksDeadline,
+      overallDeadline,
     };
   },
 });
