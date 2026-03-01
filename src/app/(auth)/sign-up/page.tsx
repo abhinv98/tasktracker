@@ -55,7 +55,7 @@ function SignUpForm() {
           <span className="text-white font-bold text-[13px]">O</span>
         </div>
         <span className="font-semibold text-[16px] text-[var(--text-primary)]">
-          The Orchestrator
+          The Ecultify
         </span>
       </div>
 
@@ -166,7 +166,7 @@ export default function SignUpPage() {
             <span className="text-white font-bold text-[13px]">O</span>
           </div>
           <span className="font-semibold text-[16px] text-[var(--text-primary)]">
-            The Orchestrator
+            The Ecultify
           </span>
         </div>
         <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>

@@ -594,7 +594,7 @@ export default function JsrPublicPage() {
         {/* Footer */}
         <footer className="text-center pt-4 pb-8">
           <p className="text-[11px] text-[#d4d4d4]">
-            Powered by Orchestrator
+            Powered by Ecultify
           </p>
         </footer>
       </main>

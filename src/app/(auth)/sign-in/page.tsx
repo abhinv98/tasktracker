@@ -39,7 +39,7 @@ export default function SignInPage() {
           <span className="text-white font-bold text-[13px]">O</span>
         </div>
         <span className="font-semibold text-[16px] text-[var(--text-primary)]">
-          The Orchestrator
+          The Ecultify
         </span>
       </div>
 

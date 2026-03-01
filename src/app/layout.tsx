@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "The Orchestrator",
+  title: "The Ecultify",
   description: "Hierarchical RBAC task tracking application",
 };
 

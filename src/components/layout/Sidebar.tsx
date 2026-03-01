@@ -215,7 +215,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               <span className="text-white font-bold text-[12px]">O</span>
             </div>
             <span className="font-semibold text-[14px] text-[var(--text-primary)]">
-              Orchestrator
+              Ecultify
             </span>
           </div>
           <button
