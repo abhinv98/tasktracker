@@ -173,53 +173,15 @@ export const getJsrByToken = query({
 
     const lastUpdated = brandActivity.length > 0 ? brandActivity[0].timestamp : null;
 
-    // Client-added tasks
+    // Client-added tasks — query by brand so all requests persist across links
     const clientTasks = await ctx.db
       .query("jsrClientTasks")
-      .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLink._id))
+      .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
       .collect();
 
-    // Accepted client tasks contribute to overall progress
-    const activeClientTasks = clientTasks.filter(
-      (t) => t.status === "accepted" || t.status === "in_progress" || t.status === "completed"
-    );
-
-    // Map client task statuses → internal statuses for counting
-    function clientStatusToInternal(s: string) {
-      if (s === "accepted") return "pending";
-      if (s === "in_progress") return "in-progress";
-      if (s === "completed") return "done";
-      return "pending";
-    }
-
-    // Merge accepted client tasks into summary counts
-    const combinedTotal = internalTasks.length + activeClientTasks.length;
-    const combinedPending = internalSummary.pending + activeClientTasks.filter((t) => t.status === "accepted").length;
-    const combinedInProgress = internalSummary.inProgress + activeClientTasks.filter((t) => t.status === "in_progress").length;
-    const combinedDone = internalSummary.done + activeClientTasks.filter((t) => t.status === "completed").length;
-
-    const combinedSummary = {
-      total: combinedTotal,
-      pending: combinedPending,
-      inProgress: combinedInProgress,
-      review: internalSummary.review,
-      done: combinedDone,
-      internalDeadline,
-    };
-
-    // Add accepted client tasks as a group in tasksByBrief
-    if (activeClientTasks.length > 0) {
-      tasksByBrief.push({
-        briefTitle: "Client Requests",
-        briefStatus: "active",
-        tasks: activeClientTasks.map((t) => ({
-          _id: t._id,
-          title: t.title,
-          status: clientStatusToInternal(t.status),
-        })),
-      });
-    }
-
+    // Accepted client tasks now live as real tasks in the tasks table
+    // so they're already counted in internalSummary and tasksByBrief above.
+    // Only use clientTasksDeadline for tasks still pending acceptance.
     const clientDeadlines = clientTasks
       .map((t) => t.finalDeadline)
       .filter((d): d is number => d !== undefined);
@@ -239,7 +201,7 @@ export const getJsrByToken = query({
         description: brand.description,
         logoUrl: brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null,
       },
-      internalSummary: combinedSummary,
+      internalSummary,
       tasksByBrief,
       taskList,
       calendarList,
@@ -331,10 +293,61 @@ export const listClientTasks = query({
     const user = await ctx.db.get(userId);
     if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
 
-    return await ctx.db
+    const tasks = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
+
+    const users = await ctx.db.query("users").collect();
+    const result = [];
+    for (const task of tasks) {
+      let assigneeName: string | null = null;
+      let assigneeId: string | null = null;
+      if (task.linkedTaskId) {
+        const realTask = await ctx.db.get(task.linkedTaskId);
+        if (realTask) {
+          assigneeId = realTask.assigneeId;
+          const assignee = users.find((u) => u._id === realTask.assigneeId);
+          assigneeName = assignee?.name ?? assignee?.email ?? null;
+        }
+      }
+      result.push({ ...task, assigneeName, assigneeId });
+    }
+    return result;
+  },
+});
+
+export const reassignClientTask = mutation({
+  args: {
+    clientTaskId: v.id("jsrClientTasks"),
+    assigneeId: v.id("users"),
+  },
+  handler: async (ctx, { clientTaskId, assigneeId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager"))
+      throw new Error("Not authorized");
+
+    const clientTask = await ctx.db.get(clientTaskId);
+    if (!clientTask) throw new Error("Task not found");
+    if (!clientTask.linkedTaskId) throw new Error("Task has not been accepted yet");
+
+    await ctx.db.patch(clientTask.linkedTaskId, { assigneeId, assignedBy: userId });
+
+    // Send notification to the assignee
+    const brand = await ctx.db.get(clientTask.brandId);
+    await ctx.db.insert("notifications", {
+      recipientId: assigneeId,
+      type: "task_assigned",
+      title: "New task assigned",
+      message: `You've been assigned "${clientTask.title}" from ${brand?.name ?? "Unknown"} client requests`,
+      briefId: clientTask.linkedBriefId,
+      taskId: clientTask.linkedTaskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
   },
 });
 
@@ -351,6 +364,12 @@ export const updateClientTaskDeadline = mutation({
       throw new Error("Not authorized");
 
     await ctx.db.patch(taskId, { finalDeadline });
+
+    // Sync deadline to linked real task
+    const clientTask = await ctx.db.get(taskId);
+    if (clientTask?.linkedTaskId) {
+      await ctx.db.patch(clientTask.linkedTaskId, { deadline: finalDeadline });
+    }
   },
 });
 
@@ -372,7 +391,82 @@ export const updateClientTaskStatus = mutation({
     if (!user || (user.role !== "admin" && user.role !== "manager"))
       throw new Error("Not authorized");
 
+    const clientTask = await ctx.db.get(taskId);
+    if (!clientTask) throw new Error("Task not found");
+
     await ctx.db.patch(taskId, { status });
+
+    // On accept: create a real task under a consolidated "Client Requests" brief
+    if (status === "accepted" && !clientTask.linkedTaskId) {
+      const brand = await ctx.db.get(clientTask.brandId);
+      const brandName = brand?.name ?? "Unknown";
+      const briefTitle = `${brandName} - Client Requests`;
+
+      // Find or create the consolidated brief
+      const allBriefs = await ctx.db.query("briefs").collect();
+      let brief = allBriefs.find(
+        (b) => b.brandId === clientTask.brandId && b.title === briefTitle && b.status !== "archived"
+      );
+
+      let briefId;
+      if (brief) {
+        briefId = brief._id;
+      } else {
+        const maxPriority = allBriefs.length > 0
+          ? Math.max(...allBriefs.map((b) => b.globalPriority))
+          : 0;
+        briefId = await ctx.db.insert("briefs", {
+          title: briefTitle,
+          description: `Consolidated brief for client requests from ${brandName}`,
+          status: "active",
+          briefType: "developmental",
+          createdBy: userId,
+          assignedManagerId: userId,
+          globalPriority: maxPriority + 1,
+          deadline: clientTask.finalDeadline,
+          brandId: clientTask.brandId,
+        });
+      }
+
+      // Count existing tasks in this brief for sort order
+      const existingTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+        .collect();
+
+      // Create the real task (unassigned initially — assigneeId = current user as placeholder)
+      const realTaskId = await ctx.db.insert("tasks", {
+        briefId,
+        title: clientTask.title,
+        description: clientTask.description,
+        assigneeId: userId,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: existingTasks.length,
+        duration: "2 Hours",
+        durationMinutes: 120,
+        deadline: clientTask.finalDeadline,
+      });
+
+      // Link back
+      await ctx.db.patch(taskId, { linkedTaskId: realTaskId, linkedBriefId: briefId });
+    }
+
+    // Sync status to linked real task if it exists
+    if (clientTask.linkedTaskId) {
+      const statusMap: Record<string, string> = {
+        accepted: "pending",
+        in_progress: "in-progress",
+        completed: "done",
+      };
+      const mappedStatus = statusMap[status];
+      if (mappedStatus) {
+        await ctx.db.patch(clientTask.linkedTaskId, {
+          status: mappedStatus as "pending" | "in-progress" | "review" | "done",
+          ...(status === "completed" ? { completedAt: Date.now() } : {}),
+        });
+      }
+    }
   },
 });
 

@@ -65,6 +65,8 @@ export default function BrandDetailPage() {
   const deactivateJsrLink = useMutation(api.jsr.deactivateJsrLink);
   const updateClientTaskDeadline = useMutation(api.jsr.updateClientTaskDeadline);
   const updateClientTaskStatus = useMutation(api.jsr.updateClientTaskStatus);
+  const reassignClientTask = useMutation(api.jsr.reassignClientTask);
+  const allUsers = useQuery(api.users.listAllUsers);
   const [jsrExpanded, setJsrExpanded] = useState(true);
 
   if (brand === undefined) {
@@ -778,45 +780,77 @@ export default function BrandDetailPage() {
                 <div>
                   <p className="text-[12px] font-medium text-[var(--text-secondary)] mb-2">Client Requests</p>
                   <div className="flex flex-col gap-2">
-                    {(jsrClientTasks ?? []).map((task) => (
-                      <div key={task._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-[13px] text-[var(--text-primary)]">{task.title}</span>
-                          <select
-                            value={task.status}
-                            onChange={(e) => updateClientTaskStatus({ taskId: task._id, status: e.target.value as "pending_review" | "accepted" | "in_progress" | "completed" | "declined" })}
-                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-2 py-0.5 text-[var(--text-primary)]"
-                          >
-                            <option value="pending_review">Pending Review</option>
-                            <option value="accepted">Accepted</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="declined">Declined</option>
-                          </select>
-                        </div>
-                        {task.description && (
-                          <p className="text-[12px] text-[var(--text-secondary)] mb-1">{task.description}</p>
-                        )}
-                        <div className="flex items-center gap-4 text-[11px] text-[var(--text-muted)]">
-                          {task.clientName && <span>From: {task.clientName}</span>}
-                          {task.proposedDeadline && (
-                            <span>Proposed: {new Date(task.proposedDeadline).toLocaleDateString()}</span>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <span>Deadline:</span>
-                            <input
-                              type="date"
-                              value={task.finalDeadline ? new Date(task.finalDeadline).toISOString().split("T")[0] : ""}
-                              onChange={(e) => {
-                                const d = e.target.value ? new Date(e.target.value).getTime() : undefined;
-                                if (d) updateClientTaskDeadline({ taskId: task._id, finalDeadline: d });
-                              }}
-                              className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-1 py-0.5 text-[var(--text-primary)]"
-                            />
+                    {(jsrClientTasks ?? []).map((task: any) => {
+                      const isAccepted = task.status !== "pending_review" && task.status !== "declined";
+                      return (
+                        <div key={task._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-[13px] text-[var(--text-primary)]">{task.title}</span>
+                            <select
+                              value={task.status}
+                              onChange={(e) => updateClientTaskStatus({ taskId: task._id, status: e.target.value as "pending_review" | "accepted" | "in_progress" | "completed" | "declined" })}
+                              className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-2 py-0.5 text-[var(--text-primary)]"
+                            >
+                              <option value="pending_review">Pending Review</option>
+                              <option value="accepted">Accepted</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                              <option value="declined">Declined</option>
+                            </select>
                           </div>
+                          {task.description && (
+                            <p className="text-[12px] text-[var(--text-secondary)] mb-1">{task.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 text-[11px] text-[var(--text-muted)] flex-wrap">
+                            {task.clientName && <span>From: {task.clientName}</span>}
+                            {task.proposedDeadline && (
+                              <span>Proposed: {new Date(task.proposedDeadline).toLocaleDateString()}</span>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <span>Deadline:</span>
+                              <input
+                                type="date"
+                                value={task.finalDeadline ? new Date(task.finalDeadline).toISOString().split("T")[0] : ""}
+                                onChange={(e) => {
+                                  const d = e.target.value ? new Date(e.target.value).getTime() : undefined;
+                                  if (d) updateClientTaskDeadline({ taskId: task._id, finalDeadline: d });
+                                }}
+                                className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-1 py-0.5 text-[var(--text-primary)]"
+                              />
+                            </div>
+                          </div>
+                          {isAccepted && (
+                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                              <span className="text-[11px] text-[var(--text-muted)]">Assignee:</span>
+                              <select
+                                value={task.assigneeId ?? ""}
+                                onChange={async (e) => {
+                                  if (e.target.value) {
+                                    try {
+                                      await reassignClientTask({ clientTaskId: task._id, assigneeId: e.target.value as any });
+                                      toast("success", "Task reassigned");
+                                    } catch (err: any) {
+                                      toast("error", err.message ?? "Failed to reassign");
+                                    }
+                                  }
+                                }}
+                                className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-2 py-0.5 text-[var(--text-primary)] flex-1 max-w-[200px]"
+                              >
+                                <option value="">Select employee</option>
+                                {(allUsers ?? []).map((u: any) => (
+                                  <option key={u._id} value={u._id}>{u.name ?? u.email}{u.designation ? ` (${u.designation})` : ""}</option>
+                                ))}
+                              </select>
+                              {task.assigneeName && (
+                                <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                                  {task.assigneeName}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

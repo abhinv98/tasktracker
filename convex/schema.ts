@@ -429,6 +429,8 @@ export default defineSchema({
     ),
     internalNotes: v.optional(v.string()),
     clientName: v.optional(v.string()),
+    linkedTaskId: v.optional(v.id("tasks")),
+    linkedBriefId: v.optional(v.id("briefs")),
     createdAt: v.number(),
   })
     .index("by_brand", ["brandId"])
