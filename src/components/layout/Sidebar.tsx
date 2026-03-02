@@ -210,13 +210,8 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex shrink-0 items-center justify-between h-14 border-b border-[var(--border)] px-5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
-              <span className="text-white font-bold text-[12px]">O</span>
-            </div>
-            <span className="font-semibold text-[14px] text-[var(--text-primary)]">
-              Ecultify
-            </span>
+          <div className="flex items-center flex-1 min-w-0">
+            <img src="/ecultify.png" alt="Ecultify" className="h-8 w-auto object-contain" />
           </div>
           <button
             onClick={onClose}

@@ -7,6 +7,7 @@ interface ConfirmModalProps {
   open: boolean;
   title: string;
   message: string;
+  children?: React.ReactNode;
   confirmLabel?: string;
   confirmingLabel?: string;
   cancelLabel?: string;
@@ -19,6 +20,7 @@ export function ConfirmModal({
   open,
   title,
   message,
+  children,
   confirmLabel = "Confirm",
   confirmingLabel,
   cancelLabel = "Cancel",
@@ -76,6 +78,7 @@ export function ConfirmModal({
           <p className="text-[13px] text-[var(--text-secondary)] mt-2 leading-relaxed">
             {message}
           </p>
+          {children}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-[var(--border)] bg-[var(--bg-primary)] rounded-b-xl">
           <button

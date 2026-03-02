@@ -51,8 +51,11 @@ export const listJsrLinks = query({
 });
 
 export const deactivateJsrLink = mutation({
-  args: { jsrLinkId: v.id("jsrLinks") },
-  handler: async (ctx, { jsrLinkId }) => {
+  args: {
+    jsrLinkId: v.id("jsrLinks"),
+    deleteTasks: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { jsrLinkId, deleteTasks }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
@@ -60,6 +63,23 @@ export const deactivateJsrLink = mutation({
       throw new Error("Not authorized");
 
     await ctx.db.patch(jsrLinkId, { isActive: false });
+
+    if (deleteTasks) {
+      const clientTasks = await ctx.db
+        .query("jsrClientTasks")
+        .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLinkId))
+        .collect();
+
+      for (const ct of clientTasks) {
+        if (ct.linkedTaskId) {
+          const realTask = await ctx.db.get(ct.linkedTaskId);
+          if (realTask) {
+            await ctx.db.delete(ct.linkedTaskId);
+          }
+        }
+        await ctx.db.delete(ct._id);
+      }
+    }
   },
 });
 

@@ -68,6 +68,8 @@ export default function BrandDetailPage() {
   const reassignClientTask = useMutation(api.jsr.reassignClientTask);
   const allUsers = useQuery(api.users.listAllUsers);
   const [jsrExpanded, setJsrExpanded] = useState(true);
+  const [deactivatingJsrId, setDeactivatingJsrId] = useState<Id<"jsrLinks"> | null>(null);
+  const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
 
   if (brand === undefined) {
     return (
@@ -760,9 +762,9 @@ export default function BrandDetailPage() {
                             <Copy className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={async () => {
-                              await deactivateJsrLink({ jsrLinkId: link._id });
-                              toast("success", "Link deactivated");
+                            onClick={() => {
+                              setDeactivatingJsrId(link._id);
+                              setDeleteJsrTasks(false);
                             }}
                             className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors text-[11px] font-medium"
                           >
@@ -862,6 +864,37 @@ export default function BrandDetailPage() {
           )}
         </div>
       )}
+
+      {/* Deactivate JSR Link Confirmation */}
+      <ConfirmModal
+        open={!!deactivatingJsrId}
+        title="Deactivate JSR Link"
+        message="This will deactivate the link so clients can no longer access it."
+        confirmLabel="Deactivate"
+        confirmingLabel="Deactivating..."
+        variant="danger"
+        onConfirm={async () => {
+          if (deactivatingJsrId) {
+            await deactivateJsrLink({ jsrLinkId: deactivatingJsrId, deleteTasks: deleteJsrTasks });
+            toast("success", deleteJsrTasks ? "Link deactivated and tasks deleted" : "Link deactivated");
+          }
+          setDeactivatingJsrId(null);
+          setDeleteJsrTasks(false);
+        }}
+        onCancel={() => { setDeactivatingJsrId(null); setDeleteJsrTasks(false); }}
+      >
+        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={deleteJsrTasks}
+            onChange={(e) => setDeleteJsrTasks(e.target.checked)}
+            className="h-4 w-4 rounded border-[var(--border)] accent-[var(--danger)]"
+          />
+          <span className="text-[13px] text-[var(--text-primary)]">
+            Also delete all client request tasks created from this link
+          </span>
+        </label>
+      </ConfirmModal>
 
       {/* Delete Document Confirmation */}
       <ConfirmModal
