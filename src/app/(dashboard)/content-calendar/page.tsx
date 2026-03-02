@@ -273,7 +273,7 @@ export default function ContentCalendarPage() {
             </div>
 
             {/* Day Cells */}
-            <div className="grid grid-cols-7 gap-px bg-[var(--border-subtle)] rounded-xl overflow-hidden border border-[var(--border-subtle)]">
+            <div className="grid grid-cols-7 gap-px bg-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]">
               {/* Empty cells for days before the 1st */}
               {Array.from({ length: firstDay }).map((_, i) => (
                 <div key={`empty-${i}`} className="bg-[var(--bg-primary)] min-h-[120px] p-2 opacity-40" />
@@ -290,7 +290,7 @@ export default function ContentCalendarPage() {
                 return (
                   <div
                     key={day}
-                    className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group ${
+                    className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group relative ${
                       isWeekend ? "bg-[#fafafa]" : ""
                     } ${isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""}`}
                   >
@@ -316,7 +316,7 @@ export default function ContentCalendarPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-1 flex-1 overflow-hidden relative">
+                    <div className="flex flex-col gap-1.5 flex-1">
                       {dayTasks.slice(0, 2).map((task: any) => {
                         const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
                         return (
@@ -329,7 +329,7 @@ export default function ContentCalendarPage() {
                             }}
                             className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
                               selectedTaskId === task._id
-                                ? "ring-1 ring-[var(--accent-admin)] shadow-sm"
+                                ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm"
                                 : ""
                             }`}
                             style={{ backgroundColor: sc.bg }}
@@ -368,24 +368,24 @@ export default function ContentCalendarPage() {
                           +{dayTasks.length - 2} more
                         </button>
                       )}
-
-                      {popoverDate === dateStr && dayTasks.length > 0 && (
-                        <DayPopover
-                          dateStr={dateStr}
-                          tasks={dayTasks}
-                          selectedTaskId={selectedTaskId}
-                          isEditable={!!isEditable}
-                          onSelectTask={(id) => { setSelectedTaskId(id); setPopoverDate(null); }}
-                          onAddEntry={() => {
-                            setAddingDate(dateStr);
-                            setNewPlatform(PLATFORMS[0]);
-                            setNewContentType(CONTENT_TYPES[0]);
-                            setPopoverDate(null);
-                          }}
-                          onClose={() => setPopoverDate(null)}
-                        />
-                      )}
                     </div>
+
+                    {popoverDate === dateStr && dayTasks.length > 0 && (
+                      <DayPopover
+                        dateStr={dateStr}
+                        tasks={dayTasks}
+                        selectedTaskId={selectedTaskId}
+                        isEditable={!!isEditable}
+                        onSelectTask={(id) => { setSelectedTaskId(id); setPopoverDate(null); }}
+                        onAddEntry={() => {
+                          setAddingDate(dateStr);
+                          setNewPlatform(PLATFORMS[0]);
+                          setNewContentType(CONTENT_TYPES[0]);
+                          setPopoverDate(null);
+                        }}
+                        onClose={() => setPopoverDate(null)}
+                      />
+                    )}
                   </div>
                 );
               })}
@@ -618,7 +618,7 @@ function DayPopover({
                 key={task._id}
                 onClick={() => onSelectTask(task._id)}
                 className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] transition-all hover:shadow-sm ${
-                  isSelected ? "ring-1 ring-[var(--accent-admin)]" : ""
+                  isSelected ? "outline outline-2 outline-[var(--accent-admin)]" : ""
                 }`}
                 style={{ backgroundColor: sc.bg }}
               >
