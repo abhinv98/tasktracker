@@ -80,6 +80,7 @@ export default function ContentCalendarPage() {
   const [newDescription, setNewDescription] = useState("");
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [popoverDate, setPopoverDate] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -315,13 +316,17 @@ export default function ContentCalendarPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-1 flex-1 overflow-y-auto">
-                      {dayTasks.map((task: any) => {
+                    <div className="flex flex-col gap-1 flex-1 overflow-hidden relative">
+                      {dayTasks.slice(0, 2).map((task: any) => {
                         const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
                         return (
                           <button
                             key={task._id}
-                            onClick={() => setSelectedTaskId(task._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTaskId(task._id);
+                              setPopoverDate(null);
+                            }}
                             className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
                               selectedTaskId === task._id
                                 ? "ring-1 ring-[var(--accent-admin)] shadow-sm"
@@ -346,6 +351,40 @@ export default function ContentCalendarPage() {
                           </button>
                         );
                       })}
+                      {dayTasks.length > 2 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPopoverDate(popoverDate === dateStr ? null : dateStr);
+                          }}
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                          <div className="flex items-center gap-0.5">
+                            {dayTasks.slice(2).map((t: any) => {
+                              const sc = STATUS_COLORS[t.status] ?? STATUS_COLORS.pending;
+                              return <div key={t._id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sc.dot }} />;
+                            })}
+                          </div>
+                          +{dayTasks.length - 2} more
+                        </button>
+                      )}
+
+                      {popoverDate === dateStr && dayTasks.length > 0 && (
+                        <DayPopover
+                          dateStr={dateStr}
+                          tasks={dayTasks}
+                          selectedTaskId={selectedTaskId}
+                          isEditable={!!isEditable}
+                          onSelectTask={(id) => { setSelectedTaskId(id); setPopoverDate(null); }}
+                          onAddEntry={() => {
+                            setAddingDate(dateStr);
+                            setNewPlatform(PLATFORMS[0]);
+                            setNewContentType(CONTENT_TYPES[0]);
+                            setPopoverDate(null);
+                          }}
+                          onClose={() => setPopoverDate(null)}
+                        />
+                      )}
                     </div>
                   </div>
                 );
@@ -514,6 +553,93 @@ export default function ContentCalendarPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ────── Day Popover ────── */
+
+function DayPopover({
+  dateStr,
+  tasks,
+  selectedTaskId,
+  isEditable,
+  onSelectTask,
+  onAddEntry,
+  onClose,
+}: {
+  dateStr: string;
+  tasks: any[];
+  selectedTaskId: string | null;
+  isEditable: boolean;
+  onSelectTask: (id: string) => void;
+  onAddEntry: () => void;
+  onClose: () => void;
+}) {
+  const dateLabel = new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  return (
+    <>
+      <div className="fixed inset-0 z-30" onClick={onClose} />
+      <div
+        className="absolute left-0 right-0 top-full mt-1 z-40 bg-white rounded-xl shadow-xl border border-[var(--border)] p-3 min-w-[240px] max-w-[300px] animate-scaleIn"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+            {dateLabel}
+          </span>
+          <div className="flex items-center gap-1">
+            {isEditable && (
+              <button
+                onClick={onAddEntry}
+                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 max-h-[280px] overflow-y-auto">
+          {tasks.map((task: any) => {
+            const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+            const isSelected = selectedTaskId === task._id;
+            return (
+              <button
+                key={task._id}
+                onClick={() => onSelectTask(task._id)}
+                className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] transition-all hover:shadow-sm ${
+                  isSelected ? "ring-1 ring-[var(--accent-admin)]" : ""
+                }`}
+                style={{ backgroundColor: sc.bg }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc.dot }} />
+                  <span className="font-medium text-[var(--text-primary)] truncate flex-1">{task.title}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 ml-3.5">
+                  <span className="text-[var(--text-muted)]">{task.platform}</span>
+                  <span className="text-[var(--text-muted)]">{task.assigneeName}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] text-center">
+          {tasks.length} {tasks.length === 1 ? "entry" : "entries"}
+        </div>
+      </div>
+    </>
   );
 }
 
