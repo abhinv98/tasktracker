@@ -522,6 +522,29 @@ export const updateClientTaskStatus = mutation({
   },
 });
 
+export const deleteClientTask = mutation({
+  args: { clientTaskId: v.id("jsrClientTasks") },
+  handler: async (ctx, { clientTaskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || (user.role !== "admin" && user.role !== "manager"))
+      throw new Error("Not authorized");
+
+    const clientTask = await ctx.db.get(clientTaskId);
+    if (!clientTask) throw new Error("Client task not found");
+
+    if (clientTask.linkedTaskId) {
+      const realTask = await ctx.db.get(clientTask.linkedTaskId);
+      if (realTask) {
+        await ctx.db.delete(clientTask.linkedTaskId);
+      }
+    }
+
+    await ctx.db.delete(clientTaskId);
+  },
+});
+
 export const setCumulativeDeadline = mutation({
   args: {
     jsrLinkId: v.id("jsrLinks"),

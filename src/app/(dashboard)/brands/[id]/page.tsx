@@ -66,7 +66,9 @@ export default function BrandDetailPage() {
   const updateClientTaskDeadline = useMutation(api.jsr.updateClientTaskDeadline);
   const updateClientTaskStatus = useMutation(api.jsr.updateClientTaskStatus);
   const reassignClientTask = useMutation(api.jsr.reassignClientTask);
+  const deleteClientTask = useMutation(api.jsr.deleteClientTask);
   const allUsers = useQuery(api.users.listAllUsers);
+  const [deletingClientTaskId, setDeletingClientTaskId] = useState<Id<"jsrClientTasks"> | null>(null);
   const [jsrExpanded, setJsrExpanded] = useState(true);
   const [deactivatingJsrId, setDeactivatingJsrId] = useState<Id<"jsrLinks"> | null>(null);
   const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
@@ -788,17 +790,26 @@ export default function BrandDetailPage() {
                         <div key={task._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-[13px] text-[var(--text-primary)]">{task.title}</span>
-                            <select
-                              value={task.status}
-                              onChange={(e) => updateClientTaskStatus({ taskId: task._id, status: e.target.value as "pending_review" | "accepted" | "in_progress" | "completed" | "declined" })}
-                              className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-2 py-0.5 text-[var(--text-primary)]"
-                            >
-                              <option value="pending_review">Pending Review</option>
-                              <option value="accepted">Accepted</option>
-                              <option value="in_progress">In Progress</option>
-                              <option value="completed">Completed</option>
-                              <option value="declined">Declined</option>
-                            </select>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={task.status}
+                                onChange={(e) => updateClientTaskStatus({ taskId: task._id, status: e.target.value as "pending_review" | "accepted" | "in_progress" | "completed" | "declined" })}
+                                className="bg-[var(--bg-input)] border border-[var(--border)] rounded text-[11px] px-2 py-0.5 text-[var(--text-primary)]"
+                              >
+                                <option value="pending_review">Pending Review</option>
+                                <option value="accepted">Accepted</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="declined">Declined</option>
+                              </select>
+                              <button
+                                onClick={() => setDeletingClientTaskId(task._id)}
+                                className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                                title="Delete client request"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
                           {task.description && (
                             <p className="text-[12px] text-[var(--text-secondary)] mb-1">{task.description}</p>
@@ -864,6 +875,24 @@ export default function BrandDetailPage() {
           )}
         </div>
       )}
+
+      {/* Delete Client Request Confirmation */}
+      <ConfirmModal
+        open={!!deletingClientTaskId}
+        title="Delete Client Request"
+        message="This will permanently delete this client request and its associated task. This cannot be undone."
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={async () => {
+          if (deletingClientTaskId) {
+            await deleteClientTask({ clientTaskId: deletingClientTaskId });
+            toast("success", "Client request deleted");
+          }
+          setDeletingClientTaskId(null);
+        }}
+        onCancel={() => setDeletingClientTaskId(null)}
+      />
 
       {/* Deactivate JSR Link Confirmation */}
       <ConfirmModal
