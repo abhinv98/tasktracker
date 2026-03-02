@@ -308,7 +308,6 @@ export default function BriefsPage() {
                   <option value="developmental">Developmental</option>
                   <option value="designing">Designing</option>
                   <option value="video_editing">Video Editing</option>
-                  <option value="content_calendar">Content Calendar</option>
                 </select>
               </div>
               <div>

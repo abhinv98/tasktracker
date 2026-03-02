@@ -20,6 +20,7 @@ import {
   MessageCircle,
   MessageSquare,
   CalendarDays,
+  CalendarRange,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -48,6 +49,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/profile": UserCircle,
   "/deliverables": FileCheck,
   "/worklog": ClipboardList,
+  "/content-calendar": CalendarRange,
 };
 
 interface NavCategory {
@@ -68,6 +70,7 @@ const ADMIN_NAV: NavCategory[] = [
     category: "Planning",
     items: [
       { href: "/planner", label: "Planner" },
+      { href: "/content-calendar", label: "Content Calendar" },
       { href: "/messages", label: "Messages" },
     ],
   },
@@ -108,6 +111,7 @@ const MANAGER_NAV: NavCategory[] = [
     category: "Planning",
     items: [
       { href: "/planner", label: "Planner" },
+      { href: "/content-calendar", label: "Content Calendar" },
       { href: "/messages", label: "Messages" },
     ],
   },
