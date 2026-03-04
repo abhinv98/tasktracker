@@ -19,7 +19,22 @@ async function getOrCreateCalendarBrief(
       b.briefType === "content_calendar" &&
       b.status !== "archived"
   );
-  if (existing) return existing._id;
+  if (existing) {
+    const brandMgrs = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_brand", (q: any) => q.eq("brandId", brandId))
+      .collect();
+    if (brandMgrs.length > 0 && existing.assignedManagerId !== brandMgrs[0].managerId) {
+      await ctx.db.patch(existing._id, { assignedManagerId: brandMgrs[0].managerId });
+    }
+    return existing._id;
+  }
+
+  const brandMgrs = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_brand", (q: any) => q.eq("brandId", brandId))
+    .collect();
+  const managerId = brandMgrs.length > 0 ? brandMgrs[0].managerId : userId;
 
   const maxPriority = allBriefs.length > 0
     ? Math.max(...allBriefs.map((b: any) => b.globalPriority))
@@ -31,7 +46,7 @@ async function getOrCreateCalendarBrief(
     status: "active",
     briefType: "content_calendar",
     createdBy: userId,
-    assignedManagerId: userId,
+    assignedManagerId: managerId,
     globalPriority: maxPriority + 1,
     brandId,
   });

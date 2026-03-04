@@ -129,8 +129,17 @@ export const createBrief = mutation({
     const count = await ctx.db.query("briefs").collect();
     const globalPriority = count.length + 1;
 
-    // Auto-assign manager as the brief's manager when they create it
-    const assignedManagerId = args.assignedManagerId ?? (user.role === "manager" ? userId : undefined);
+    let assignedManagerId = args.assignedManagerId;
+    if (!assignedManagerId && args.brandId) {
+      const brandMgrs = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", args.brandId!))
+        .collect();
+      if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
+    }
+    if (!assignedManagerId && user.role === "manager") {
+      assignedManagerId = userId;
+    }
 
     const briefId = await ctx.db.insert("briefs", {
       ...args,
