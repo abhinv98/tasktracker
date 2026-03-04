@@ -814,6 +814,8 @@ function DetailSidebar({
       if (Object.keys(updates).length > 0) {
         await updateTask({ taskId: task._id, ...updates });
         toast("success", "Entry updated");
+      } else {
+        toast("info", "No changes to save");
       }
     } catch (err) {
       toast(
