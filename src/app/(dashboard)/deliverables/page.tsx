@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal } from "@/components/ui";
 import { Check, X, MessageSquare, ExternalLink, Paperclip, FileText, Image as ImageIcon, Eye, Trash2 } from "lucide-react";
 import { FilePreviewModal } from "@/components/ui/FilePreviewModal";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -19,6 +19,7 @@ export default function DeliverablesPage() {
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
+  const [deletingDeliverableId, setDeletingDeliverableId] = useState<string | null>(null);
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
 
@@ -206,10 +207,7 @@ export default function DeliverablesPage() {
                   </span>
                   {role === "admin" && (
                     <button
-                      onClick={async () => {
-                        if (!window.confirm("Delete this deliverable permanently?")) return;
-                        await deleteDeliverableMutation({ deliverableId: d._id as Id<"deliverables"> });
-                      }}
+                      onClick={() => setDeletingDeliverableId(d._id)}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
                       title="Delete deliverable"
                     >
@@ -324,6 +322,22 @@ export default function DeliverablesPage() {
       {previewFile && (
         <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
+
+      <ConfirmModal
+        open={!!deletingDeliverableId}
+        title="Delete Deliverable"
+        message="Are you sure you want to permanently delete this deliverable and its attached files?"
+        confirmLabel="Delete"
+        confirmingLabel="Deleting..."
+        variant="danger"
+        onConfirm={async () => {
+          if (deletingDeliverableId) {
+            await deleteDeliverableMutation({ deliverableId: deletingDeliverableId as Id<"deliverables"> });
+          }
+          setDeletingDeliverableId(null);
+        }}
+        onCancel={() => setDeletingDeliverableId(null)}
+      />
     </div>
   );
 }

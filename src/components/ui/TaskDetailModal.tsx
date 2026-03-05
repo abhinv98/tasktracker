@@ -129,6 +129,8 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDeleteDeliverableId, setConfirmDeleteDeliverableId] = useState<string | null>(null);
+  const [isDeletingDeliverable, setIsDeletingDeliverable] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
 
   // Escape to close
@@ -572,10 +574,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                         </span>
                         {user?.role === "admin" && (
                           <button
-                            onClick={async () => {
-                              if (!window.confirm("Delete this deliverable?")) return;
-                              await deleteDeliverable({ deliverableId: d._id });
-                            }}
+                            onClick={() => setConfirmDeleteDeliverableId(d._id)}
                             className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
                             title="Delete deliverable"
                           >
@@ -627,6 +626,32 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                           <p className="text-[11px] text-[var(--text-secondary)]">
                             {d.reviewNote}
                           </p>
+                        </div>
+                      </div>
+                    )}
+                    {confirmDeleteDeliverableId === d._id && (
+                      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-red-200">
+                        <p className="text-[11px] text-[var(--danger)] font-medium">Delete this deliverable?</p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={async () => {
+                              setIsDeletingDeliverable(true);
+                              await deleteDeliverable({ deliverableId: d._id });
+                              setIsDeletingDeliverable(false);
+                              setConfirmDeleteDeliverableId(null);
+                            }}
+                            disabled={isDeletingDeliverable}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium text-white bg-[var(--danger)] hover:bg-red-700 transition-colors disabled:opacity-60"
+                          >
+                            {isDeletingDeliverable ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                            {isDeletingDeliverable ? "Deleting..." : "Delete"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteDeliverableId(null)}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
                     )}
