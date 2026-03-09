@@ -89,7 +89,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
                   <Download className="h-3.5 w-3.5" />
                 </a>
               )}
-              {(att.uploadedBy === user?._id || user?.role === "admin") && (
+              {(att.uploadedBy === user?._id || user?.role === "admin" || user?.role === "manager") && (
                 <button
                   onClick={() => deleteAttachment({ attachmentId: att._id })}
                   className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)]"

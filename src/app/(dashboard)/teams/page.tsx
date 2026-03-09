@@ -140,7 +140,7 @@ export default function TeamsPage() {
     }
   }
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
 
   return (
     <div className="p-8">

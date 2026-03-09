@@ -44,6 +44,7 @@ export default function DashboardLayout({
 
     if (
       role !== "admin" &&
+      role !== "manager" &&
       ADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r))
     ) {
       router.replace("/dashboard");

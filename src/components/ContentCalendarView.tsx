@@ -1143,7 +1143,8 @@ function DetailSidebar({
                     </a>
                   )}
                   {(att.uploadedBy === user?._id ||
-                    user?.role === "admin") && (
+                    user?.role === "admin" ||
+                    user?.role === "manager") && (
                     <button
                       onClick={() =>
                         deleteAttachment({ attachmentId: att._id })

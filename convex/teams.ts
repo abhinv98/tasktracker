@@ -64,8 +64,8 @@ export const createTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can create teams");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can create teams");
     }
     return await ctx.db.insert("teams", {
       ...args,
@@ -110,8 +110,8 @@ export const removeUserFromTeam = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const user = await ctx.db.get(currentUserId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can remove users from teams");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can remove users from teams");
     }
     const existing = await ctx.db
       .query("userTeams")
@@ -137,8 +137,8 @@ export const updateTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can update teams");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can update teams");
     }
     const updates: Record<string, unknown> = {};
     if (fields.name !== undefined) updates.name = fields.name;
@@ -157,8 +157,8 @@ export const deleteTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can delete teams");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can delete teams");
     }
     const briefTeams = await ctx.db
       .query("briefTeams")
@@ -183,5 +183,89 @@ export const deleteTeam = mutation({
       await ctx.db.delete(ut._id);
     }
     await ctx.db.delete(teamId);
+  },
+});
+
+export const getTeamLeadBriefOverview = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const teams = await ctx.db.query("teams").collect();
+    const ledTeams = teams.filter((t) => t.leadId === userId);
+    if (ledTeams.length === 0) return [];
+
+    const allUserTeams = await ctx.db.query("userTeams").collect();
+    const allUsers = await ctx.db.query("users").collect();
+    const allBriefTeams = await ctx.db.query("briefTeams").collect();
+    const allBriefs = await ctx.db.query("briefs").collect();
+    const allTasks = await ctx.db.query("tasks").collect();
+
+    return ledTeams.map((team) => {
+      const memberLinks = allUserTeams.filter((ut) => ut.teamId === team._id);
+      const members = memberLinks
+        .map((ut) => {
+          const user = allUsers.find((u) => u._id === ut.userId);
+          if (!user) return null;
+
+          const teamBriefLinks = allBriefTeams.filter(
+            (bt) => bt.teamId === team._id
+          );
+          const teamBriefIds = new Set(teamBriefLinks.map((bt) => bt.briefId));
+
+          const memberTasks = allTasks.filter(
+            (t) => t.assigneeId === user._id && teamBriefIds.has(t.briefId)
+          );
+
+          const briefIdsFromTasks = [
+            ...new Set(memberTasks.map((t) => t.briefId)),
+          ];
+
+          const briefs = briefIdsFromTasks
+            .map((briefId) => {
+              const brief = allBriefs.find((b) => b._id === briefId);
+              if (!brief || brief.status === "archived") return null;
+              const taskCount = memberTasks.filter(
+                (t) => t.briefId === briefId
+              ).length;
+              const doneCount = memberTasks.filter(
+                (t) => t.briefId === briefId && t.status === "done"
+              ).length;
+              return {
+                _id: brief._id,
+                title: brief.title,
+                status: brief.status,
+                taskCount,
+                doneCount,
+              };
+            })
+            .filter(Boolean);
+
+          if (briefs.length === 0) return null;
+
+          return {
+            user: {
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              avatarUrl: user.avatarUrl,
+              designation: user.designation,
+              role: user.role,
+            },
+            briefs,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        team: {
+          _id: team._id,
+          name: team.name,
+          color: team.color,
+        },
+        members,
+      };
+    });
   },
 });

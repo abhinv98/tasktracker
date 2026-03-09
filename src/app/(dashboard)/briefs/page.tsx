@@ -61,7 +61,7 @@ export default function BriefsPage() {
   const [deletingTemplateId, setDeletingTemplateId] = useState<Id<"briefTemplates"> | null>(null);
   const [templateForBrief, setTemplateForBrief] = useState<Id<"briefTemplates"> | null>(null);
   const { toast } = useToast();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
   const isManager = user?.role === "manager";
 
   async function handleCreate(e: React.FormEvent) {

@@ -16,7 +16,7 @@ export const listDocuments = query({
       .collect();
 
     const filtered =
-      user.role === "admin"
+      user.role === "admin" || user.role === "manager"
         ? docs
         : docs.filter((d) => d.visibility === "all");
 
@@ -51,8 +51,8 @@ export const uploadDocument = mutation({
     if (!user || (user.role !== "admin" && user.role !== "manager"))
       throw new Error("Only admins and managers can upload documents");
 
-    if (args.visibility === "admin_only" && user.role !== "admin")
-      throw new Error("Only admins can upload admin-only documents");
+    if (args.visibility === "admin_only" && user.role !== "admin" && user.role !== "manager")
+      throw new Error("Only admins and managers can upload admin-only documents");
 
     return await ctx.db.insert("brandDocuments", {
       ...args,
@@ -73,7 +73,7 @@ export const deleteDocument = mutation({
     const doc = await ctx.db.get(documentId);
     if (!doc) throw new Error("Document not found");
 
-    if (doc.uploadedBy !== userId && user.role !== "admin")
+    if (doc.uploadedBy !== userId && user.role !== "admin" && user.role !== "manager")
       throw new Error("Not authorized");
 
     await ctx.storage.delete(doc.fileId);

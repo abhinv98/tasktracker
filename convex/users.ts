@@ -68,8 +68,8 @@ export const updateUserRole = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
-    if (!currentUser || currentUser.role !== "admin") {
-      throw new Error("Only admins can change roles");
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "manager")) {
+      throw new Error("Only admins and managers can change roles");
     }
     if (userId === currentUserId && newRole !== "admin") {
       const admins = await ctx.db
@@ -120,7 +120,7 @@ export const createInvite = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") throw new Error("Only admins can create invites");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) throw new Error("Only admins and managers can create invites");
 
     // Generate a random token
     const token = Array.from({ length: 32 }, () =>
@@ -157,7 +157,7 @@ export const deleteUser = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
-    if (!currentUser || currentUser.role !== "admin") throw new Error("Only admins can delete users");
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "manager")) throw new Error("Only admins and managers can delete users");
     if (targetUserId === currentUserId) throw new Error("Cannot delete yourself");
 
     // Check if user is last admin

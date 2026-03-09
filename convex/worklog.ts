@@ -8,7 +8,7 @@ export const getEmployeeWorkLog = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return null;
+    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
 
     const allUsers = await ctx.db.query("users").collect();
     const employees = allUsers.filter(
@@ -116,7 +116,7 @@ export const getTaskManifest = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return null;
+    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
 
     const allUsers = await ctx.db.query("users").collect();
     const allTasks = await ctx.db.query("tasks").collect();
@@ -178,7 +178,7 @@ export const getTeamLoadView = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return null;
+    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
 
     const teams = await ctx.db.query("teams").collect();
     const userTeams = await ctx.db.query("userTeams").collect();

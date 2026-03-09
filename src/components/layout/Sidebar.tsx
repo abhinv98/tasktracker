@@ -171,11 +171,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
 
   const nav =
-    role === "admin"
+    role === "admin" || role === "manager"
       ? ADMIN_NAV
-      : role === "manager"
-        ? MANAGER_NAV
-        : EMPLOYEE_NAV;
+      : EMPLOYEE_NAV;
 
   // All categories open by default
   const [openCategories, setOpenCategories] = useState<Set<string>>(

@@ -149,8 +149,7 @@ export default function BriefPage() {
   }
 
   const isAdminOrManager =
-    user?.role === "admin" ||
-    (user?.role === "manager" && brief.assignedManagerId === user._id);
+    user?.role === "admin" || user?.role === "manager";
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -234,7 +233,7 @@ export default function BriefPage() {
             <FileDown className="h-4 w-4" />
           </button>
           {/* Save as template */}
-          {user?.role === "admin" && allTasks.length > 0 && (
+          {(user?.role === "admin" || user?.role === "manager") && allTasks.length > 0 && (
             <button
               onClick={() => setShowTemplatePrompt(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
@@ -243,7 +242,7 @@ export default function BriefPage() {
               <Save className="h-4 w-4" />
             </button>
           )}
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "manager") && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"

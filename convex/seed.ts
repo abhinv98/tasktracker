@@ -13,8 +13,8 @@ export const seedTestData = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can run seed");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can run seed");
     }
 
     const existingTeams = await ctx.db.query("teams").collect();

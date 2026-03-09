@@ -199,8 +199,8 @@ export const deleteDeliverable = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can delete deliverables");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+      throw new Error("Only admins and managers can delete deliverables");
     }
 
     const deliverable = await ctx.db.get(deliverableId);

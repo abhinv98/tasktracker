@@ -20,7 +20,7 @@ export const saveAsTemplate = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") throw new Error("Only admins can create templates");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) throw new Error("Only admins and managers can create templates");
 
     const brief = await ctx.db.get(briefId);
     if (!brief) throw new Error("Brief not found");
@@ -56,7 +56,7 @@ export const createFromTemplate = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") throw new Error("Only admins can create briefs");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) throw new Error("Only admins and managers can create briefs from templates");
 
     const template = await ctx.db.get(templateId);
     if (!template) throw new Error("Template not found");
@@ -91,7 +91,7 @@ export const deleteTemplate = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") throw new Error("Only admins can delete templates");
+    if (!user || (user.role !== "admin" && user.role !== "manager")) throw new Error("Only admins and managers can delete templates");
     await ctx.db.delete(templateId);
   },
 });

@@ -25,7 +25,7 @@ export default function BrandDetailPage() {
   const [removingManagerId, setRemovingManagerId] = useState<Id<"users"> | null>(null);
   const { toast } = useToast();
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "manager";
 
   // Documents
   const brandDocs = useQuery(api.brandDocuments.listDocuments, { brandId });

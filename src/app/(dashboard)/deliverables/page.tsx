@@ -205,7 +205,7 @@ export default function DeliverablesPage() {
                   >
                     {style.label}
                   </span>
-                  {role === "admin" && (
+                  {(role === "admin" || role === "manager") && (
                     <button
                       onClick={() => setDeletingDeliverableId(d._id)}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"

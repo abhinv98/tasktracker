@@ -541,7 +541,7 @@ export function CommentThread({
                       </button>
                     )}
                     {/* Delete button */}
-                    {(c.userId === user?._id || user?.role === "admin") && (
+                    {(c.userId === user?._id || user?.role === "admin" || user?.role === "manager") && (
                       <button
                         onClick={() => deleteComment({ commentId: c._id })}
                         className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"

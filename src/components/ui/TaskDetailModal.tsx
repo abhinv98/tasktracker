@@ -572,7 +572,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                         >
                           {ds.label}
                         </span>
-                        {user?.role === "admin" && (
+                        {(user?.role === "admin" || user?.role === "manager") && (
                           <button
                             onClick={() => setConfirmDeleteDeliverableId(d._id)}
                             className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"

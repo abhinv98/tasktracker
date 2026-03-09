@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Card, useToast } from "@/components/ui";
@@ -13,6 +13,17 @@ import {
   Trash2,
   Calendar,
 } from "lucide-react";
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 
 const PLATFORMS = [
   "Instagram",
@@ -194,6 +205,35 @@ export default function ContentCalendarPage() {
     }
   }
 
+  const [activeTask, setActiveTask] = useState<any>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const task = (event.active.data.current as any)?.task;
+    if (task) setActiveTask(task);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      setActiveTask(null);
+      const { active, over } = event;
+      if (!over) return;
+      const task = (active.data.current as any)?.task;
+      const targetDate = over.id as string;
+      if (!task || targetDate === task.postDate) return;
+      try {
+        await updateTask({ taskId: task._id as Id<"tasks">, postDate: targetDate });
+        toast("success", "Entry moved");
+      } catch (err: any) {
+        toast("error", err.message ?? "Failed to move entry");
+      }
+    },
+    [updateTask, toast]
+  );
+
   const selectedTask = selectedTaskId && tasks
     ? tasks.find((t: any) => t._id === selectedTaskId)
     : null;
@@ -280,6 +320,11 @@ export default function ContentCalendarPage() {
           </div>
         </div>
       ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
         <div className="flex-1 flex overflow-hidden">
           {/* Calendar Grid */}
           <div className={`flex-1 overflow-auto p-4 ${selectedTask ? "border-r border-[var(--border)]" : ""}`}>
@@ -308,69 +353,32 @@ export default function ContentCalendarPage() {
                 const isWeekend = new Date(year, month, day).getDay() === 0 || new Date(year, month, day).getDay() === 6;
 
                 return (
-                  <div
+                  <DroppableDayCell
                     key={day}
-                    className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group relative ${
-                      isWeekend ? "bg-[#fafafa]" : ""
-                    } ${isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""}`}
+                    dateStr={dateStr}
+                    isToday={isToday}
+                    isWeekend={isWeekend}
+                    day={day}
+                    isEditable={!!isEditable}
+                    onAddClick={() => {
+                      setAddingDate(dateStr);
+                      setNewPlatform(PLATFORMS[0]);
+                      setNewContentType(CONTENT_TYPES[0]);
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-[12px] font-medium ${
-                        isToday
-                          ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
-                          : "text-[var(--text-secondary)]"
-                      }`}>
-                        {day}
-                      </span>
-                      {isEditable && (
-                        <button
-                          onClick={() => {
-                            setAddingDate(dateStr);
-                            setNewPlatform(PLATFORMS[0]);
-                            setNewContentType(CONTENT_TYPES[0]);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-all"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-
                     <div className="flex flex-col gap-1.5 flex-1">
-                      {dayTasks.slice(0, 2).map((task: any) => {
-                        const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
-                        return (
-                          <button
-                            key={task._id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTaskId(task._id);
-                              setPopoverDate(null);
-                            }}
-                            className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
-                              selectedTaskId === task._id
-                                ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm"
-                                : ""
-                            }`}
-                            style={{ backgroundColor: sc.bg }}
-                          >
-                            <div className="flex items-center gap-1">
-                              <div
-                                className="w-1.5 h-1.5 rounded-full shrink-0"
-                                style={{ backgroundColor: sc.dot }}
-                              />
-                              <span className="font-medium text-[var(--text-primary)] truncate">
-                                {task.title}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5 ml-2.5">
-                              <span className="text-[var(--text-muted)] truncate">
-                                {task.platform}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                      {dayTasks.slice(0, 2).map((task: any) => (
+                        <DraggableTaskCard
+                          key={task._id}
+                          task={task}
+                          isSelected={selectedTaskId === task._id}
+                          isDragEnabled={!!isEditable}
+                          onClick={() => {
+                            setSelectedTaskId(task._id);
+                            setPopoverDate(null);
+                          }}
+                        />
+                      ))}
                       {dayTasks.length > 2 && (
                         <button
                           onClick={(e) => {
@@ -406,7 +414,7 @@ export default function ContentCalendarPage() {
                         onClose={() => setPopoverDate(null)}
                       />
                     )}
-                  </div>
+                  </DroppableDayCell>
                 );
               })}
 
@@ -436,6 +444,10 @@ export default function ContentCalendarPage() {
             />
           )}
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
+        </DragOverlay>
+        </DndContext>
       )}
 
       {/* Add Entry Modal */}
@@ -587,6 +599,134 @@ export default function ContentCalendarPage() {
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ────── Drag & Drop Helpers ────── */
+
+function DroppableDayCell({
+  dateStr,
+  isToday,
+  isWeekend,
+  day,
+  isEditable,
+  onAddClick,
+  children,
+}: {
+  dateStr: string;
+  isToday: boolean;
+  isWeekend: boolean;
+  day: number;
+  isEditable: boolean;
+  onAddClick: () => void;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dateStr });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group relative ${
+        isWeekend ? "bg-[#fafafa]" : ""
+      } ${isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""} ${
+        isOver ? "!bg-[var(--accent-admin-dim)] ring-2 ring-inset ring-[var(--accent-admin)]" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className={`text-[12px] font-medium ${
+          isToday
+            ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
+            : "text-[var(--text-secondary)]"
+        }`}>
+          {day}
+        </span>
+        {isEditable && (
+          <button
+            onClick={onAddClick}
+            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-all"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function DraggableTaskCard({
+  task,
+  isSelected,
+  isDragEnabled,
+  onClick,
+}: {
+  task: any;
+  isSelected: boolean;
+  isDragEnabled: boolean;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task._id,
+    data: { task },
+    disabled: !isDragEnabled,
+  });
+
+  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+
+  return (
+    <button
+      ref={setNodeRef}
+      {...(isDragEnabled ? { ...listeners, ...attributes } : {})}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
+        isSelected ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
+      } ${isDragging ? "opacity-30" : ""} ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
+      style={{ backgroundColor: sc.bg }}
+    >
+      <div className="flex items-center gap-1">
+        <div
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: sc.dot }}
+        />
+        <span className="font-medium text-[var(--text-primary)] truncate">
+          {task.title}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 mt-0.5 ml-2.5">
+        <span className="text-[var(--text-muted)] truncate">
+          {task.platform}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function TaskCardOverlay({ task }: { task: any }) {
+  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+
+  return (
+    <div
+      className="px-1.5 py-1 rounded-md text-[10px] leading-tight shadow-lg ring-2 ring-[var(--accent-admin)] cursor-grabbing w-[140px]"
+      style={{ backgroundColor: sc.bg }}
+    >
+      <div className="flex items-center gap-1">
+        <div
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: sc.dot }}
+        />
+        <span className="font-medium text-[var(--text-primary)] truncate">
+          {task.title}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 mt-0.5 ml-2.5">
+        <span className="text-[var(--text-muted)] truncate">
+          {task.platform}
+        </span>
+      </div>
     </div>
   );
 }
