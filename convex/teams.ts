@@ -64,8 +64,8 @@ export const createTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can create teams");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can create teams");
     }
     return await ctx.db.insert("teams", {
       ...args,
@@ -83,8 +83,8 @@ export const addUserToTeam = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const user = await ctx.db.get(currentUserId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can add users to teams");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can add users to teams");
     }
     const existing = await ctx.db
       .query("userTeams")
@@ -110,8 +110,8 @@ export const removeUserFromTeam = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const user = await ctx.db.get(currentUserId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can remove users from teams");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can remove users from teams");
     }
     const existing = await ctx.db
       .query("userTeams")
@@ -137,8 +137,8 @@ export const updateTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can update teams");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can update teams");
     }
     const updates: Record<string, unknown> = {};
     if (fields.name !== undefined) updates.name = fields.name;
@@ -157,8 +157,8 @@ export const deleteTeam = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can delete teams");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can delete teams");
     }
     const briefTeams = await ctx.db
       .query("briefTeams")

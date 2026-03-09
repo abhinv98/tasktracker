@@ -29,7 +29,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [designation, setDesignation] = useState("");
-  const [role, setRole] = useState<"admin" | "manager" | "employee">("employee");
+  const [role, setRole] = useState<"admin" | "employee">("employee");
   const [teamId, setTeamId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -171,11 +171,10 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
                 label="Role"
                 value={role}
                 onChange={(e) =>
-                  setRole(e.target.value as "admin" | "manager" | "employee")
+                  setRole(e.target.value as "admin" | "employee")
                 }
                 options={[
                   { value: "admin", label: "Admin" },
-                  { value: "manager", label: "Manager" },
                   { value: "employee", label: "Employee" },
                 ]}
               />
@@ -243,7 +242,7 @@ export default function UsersPage() {
 
   async function handleRoleChange(
     userId: Id<"users">,
-    newRole: "admin" | "manager" | "employee"
+    newRole: "admin" | "employee"
   ) {
     try {
       await updateRole({ userId, newRole });
@@ -315,13 +314,12 @@ export default function UsersPage() {
                     onChange={(e) =>
                       handleRoleChange(
                         user._id,
-                        e.target.value as "admin" | "manager" | "employee"
+                        e.target.value as "admin" | "employee"
                       )
                     }
                     className="bg-[var(--bg-input)] rounded-lg border border-[var(--border)] text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
                     <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
                     <option value="employee">Employee</option>
                   </select>
                 </TableCell>

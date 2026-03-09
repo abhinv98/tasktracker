@@ -49,7 +49,7 @@ export default function WorkLogPage() {
   const manifest = useQuery(api.worklog.getTaskManifest);
   const teamLoad = useQuery(api.worklog.getTeamLoadView);
 
-  if (!user || (user.role !== "admin" && user.role !== "manager")) {
+  if (!user || user.role !== "admin") {
     return (
       <div className="p-8">
         <p className="text-[14px] text-[var(--text-secondary)]">Access denied. Admin only.</p>

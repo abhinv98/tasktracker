@@ -20,8 +20,8 @@ export const generateJsrLink = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can generate JSR links");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can generate JSR links");
 
     const token = generateToken();
     return await ctx.db.insert("jsrLinks", {
@@ -41,7 +41,7 @@ export const listJsrLinks = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     return await ctx.db
       .query("jsrLinks")
@@ -59,7 +59,7 @@ export const deactivateJsrLink = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     await ctx.db.patch(jsrLinkId, { isActive: false });
@@ -350,7 +350,7 @@ export const listClientTasks = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const tasks = await ctx.db
       .query("jsrClientTasks")
@@ -385,7 +385,7 @@ export const reassignClientTask = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     const clientTask = await ctx.db.get(clientTaskId);
@@ -419,7 +419,7 @@ export const updateClientTaskDeadline = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     await ctx.db.patch(taskId, { finalDeadline });
@@ -447,7 +447,7 @@ export const updateClientTaskStatus = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     const clientTask = await ctx.db.get(taskId);
@@ -535,7 +535,7 @@ export const deleteClientTask = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     const clientTask = await ctx.db.get(clientTaskId);
@@ -561,7 +561,7 @@ export const setCumulativeDeadline = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     const tasks = await ctx.db
@@ -614,7 +614,7 @@ export const sendManagerMessage = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     const jsrLinks = await ctx.db
@@ -642,7 +642,7 @@ export const listJsrMessages = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const messages = await ctx.db
       .query("jsrMessages")
@@ -692,7 +692,7 @@ export const addManagerRemark = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
+    if (!user || user.role !== "admin")
       throw new Error("Not authorized");
 
     await ctx.db.insert("jsrRemarks", {
@@ -713,7 +713,7 @@ export const listJsrRemarks = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const remarks = await ctx.db
       .query("jsrRemarks")

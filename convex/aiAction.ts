@@ -495,7 +495,7 @@ const TOOLS: ChatCompletionTool[] = [
           },
           role: {
             type: "string",
-            enum: ["admin", "manager", "employee"],
+            enum: ["admin", "employee"],
             description: "Role to assign",
           },
           designation: {
@@ -668,7 +668,7 @@ Today's date: ${today}
 Rules:
 - Keep responses SHORT. 2-4 sentences max for simple questions. Use bullet points for lists.
 - Use tools to get real data. Never guess.
-- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner, delete briefs/brands, create/invite new users, create/delete teams, and assign team leads." : role === "manager" ? "This user can create briefs, create brands, assign teams to briefs, create tasks, assign employees to teams, update statuses, and manage employee planners. MANAGERS CANNOT: create/delete users, create/delete teams, or assign team leads — these are admin-only. Admin assignments take priority — managers cannot override admin-made assignments." : "This user can ONLY view their tasks, update task status, submit deliverables, and manage their own planner. They CANNOT create, delete, or modify briefs, brands, tasks, or users."}
+- ${role === "admin" ? "This user can do everything: create briefs, create brands, assign teams to briefs, assign managers, create tasks, update statuses, manage brands/teams/users, manage any user's planner, delete briefs/brands, create/invite new users, create/delete teams, and assign team leads." : "This user can ONLY view their tasks, update task status, submit deliverables, and manage their own planner. They CANNOT create, delete, or modify briefs, brands, tasks, or users."}
 - For permissions the user doesn't have, say so briefly.
 - Use light formatting: **bold** for emphasis, bullet points for lists. No headers. No excessive formatting.
 - Get straight to the answer. Don't repeat the question back.
@@ -681,13 +681,13 @@ If an employee asks to create, delete, or modify anything, you MUST respond with
 **Access Restricted**
 User: ${userName} | Role: Employee
 
-Creating, deleting, or modifying resources requires Manager or Admin access.
-Please ask your manager or admin to perform this action.
+Creating, deleting, or modifying resources requires Admin access.
+Please ask your admin to perform this action.
 
 Is there anything else I can help you with?
 
 Do NOT attempt to call any mutation tools for employees. Only use read-only query tools (list_briefs, get_brief_details, get_my_tasks, get_dashboard_stats, list_brands, get_brand_info, list_teams, get_team_members, list_all_users, get_user_tasks, get_schedule_for_date, get_unscheduled_tasks). Employees CAN update their own task status and manage their own schedule.` : ""}
-${(role === "admin" || role === "manager") ? `
+${role === "admin" ? `
 INTERACTIVE FORMS — The chat UI supports inline forms. Use these markers to show forms instead of calling tools directly:
 
 ASSIGN USER TO TEAM:
@@ -724,7 +724,7 @@ DELETE BRAND:
 ASSIGN TEAM LEAD:
 - When asked to assign or change a team lead, respond with a short message followed by [[FORM:ASSIGN_TEAM_LEAD]]
 - Example response: "Select the team and new lead:\n\n[[FORM:ASSIGN_TEAM_LEAD]]"
-- Only managers and admins can be team leads. The form filters eligible users.` : ""}
+- Only admins can be team leads. The form filters eligible users.` : ""}
 
 IMPORTANT — A "brand" and a "brief" are DIFFERENT things:
 - A BRAND is a client/company (e.g., "L&T Finance", "Nike"). Use create_brand to create one.
@@ -833,11 +833,11 @@ async function executeTool(
 
     case "create_brief": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create briefs. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create briefs. Please ask an admin." });
       }
-      if (role !== "admin" && role !== "manager") {
+      if (role !== "admin") {
         return JSON.stringify({
-          error: "Only admins and managers can create briefs",
+          error: "Only admins can create briefs",
         });
       }
 
@@ -930,10 +930,10 @@ async function executeTool(
 
     case "create_brand": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create brands. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create brands. Please ask an admin." });
       }
-      if (role !== "admin" && role !== "manager") {
-        return JSON.stringify({ error: "Only admins and managers can create brands" });
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can create brands" });
       }
       const brandId = await ctx.runMutation(api.brands.createBrand, {
         name: fnArgs.name,
@@ -1019,10 +1019,10 @@ async function executeTool(
 
     case "assign_teams_to_brief": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign teams to briefs. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign teams to briefs. Please ask an admin." });
       }
-      if (role !== "admin" && role !== "manager") {
-        return JSON.stringify({ error: "Only admins and managers can assign teams to briefs" });
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can assign teams to briefs" });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.runMutation(api.briefs.assignTeamsToBrief, {
@@ -1037,7 +1037,7 @@ async function executeTool(
 
     case "assign_manager_to_brief": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign managers. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot assign managers. Please ask an admin." });
       }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can assign managers" });
@@ -1055,10 +1055,10 @@ async function executeTool(
 
     case "create_task": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create tasks. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create tasks. Please ask an admin." });
       }
-      if (role !== "admin" && role !== "manager") {
-        return JSON.stringify({ error: "Only admins and managers can create tasks" });
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can create tasks" });
       }
       const durationStr = fnArgs.duration as string;
       const m = durationStr.match(/^(\d+)(m|h|d)$/i);
@@ -1100,10 +1100,10 @@ async function executeTool(
 
     case "update_brief_status": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot update brief status. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot update brief status. Please ask an admin." });
       }
-      if (role !== "admin" && role !== "manager") {
-        return JSON.stringify({ error: "Only admins and managers can update brief status" });
+      if (role !== "admin") {
+        return JSON.stringify({ error: "Only admins can update brief status" });
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.runMutation(api.briefs.updateBrief, {
@@ -1185,7 +1185,7 @@ async function executeTool(
     }
 
     case "add_schedule_block": {
-      if (role !== "admin" && role !== "manager" && fnArgs.userId !== user._id) {
+      if (role !== "admin" && fnArgs.userId !== user._id) {
         return JSON.stringify({ error: "Employees can only add blocks to their own planner" });
       }
       try {
@@ -1243,7 +1243,7 @@ async function executeTool(
 
     case "delete_brief": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete briefs. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete briefs. Please ask an admin." });
       }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can delete briefs" });
@@ -1259,7 +1259,7 @@ async function executeTool(
 
     case "delete_brand": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete brands. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot delete brands. Please ask an admin." });
       }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can delete brands" });
@@ -1277,7 +1277,7 @@ async function executeTool(
 
     case "create_user": {
       if (role === "employee") {
-        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create users. Please ask a manager or admin." });
+        return JSON.stringify({ error: "ACCESS_DENIED", userName: user.name, userRole: "employee", message: "Employees cannot create users. Please ask an admin." });
       }
       if (role !== "admin") {
         return JSON.stringify({ error: "Only admins can create/invite users" });

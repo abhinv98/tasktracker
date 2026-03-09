@@ -60,7 +60,7 @@ export function CopyableLink({ url }: { url: string }) {
 export function CreateUserForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"admin" | "manager" | "employee">("employee");
+  const [role, setRole] = useState<"admin" | "employee">("employee");
   const [designation, setDesignation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<{ signupUrl: string; name: string } | null>(null);
@@ -166,11 +166,10 @@ export function CreateUserForm() {
         <div className="relative">
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "manager" | "employee")}
+            onChange={(e) => setRole(e.target.value as "admin" | "employee")}
             className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="employee">Employee</option>
-            <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)] pointer-events-none" />
@@ -679,7 +678,7 @@ export function AssignTeamLeadForm() {
   const allUsers = useQuery(api.users.listAllUsers) ?? [];
   const updateTeam = useMutation(api.teams.updateTeam);
 
-  const eligibleLeads = allUsers.filter((u) => u.role === "manager" || u.role === "admin");
+  const eligibleLeads = allUsers.filter((u) => u.role === "admin");
 
   function handleClear() {
     setSelectedTeamId("");

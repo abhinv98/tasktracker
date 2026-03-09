@@ -127,10 +127,10 @@ export function ContentCalendarView({
   );
 
   const employees = (allUsers ?? []).filter(
-    (u: any) => u.role === "employee" || u.role === "manager"
+    (u: any) => u.role === "employee"
   );
-  const managersAndAdmins = (allUsers ?? []).filter(
-    (u: any) => u.role === "admin" || u.role === "manager"
+  const admins = (allUsers ?? []).filter(
+    (u: any) => u.role === "admin"
   );
   const defaultAssignor = brandManagers && brandManagers.length > 0 ? brandManagers[0] : "";
 
@@ -656,7 +656,7 @@ export function ContentCalendarView({
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
                     <option value="">Select assignor</option>
-                    {managersAndAdmins.map((u: any) => (
+                    {admins.map((u: any) => (
                       <option key={u._id} value={u._id}>
                         {u.name ?? u.email}
                         {u.designation ? ` — ${u.designation}` : ""}
@@ -1143,8 +1143,7 @@ function DetailSidebar({
                     </a>
                   )}
                   {(att.uploadedBy === user?._id ||
-                    user?.role === "admin" ||
-                    user?.role === "manager") && (
+                    user?.role === "admin") && (
                     <button
                       onClick={() =>
                         deleteAttachment({ attachmentId: att._id })

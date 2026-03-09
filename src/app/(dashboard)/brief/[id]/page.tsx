@@ -148,8 +148,7 @@ export default function BriefPage() {
     );
   }
 
-  const isAdminOrManager =
-    user?.role === "admin" || user?.role === "manager";
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -199,7 +198,7 @@ export default function BriefPage() {
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {isAdminOrManager && brief.status !== "archived" && (
+          {isAdmin && brief.status !== "archived" && (
             <>
               {/* Deadline picker */}
               <DatePicker
@@ -233,7 +232,7 @@ export default function BriefPage() {
             <FileDown className="h-4 w-4" />
           </button>
           {/* Save as template */}
-          {(user?.role === "admin" || user?.role === "manager") && allTasks.length > 0 && (
+          {isAdmin && allTasks.length > 0 && (
             <button
               onClick={() => setShowTemplatePrompt(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
@@ -242,7 +241,7 @@ export default function BriefPage() {
               <Save className="h-4 w-4" />
             </button>
           )}
-          {(user?.role === "admin" || user?.role === "manager") && (
+          {isAdmin && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
@@ -257,7 +256,7 @@ export default function BriefPage() {
       {/* Content Calendar briefs get a full-width spreadsheet layout */}
       {brief.briefType === "content_calendar" ? (
         <div className="flex-1 overflow-hidden">
-          <ContentCalendarView briefId={briefId} isEditable={!!isAdminOrManager} brandId={brief?.brandId} />
+          <ContentCalendarView briefId={briefId} isEditable={!!isAdmin} brandId={brief?.brandId} />
         </div>
       ) : (
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
@@ -270,7 +269,7 @@ export default function BriefPage() {
             </h2>
 
             {/* Team assignment */}
-            {isAdminOrManager && brief.status !== "archived" && (
+            {isAdmin && brief.status !== "archived" && (
               <div className="mb-4 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                 <p className="text-[11px] font-medium text-[var(--text-secondary)] mb-2">
                   Assigned Teams
@@ -327,7 +326,7 @@ export default function BriefPage() {
             )}
 
             {/* Create task form */}
-            {isAdminOrManager && brief.status !== "archived" ? (
+            {isAdmin && brief.status !== "archived" ? (
               <form onSubmit={handleCreateTask} className="flex flex-col gap-2">
                 <Input
                   label="Title"
@@ -527,10 +526,10 @@ export default function BriefPage() {
                               </p>
                               {(() => {
                                 const rawNext = status === "pending" ? "in-progress" : status === "in-progress" ? "review" : "done";
-                                const canMoveDone = isAdminOrManager;
+                                const canMoveDone = isAdmin;
                                 const next = rawNext === "done" && !canMoveDone ? null : rawNext;
                                 if (!next || status === "done" || isBlocked) return null;
-                                if (!isAdminOrManager && task.assigneeId !== user?._id) return null;
+                                if (!isAdmin && task.assigneeId !== user?._id) return null;
                                 return (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); updateTaskStatus({ taskId: task._id, newStatus: next as "pending" | "in-progress" | "review" | "done" }); }}
@@ -576,10 +575,10 @@ export default function BriefPage() {
                           </p>
                           {(() => {
                             const rawNext = task.status === "pending" ? "in-progress" : task.status === "in-progress" ? "review" : "done";
-                            const canMoveDone = isAdminOrManager;
+                            const canMoveDone = isAdmin;
                             const next = rawNext === "done" && !canMoveDone ? null : rawNext;
                             if (!next || task.status === "done" || isBlocked) return null;
-                            if (!isAdminOrManager && task.assigneeId !== user?._id) return null;
+                            if (!isAdmin && task.assigneeId !== user?._id) return null;
                             const label = next === "in-progress" ? "In Progress" : next === "review" ? "Review" : "Done";
                             return (
                               <button

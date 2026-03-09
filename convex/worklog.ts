@@ -8,12 +8,10 @@ export const getEmployeeWorkLog = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
+    if (!user || user.role !== "admin") return null;
 
     const allUsers = await ctx.db.query("users").collect();
-    const employees = allUsers.filter(
-      (u) => u.role === "employee" || u.role === "manager"
-    );
+    const employees = allUsers.filter((u) => u.role === "employee");
     const allTasks = await ctx.db.query("tasks").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
@@ -116,7 +114,7 @@ export const getTaskManifest = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
+    if (!user || user.role !== "admin") return null;
 
     const allUsers = await ctx.db.query("users").collect();
     const allTasks = await ctx.db.query("tasks").collect();
@@ -127,9 +125,7 @@ export const getTaskManifest = query({
       (b) => !["archived", "completed"].includes(b.status)
     );
 
-    const employees = allUsers.filter(
-      (u) => u.role === "employee" || u.role === "manager"
-    );
+    const employees = allUsers.filter((u) => u.role === "employee");
 
     return employees.map((emp) => {
       const empTasks = allTasks.filter((t) => t.assigneeId === emp._id);
@@ -178,7 +174,7 @@ export const getTeamLoadView = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
+    if (!user || user.role !== "admin") return null;
 
     const teams = await ctx.db.query("teams").collect();
     const userTeams = await ctx.db.query("userTeams").collect();

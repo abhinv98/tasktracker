@@ -16,7 +16,7 @@ export default function TeamsPage() {
   const allUsers = useQuery(api.users.listAllUsers, {});
   
   const leadOptions = (allUsers ?? [])
-    .filter((u) => u.role === "admin" || u.role === "manager")
+    .filter((u) => u.role === "admin")
     .map((u) => ({ value: u._id, label: (u.name ?? u.email ?? "Unknown") as string }));
   const createTeam = useMutation(api.teams.createTeam);
   const updateTeam = useMutation(api.teams.updateTeam);
@@ -140,7 +140,7 @@ export default function TeamsPage() {
     }
   }
 
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const isAdmin = user?.role === "admin";
 
   return (
     <div className="p-8">
@@ -404,9 +404,7 @@ export default function TeamsPage() {
                               variant={
                                 member.role === "admin"
                                   ? "admin"
-                                  : member.role === "manager"
-                                    ? "manager"
-                                    : "employee"
+                                  : "employee"
                               }
                             >
                               {member.role}

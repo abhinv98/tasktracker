@@ -31,7 +31,7 @@ export default function DeliverablesPage() {
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
 
   const role = user?.role ?? "employee";
-  const isManagerOrAdmin = role === "admin" || role === "manager";
+  const isAdmin = role === "admin";
 
   // For employees, show their tasks to submit deliverables
   const myTasks = useQuery(
@@ -205,7 +205,7 @@ export default function DeliverablesPage() {
                   >
                     {style.label}
                   </span>
-                  {(role === "admin" || role === "manager") && (
+                  {role === "admin" && (
                     <button
                       onClick={() => setDeletingDeliverableId(d._id)}
                       className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
@@ -264,7 +264,7 @@ export default function DeliverablesPage() {
               )}
 
               {/* Actions for managers/admins */}
-              {isManagerOrAdmin && status === "pending" && (
+              {isAdmin && status === "pending" && (
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                   <button
                     onClick={() => handleApprove(d._id)}

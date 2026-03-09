@@ -132,8 +132,8 @@ export const createEntryForBrand = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can create calendar entries");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can create calendar entries");
 
     const briefId = await getOrCreateCalendarBrief(ctx, args.brandId, userId);
     const assignor = args.assignedBy ?? userId;
@@ -225,8 +225,8 @@ export const createSheet = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can manage sheets");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can manage sheets");
 
     const existing = await ctx.db
       .query("contentCalendarSheets")
@@ -256,8 +256,8 @@ export const deleteSheet = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can delete sheets");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can delete sheets");
 
     const sheet = await ctx.db.get(sheetId);
     if (!sheet) throw new Error("Sheet not found");
@@ -344,8 +344,8 @@ export const createCalendarEntry = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can create calendar entries");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can create calendar entries");
 
     const brief = await ctx.db.get(args.briefId);
     if (!brief) throw new Error("Brief not found");

@@ -7,7 +7,7 @@ export const getDashboardAnalytics = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return null;
+    if (!user || user.role !== "admin") return null;
 
     const briefs = await ctx.db.query("briefs").collect();
     const tasks = await ctx.db.query("tasks").collect();

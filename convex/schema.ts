@@ -17,7 +17,6 @@ export default defineSchema({
     role: v.optional(
       v.union(
         v.literal("admin"),
-        v.literal("manager"),
         v.literal("employee")
       )
     ),
@@ -241,7 +240,6 @@ export default defineSchema({
     designation: v.optional(v.string()),
     role: v.union(
       v.literal("admin"),
-      v.literal("manager"),
       v.literal("employee")
     ),
     teamId: v.optional(v.id("teams")),

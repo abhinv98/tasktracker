@@ -201,8 +201,7 @@ export default function PlannerPage() {
   const noteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAdmin = user?.role === "admin";
-  const isManager = user?.role === "manager";
-  const isAdminOrManager = isAdmin || isManager;
+  const isAdminOrManager = isAdmin;
   const viewingUserId = (isAdminOrManager && selectedUserId) ? selectedUserId : user?._id;
   const isViewingSelf = viewingUserId === user?._id;
 

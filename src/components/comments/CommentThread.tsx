@@ -531,8 +531,8 @@ export function CommentThread({
                     >
                       <SmilePlus className="h-3 w-3" />
                     </button>
-                    {/* Pin button (admin/manager only) */}
-                    {(user?.role === "admin" || user?.role === "manager") && (
+                    {/* Pin button (admin only) */}
+                    {user?.role === "admin" && (
                       <button
                         onClick={() => isPinned ? unpinComment({ commentId: c._id }) : pinComment({ commentId: c._id })}
                         className={`p-0.5 rounded transition-colors ${isPinned ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)] hover:text-[var(--accent-admin)]"}`}
@@ -541,7 +541,7 @@ export function CommentThread({
                       </button>
                     )}
                     {/* Delete button */}
-                    {(c.userId === user?._id || user?.role === "admin" || user?.role === "manager") && (
+                    {(c.userId === user?._id || user?.role === "admin") && (
                       <button
                         onClick={() => deleteComment({ commentId: c._id })}
                         className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"

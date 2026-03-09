@@ -119,22 +119,22 @@ export default function ContentCalendarPage() {
   );
 
   const employees = useMemo(
-    () => (allUsers ?? []).filter((u: any) => u.role === "employee" || u.role === "manager"),
+    () => (allUsers ?? []).filter((u: any) => u.role === "employee"),
     [allUsers]
   );
 
-  const managersAndAdmins = useMemo(
-    () => (allUsers ?? []).filter((u: any) => u.role === "admin" || u.role === "manager"),
+  const admins = useMemo(
+    () => (allUsers ?? []).filter((u: any) => u.role === "admin"),
     [allUsers]
   );
 
   const defaultAssignor = useMemo(() => {
-    if (!brandManagers?.length || !managersAndAdmins.length) return "";
-    const mgr = managersAndAdmins.find((u: any) => brandManagers.includes(u._id));
+    if (!brandManagers?.length || !admins.length) return "";
+    const mgr = admins.find((u: any) => brandManagers.includes(u._id));
     return mgr?._id ?? "";
-  }, [brandManagers, managersAndAdmins]);
+  }, [brandManagers, admins]);
 
-  const isEditable = user?.role === "admin" || user?.role === "manager";
+  const isEditable = user?.role === "admin";
 
   const selectedBrand = useMemo(
     () => (brands ?? []).find((b: any) => b._id === selectedBrandId),
@@ -435,7 +435,7 @@ export default function ContentCalendarPage() {
               task={selectedTask}
               isEditable={isEditable}
               employees={employees}
-              managersAndAdmins={managersAndAdmins}
+              managersAndAdmins={admins}
               onClose={() => setSelectedTaskId(null)}
               updateTask={updateTask}
               updateTaskStatus={updateTaskStatus}
@@ -516,7 +516,7 @@ export default function ContentCalendarPage() {
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 >
                   <option value="">Select assignor</option>
-                  {managersAndAdmins.map((u: any) => (
+                  {admins.map((u: any) => (
                     <option key={u._id} value={u._id}>
                       {u.name ?? u.email}{u.designation ? ` — ${u.designation}` : ""}
                     </option>

@@ -171,7 +171,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
 
   const nav =
-    role === "admin" || role === "manager"
+    role === "admin"
       ? ADMIN_NAV
       : EMPLOYEE_NAV;
 

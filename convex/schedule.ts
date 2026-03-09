@@ -112,7 +112,7 @@ export const getEmployeesWithSchedule = query({
     const authId = await getAuthUserId(ctx);
     if (!authId) return [];
     const user = await ctx.db.get(authId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const employees = await ctx.db.query("users").collect();
     const allBlocks = await ctx.db.query("scheduleBlocks").collect();
@@ -122,7 +122,7 @@ export const getEmployeesWithSchedule = query({
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
     return employees
-      .filter((e) => e.role === "employee" || e.role === "manager")
+      .filter((e) => e.role === "employee")
       .map((emp) => {
         const empBlocks = dayBlocks.filter((b) => b.userId === emp._id);
         const totalMinutes = empBlocks.reduce((s, b) => s + (b.endTime - b.startTime), 0);
@@ -441,12 +441,10 @@ export const deleteBlock = mutation({
     const block = await ctx.db.get(blockId);
     if (!block) throw new Error("Block not found");
     const authUser = await ctx.db.get(authId);
-    // Allow: own blocks, admin always, manager if they created it
+    // Allow: own blocks, admin always
     const isOwn = block.userId === authId;
     const isAdmin = authUser?.role === "admin";
-    const isCreator = block.createdBy === authId;
-    const isManager = authUser?.role === "manager";
-    if (!isOwn && !isAdmin && !(isManager && isCreator)) {
+    if (!isOwn && !isAdmin) {
       throw new Error("Not authorized");
     }
     await ctx.db.delete(blockId);
@@ -548,8 +546,8 @@ export const reorderTaskPriority = mutation({
     const authId = await getAuthUserId(ctx);
     if (!authId) throw new Error("Not authenticated");
     const authUser = await ctx.db.get(authId);
-    if (!authUser || (authUser.role !== "admin" && authUser.role !== "manager")) {
-      throw new Error("Only admins and managers can adjust priority");
+    if (!authUser || authUser.role !== "admin") {
+      throw new Error("Only admins can adjust priority");
     }
 
     const task = await ctx.db.get(taskId);

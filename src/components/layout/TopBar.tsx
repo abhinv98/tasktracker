@@ -64,7 +64,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
   }, [showNotifs]);
 
   const roleVariant =
-    role === "admin" ? "admin" : role === "manager" ? "manager" : "employee";
+    role === "admin" ? "admin" : "employee";
   const pageTitle = getPageTitle(pathname);
   const notifications = notificationsData?.notifications ?? [];
 

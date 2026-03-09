@@ -111,8 +111,8 @@ export const approveDeliverable = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins/managers can approve deliverables");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can approve deliverables");
     }
 
     const deliverable = await ctx.db.get(deliverableId);
@@ -158,8 +158,8 @@ export const rejectDeliverable = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins/managers can reject deliverables");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can reject deliverables");
     }
 
     const deliverable = await ctx.db.get(deliverableId);
@@ -199,8 +199,8 @@ export const deleteDeliverable = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can delete deliverables");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can delete deliverables");
     }
 
     const deliverable = await ctx.db.get(deliverableId);

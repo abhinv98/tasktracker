@@ -15,9 +15,7 @@ export const globalSearch = query({
 
     // Briefs
     let briefs = await ctx.db.query("briefs").collect();
-    if (role === "manager") {
-      briefs = briefs.filter((b) => b.assignedManagerId === userId);
-    } else if (role === "employee") {
+    if (role === "employee") {
       const myTasks = await ctx.db
         .query("tasks")
         .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
@@ -60,9 +58,9 @@ export const globalSearch = query({
           .map((t) => ({ _id: t._id, name: t.name, type: "team" as const }))
       : [];
 
-    // Users (admin/manager only)
+    // Users (admin only)
     const users =
-      role === "admin" || role === "manager"
+      role === "admin"
         ? (await ctx.db.query("users").collect())
             .filter(
               (u) =>

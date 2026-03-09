@@ -15,7 +15,7 @@ export const getManagersForBrand = query({
   },
 });
 
-// List all brands (admin sees all, managers see their assigned brands)
+// List all brands (admin sees all, employees see none)
 export const listBrands = query({
   args: {},
   handler: async (ctx) => {
@@ -26,15 +26,7 @@ export const listBrands = query({
 
     let brands = await ctx.db.query("brands").collect();
 
-    // Managers only see their assigned brands
-    if (user.role === "manager") {
-      const assignments = await ctx.db
-        .query("brandManagers")
-        .withIndex("by_manager", (q) => q.eq("managerId", userId))
-        .collect();
-      const brandIds = assignments.map((a) => a.brandId);
-      brands = brands.filter((b) => brandIds.includes(b._id));
-    } else if (user.role === "employee") {
+    if (user.role === "employee") {
       return []; // Employees don't see brands
     }
 
@@ -142,7 +134,7 @@ export const getBrandOverview = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const brands = await ctx.db.query("brands").collect();
     const brandManagers = await ctx.db.query("brandManagers").collect();
@@ -211,8 +203,8 @@ export const createBrand = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can create brands");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can create brands");
 
     return await ctx.db.insert("brands", {
       ...args,
@@ -263,11 +255,8 @@ export const deleteBrand = mutation({
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
 
-    const isAssignedManager =
-      user.role === "manager" && managers.some((m) => m.managerId === userId);
-
-    if (user.role !== "admin" && !isAssignedManager)
-      throw new Error("Only admins or the assigned manager can delete this brand");
+    if (user.role !== "admin")
+      throw new Error("Only admins can delete this brand");
 
     for (const m of managers) {
       await ctx.db.delete(m._id);
@@ -439,8 +428,8 @@ export const updateBrandLogo = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can update brand logo");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can update brand logo");
 
     const brand = await ctx.db.get(brandId);
     if (!brand) throw new Error("Brand not found");
@@ -459,8 +448,8 @@ export const removeBrandLogo = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can update brand logo");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can update brand logo");
 
     const brand = await ctx.db.get(brandId);
     if (!brand) throw new Error("Brand not found");

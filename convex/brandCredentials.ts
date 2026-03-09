@@ -8,7 +8,7 @@ export const listCredentials = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) return [];
+    if (!user || user.role !== "admin") return [];
 
     return await ctx.db
       .query("brandCredentials")
@@ -31,8 +31,8 @@ export const addCredential = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can manage credentials");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can manage credentials");
 
     return await ctx.db.insert("brandCredentials", {
       ...args,
@@ -57,8 +57,8 @@ export const updateCredential = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can manage credentials");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can manage credentials");
 
     const updates: Record<string, unknown> = { updatedAt: Date.now() };
     for (const [k, val] of Object.entries(fields)) {
@@ -74,8 +74,8 @@ export const deleteCredential = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager"))
-      throw new Error("Only admins and managers can manage credentials");
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can manage credentials");
 
     await ctx.db.delete(credentialId);
   },

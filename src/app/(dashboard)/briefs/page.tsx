@@ -61,8 +61,7 @@ export default function BriefsPage() {
   const [deletingTemplateId, setDeletingTemplateId] = useState<Id<"briefTemplates"> | null>(null);
   const [templateForBrief, setTemplateForBrief] = useState<Id<"briefTemplates"> | null>(null);
   const { toast } = useToast();
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
-  const isManager = user?.role === "manager";
+  const isAdmin = user?.role === "admin";
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -99,7 +98,7 @@ export default function BriefsPage() {
             Manage your briefs and priorities
           </p>
         </div>
-        {(isAdmin || isManager) && (
+        {isAdmin && (
           <div className="flex items-center gap-2">
             {(templates ?? []).length > 0 && (
               <div className="relative">

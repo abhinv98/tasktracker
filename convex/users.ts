@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const getCurrentUser = query({
@@ -18,7 +18,7 @@ export const listAllUsers = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const currentUser = await ctx.db.get(userId);
-    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "manager")) {
+    if (!currentUser || currentUser.role !== "admin") {
       return null;
     }
     const users = await ctx.db.query("users").collect();
@@ -51,7 +51,7 @@ export const listManagers = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const users = await ctx.db.query("users").collect();
-    return users.filter((u) => u.role === "manager");
+    return users.filter((u) => u.role === "admin");
   },
 });
 
@@ -60,7 +60,6 @@ export const updateUserRole = mutation({
     userId: v.id("users"),
     newRole: v.union(
       v.literal("admin"),
-      v.literal("manager"),
       v.literal("employee")
     ),
   },
@@ -68,8 +67,8 @@ export const updateUserRole = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
-    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "manager")) {
-      throw new Error("Only admins and managers can change roles");
+    if (!currentUser || currentUser.role !== "admin") {
+      throw new Error("Only admins can change roles");
     }
     if (userId === currentUserId && newRole !== "admin") {
       const admins = await ctx.db
@@ -113,14 +112,14 @@ export const createInvite = mutation({
     email: v.string(),
     name: v.string(),
     designation: v.optional(v.string()),
-    role: v.union(v.literal("admin"), v.literal("manager"), v.literal("employee")),
+    role: v.union(v.literal("admin"), v.literal("employee")),
     teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) throw new Error("Only admins and managers can create invites");
+    if (!user || user.role !== "admin") throw new Error("Only admins can create invites");
 
     // Generate a random token
     const token = Array.from({ length: 32 }, () =>
@@ -157,7 +156,7 @@ export const deleteUser = mutation({
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
-    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "manager")) throw new Error("Only admins and managers can delete users");
+    if (!currentUser || currentUser.role !== "admin") throw new Error("Only admins can delete users");
     if (targetUserId === currentUserId) throw new Error("Cannot delete yourself");
 
     // Check if user is last admin
@@ -226,5 +225,30 @@ export const generateProfileUploadUrl = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const migrateManagersToAdmin = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allUsers = await ctx.db.query("users").collect();
+    let migrated = 0;
+    for (const u of allUsers) {
+      if ((u.role as string) === "manager") {
+        await ctx.db.patch(u._id, { role: "admin" });
+        migrated++;
+      }
+    }
+
+    const allInvites = await ctx.db.query("invites").collect();
+    let invitesMigrated = 0;
+    for (const inv of allInvites) {
+      if ((inv.role as string) === "manager") {
+        await ctx.db.patch(inv._id, { role: "admin" });
+        invitesMigrated++;
+      }
+    }
+
+    return { migrated, invitesMigrated };
   },
 });

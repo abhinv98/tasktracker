@@ -19,7 +19,7 @@ export default function OverviewPage() {
     );
   }
 
-  if (!user || (user.role !== "admin" && user.role !== "manager")) {
+  if (!user || user.role !== "admin") {
     return (
       <div className="p-8">
         <p className="text-[14px] text-[var(--text-secondary)]">Access denied.</p>

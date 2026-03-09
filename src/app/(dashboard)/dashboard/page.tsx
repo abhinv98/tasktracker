@@ -171,7 +171,7 @@ export default function DashboardPage() {
   // ═══════════════════════════════════════════
   // ADMIN DASHBOARD
   // ═══════════════════════════════════════════
-  if (role === "admin" || role === "manager") {
+  if (role === "admin") {
     const teams = useQuery(api.teams.listTeams);
     const teamLeadOverview = useQuery(api.teams.getTeamLeadBriefOverview);
     const employeeCount = (allUsers ?? []).filter(

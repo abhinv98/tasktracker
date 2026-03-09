@@ -174,10 +174,10 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const status = task.status;
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const isAssignee = user._id === task.assigneeId;
-  const isAdminOrManager = user.role === "admin" || user.role === "manager";
-  const canUpdateStatus = isAssignee || isAdminOrManager;
+  const isAdmin = user.role === "admin";
+  const canUpdateStatus = isAssignee || isAdmin;
   const rawNext = STATUS_FLOW[status];
-  const nextStatus = (rawNext === "done" && !isAdminOrManager) ? null : rawNext;
+  const nextStatus = (rawNext === "done" && !isAdmin) ? null : rawNext;
 
   async function handleStatusUpdate() {
     if (!nextStatus || isUpdatingStatus) return;
@@ -316,7 +316,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
             </p>
           </div>
           <div className="flex items-center gap-1">
-            {isAdminOrManager && (
+            {isAdmin && (
               <button
                 onClick={openEditForm}
                 className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -325,7 +325,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                 <Pencil className="h-4 w-4" />
               </button>
             )}
-            {isAdminOrManager && (
+            {isAdmin && (
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
@@ -394,7 +394,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                   Move to {STATUS_CONFIG[nextStatus]?.label}
                 </button>
               )}
-              {isAssignee && !isAdminOrManager && status === "review" && (
+              {isAssignee && !isAdmin && status === "review" && (
                 <span className="text-[11px] text-[var(--text-muted)] italic">
                   Submit a deliverable for approval
                 </span>
@@ -572,7 +572,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                         >
                           {ds.label}
                         </span>
-                        {(user?.role === "admin" || user?.role === "manager") && (
+                        {user?.role === "admin" && (
                           <button
                             onClick={() => setConfirmDeleteDeliverableId(d._id)}
                             className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"

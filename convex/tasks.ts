@@ -236,12 +236,10 @@ export const updateTaskStatus = mutation({
     const user = await ctx.db.get(userId);
 
     const canUpdate =
-      task.assigneeId === userId ||
-      user?.role === "admin" ||
-      (user?.role === "manager" && brief?.assignedManagerId === userId);
+      task.assigneeId === userId || user?.role === "admin";
     if (!canUpdate) throw new Error("Not authorized");
 
-    if (newStatus === "done" && user?.role !== "admin" && user?.role !== "manager") {
+    if (newStatus === "done" && user?.role !== "admin") {
       throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
     }
 
@@ -294,8 +292,8 @@ export const reorderTasks = mutation({
     if (!currentUserId) throw new Error("Not authenticated");
     const user = await ctx.db.get(currentUserId);
     const isSelf = currentUserId === userId;
-    const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
-    if (!isSelf && !isAdminOrManager) {
+    const isAdmin = user?.role === "admin";
+    if (!isSelf && !isAdmin) {
       throw new Error("Not authorized to reorder");
     }
 
@@ -303,7 +301,7 @@ export const reorderTasks = mutation({
       await ctx.db.patch(orderedTaskIds[i], { sortOrder: (i + 1) * 1000 });
     }
 
-    if (!isSelf && isAdminOrManager) {
+    if (!isSelf && isAdmin) {
       await ctx.db.insert("notifications", {
         recipientId: userId,
         type: "priority_changed",
@@ -378,8 +376,8 @@ export const deleteTask = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can delete tasks");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can delete tasks");
     }
     await ctx.db.delete(taskId);
     await ctx.db.insert("activityLog", {
@@ -412,12 +410,10 @@ export const bulkUpdateStatus = mutation({
       if (!task) continue;
       const brief = await ctx.db.get(task.briefId);
       const canUpdate =
-        task.assigneeId === userId ||
-        user?.role === "admin" ||
-        (user?.role === "manager" && brief?.assignedManagerId === userId);
+        task.assigneeId === userId || user?.role === "admin";
       if (!canUpdate) continue;
 
-      if (newStatus === "done" && user?.role !== "admin" && user?.role !== "manager") {
+      if (newStatus === "done" && user?.role !== "admin") {
         continue;
       }
 

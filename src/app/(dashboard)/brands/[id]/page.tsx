@@ -25,7 +25,7 @@ export default function BrandDetailPage() {
   const [removingManagerId, setRemovingManagerId] = useState<Id<"users"> | null>(null);
   const { toast } = useToast();
 
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const isAdmin = user?.role === "admin";
 
   // Documents
   const brandDocs = useQuery(api.brandDocuments.listDocuments, { brandId });
@@ -264,7 +264,7 @@ export default function BrandDetailPage() {
                 alt={brand.name}
                 className="w-14 h-14 rounded-xl object-cover border border-[var(--border-primary)]"
               />
-              {(isAdmin || user?.role === "manager") && (
+              {isAdmin && (
                 <div className="absolute inset-0 rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                   <button
                     onClick={() => logoInputRef.current?.click()}
@@ -286,7 +286,7 @@ export default function BrandDetailPage() {
           ) : (
             <button
               onClick={() => {
-                if (isAdmin || user?.role === "manager") logoInputRef.current?.click();
+                if (isAdmin) logoInputRef.current?.click();
               }}
               disabled={uploadingLogo}
               className="w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 border-dashed transition-colors"
@@ -294,11 +294,11 @@ export default function BrandDetailPage() {
                 borderColor: brand.color + "40",
                 backgroundColor: brand.color + "08",
               }}
-              title={isAdmin || user?.role === "manager" ? "Upload brand logo" : brand.name}
+              title={isAdmin ? "Upload brand logo" : brand.name}
             >
               {uploadingLogo ? (
                 <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: brand.color + "30", borderTopColor: brand.color }} />
-              ) : (isAdmin || user?.role === "manager") ? (
+              ) : isAdmin ? (
                 <ImagePlus className="h-5 w-5" style={{ color: brand.color + "80" }} />
               ) : (
                 <Tag className="h-5 w-5" style={{ color: brand.color }} />
@@ -503,7 +503,7 @@ export default function BrandDetailPage() {
                   {emp.name ?? emp.email ?? "Unknown"}
                 </p>
                 <p className="text-[12px] text-[var(--text-secondary)]">{emp.email}</p>
-                <Badge variant={emp.role === "manager" ? "manager" : "employee"} className="mt-1">
+                <Badge variant={emp.role === "admin" ? "admin" : "employee"} className="mt-1">
                   {emp.role}
                 </Badge>
               </Card>
@@ -529,7 +529,7 @@ export default function BrandDetailPage() {
         </button>
         {docsExpanded && (
           <Card>
-            {(isAdmin || user?.role === "manager") && (
+            {isAdmin && (
               <div className="mb-4 pb-4 border-b border-[var(--border)]">
                 <input
                   ref={fileInputRef}
@@ -716,7 +716,7 @@ export default function BrandDetailPage() {
       )}
 
       {/* JSR (Job Status Report) Section */}
-      {(isAdmin || user?.role === "manager") && (
+      {isAdmin && (
         <div className="mt-8">
           <button
             onClick={() => setJsrExpanded(!jsrExpanded)}

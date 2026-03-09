@@ -223,9 +223,7 @@ export const getUnreadCounts = query({
     // Get all briefs user has access to
     const user = await ctx.db.get(userId);
     let briefs = await ctx.db.query("briefs").collect();
-    if (user?.role === "manager") {
-      briefs = briefs.filter((b) => b.assignedManagerId === userId);
-    } else if (user?.role === "employee") {
+    if (user?.role === "employee") {
       const tasks = await ctx.db.query("tasks").withIndex("by_assignee", (q) => q.eq("assigneeId", userId)).collect();
       const briefIds = new Set(tasks.map((t) => t.briefId));
       briefs = briefs.filter((b) => briefIds.has(b._id));
@@ -277,8 +275,8 @@ export const pinComment = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can pin messages");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can pin messages");
     }
     await ctx.db.patch(commentId, { pinned: true, pinnedBy: userId });
   },
@@ -290,8 +288,8 @@ export const unpinComment = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can unpin messages");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can unpin messages");
     }
     await ctx.db.patch(commentId, { pinned: false, pinnedBy: undefined });
   },

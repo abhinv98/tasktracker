@@ -112,8 +112,8 @@ export const createBrief = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can create briefs");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can create briefs");
     }
 
     const count = await ctx.db.query("briefs").collect();
@@ -126,9 +126,6 @@ export const createBrief = mutation({
         .withIndex("by_brand", (q) => q.eq("brandId", args.brandId!))
         .collect();
       if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
-    }
-    if (!assignedManagerId && user.role === "manager") {
-      assignedManagerId = userId;
     }
 
     const briefId = await ctx.db.insert("briefs", {
@@ -175,9 +172,6 @@ export const updateBrief = mutation({
     if (!brief) throw new Error("Brief not found");
     const user = await ctx.db.get(userId);
 
-    if (user?.role === "manager" && brief.assignedManagerId !== userId) {
-      throw new Error("Not assigned to this brief");
-    }
     if (user?.role === "employee") {
       throw new Error("Employees cannot update briefs");
     }
@@ -213,8 +207,8 @@ export const assignManagerToBrief = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can assign managers");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can assign managers");
     }
     await ctx.db.patch(briefId, { assignedManagerId: managerId });
     await ctx.db.insert("activityLog", {
@@ -343,8 +337,8 @@ export const deleteBrief = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can delete briefs");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can delete briefs");
     }
     const brief = await ctx.db.get(briefId);
     if (!brief) throw new Error("Brief not found");
@@ -402,8 +396,8 @@ export const restoreBrief = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
-      throw new Error("Only admins and managers can restore briefs");
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can restore briefs");
     }
     await ctx.db.patch(briefId, {
       status: "draft",
@@ -487,7 +481,7 @@ export const getArchivedBriefs = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && user.role !== "manager")) {
+    if (!user || user.role !== "admin") {
       return [];
     }
     const briefs = await ctx.db

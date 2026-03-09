@@ -23,7 +23,6 @@ export default function BrandsPage() {
   const [color, setColor] = useState(BRAND_COLORS[0]);
 
   const isAdmin = user?.role === "admin";
-  const isManager = user?.role === "manager";
   const { toast } = useToast();
 
   async function handleCreate(e: React.FormEvent) {
@@ -60,7 +59,7 @@ export default function BrandsPage() {
             Manage your client brands and projects
           </p>
         </div>
-        {(isAdmin || isManager) && (
+        {isAdmin && (
           <Button variant="primary" onClick={() => setShowModal(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
             Create Brand
@@ -123,7 +122,7 @@ export default function BrandsPage() {
         ))}
         {brands.length === 0 && (
           <p className="text-[13px] text-[var(--text-muted)] col-span-3">
-            No brands yet.{(isAdmin || isManager) ? " Create one to get started." : ""}
+            No brands yet.{isAdmin ? " Create one to get started." : ""}
           </p>
         )}
       </div>

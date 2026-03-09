@@ -214,7 +214,7 @@ export default function ProfilePage() {
             <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
               Role
             </label>
-            <Badge variant={user.role === "admin" ? "admin" : user.role === "manager" ? "manager" : "employee"}>
+            <Badge variant={user.role === "admin" ? "admin" : "employee"}>
               {user.role ?? "employee"}
             </Badge>
           </div>
