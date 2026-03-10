@@ -977,6 +977,75 @@ function DetailSidebar({
           )}
         </div>
 
+        {/* Reference Links */}
+        <div className="pt-2 border-t border-[var(--border)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
+              <Link2 className="h-3.5 w-3.5" />
+              Reference Links
+            </label>
+            {isEditable && user?.role === "admin" && (
+              <button
+                onClick={() => setShowLinkInput(true)}
+                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                Add Link
+              </button>
+            )}
+          </div>
+          {showLinkInput && (
+            <div className="flex gap-1.5 mb-2">
+              <input
+                value={newLink}
+                onChange={(e) => setNewLink(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLink(); } }}
+                placeholder="https://..."
+                autoFocus
+                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              />
+              <button
+                onClick={handleAddLink}
+                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:opacity-90"
+              >
+                Add
+              </button>
+              <button
+                onClick={() => { setShowLinkInput(false); setNewLink(""); }}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            {refLinks.map((link, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 group">
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin)] hover:underline flex-1 min-w-0"
+                >
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{link}</span>
+                </a>
+                {isEditable && user?.role === "admin" && (
+                  <button
+                    onClick={() => handleRemoveLink(idx)}
+                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {refLinks.length === 0 && !showLinkInput && (
+              <p className="text-[11px] text-[var(--text-muted)]">No reference links added</p>
+            )}
+          </div>
+        </div>
+
         {/* Platform + Content Type */}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -1180,74 +1249,6 @@ function DetailSidebar({
           ) : (
             <Badge variant="neutral">{si.label}</Badge>
           )}
-        </div>
-
-        {/* Reference Links */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
-              Reference Links
-            </label>
-            {isEditable && user?.role === "admin" && (
-              <button
-                onClick={() => setShowLinkInput(true)}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
-              >
-                <Plus className="h-3 w-3" />
-                Add Link
-              </button>
-            )}
-          </div>
-          {showLinkInput && (
-            <div className="flex gap-1.5 mb-2">
-              <input
-                value={newLink}
-                onChange={(e) => setNewLink(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLink(); } }}
-                placeholder="https://..."
-                autoFocus
-                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-              />
-              <button
-                onClick={handleAddLink}
-                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:opacity-90"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => { setShowLinkInput(false); setNewLink(""); }}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {refLinks.map((link, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 group">
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin)] hover:underline flex-1 min-w-0"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{link}</span>
-                </a>
-                {isEditable && user?.role === "admin" && (
-                  <button
-                    onClick={() => handleRemoveLink(idx)}
-                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            {refLinks.length === 0 && !showLinkInput && (
-              <p className="text-[11px] text-[var(--text-muted)]">No reference links</p>
-            )}
-          </div>
         </div>
 
         {/* Save button */}
