@@ -43,7 +43,22 @@ function SignUpForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign up failed");
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.toLowerCase().includes("already exists")) {
+        // Account exists — try signing in instead
+        try {
+          formData.set("flow", "signIn");
+          await signIn("password", formData);
+          router.push("/");
+          router.refresh();
+          return;
+        } catch (signInErr) {
+          setError("Account already exists. Please sign in with your existing password.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      setError(msg || "Sign up failed");
       setIsSubmitting(false);
     }
   }
