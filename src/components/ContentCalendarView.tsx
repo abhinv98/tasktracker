@@ -477,6 +477,7 @@ export function ContentCalendarView({
         {/* Detail Sidebar */}
         {selectedTask && (
           <DetailSidebar
+            key={selectedTask._id}
             task={selectedTask}
             isEditable={isEditable}
             employees={employees}

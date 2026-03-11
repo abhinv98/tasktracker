@@ -434,6 +434,7 @@ export default function ContentCalendarPage() {
           {/* Detail Sidebar */}
           {selectedTask && (
             <TaskDetailSidebar
+              key={selectedTask._id}
               task={selectedTask}
               isEditable={isEditable}
               employees={employees}

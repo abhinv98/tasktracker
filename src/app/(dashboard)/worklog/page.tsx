@@ -200,7 +200,7 @@ export default function WorkLogPage() {
 
           {/* Employee Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {(worklog?.employees ?? []).map((emp) => (
+            {[...(worklog?.employees ?? [])].sort((a, b) => b.totalTasks - a.totalTasks).map((emp) => (
               <Card key={emp.user._id} className={emp.totalTasks === 0 ? "opacity-50" : ""}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
@@ -475,7 +475,7 @@ export default function WorkLogPage() {
           />
           <div
             ref={panelRef}
-            className={`fixed right-0 top-0 h-full w-full sm:w-[420px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
+            className={`fixed right-0 top-0 h-full w-full sm:w-[560px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
               panelOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >
