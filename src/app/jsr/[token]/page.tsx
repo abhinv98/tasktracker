@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { useState, useMemo } from "react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import {
   CheckCircle2,
   Clock,
@@ -19,6 +20,12 @@ import {
   Sparkles,
   MessageCircle,
   Send,
+  AlertCircle,
+  FileDown,
+  X,
+  ThumbsUp,
+  RotateCcw,
+  Ban,
 } from "lucide-react";
 
 const TASK_STATUS: Record<string, { label: string; color: string; icon: "pending" | "progress" | "review" | "done" }> = {
@@ -82,6 +89,9 @@ export default function JsrPublicPage() {
   const jsr = useQuery(api.jsr.getJsrByToken, { token });
   const sendClientMessage = useMutation(api.jsr.sendClientMessage);
   const addJsrRemark = useMutation(api.jsr.addJsrRemark);
+  const clientApproveMut = useMutation(api.jsr.clientApproveDeliverable);
+  const clientRequestChangesMut = useMutation(api.jsr.clientRequestChanges);
+  const clientDenyMut = useMutation(api.jsr.clientDenyDeliverable);
 
   const [calendarExpanded, setCalendarExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
@@ -89,6 +99,12 @@ export default function JsrPublicPage() {
   const [msgContent, setMsgContent] = useState("");
   const [msgName, setMsgName] = useState("");
   const [sendingMsg, setSendingMsg] = useState(false);
+
+  // Client approval sidebar state
+  const [reviewSidebarItem, setReviewSidebarItem] = useState<any>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewAction, setReviewAction] = useState<"approve" | "changes" | "deny" | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const calendarList = jsr?.calendarList ?? [];
 
@@ -296,6 +312,66 @@ export default function JsrPublicPage() {
             </div>
           </div>
         </section>
+
+        {/* ═══ ECULTIFY REQUESTS (Needs Client Input) ═══ */}
+        {(jsr.ecultifyRequests ?? []).length > 0 && (
+          <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
+            <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
+              <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
+                <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
+              </div>
+              <h2 className="font-semibold text-[15px] text-[#171717]">Ecultify Requests</h2>
+              <span className="text-[12px] text-[#a3a3a3] ml-1">{jsr.ecultifyRequests.length}</span>
+            </div>
+            <div>
+              {jsr.ecultifyRequests.map((req: any, i: number) => (
+                <div key={req._id} className={`px-6 py-4 ${i < jsr.ecultifyRequests.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <p className="font-medium text-[13px] text-[#171717]">{req.title}</p>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">{req.briefTitle}</span>
+                  </div>
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50/60 border border-orange-100">
+                    <AlertCircle className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-[#525252] leading-relaxed">{req.clientInputMessage}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ═══ READY FOR REVIEW (Client Approval) ═══ */}
+        {(jsr.readyForReview ?? []).length > 0 && (
+          <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
+            <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: bc + "12" }}>
+                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: bc }} />
+              </div>
+              <h2 className="font-semibold text-[15px] text-[#171717]">Ready for Review</h2>
+              <span className="text-[12px] text-[#a3a3a3] ml-1">{jsr.readyForReview.length}</span>
+            </div>
+            <div>
+              {jsr.readyForReview.map((item: any, i: number) => (
+                <button
+                  key={item.deliverableId}
+                  onClick={() => { setReviewSidebarItem(item); setReviewNote(""); setReviewAction(null); }}
+                  className={`flex items-center gap-3 w-full text-left px-6 py-3.5 hover:bg-[#fafafa] transition-colors ${i < jsr.readyForReview.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "12" }}>
+                    <FileDown className="h-4 w-4" style={{ color: bc }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-[13px] text-[#171717] truncate">{item.taskTitle}</p>
+                    <p className="text-[10px] text-[#a3a3a3]">{item.briefTitle}</p>
+                  </div>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
+                    Review
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ═══ TASKS GROUPED BY BRIEF ═══ */}
         {tasksByBrief.length > 0 && (
@@ -595,6 +671,119 @@ export default function JsrPublicPage() {
           <p className="text-[11px] text-[#d4d4d4]">Powered by Ecultify</p>
         </footer>
       </main>
+
+      {/* ═══ CLIENT REVIEW SIDEBAR ═══ */}
+      {reviewSidebarItem && (
+        <>
+          <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setReviewSidebarItem(null)} />
+          <div className="fixed top-0 right-0 h-full w-[520px] max-w-[90vw] bg-white border-l border-[#e5e5e5] shadow-2xl z-50 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e5]">
+              <h3 className="font-semibold text-[16px] text-[#171717]">Review Deliverable</h3>
+              <button onClick={() => setReviewSidebarItem(null)} className="p-1.5 rounded-lg hover:bg-[#f0f0f0] text-[#a3a3a3]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div>
+                <h4 className="font-semibold text-[14px] text-[#171717] mb-1">{reviewSidebarItem.taskTitle}</h4>
+                <p className="text-[12px] text-[#a3a3a3] mb-2">{reviewSidebarItem.briefTitle}</p>
+                {reviewSidebarItem.taskDescription && (
+                  <p className="text-[13px] text-[#525252] leading-relaxed">{reviewSidebarItem.taskDescription}</p>
+                )}
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-4">
+                <h5 className="font-medium text-[13px] text-[#171717] mb-3">Deliverable</h5>
+                {reviewSidebarItem.message && (
+                  <p className="text-[13px] text-[#525252] mb-3 leading-relaxed">{reviewSidebarItem.message}</p>
+                )}
+                {reviewSidebarItem.link && (
+                  <a href={reviewSidebarItem.link} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium underline block mb-3" style={{ color: bc }}>
+                    {reviewSidebarItem.link}
+                  </a>
+                )}
+                {reviewSidebarItem.files && reviewSidebarItem.files.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {reviewSidebarItem.files.map((f: any, idx: number) => (
+                      <a
+                        key={idx}
+                        href={f.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#fafafa] border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] transition-colors"
+                      >
+                        <FileDown className="h-3.5 w-3.5 text-[#a3a3a3]" />
+                        {f.name}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-[#f0f0f0] pt-4">
+                <h5 className="font-medium text-[13px] text-[#171717] mb-3">Your Response</h5>
+                <textarea
+                  value={reviewNote}
+                  onChange={(e) => setReviewNote(e.target.value)}
+                  placeholder="Add a note (required for Request Changes and Deny)..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
+                  style={{ "--tw-ring-color": bc + "30" } as any}
+                />
+              </div>
+            </div>
+            <div className="border-t border-[#e5e5e5] px-6 py-4 flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setReviewSubmitting(true);
+                  try {
+                    await clientApproveMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote || undefined, senderName: msgName || undefined });
+                    setReviewSidebarItem(null);
+                  } catch {}
+                  setReviewSubmitting(false);
+                }}
+                disabled={reviewSubmitting}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-500 text-white text-[13px] font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50"
+              >
+                <ThumbsUp className="h-3.5 w-3.5" /> Approve
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewNote.trim()) { setReviewAction("changes"); return; }
+                  setReviewSubmitting(true);
+                  try {
+                    await clientRequestChangesMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote.trim(), senderName: msgName || undefined });
+                    setReviewSidebarItem(null);
+                  } catch {}
+                  setReviewSubmitting(false);
+                }}
+                disabled={reviewSubmitting}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 text-white text-[13px] font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> Request Changes
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewNote.trim()) { setReviewAction("deny"); return; }
+                  setReviewSubmitting(true);
+                  try {
+                    await clientDenyMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote.trim(), senderName: msgName || undefined });
+                    setReviewSidebarItem(null);
+                  } catch {}
+                  setReviewSubmitting(false);
+                }}
+                disabled={reviewSubmitting}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                <Ban className="h-3.5 w-3.5" /> Deny
+              </button>
+            </div>
+            {(reviewAction === "changes" || reviewAction === "deny") && !reviewNote.trim() && (
+              <div className="px-6 pb-3">
+                <p className="text-[12px] text-red-500 font-medium">Please add a note before {reviewAction === "changes" ? "requesting changes" : "denying"}.</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -297,10 +297,53 @@ export const listManagerDeliverables = query({
           teamLeadReviewerName: teamLeadReviewer?.name ?? teamLeadReviewer?.email ?? null,
           teamName,
           files,
+          taskClientFacing: task?.clientFacing ?? false,
+          clientStatus: d.clientStatus,
         };
       })
     );
-    return results;
+
+    const readyToSend = allDeliverables.filter((d) => {
+      if (d.status !== "approved") return false;
+      const task = tasks.find((t) => t._id === d.taskId);
+      if (!task?.clientFacing) return false;
+      if (d.clientStatus && d.clientStatus !== "client_changes_requested") return false;
+      const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+      return brief?.brandId && myBrandIds.has(brief.brandId);
+    });
+
+    const sendToClientResults = await Promise.all(
+      readyToSend.map(async (d) => {
+        const submitter = users.find((u) => u._id === d.submittedBy);
+        const task = tasks.find((t) => t._id === d.taskId);
+        const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+        const brand = brief?.brandId ? brands.find((b) => b._id === brief.brandId) : null;
+        let files: { name: string; url: string }[] = [];
+        if (d.fileIds && d.fileIds.length > 0) {
+          files = (await Promise.all(
+            d.fileIds.map(async (fileId, idx) => {
+              const url = await ctx.storage.getUrl(fileId);
+              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
+            })
+          )).filter((f) => f.url);
+        }
+        return {
+          ...d,
+          submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          taskTitle: task?.title ?? "Unknown",
+          taskDuration: task?.duration ?? "—",
+          briefTitle: brief?.title ?? "Unknown",
+          briefId: brief?._id,
+          brandName: brand?.name ?? "No Brand",
+          brandId: brief?.brandId,
+          files,
+          taskClientFacing: true as const,
+          _sendToClient: true as const,
+        };
+      })
+    );
+
+    return [...results, ...sendToClientResults];
   },
 });
 
@@ -801,17 +844,21 @@ export const approveDeliverable = mutation({
     });
 
     if (task) {
-      await ctx.db.patch(deliverable.taskId, {
-        status: "done",
-        completedAt: Date.now(),
-      });
+      if (task.clientFacing) {
+        await ctx.db.patch(deliverable.taskId, { status: "review" });
+      } else {
+        await ctx.db.patch(deliverable.taskId, {
+          status: "done",
+          completedAt: Date.now(),
+        });
+      }
     }
 
     await ctx.db.insert("notifications", {
       recipientId: deliverable.submittedBy,
       type: "deliverable_approved",
       title: "Deliverable approved",
-      message: `Your deliverable for "${task?.title ?? "a task"}" was approved`,
+      message: `Your deliverable for "${task?.title ?? "a task"}" was approved${task?.clientFacing ? " (pending client review)" : ""}`,
       briefId: task?.briefId,
       taskId: deliverable.taskId,
       triggeredBy: userId,

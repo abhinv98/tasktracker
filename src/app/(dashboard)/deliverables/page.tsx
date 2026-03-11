@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Card, Badge, Button, ConfirmModal } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
-  Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck
+  Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send
 } from "lucide-react";
 import { FilePreviewModal } from "@/components/ui/FilePreviewModal";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -31,6 +31,7 @@ export default function DeliverablesPage() {
   const mainAssigneeApproveMut = useMutation(api.approvals.mainAssigneeApprove);
   const mainAssigneeRejectMut = useMutation(api.approvals.mainAssigneeReject);
   const passSubTaskToTeamLeadMut = useMutation(api.approvals.passSubTaskToTeamLead);
+  const sendToClientMut = useMutation(api.jsr.sendToClient);
 
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
@@ -719,18 +720,45 @@ export default function DeliverablesPage() {
             <Card key={d._id} className="p-4">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[13px] text-[var(--text-primary)]">
-                    {d.taskTitle}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                      {d.taskTitle}
+                    </p>
+                    {d.taskClientFacing && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-600">Client-facing</span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
                     {d.briefTitle} &middot; {d.brandName} &middot; by{" "}
                     <span className="font-semibold">{d.submitterName}</span> &middot;{" "}
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 shrink-0">
-                  Awaiting Your Approval
-                </span>
+                {d._sendToClient ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 shrink-0">
+                    Ready to Send to Client
+                  </span>
+                ) : d.clientStatus === "client_approved" ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-green-50 text-green-700 shrink-0">
+                    Client Approved
+                  </span>
+                ) : d.clientStatus === "client_changes_requested" ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 shrink-0">
+                    Client Wants Changes
+                  </span>
+                ) : d.clientStatus === "client_denied" ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-red-50 text-red-700 shrink-0">
+                    Client Denied
+                  </span>
+                ) : d.clientStatus === "pending_client" ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
+                    Pending Client Review
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 shrink-0">
+                    Awaiting Your Approval
+                  </span>
+                )}
               </div>
 
               {d.teamLeadReviewerName && (
@@ -754,23 +782,39 @@ export default function DeliverablesPage() {
               {renderFiles(d.files ?? [])}
 
               <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                <button
-                  onClick={() => handleApprove(d._id)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  Approve (Final)
-                </button>
-                {showRejectForm === d._id ? (
-                  renderRejectForm(d._id, handleReject)
-                ) : (
+                {d._sendToClient ? (
                   <button
-                    onClick={() => setShowRejectForm(d._id)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                    onClick={async () => {
+                      try {
+                        await sendToClientMut({ deliverableId: d._id as Id<"deliverables"> });
+                      } catch {}
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                   >
-                    <X className="h-3.5 w-3.5" />
-                    Request Changes
+                    <Send className="h-3.5 w-3.5" />
+                    Send to Client
                   </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleApprove(d._id)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      Approve (Final)
+                    </button>
+                    {showRejectForm === d._id ? (
+                      renderRejectForm(d._id, handleReject)
+                    ) : (
+                      <button
+                        onClick={() => setShowRejectForm(d._id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Request Changes
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </Card>

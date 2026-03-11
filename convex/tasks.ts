@@ -86,6 +86,7 @@ export const createTask = mutation({
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),
     postDate: v.optional(v.string()),
+    clientFacing: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);

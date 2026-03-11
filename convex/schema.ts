@@ -114,6 +114,9 @@ export default defineSchema({
     assignedAt: v.optional(v.number()),
     parentTaskId: v.optional(v.id("tasks")),
     referenceLinks: v.optional(v.array(v.string())),
+    clientFacing: v.optional(v.boolean()),
+    needsClientInput: v.optional(v.boolean()),
+    clientInputMessage: v.optional(v.string()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -151,6 +154,11 @@ export default defineSchema({
     mainAssigneeReviewedBy: v.optional(v.id("users")),
     mainAssigneeReviewNote: v.optional(v.string()),
     mainAssigneeReviewedAt: v.optional(v.number()),
+    clientStatus: v.optional(v.union(v.literal("pending_client"), v.literal("client_approved"), v.literal("client_changes_requested"), v.literal("client_denied"))),
+    clientNote: v.optional(v.string()),
+    clientReviewedAt: v.optional(v.number()),
+    sentToClientAt: v.optional(v.number()),
+    sentToClientBy: v.optional(v.id("users")),
   })
     .index("by_task", ["taskId"])
     .index("by_submittedBy", ["submittedBy"]),
@@ -236,7 +244,11 @@ export default defineSchema({
       v.literal("deliverable_approved"),
       v.literal("deliverable_rejected"),
       v.literal("direct_message"),
-      v.literal("jsr_task_added")
+      v.literal("jsr_task_added"),
+      v.literal("client_approved"),
+      v.literal("client_changes_requested"),
+      v.literal("client_denied"),
+      v.literal("client_input_requested")
     ),
     title: v.string(),
     message: v.string(),

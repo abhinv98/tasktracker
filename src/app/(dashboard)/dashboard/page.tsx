@@ -176,6 +176,7 @@ export default function DashboardPage() {
     const teamLeadOverview = useQuery(api.teams.getTeamLeadBriefOverview);
     const pendingApprovalCount = useQuery(api.approvals.getTeamLeadPendingCount);
     const myBrandIds = useQuery(api.brands.getMyManagedBrandIds);
+    const clientApprovalCounts = useQuery(api.jsr.getClientApprovalCounts);
     const employeeCount = (allUsers ?? []).filter(
       (u) => u.role === "employee"
     ).length;
@@ -278,6 +279,39 @@ export default function DashboardPage() {
             <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
           </div>
         </Card>
+
+        {/* Client Approval Status */}
+        {clientApprovalCounts && (clientApprovalCounts.approved > 0 || clientApprovalCounts.pendingClient > 0 || clientApprovalCounts.changesRequested > 0 || clientApprovalCounts.denied > 0) && (
+          <div className="mb-6 sm:mb-8">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Client Approvals</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {clientApprovalCounts.pendingClient > 0 && (
+                <Card>
+                  <p className="text-[11px] font-medium text-[var(--text-secondary)]">Pending Client</p>
+                  <p className="font-bold text-[24px] text-purple-600 mt-1 tabular-nums">{clientApprovalCounts.pendingClient}</p>
+                </Card>
+              )}
+              {clientApprovalCounts.approved > 0 && (
+                <Card accent="employee">
+                  <p className="text-[11px] font-medium text-[var(--text-secondary)]">Client Approved</p>
+                  <p className="font-bold text-[24px] text-emerald-600 mt-1 tabular-nums">{clientApprovalCounts.approved}</p>
+                </Card>
+              )}
+              {clientApprovalCounts.changesRequested > 0 && (
+                <Card accent="manager">
+                  <p className="text-[11px] font-medium text-[var(--text-secondary)]">Changes Requested</p>
+                  <p className="font-bold text-[24px] text-amber-600 mt-1 tabular-nums">{clientApprovalCounts.changesRequested}</p>
+                </Card>
+              )}
+              {clientApprovalCounts.denied > 0 && (
+                <Card>
+                  <p className="text-[11px] font-medium text-[var(--text-secondary)]">Client Denied</p>
+                  <p className="font-bold text-[24px] text-red-600 mt-1 tabular-nums">{clientApprovalCounts.denied}</p>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* My Tasks (for admins who have tasks assigned) */}
         {adminActiveTasks.length > 0 && (

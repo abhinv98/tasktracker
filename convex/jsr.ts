@@ -64,6 +64,32 @@ export const deactivateJsrLink = mutation({
 
     await ctx.db.patch(jsrLinkId, { isActive: false });
 
+    const jsrMessages = await ctx.db
+      .query("jsrMessages")
+      .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLinkId))
+      .collect();
+    for (const msg of jsrMessages) {
+      await ctx.db.delete(msg._id);
+    }
+
+    const jsrLink = await ctx.db.get(jsrLinkId);
+    if (jsrLink) {
+      const otherActiveLinks = await ctx.db
+        .query("jsrLinks")
+        .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
+        .filter((q) => q.and(q.eq(q.field("isActive"), true), q.neq(q.field("_id"), jsrLinkId)))
+        .collect();
+      if (otherActiveLinks.length === 0) {
+        const jsrRemarks = await ctx.db
+          .query("jsrRemarks")
+          .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
+          .collect();
+        for (const remark of jsrRemarks) {
+          await ctx.db.delete(remark._id);
+        }
+      }
+    }
+
     if (deleteTasks) {
       const clientTasks = await ctx.db
         .query("jsrClientTasks")
@@ -263,6 +289,51 @@ export const getJsrByToken = query({
         createdAt: m.createdAt,
       }));
 
+    // Ecultify Requests: tasks flagged as needing client input
+    const ecultifyRequests = internalTasks
+      .filter((t) => t.clientFacing && t.needsClientInput)
+      .map((t) => {
+        const brief = brandBriefs.find((b) => b._id === t.briefId);
+        return {
+          _id: t._id,
+          title: t.title,
+          briefTitle: brief?.title ?? "",
+          clientInputMessage: t.clientInputMessage ?? "",
+          status: t.status,
+        };
+      });
+
+    // Ready for Review: deliverables with clientStatus === "pending_client"
+    const readyForReview = await Promise.all(
+      allDeliverables
+        .filter((d) => d.clientStatus === "pending_client")
+        .filter((d) => internalTasks.some((t) => t._id === d.taskId))
+        .map(async (d) => {
+          const task = internalTasks.find((t) => t._id === d.taskId);
+          const brief = task ? brandBriefs.find((b) => b._id === task.briefId) : null;
+          let files: { name: string; url: string }[] = [];
+          if (d.fileIds && d.fileIds.length > 0) {
+            files = (await Promise.all(
+              d.fileIds.map(async (fileId, idx) => {
+                const url = await ctx.storage.getUrl(fileId);
+                return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
+              })
+            )).filter((f) => f.url);
+          }
+          return {
+            deliverableId: d._id,
+            taskId: task?._id ?? "",
+            taskTitle: task?.title ?? "",
+            taskDescription: task?.description ?? "",
+            briefTitle: brief?.title ?? "",
+            message: d.message,
+            link: d.link,
+            files,
+            sentToClientAt: d.sentToClientAt,
+          };
+        })
+    );
+
     return {
       brand: {
         name: brand.name,
@@ -278,6 +349,8 @@ export const getJsrByToken = query({
       lastUpdated,
       overallDeadline,
       messages: sortedMessages,
+      ecultifyRequests,
+      readyForReview,
     };
   },
 });
@@ -704,6 +777,313 @@ export const addManagerRemark = mutation({
       content,
       createdAt: Date.now(),
     });
+  },
+});
+
+// ─── CLIENT COLLABORATION MUTATIONS ──────────────
+
+export const markNeedsClientInput = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    message: v.string(),
+  },
+  handler: async (ctx, { taskId, message }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    await ctx.db.patch(taskId, {
+      needsClientInput: true,
+      clientInputMessage: message,
+    });
+  },
+});
+
+export const clearClientInputFlag = mutation({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    await ctx.db.patch(taskId, {
+      needsClientInput: false,
+      clientInputMessage: undefined,
+    });
+  },
+});
+
+export const sendToClient = mutation({
+  args: { deliverableId: v.id("deliverables") },
+  handler: async (ctx, { deliverableId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+    if (deliverable.status !== "approved") throw new Error("Deliverable must be internally approved first");
+
+    const task = await ctx.db.get(deliverable.taskId);
+    if (!task || !task.clientFacing) throw new Error("Task is not client-facing");
+
+    await ctx.db.patch(deliverableId, {
+      clientStatus: "pending_client",
+      sentToClientAt: Date.now(),
+      sentToClientBy: userId,
+    });
+  },
+});
+
+export const clientApproveDeliverable = mutation({
+  args: {
+    token: v.string(),
+    deliverableId: v.id("deliverables"),
+    note: v.optional(v.string()),
+    senderName: v.optional(v.string()),
+  },
+  handler: async (ctx, { token, deliverableId, note, senderName }) => {
+    const jsrLinks = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .collect();
+    const jsrLink = jsrLinks[0];
+    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable || deliverable.clientStatus !== "pending_client")
+      throw new Error("Deliverable not pending client review");
+
+    await ctx.db.patch(deliverableId, {
+      clientStatus: "client_approved",
+      clientNote: note ?? (senderName ? `Approved by ${senderName}` : "Approved by client"),
+      clientReviewedAt: Date.now(),
+    });
+
+    const task = await ctx.db.get(deliverable.taskId);
+    if (task) {
+      await ctx.db.patch(task._id, { status: "done", completedAt: Date.now() });
+
+      const brief = await ctx.db.get(task.briefId);
+      const brandManagers = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
+        .collect();
+      for (const bm of brandManagers) {
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "client_approved",
+          title: "Client approved deliverable",
+          message: `Client approved "${task.title}"${senderName ? ` (by ${senderName})` : ""}`,
+          briefId: task.briefId,
+          taskId: task._id,
+          triggeredBy: bm.managerId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+    }
+  },
+});
+
+export const clientRequestChanges = mutation({
+  args: {
+    token: v.string(),
+    deliverableId: v.id("deliverables"),
+    note: v.string(),
+    senderName: v.optional(v.string()),
+  },
+  handler: async (ctx, { token, deliverableId, note, senderName }) => {
+    const jsrLinks = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .collect();
+    const jsrLink = jsrLinks[0];
+    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable || deliverable.clientStatus !== "pending_client")
+      throw new Error("Deliverable not pending client review");
+
+    await ctx.db.patch(deliverableId, {
+      clientStatus: "client_changes_requested",
+      clientNote: note,
+      clientReviewedAt: Date.now(),
+      status: "pending",
+      teamLeadStatus: undefined,
+      teamLeadReviewedBy: undefined,
+      teamLeadReviewNote: undefined,
+      teamLeadReviewedAt: undefined,
+      passedToManagerBy: undefined,
+      passedToManagerAt: undefined,
+      reviewedBy: undefined,
+      reviewNote: undefined,
+      reviewedAt: undefined,
+      sentToClientAt: undefined,
+      sentToClientBy: undefined,
+    });
+
+    const task = await ctx.db.get(deliverable.taskId);
+    if (task) {
+      await ctx.db.patch(task._id, { status: "in-progress" });
+
+      const brandManagers = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
+        .collect();
+      for (const bm of brandManagers) {
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "client_changes_requested",
+          title: "Client requested changes",
+          message: `Client requested changes on "${task.title}": ${note}`,
+          briefId: task.briefId,
+          taskId: task._id,
+          triggeredBy: bm.managerId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "client_changes_requested",
+        title: "Client requested changes",
+        message: `Client requested changes on "${task.title}": ${note}`,
+        briefId: task.briefId,
+        taskId: task._id,
+        triggeredBy: task.assigneeId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+  },
+});
+
+export const clientDenyDeliverable = mutation({
+  args: {
+    token: v.string(),
+    deliverableId: v.id("deliverables"),
+    note: v.string(),
+    senderName: v.optional(v.string()),
+  },
+  handler: async (ctx, { token, deliverableId, note, senderName }) => {
+    const jsrLinks = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .collect();
+    const jsrLink = jsrLinks[0];
+    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable || deliverable.clientStatus !== "pending_client")
+      throw new Error("Deliverable not pending client review");
+
+    await ctx.db.patch(deliverableId, {
+      clientStatus: "client_denied",
+      clientNote: note,
+      clientReviewedAt: Date.now(),
+    });
+
+    const task = await ctx.db.get(deliverable.taskId);
+    if (task) {
+      const brandManagers = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
+        .collect();
+      for (const bm of brandManagers) {
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "client_denied",
+          title: "Client denied deliverable",
+          message: `Client denied "${task.title}": ${note}`,
+          briefId: task.briefId,
+          taskId: task._id,
+          triggeredBy: bm.managerId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+    }
+  },
+});
+
+// ─── QUERIES FOR BRAND PAGE CLIENT TASK MANAGEMENT ──
+
+export const listBrandTasksForClient = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const brandBriefs = briefs.filter((b) => b.brandId === brandId && b.status !== "archived");
+    const briefIds = new Set(brandBriefs.map((b) => b._id));
+
+    const allTasks = await ctx.db.query("tasks").collect();
+    const brandTasks = allTasks.filter((t) => briefIds.has(t.briefId) && !t.parentTaskId);
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+
+    return brandTasks.map((t) => {
+      const brief = brandBriefs.find((b) => b._id === t.briefId);
+      const latestDeliverable = allDeliverables
+        .filter((d) => d.taskId === t._id)
+        .sort((a, b) => b.submittedAt - a.submittedAt)[0];
+      return {
+        _id: t._id,
+        title: t.title,
+        status: t.status,
+        clientFacing: t.clientFacing ?? false,
+        needsClientInput: t.needsClientInput ?? false,
+        clientInputMessage: t.clientInputMessage,
+        briefTitle: brief?.title ?? "",
+        deliverableId: latestDeliverable?._id,
+        deliverableStatus: latestDeliverable?.status,
+        clientStatus: latestDeliverable?.clientStatus,
+      };
+    });
+  },
+});
+
+export const getClientApprovalCounts = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { approved: 0, pendingClient: 0, changesRequested: 0, denied: 0 };
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return { approved: 0, pendingClient: 0, changesRequested: 0, denied: 0 };
+
+    const myBrandAssignments = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_manager", (q) => q.eq("managerId", userId))
+      .collect();
+    if (myBrandAssignments.length === 0) return { approved: 0, pendingClient: 0, changesRequested: 0, denied: 0 };
+
+    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+    const briefs = await ctx.db.query("briefs").collect();
+    const brandBriefs = briefs.filter((b) => b.brandId && myBrandIds.has(b.brandId));
+    const briefIds = new Set(brandBriefs.map((b) => b._id));
+
+    const allTasks = await ctx.db.query("tasks").collect();
+    const brandTasks = allTasks.filter((t) => briefIds.has(t.briefId) && t.clientFacing);
+    const taskIds = new Set(brandTasks.map((t) => t._id));
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const clientDeliverables = allDeliverables.filter((d) => taskIds.has(d.taskId) && d.clientStatus);
+
+    return {
+      approved: clientDeliverables.filter((d) => d.clientStatus === "client_approved").length,
+      pendingClient: clientDeliverables.filter((d) => d.clientStatus === "pending_client").length,
+      changesRequested: clientDeliverables.filter((d) => d.clientStatus === "client_changes_requested").length,
+      denied: clientDeliverables.filter((d) => d.clientStatus === "client_denied").length,
+    };
   },
 });
 

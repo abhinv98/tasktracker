@@ -60,6 +60,8 @@ export default function BriefsPage() {
   const [briefType, setBriefType] = useState<string>("");
   const [briefMode, setBriefMode] = useState<"master" | "single">("master");
 
+  const [clientFacing, setClientFacing] = useState(false);
+
   // Single task brief fields
   const [stAssignee, setStAssignee] = useState("");
   const [stTeamId, setStTeamId] = useState("");
@@ -180,6 +182,7 @@ export default function BriefsPage() {
           taskAssigneeId: stAssignee as Id<"users">,
           taskDuration,
           taskDurationMinutes,
+          taskClientFacing: clientFacing || undefined,
         } : {}),
       });
       setShowModal(false);
@@ -190,6 +193,7 @@ export default function BriefsPage() {
       setDeadline(undefined);
       setBriefType("");
       setBriefMode("master");
+      setClientFacing(false);
       setStAssignee("");
       setStTeamId("");
       setStDurVal("2");
@@ -642,6 +646,18 @@ export default function BriefsPage() {
                   )}
                 </div>
               )}
+              <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
+                <input
+                  type="checkbox"
+                  checked={clientFacing}
+                  onChange={(e) => setClientFacing(e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent-admin)]"
+                />
+                <div>
+                  <span className="font-medium text-[13px] text-[var(--text-primary)]">Client Review Required</span>
+                  <p className="text-[11px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
+                </div>
+              </label>
               <div className="flex gap-2">
                 <Button type="submit" variant="primary">Create</Button>
                 <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>

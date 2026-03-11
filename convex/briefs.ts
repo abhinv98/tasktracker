@@ -115,6 +115,7 @@ export const createBrief = mutation({
     taskAssigneeId: v.optional(v.id("users")),
     taskDuration: v.optional(v.string()),
     taskDurationMinutes: v.optional(v.number()),
+    taskClientFacing: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -136,7 +137,7 @@ export const createBrief = mutation({
       if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
     }
 
-    const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, ...briefArgs } = args;
+    const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, taskClientFacing, ...briefArgs } = args;
 
     const briefId = await ctx.db.insert("briefs", {
       ...briefArgs,
@@ -167,6 +168,7 @@ export const createBrief = mutation({
         durationMinutes: taskDurationMinutes,
         ...(args.deadline ? { deadline: args.deadline } : {}),
         assignedAt: Date.now(),
+        ...(taskClientFacing ? { clientFacing: true } : {}),
       });
 
       await ctx.db.insert("notifications", {

@@ -253,6 +253,7 @@ export default function BriefPage() {
   const [taskDurationValue, setTaskDurationValue] = useState("2");
   const [taskDurationUnit, setTaskDurationUnit] = useState<"m" | "h" | "d">("h");
   const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
+  const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -303,6 +304,7 @@ export default function BriefPage() {
         duration: taskDuration,
         durationMinutes,
         ...(taskDeadline !== undefined ? { deadline: taskDeadline } : {}),
+        ...(taskClientFacing ? { clientFacing: true } : {}),
       });
       setTaskTitle("");
       setTaskDesc("");
@@ -311,6 +313,7 @@ export default function BriefPage() {
       setTaskDurationValue("2");
       setTaskDurationUnit("h");
       setTaskDeadline(undefined);
+      setTaskClientFacing(false);
       toast("success", "Task created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create task");
@@ -601,6 +604,15 @@ export default function BriefPage() {
                     placeholder="Set date"
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
+                  <input
+                    type="checkbox"
+                    checked={taskClientFacing}
+                    onChange={(e) => setTaskClientFacing(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-[var(--border)] accent-[var(--accent-admin)]"
+                  />
+                  <span className="text-[11px] font-medium text-[var(--text-secondary)]">Client-facing task</span>
+                </label>
                 <Button type="submit" variant="primary" className="mt-2">
                   Assign Task
                 </Button>
