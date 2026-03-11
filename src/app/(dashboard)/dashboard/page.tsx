@@ -1,12 +1,12 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, TaskDetailModal, useToast } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, Plus } from "lucide-react";
+import { Badge, Button, Card, TaskDetailModal } from "@/components/ui";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -663,54 +663,9 @@ export default function DashboardPage() {
   // EMPLOYEE DASHBOARD
   // ═══════════════════════════════════════════
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const employeeBriefs = useQuery(api.briefs.listBriefsForEmployee);
-  const adminsList = (allUsers ?? []).filter((u: any) => u.role === "admin");
-  const createEmployeeTask = useMutation(api.tasks.createEmployeeTask);
-  const { toast: empToast } = useToast();
-  const [showEmpTaskForm, setShowEmpTaskForm] = useState(false);
-  const [empTaskBrief, setEmpTaskBrief] = useState("");
-  const [empTaskTitle, setEmpTaskTitle] = useState("");
-  const [empTaskDesc, setEmpTaskDesc] = useState("");
-  const [empTaskAssignor, setEmpTaskAssignor] = useState("");
-  const [empTaskDurVal, setEmpTaskDurVal] = useState("2");
-  const [empTaskDurUnit, setEmpTaskDurUnit] = useState<"m" | "h" | "d">("h");
-  const [empTaskDeadline, setEmpTaskDeadline] = useState<number | undefined>(undefined);
-  const [isCreatingEmpTask, setIsCreatingEmpTask] = useState(false);
 
-  function parseDurationEmp(v: number, u: string): number {
-    if (u === "m") return v;
-    if (u === "h") return v * 60;
-    if (u === "d") return v * 60 * 8;
-    return 0;
-  }
-
-  async function handleCreateEmpTask(e: React.FormEvent) {
-    e.preventDefault();
-    setIsCreatingEmpTask(true);
-    try {
-      const numVal = parseInt(empTaskDurVal, 10);
-      await createEmployeeTask({
-        briefId: empTaskBrief as Id<"briefs">,
-        title: empTaskTitle,
-        description: empTaskDesc || undefined,
-        assignorId: empTaskAssignor as Id<"users">,
-        duration: `${numVal}${empTaskDurUnit}`,
-        durationMinutes: parseDurationEmp(numVal, empTaskDurUnit),
-        ...(empTaskDeadline ? { deadline: empTaskDeadline } : {}),
-      });
-      empToast("success", "Task added!");
-      setShowEmpTaskForm(false);
-      setEmpTaskTitle("");
-      setEmpTaskDesc("");
-      setEmpTaskBrief("");
-      setEmpTaskAssignor("");
-      setEmpTaskDurVal("2");
-      setEmpTaskDurUnit("h");
-      setEmpTaskDeadline(undefined);
-    } catch (err: any) {
-      empToast("error", err.message ?? "Failed to add task");
-    } finally { setIsCreatingEmpTask(false); }
-  }
+  // Employee self-created tasks — commented out for now, will re-enable later
+  // Employee self-created tasks — disabled for now, backend remains in convex/tasks.ts (createEmployeeTask)
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -728,103 +683,6 @@ export default function DashboardPage() {
         <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
           Here are your active tasks &mdash; click a task for details
         </p>
-      </div>
-
-      {/* Add Task button + form */}
-      <div className="mb-4">
-        <button
-          onClick={() => setShowEmpTaskForm(!showEmpTaskForm)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-admin)] text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {showEmpTaskForm ? "Cancel" : "Add Task"}
-        </button>
-        {showEmpTaskForm && (
-          <Card className="mt-3">
-            <form onSubmit={handleCreateEmpTask} className="flex flex-col gap-3">
-              <div>
-                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Brief</label>
-                <select
-                  value={empTaskBrief}
-                  onChange={(e) => setEmpTaskBrief(e.target.value)}
-                  required
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                >
-                  <option value="">Select brief...</option>
-                  {(employeeBriefs ?? []).map((b: any) => (
-                    <option key={b._id} value={b._id}>{b.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Task Title</label>
-                <input
-                  type="text"
-                  value={empTaskTitle}
-                  onChange={(e) => setEmpTaskTitle(e.target.value)}
-                  placeholder="What did you work on?"
-                  required
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Description (optional)</label>
-                <textarea
-                  value={empTaskDesc}
-                  onChange={(e) => setEmpTaskDesc(e.target.value)}
-                  placeholder="Details..."
-                  rows={2}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Assignor (Admin)</label>
-                <select
-                  value={empTaskAssignor}
-                  onChange={(e) => setEmpTaskAssignor(e.target.value)}
-                  required
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                >
-                  <option value="">Select admin...</option>
-                  {adminsList.map((a: any) => (
-                    <option key={a._id} value={a._id}>{a.name ?? a.email}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Duration</label>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="number"
-                      min="1"
-                      value={empTaskDurVal}
-                      onChange={(e) => setEmpTaskDurVal(e.target.value)}
-                      required
-                      className="w-16 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    />
-                    <select
-                      value={empTaskDurUnit}
-                      onChange={(e) => setEmpTaskDurUnit(e.target.value as "m" | "h" | "d")}
-                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="m">Min</option>
-                      <option value="h">Hours</option>
-                      <option value="d">Days</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={isCreatingEmpTask || !empTaskBrief || !empTaskTitle || !empTaskAssignor}
-                className="self-start px-4 py-1.5 bg-[var(--accent-admin)] text-white rounded-lg text-[12px] font-semibold disabled:opacity-50"
-              >
-                {isCreatingEmpTask ? "Creating..." : "Create Task"}
-              </button>
-            </form>
-          </Card>
-        )}
       </div>
 
       <div className="flex flex-col gap-3">
