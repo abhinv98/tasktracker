@@ -89,6 +89,19 @@ export const listDeliverables = query({
           }
         }
 
+        const isSubTask = !!task?.parentTaskId;
+        let parentTaskTitle: string | null = null;
+        let mainAssigneeName: string | null = null;
+        const mainAssigneeReviewer = d.mainAssigneeReviewedBy
+          ? users.find((u) => u._id === d.mainAssigneeReviewedBy)
+          : null;
+        if (isSubTask && task?.parentTaskId) {
+          const parentTask = tasks.find((t) => t._id === task.parentTaskId);
+          parentTaskTitle = parentTask?.title ?? null;
+          const ma = parentTask ? users.find((u) => u._id === parentTask.assigneeId) : null;
+          mainAssigneeName = ma?.name ?? ma?.email ?? null;
+        }
+
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -101,6 +114,10 @@ export const listDeliverables = query({
           files,
           teamLeadReviewerName: teamLeadName,
           teamName,
+          isSubTask,
+          parentTaskTitle,
+          mainAssigneeName,
+          mainAssigneeReviewerName: mainAssigneeReviewer?.name ?? mainAssigneeReviewer?.email ?? null,
         };
       })
     );
@@ -144,7 +161,6 @@ export const listTeamLeadPendingApprovals = query({
         const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
         const brand = brief?.brandId ? brands.find((b) => b._id === brief.brandId) : null;
 
-        // Find brand managers for "pass to" display
         const brandManagerEntries = brief?.brandId
           ? await ctx.db
               .query("brandManagers")
@@ -169,6 +185,19 @@ export const listTeamLeadPendingApprovals = query({
           files = files.filter((f) => f.url);
         }
 
+        const isSubTask = !!task?.parentTaskId;
+        let mainAssigneeName: string | null = null;
+        let parentTaskTitle: string | null = null;
+        if (isSubTask && task?.parentTaskId) {
+          const parentTask = tasks.find((t) => t._id === task.parentTaskId);
+          parentTaskTitle = parentTask?.title ?? null;
+          const mainAssignee = parentTask ? users.find((u) => u._id === parentTask.assigneeId) : null;
+          mainAssigneeName = mainAssignee?.name ?? mainAssignee?.email ?? null;
+        }
+        const mainAssigneeReviewer = d.mainAssigneeReviewedBy
+          ? users.find((u) => u._id === d.mainAssigneeReviewedBy)
+          : null;
+
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -180,6 +209,11 @@ export const listTeamLeadPendingApprovals = query({
           brandId: brief?.brandId,
           brandManagers,
           files,
+          isSubTask,
+          parentTaskTitle,
+          mainAssigneeName,
+          mainAssigneeApproved: d.mainAssigneeStatus === "approved",
+          mainAssigneeReviewerName: mainAssigneeReviewer?.name ?? mainAssigneeReviewer?.email ?? null,
         };
       })
     );
@@ -311,6 +345,12 @@ export const submitDeliverable = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
 
+    const isSubTask = !!task.parentTaskId;
+    let parentTask: any = null;
+    if (isSubTask) {
+      parentTask = await ctx.db.get(task.parentTaskId!);
+    }
+
     const deliverableId = await ctx.db.insert("deliverables", {
       taskId,
       submittedBy: userId,
@@ -318,41 +358,57 @@ export const submitDeliverable = mutation({
       link,
       submittedAt: Date.now(),
       status: "pending",
-      teamLeadStatus: "pending",
+      ...(isSubTask
+        ? { mainAssigneeStatus: "pending" as const }
+        : { teamLeadStatus: "pending" as const }),
       ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
       ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
     });
 
     const user = await ctx.db.get(userId);
-    const teamInfo = await findTeamLeadForUser(ctx, userId);
 
-    if (teamInfo?.leadId) {
+    if (isSubTask && parentTask) {
       await ctx.db.insert("notifications", {
-        recipientId: teamInfo.leadId,
+        recipientId: parentTask.assigneeId,
         type: "deliverable_submitted",
-        title: "Deliverable submitted for review",
-        message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
+        title: "Helper deliverable for review",
+        message: `${user?.name ?? "Someone"} submitted a deliverable for their sub-task on "${parentTask.title}"`,
         briefId: task.briefId,
         taskId,
         triggeredBy: userId,
         read: false,
         createdAt: Date.now(),
       });
-    }
+    } else {
+      const teamInfo = await findTeamLeadForUser(ctx, userId);
 
-    // Also notify the assigner
-    if (task.assignedBy !== teamInfo?.leadId) {
-      await ctx.db.insert("notifications", {
-        recipientId: task.assignedBy,
-        type: "deliverable_submitted",
-        title: "Deliverable submitted",
-        message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
-        briefId: task.briefId,
-        taskId,
-        triggeredBy: userId,
-        read: false,
-        createdAt: Date.now(),
-      });
+      if (teamInfo?.leadId) {
+        await ctx.db.insert("notifications", {
+          recipientId: teamInfo.leadId,
+          type: "deliverable_submitted",
+          title: "Deliverable submitted for review",
+          message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
+          briefId: task.briefId,
+          taskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+
+      if (task.assignedBy !== teamInfo?.leadId) {
+        await ctx.db.insert("notifications", {
+          recipientId: task.assignedBy,
+          type: "deliverable_submitted",
+          title: "Deliverable submitted",
+          message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
+          briefId: task.briefId,
+          taskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
     }
 
     return deliverableId;
@@ -491,6 +547,221 @@ export const passToManager = mutation({
           createdAt: Date.now(),
         });
       }
+    }
+  },
+});
+
+// ─── Sub-task: main assignee review queries & mutations ─────
+
+export const listMainAssigneePendingReviews = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const myTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+      .collect();
+    const myTaskIds = new Set(myTasks.map((t) => t._id));
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const subTaskDeliverables = allDeliverables.filter((d) => {
+      if (d.mainAssigneeStatus !== "pending") return false;
+      return true;
+    });
+
+    const tasks = await ctx.db.query("tasks").collect();
+    const users = await ctx.db.query("users").collect();
+    const briefs = await ctx.db.query("briefs").collect();
+
+    const results = await Promise.all(
+      subTaskDeliverables.map(async (d) => {
+        const subTask = tasks.find((t) => t._id === d.taskId);
+        if (!subTask?.parentTaskId || !myTaskIds.has(subTask.parentTaskId)) return null;
+
+        const parentTask = tasks.find((t) => t._id === subTask.parentTaskId);
+        const submitter = users.find((u) => u._id === d.submittedBy);
+        const brief = subTask ? briefs.find((b) => b._id === subTask.briefId) : null;
+
+        let files: { name: string; url: string }[] = [];
+        if (d.fileIds && d.fileIds.length > 0) {
+          files = await Promise.all(
+            d.fileIds.map(async (fileId, idx) => {
+              const url = await ctx.storage.getUrl(fileId);
+              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
+            })
+          );
+          files = files.filter((f) => f.url);
+        }
+
+        return {
+          ...d,
+          submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          subTaskTitle: subTask?.title ?? "Unknown",
+          subTaskDescription: subTask?.description ?? "",
+          parentTaskTitle: parentTask?.title ?? "Unknown",
+          parentTaskId: subTask?.parentTaskId,
+          briefTitle: brief?.title ?? "Unknown",
+          briefId: brief?._id,
+          files,
+        };
+      })
+    );
+    return results.filter(Boolean);
+  },
+});
+
+export const getMainAssigneePendingCount = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+
+    const myTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+      .collect();
+    const myTaskIds = new Set(myTasks.map((t) => t._id));
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+
+    return allDeliverables.filter((d) => {
+      if (d.mainAssigneeStatus !== "pending") return false;
+      const subTask = tasks.find((t) => t._id === d.taskId);
+      return subTask?.parentTaskId && myTaskIds.has(subTask.parentTaskId);
+    }).length;
+  },
+});
+
+export const mainAssigneeApprove = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { deliverableId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    const subTask = await ctx.db.get(deliverable.taskId);
+    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+
+    const parentTask = await ctx.db.get(subTask.parentTaskId);
+    if (!parentTask || parentTask.assigneeId !== userId) {
+      throw new Error("Only the main task assignee can review this");
+    }
+
+    await ctx.db.patch(deliverableId, {
+      mainAssigneeStatus: "approved",
+      mainAssigneeReviewedBy: userId,
+      mainAssigneeReviewNote: note,
+      mainAssigneeReviewedAt: Date.now(),
+    });
+
+    const user = await ctx.db.get(userId);
+    await ctx.db.insert("notifications", {
+      recipientId: deliverable.submittedBy,
+      type: "deliverable_approved",
+      title: "Deliverable approved by main assignee",
+      message: `${user?.name ?? "Main assignee"} approved your deliverable for "${subTask.title}"`,
+      briefId: subTask.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const mainAssigneeReject = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    note: v.string(),
+  },
+  handler: async (ctx, { deliverableId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    const subTask = await ctx.db.get(deliverable.taskId);
+    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+
+    const parentTask = await ctx.db.get(subTask.parentTaskId);
+    if (!parentTask || parentTask.assigneeId !== userId) {
+      throw new Error("Only the main task assignee can review this");
+    }
+
+    await ctx.db.patch(deliverableId, {
+      mainAssigneeStatus: "changes_requested",
+      mainAssigneeReviewedBy: userId,
+      mainAssigneeReviewNote: note,
+      mainAssigneeReviewedAt: Date.now(),
+    });
+
+    if (subTask.status === "review") {
+      await ctx.db.patch(deliverable.taskId, { status: "in-progress" });
+    }
+
+    const user = await ctx.db.get(userId);
+    await ctx.db.insert("notifications", {
+      recipientId: deliverable.submittedBy,
+      type: "deliverable_rejected",
+      title: "Changes requested by main assignee",
+      message: `${user?.name ?? "Main assignee"} requested changes on your deliverable for "${subTask.title}": ${note}`,
+      briefId: subTask.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const passSubTaskToTeamLead = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+  },
+  handler: async (ctx, { deliverableId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.mainAssigneeStatus !== "approved") {
+      throw new Error("Deliverable must be approved by main assignee first");
+    }
+
+    const subTask = await ctx.db.get(deliverable.taskId);
+    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+
+    const parentTask = await ctx.db.get(subTask.parentTaskId);
+    if (!parentTask || parentTask.assigneeId !== userId) {
+      throw new Error("Only the main task assignee can pass this to the team lead");
+    }
+
+    await ctx.db.patch(deliverableId, {
+      teamLeadStatus: "pending",
+    });
+
+    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
+    if (teamInfo?.leadId) {
+      const user = await ctx.db.get(userId);
+      await ctx.db.insert("notifications", {
+        recipientId: teamInfo.leadId,
+        type: "deliverable_submitted",
+        title: "Sub-task deliverable for review",
+        message: `${user?.name ?? "Main assignee"} passed a helper deliverable for "${subTask.title}" on "${parentTask.title}" for your review`,
+        briefId: subTask.briefId,
+        taskId: deliverable.taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
     }
   },
 });

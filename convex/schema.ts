@@ -144,6 +144,11 @@ export default defineSchema({
     teamLeadReviewedAt: v.optional(v.number()),
     passedToManagerBy: v.optional(v.id("users")),
     passedToManagerAt: v.optional(v.number()),
+    // Sub-task deliverable review by main (parent) task assignee
+    mainAssigneeStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("changes_requested"))),
+    mainAssigneeReviewedBy: v.optional(v.id("users")),
+    mainAssigneeReviewNote: v.optional(v.string()),
+    mainAssigneeReviewedAt: v.optional(v.number()),
   })
     .index("by_task", ["taskId"])
     .index("by_submittedBy", ["submittedBy"]),
