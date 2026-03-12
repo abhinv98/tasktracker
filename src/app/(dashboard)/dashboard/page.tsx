@@ -327,17 +327,23 @@ export default function DashboardPage() {
           <div className="mb-6 sm:mb-8">
             <h2 className="font-semibold text-[15px] text-red-700 mb-3 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
-              Overdue Tasks ({overdueTasksForManager!.length})
+              Overdue Alerts ({overdueTasksForManager!.length})
             </h2>
             <div className="space-y-3">
               {overdueTasksForManager!.map((ot: any) => (
-                <Card key={ot._id} className="p-4 border-l-4 border-l-red-500">
+                <Card key={ot._id} className={`p-4 border-l-4 ${ot.alertType === "unassigned" ? "border-l-amber-500" : "border-l-red-500"}`}>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[13px] text-[var(--text-primary)]">{ot.title}</p>
-                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                        {ot.briefTitle} &middot; Assigned to <span className="font-semibold">{ot.assigneeName}</span>
-                      </p>
+                      {ot.alertType === "unassigned" ? (
+                        <p className="text-[11px] text-amber-700 mt-0.5 font-medium">
+                          This brief has passed its deadline but no tasks have been assigned. Please assign someone to this brief quickly.
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                          {ot.briefTitle} &middot; Assigned to <span className="font-semibold">{ot.assigneeName}</span>
+                        </p>
+                      )}
                       <p className="text-[11px] text-red-600 mt-0.5">
                         <Clock className="inline h-3 w-3 mr-0.5" />
                         Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
@@ -351,6 +357,16 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                    {ot.alertType === "unassigned" ? (
+                      <button
+                        onClick={() => router.push(`/brief/${ot.briefId}`)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+                      >
+                        <ArrowRight className="h-3 w-3" />
+                        Assign Tasks
+                      </button>
+                    ) : (
+                      <>
                     <button
                       onClick={async () => {
                         await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
@@ -405,6 +421,8 @@ export default function DashboardPage() {
                         <CalendarClock className="h-3 w-3" />
                         Extend Deadline
                       </button>
+                    )}
+                      </>
                     )}
                   </div>
                 </Card>

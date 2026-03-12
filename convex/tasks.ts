@@ -737,16 +737,37 @@ export const listOverdueTasksForManager = query({
 
     const now = Date.now();
     const allTasks = await ctx.db.query("tasks").collect();
-    const overdueTasks = allTasks.filter(
-      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
-    );
-
-    if (overdueTasks.length === 0) return [];
-
     const briefs = await ctx.db.query("briefs").collect();
     const users = await ctx.db.query("users").collect();
 
-    return overdueTasks.map((task) => {
+    // Find brands this manager is assigned to
+    const myBrandAssignments = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_manager", (q) => q.eq("managerId", userId))
+      .collect();
+    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+
+    // Filter to briefs where this user is the assignedManager or is a brand manager for the brief's brand
+    const myBriefIds = new Set(
+      briefs
+        .filter((b) => b.assignedManagerId === userId || (b.brandId && myBrandIds.has(b.brandId)))
+        .map((b) => b._id)
+    );
+
+    const overdueTasks = allTasks.filter(
+      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true && myBriefIds.has(t.briefId)
+    );
+
+    // Also check briefs with deadlines that have NO tasks assigned yet
+    const overdueBriefsNoTasks = briefs.filter((b) => {
+      if (!myBriefIds.has(b._id)) return false;
+      if (!b.deadline || b.deadline >= now) return false;
+      if (b.status === "completed" || b.status === "archived") return false;
+      const briefTasks = allTasks.filter((t) => t.briefId === b._id);
+      return briefTasks.length === 0;
+    });
+
+    const taskResults = overdueTasks.map((task) => {
       const brief = briefs.find((b) => b._id === task.briefId);
       const assignee = users.find((u) => u._id === task.assigneeId);
       return {
@@ -760,8 +781,25 @@ export const listOverdueTasksForManager = query({
         assigneeId: task.assigneeId,
         deadlineExtended: task.deadlineExtended ?? false,
         originalDeadline: task.originalDeadline,
+        alertType: "overdue" as const,
       };
     });
+
+    const briefResults = overdueBriefsNoTasks.map((brief) => ({
+      _id: brief._id,
+      title: brief.title,
+      deadline: brief.deadline!,
+      briefTitle: brief.title,
+      briefId: brief._id,
+      brandId: brief.brandId,
+      assigneeName: "Unassigned",
+      assigneeId: null as string | null,
+      deadlineExtended: false,
+      originalDeadline: undefined as number | undefined,
+      alertType: "unassigned" as const,
+    }));
+
+    return [...taskResults, ...briefResults];
   },
 });
 
