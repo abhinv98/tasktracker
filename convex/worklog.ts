@@ -68,7 +68,7 @@ export const getEmployeeWorkLog = query({
             _id: task._id,
             title: task.title,
             status: task.status,
-            duration: task.duration,
+            duration: task.duration ?? "—",
             briefTitle: brief?.title ?? "Unknown",
             briefId: task.briefId,
             timeSpentMinutes: timeSpent,
@@ -396,7 +396,7 @@ export const getEmployeeHistory = query({
         _id: task._id as string,
         title: task.title,
         status: task.status,
-        duration: task.duration,
+        duration: task.duration ?? "—",
         deliverables: taskDeliverables.map((d) => ({
           _id: d._id as string,
           message: d.message,
