@@ -49,8 +49,8 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
   const [showAddHelper, setShowAddHelper] = useState(false);
   const [helperAssignee, setHelperAssignee] = useState("");
   const [helperDesc, setHelperDesc] = useState("");
-  const [helperDurVal, setHelperDurVal] = useState("2");
-  const [helperDurUnit, setHelperDurUnit] = useState<"m" | "h" | "d">("h");
+  const [helperDeadline, setHelperDeadline] = useState<number | undefined>(undefined);
+  const [helperDeadlineTime, setHelperDeadlineTime] = useState("");
   const [isCreatingSubTask, setIsCreatingSubTask] = useState(false);
 
   const teamMembers = useMemo(() => {
@@ -164,19 +164,23 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
                 if (!helperAssignee || !helperDesc.trim() || isCreatingSubTask || !taskId) return;
                 setIsCreatingSubTask(true);
                 try {
-                  const dur = `${helperDurVal}${helperDurUnit}`;
-                  const durMin = parseDuration(dur);
+                  let finalDeadline = helperDeadline;
+                  if (helperDeadline && helperDeadlineTime) {
+                    const [hh, mm] = helperDeadlineTime.split(":").map(Number);
+                    const d = new Date(helperDeadline);
+                    d.setHours(hh, mm, 0, 0);
+                    finalDeadline = d.getTime();
+                  }
                   await createSubTask({
                     parentTaskId: taskId,
                     assigneeId: helperAssignee as Id<"users">,
                     description: helperDesc.trim(),
-                    duration: dur,
-                    durationMinutes: durMin,
+                    ...(finalDeadline ? { deadline: finalDeadline } : {}),
                   });
                   setHelperAssignee("");
                   setHelperDesc("");
-                  setHelperDurVal("2");
-                  setHelperDurUnit("h");
+                  setHelperDeadline(undefined);
+                  setHelperDeadlineTime("");
                   setShowAddHelper(false);
                 } finally {
                   setIsCreatingSubTask(false);
@@ -204,25 +208,28 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
                 className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[50px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
                 required
               />
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  value={helperDurVal}
-                  onChange={(e) => setHelperDurVal(e.target.value)}
-                  className="w-16 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-                  required
-                />
-                <select
-                  value={helperDurUnit}
-                  onChange={(e) => setHelperDurUnit(e.target.value as "m" | "h" | "d")}
-                  className="px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              <div>
+                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Deadline</label>
+                <div className="flex gap-1.5">
+                  <div className="flex-1">
+                    <DatePicker value={helperDeadline} onChange={setHelperDeadline} placeholder="Set date" />
+                  </div>
+                  <input
+                    type="time"
+                    value={helperDeadlineTime}
+                    onChange={(e) => setHelperDeadlineTime(e.target.value)}
+                    className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowAddHelper(false)}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  <option value="m">Min</option>
-                  <option value="h">Hrs</option>
-                  <option value="d">Days</option>
-                </select>
-                <div className="flex-1" />
+                  Cancel
+                </button>
                 <button
                   type="submit"
                   disabled={isCreatingSubTask}
@@ -230,13 +237,6 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
                 >
                   {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
                   {isCreatingSubTask ? "Adding..." : "Add Helper"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddHelper(false)}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  Cancel
                 </button>
               </div>
             </form>
@@ -365,9 +365,8 @@ export default function BriefPage() {
   const [taskDesc, setTaskDesc] = useState("");
   const [taskTeamFilter, setTaskTeamFilter] = useState<string>("");
   const [taskAssignee, setTaskAssignee] = useState<Id<"users"> | "">("");
-  const [taskDurationValue, setTaskDurationValue] = useState("2");
-  const [taskDurationUnit, setTaskDurationUnit] = useState<"m" | "h" | "d">("h");
   const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
+  const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
   const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -403,31 +402,28 @@ export default function BriefPage() {
   async function handleCreateTask(e: React.FormEvent) {
     e.preventDefault();
     if (!taskAssignee) return;
-    const numVal = parseInt(taskDurationValue, 10);
-    if (!numVal || numVal <= 0) {
-      toast("error", "Please enter a valid duration");
-      return;
+    let finalDeadline = taskDeadline;
+    if (taskDeadline !== undefined && taskDeadlineTime) {
+      const [hh, mm] = taskDeadlineTime.split(":").map(Number);
+      const d = new Date(taskDeadline);
+      d.setHours(hh, mm, 0, 0);
+      finalDeadline = d.getTime();
     }
-    const taskDuration = `${numVal}${taskDurationUnit}`;
-    const durationMinutes = parseDuration(taskDuration);
     try {
       await createTask({
         briefId,
         title: taskTitle,
         description: taskDesc || undefined,
         assigneeId: taskAssignee as Id<"users">,
-        duration: taskDuration,
-        durationMinutes,
-        ...(taskDeadline !== undefined ? { deadline: taskDeadline } : {}),
+        ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
         ...(taskClientFacing ? { clientFacing: true } : {}),
       });
       setTaskTitle("");
       setTaskDesc("");
       setTaskTeamFilter("");
       setTaskAssignee("");
-      setTaskDurationValue("2");
-      setTaskDurationUnit("h");
       setTaskDeadline(undefined);
+      setTaskDeadlineTime("");
       setTaskClientFacing(false);
       toast("success", "Task created");
     } catch (err) {
@@ -690,34 +686,22 @@ export default function BriefPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Duration</label>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="number"
-                      min="1"
-                      value={taskDurationValue}
-                      onChange={(e) => setTaskDurationValue(e.target.value)}
-                      className="w-16 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      required
-                    />
-                    <select
-                      value={taskDurationUnit}
-                      onChange={(e) => setTaskDurationUnit(e.target.value as "m" | "h" | "d")}
-                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="m">Minutes</option>
-                      <option value="h">Hours</option>
-                      <option value="d">Days</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
                   <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>
-                  <DatePicker
-                    value={taskDeadline}
-                    onChange={setTaskDeadline}
-                    placeholder="Set date"
-                  />
+                  <div className="flex gap-1.5">
+                    <div className="flex-1">
+                      <DatePicker
+                        value={taskDeadline}
+                        onChange={setTaskDeadline}
+                        placeholder="Set date"
+                      />
+                    </div>
+                    <input
+                      type="time"
+                      value={taskDeadlineTime}
+                      onChange={(e) => setTaskDeadlineTime(e.target.value)}
+                      className="w-24 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    />
+                  </div>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
                   <input
@@ -1022,7 +1006,14 @@ export default function BriefPage() {
                               style={{ backgroundColor: statusInfo?.color ?? "var(--text-muted)" }}
                             />
                             <span className="text-[var(--text-primary)] truncate flex-1">{t.title}</span>
-                            <span className="text-[var(--text-muted)] shrink-0">{t.duration}</span>
+                            {t.deadlineExtended && (
+                              <span className="px-1 py-0.5 rounded text-[8px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">EXT</span>
+                            )}
+                            {t.deadline && (
+                              <span className="text-[var(--text-muted)] shrink-0 text-[10px]">
+                                {new Date(t.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                            )}
                           </div>
                         );
                       })}

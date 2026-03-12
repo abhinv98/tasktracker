@@ -116,9 +116,8 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const [editDesc, setEditDesc] = useState("");
   const [editTeamFilter, setEditTeamFilter] = useState("");
   const [editAssignee, setEditAssignee] = useState("");
-  const [editDurationValue, setEditDurationValue] = useState("");
-  const [editDurationUnit, setEditDurationUnit] = useState<"m" | "h" | "d">("h");
   const [editDeadline, setEditDeadline] = useState<number | undefined>(undefined);
+  const [editDeadlineTime, setEditDeadlineTime] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const editFilteredEmployees = editTeamFilter
@@ -145,8 +144,6 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const [showAddHelper, setShowAddHelper] = useState(false);
   const [helperAssignee, setHelperAssignee] = useState("");
   const [helperDesc, setHelperDesc] = useState("");
-  const [helperDurVal, setHelperDurVal] = useState("2");
-  const [helperDurUnit, setHelperDurUnit] = useState<"m" | "h" | "d">("h");
   const [isCreatingSubTask, setIsCreatingSubTask] = useState(false);
 
   const dailySummaries = useQuery(api.taskDailySummaries.listSummaries, { taskId: taskId as Id<"tasks"> });
@@ -270,30 +267,34 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
     setEditDesc(task.description ?? "");
     setEditTeamFilter("");
     setEditAssignee(task.assigneeId);
-    const durMatch = task.duration.match(/^(\d+)(m|h|d)$/i);
-    setEditDurationValue(durMatch ? durMatch[1] : "2");
-    setEditDurationUnit((durMatch ? durMatch[2].toLowerCase() : "h") as "m" | "h" | "d");
     setEditDeadline(task.deadline);
+    if (task.deadline) {
+      const d = new Date(task.deadline);
+      setEditDeadlineTime(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+    } else {
+      setEditDeadlineTime("");
+    }
     setShowEditForm(true);
   }
 
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (isSavingEdit || !task) return;
-    const numVal = parseInt(editDurationValue, 10);
-    if (!numVal || numVal <= 0) return;
     setIsSavingEdit(true);
     try {
-      const duration = `${numVal}${editDurationUnit}`;
-      const durationMinutes = parseDuration(duration);
+      let finalDeadline = editDeadline;
+      if (editDeadline !== undefined && editDeadlineTime) {
+        const [hh, mm] = editDeadlineTime.split(":").map(Number);
+        const d = new Date(editDeadline);
+        d.setHours(hh, mm, 0, 0);
+        finalDeadline = d.getTime();
+      }
       await updateTask({
         taskId: taskId as Id<"tasks">,
         title: editTitle,
         description: editDesc || undefined,
         assigneeId: editAssignee as Id<"users">,
-        duration,
-        durationMinutes,
-        ...(editDeadline !== undefined ? { deadline: editDeadline } : { clearDeadline: true }),
+        ...(finalDeadline !== undefined ? { deadline: finalDeadline } : { clearDeadline: true }),
       });
       setShowEditForm(false);
     } finally {
@@ -507,10 +508,12 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                   {assignee?.name ?? assignee?.email ?? "Unassigned"}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-                <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                <span>{task.duration}</span>
-              </div>
+              {task.duration && (
+                <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+                  <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  <span>{task.duration}</span>
+                </div>
+              )}
               {task.deadline && (
                 <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
                   <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -519,8 +522,19 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
-                    })}
+                    })}{" "}
+                    {new Date(task.deadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
                   </span>
+                  {task.deadlineExtended && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700">
+                      EXTENDED
+                    </span>
+                  )}
+                </div>
+              )}
+              {task.deadlineExtended && task.originalDeadline && (
+                <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                  <span>Original deadline: {new Date(task.originalDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })} {new Date(task.originalDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
                 </div>
               )}
               {assignedBy && (
@@ -688,19 +702,13 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                     if (!helperAssignee || !helperDesc.trim() || isCreatingSubTask) return;
                     setIsCreatingSubTask(true);
                     try {
-                      const dur = `${helperDurVal}${helperDurUnit}`;
-                      const durMin = parseDuration(dur);
                       await createSubTask({
                         parentTaskId: taskId as Id<"tasks">,
                         assigneeId: helperAssignee as Id<"users">,
                         description: helperDesc.trim(),
-                        duration: dur,
-                        durationMinutes: durMin,
                       });
                       setHelperAssignee("");
                       setHelperDesc("");
-                      setHelperDurVal("2");
-                      setHelperDurUnit("h");
                       setShowAddHelper(false);
                     } finally {
                       setIsCreatingSubTask(false);
@@ -730,26 +738,14 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                     className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[50px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
                     required
                   />
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={helperDurVal}
-                      onChange={(e) => setHelperDurVal(e.target.value)}
-                      className="w-16 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-                      required
-                    />
-                    <select
-                      value={helperDurUnit}
-                      onChange={(e) => setHelperDurUnit(e.target.value as "m" | "h" | "d")}
-                      className="px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddHelper(false)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                      <option value="m">Min</option>
-                      <option value="h">Hrs</option>
-                      <option value="d">Days</option>
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
+                      Cancel
+                    </button>
                     <button
                       type="submit"
                       disabled={isCreatingSubTask}
@@ -757,13 +753,6 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                     >
                       {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
                       {isCreatingSubTask ? "Adding..." : "Add Helper"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddHelper(false)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                    >
-                      Cancel
                     </button>
                   </div>
                 </form>
@@ -1099,34 +1088,22 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Estimated Duration</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={editDurationValue}
-                      onChange={(e) => setEditDurationValue(e.target.value)}
-                      required
-                      className="w-20 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    />
-                    <select
-                      value={editDurationUnit}
-                      onChange={(e) => setEditDurationUnit(e.target.value as "m" | "h" | "d")}
-                      className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="m">Minutes</option>
-                      <option value="h">Hours</option>
-                      <option value="d">Days</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
                   <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Deadline</label>
-                  <DatePicker
-                    value={editDeadline}
-                    onChange={setEditDeadline}
-                    placeholder="Set task deadline"
-                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <DatePicker
+                        value={editDeadline}
+                        onChange={setEditDeadline}
+                        placeholder="Set task deadline"
+                      />
+                    </div>
+                    <input
+                      type="time"
+                      value={editDeadlineTime}
+                      onChange={(e) => setEditDeadlineTime(e.target.value)}
+                      className="w-28 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button

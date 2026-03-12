@@ -871,6 +871,7 @@ export const clientApproveDeliverable = mutation({
       await ctx.db.patch(task._id, { status: "done", completedAt: Date.now() });
 
       const brief = await ctx.db.get(task.briefId);
+      const brand = await ctx.db.get(jsrLink.brandId);
       const brandManagers = await ctx.db
         .query("brandManagers")
         .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
@@ -888,6 +889,15 @@ export const clientApproveDeliverable = mutation({
           createdAt: Date.now(),
         });
       }
+
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId: brandManagers[0]?.managerId ?? task.assignedBy,
+        action: "client_approved",
+        details: JSON.stringify({ taskTitle: task.title, briefTitle: brief?.title, brandName: brand?.name }),
+        timestamp: Date.now(),
+      });
     }
   },
 });
@@ -961,6 +971,15 @@ export const clientRequestChanges = mutation({
         read: false,
         createdAt: Date.now(),
       });
+
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId: brandManagers[0]?.managerId ?? task.assignedBy,
+        action: "client_changes_requested",
+        details: JSON.stringify({ taskTitle: task.title, note }),
+        timestamp: Date.now(),
+      });
     }
   },
 });
@@ -1009,6 +1028,15 @@ export const clientDenyDeliverable = mutation({
           createdAt: Date.now(),
         });
       }
+
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId: brandManagers[0]?.managerId ?? task.assignedBy,
+        action: "client_denied",
+        details: JSON.stringify({ taskTitle: task.title, note }),
+        timestamp: Date.now(),
+      });
     }
   },
 });

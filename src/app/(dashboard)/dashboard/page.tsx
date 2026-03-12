@@ -1,12 +1,12 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, TaskDetailModal } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase } from "lucide-react";
+import { Badge, Button, Card, TaskDetailModal, DatePicker } from "@/components/ui";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -155,9 +155,11 @@ export default function DashboardPage() {
                     <span className="text-[var(--text-disabled)] whitespace-nowrap ml-1">
                       — @{getUserName(task.assigneeId)}
                     </span>
-                    <span className="text-[var(--accent-admin)] whitespace-nowrap ml-1">
-                      ({task.duration})
-                    </span>
+                    {task.deadline && (
+                      <span className="text-[var(--accent-admin)] whitespace-nowrap ml-1">
+                        (Due {new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -182,6 +184,13 @@ export default function DashboardPage() {
     ).length;
     const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
     const [adminSelectedTaskId, setAdminSelectedTaskId] = useState<string | null>(null);
+
+    const overdueTasksForManager = useQuery(api.tasks.listOverdueTasksForManager);
+    const resumeOverdueTask = useMutation(api.tasks.resumeOverdueTask);
+    const extendTaskDeadline = useMutation(api.tasks.extendTaskDeadline);
+    const [extendingTaskId, setExtendingTaskId] = useState<string | null>(null);
+    const [extendDeadline, setExtendDeadline] = useState<number | undefined>(undefined);
+    const [extendDeadlineTime, setExtendDeadlineTime] = useState("");
 
     const adminActiveTasks = (tasks ?? []).filter((t) => t.status !== "done");
 
@@ -313,6 +322,97 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Overdue Tasks Section */}
+        {(overdueTasksForManager ?? []).length > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <h2 className="font-semibold text-[15px] text-red-700 mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Overdue Tasks ({overdueTasksForManager!.length})
+            </h2>
+            <div className="space-y-3">
+              {overdueTasksForManager!.map((ot: any) => (
+                <Card key={ot._id} className="p-4 border-l-4 border-l-red-500">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-[13px] text-[var(--text-primary)]">{ot.title}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                        {ot.briefTitle} &middot; Assigned to <span className="font-semibold">{ot.assigneeName}</span>
+                      </p>
+                      <p className="text-[11px] text-red-600 mt-0.5">
+                        <Clock className="inline h-3 w-3 mr-0.5" />
+                        Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
+                        {" "}({Math.round((Date.now() - ot.deadline) / (1000 * 60 * 60))}h overdue)
+                      </p>
+                      {ot.deadlineExtended && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
+                          EXTENDED
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                    <button
+                      onClick={async () => {
+                        await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                    >
+                      <Play className="h-3 w-3" />
+                      Resume
+                    </button>
+                    {extendingTaskId === ot._id ? (
+                      <div className="flex items-center gap-1.5 flex-1">
+                        <div className="flex-1">
+                          <DatePicker value={extendDeadline} onChange={setExtendDeadline} placeholder="New deadline" />
+                        </div>
+                        <input
+                          type="time"
+                          value={extendDeadlineTime}
+                          onChange={(e) => setExtendDeadlineTime(e.target.value)}
+                          className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!extendDeadline) return;
+                            let finalDeadline = extendDeadline;
+                            if (extendDeadlineTime) {
+                              const [hh, mm] = extendDeadlineTime.split(":").map(Number);
+                              const d = new Date(extendDeadline);
+                              d.setHours(hh, mm, 0, 0);
+                              finalDeadline = d.getTime();
+                            }
+                            await extendTaskDeadline({ taskId: ot._id as Id<"tasks">, newDeadline: finalDeadline });
+                            setExtendingTaskId(null);
+                            setExtendDeadline(undefined);
+                            setExtendDeadlineTime("");
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => { setExtendingTaskId(null); setExtendDeadline(undefined); setExtendDeadlineTime(""); }}
+                          className="px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setExtendingTaskId(ot._id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                      >
+                        <CalendarClock className="h-3 w-3" />
+                        Extend Deadline
+                      </button>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* My Tasks (for admins who have tasks assigned) */}
         {adminActiveTasks.length > 0 && (
           <div className="mb-6 sm:mb-8">
@@ -342,12 +442,17 @@ export default function DashboardPage() {
                               HELPER
                             </span>
                           )}
+                          {(task as any).deadlineExtended && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
+                              EXTENDED
+                            </span>
+                          )}
                           <h3 className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
                             {task.title}
                           </h3>
                         </div>
                         <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
-                          {task.briefName} &middot; {task.duration}
+                          {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                         </p>
                       </div>
                       <span
@@ -697,9 +802,9 @@ export default function DashboardPage() {
   // EMPLOYEE DASHBOARD
   // ═══════════════════════════════════════════
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-
-  // Employee self-created tasks — commented out for now, will re-enable later
-  // Employee self-created tasks — disabled for now, backend remains in convex/tasks.ts (createEmployeeTask)
+  const overdueStatus = useQuery(api.tasks.getOverdueHaltStatus);
+  const contactManager = useMutation(api.tasks.contactManagerForOverdue);
+  const [contactedTasks, setContactedTasks] = useState<Set<string>>(new Set());
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -708,8 +813,62 @@ export default function DashboardPage() {
     "done": { color: "var(--accent-employee)", bg: "var(--accent-employee-dim)" },
   };
 
+  const isHalted = overdueStatus && overdueStatus.length > 0;
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 relative">
+      {/* Overdue Halt Overlay */}
+      {isHalted && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-[18px] text-[var(--text-primary)]">Tasks Halted</h2>
+                <p className="text-[13px] text-[var(--text-secondary)]">
+                  You have overdue tasks that need attention
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {overdueStatus.map((ot) => (
+                <div key={ot._id} className="p-3 rounded-lg border border-red-200 bg-red-50">
+                  <p className="font-semibold text-[13px] text-red-800">{ot.title}</p>
+                  <p className="text-[11px] text-red-600 mt-0.5">
+                    {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
+                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-[11px] text-[var(--text-secondary)]">
+                      Brand Manager: <span className="font-semibold">{ot.managerName}</span>
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await contactManager({ taskId: ot._id as Id<"tasks"> });
+                          setContactedTasks((prev) => new Set(prev).add(ot._id));
+                        } catch {}
+                      }}
+                      disabled={contactedTasks.has(ot._id)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                    >
+                      <Phone className="h-3 w-3" />
+                      {contactedTasks.has(ot._id) ? "Contacted" : "Contact Manager"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-[var(--text-muted)] text-center">
+              All your tasks are halted until the brand manager resumes them.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 sm:mb-8">
         <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
           {greeting}, {displayName}
@@ -719,7 +878,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className={`flex flex-col gap-3 ${isHalted ? "opacity-30 pointer-events-none select-none" : ""}`}>
         {(tasks ?? []).map((task) => {
           const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
           return (
@@ -737,12 +896,17 @@ export default function DashboardPage() {
                         HELPER
                       </span>
                     )}
+                    {(task as any).deadlineExtended && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
+                        EXTENDED
+                      </span>
+                    )}
                     <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
                       {task.title}
                     </h3>
                   </div>
                   <p className="text-[12px] text-[var(--text-secondary)] mt-1">
-                    {task.briefName} &middot; {task.duration}
+                    {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
                   </p>
                 </div>
                 <span

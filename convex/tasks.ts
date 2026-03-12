@@ -80,8 +80,8 @@ export const createTask = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     assigneeId: v.id("users"),
-    duration: v.string(),
-    durationMinutes: v.number(),
+    duration: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
     deadline: v.optional(v.number()),
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),
@@ -432,8 +432,9 @@ export const createSubTask = mutation({
     parentTaskId: v.id("tasks"),
     assigneeId: v.id("users"),
     description: v.string(),
-    duration: v.string(),
-    durationMinutes: v.number(),
+    duration: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
+    deadline: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -471,8 +472,9 @@ export const createSubTask = mutation({
       assignedBy: userId,
       status: "pending",
       sortOrder: maxOrder + 1000,
-      duration: args.duration,
-      durationMinutes: args.durationMinutes,
+      ...(args.duration ? { duration: args.duration } : {}),
+      ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
+      ...(args.deadline ? { deadline: args.deadline } : {}),
       parentTaskId: args.parentTaskId,
     });
 
@@ -520,8 +522,8 @@ export const createEmployeeTask = mutation({
     title: v.string(),
     description: v.optional(v.string()),
     assignorId: v.id("users"),
-    duration: v.string(),
-    durationMinutes: v.number(),
+    duration: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
     deadline: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -557,8 +559,8 @@ export const createEmployeeTask = mutation({
       assignedBy: args.assignorId,
       status: "pending",
       sortOrder: maxOrder + 1000,
-      duration: args.duration,
-      durationMinutes: args.durationMinutes,
+      ...(args.duration ? { duration: args.duration } : {}),
+      ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
       ...(args.deadline ? { deadline: args.deadline } : {}),
       assignedAt: Date.now(),
     });
@@ -595,5 +597,200 @@ export const updateTaskBlockers = mutation({
       throw new Error("Not authorized");
     }
     await ctx.db.patch(taskId, { blockedBy: blockedBy.length > 0 ? blockedBy : undefined });
+  },
+});
+
+// ─── OVERDUE HALT FLOW ────────────────────────────
+
+export const getOverdueHaltStatus = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "employee") return null;
+
+    const now = Date.now();
+    const myTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+      .collect();
+
+    const overdueTasks = myTasks.filter(
+      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
+    );
+
+    if (overdueTasks.length === 0) return null;
+
+    const briefs = await Promise.all(overdueTasks.map((t) => ctx.db.get(t.briefId)));
+    const users = await ctx.db.query("users").collect();
+
+    const results = overdueTasks.map((task, i) => {
+      const brief = briefs[i];
+      const manager = brief?.assignedManagerId
+        ? users.find((u) => u._id === brief.assignedManagerId)
+        : null;
+      return {
+        _id: task._id,
+        title: task.title,
+        deadline: task.deadline!,
+        briefTitle: brief?.title ?? "Unknown",
+        briefId: task.briefId,
+        managerName: manager?.name ?? manager?.email ?? "Brand Manager",
+        managerId: brief?.assignedManagerId ?? null,
+      };
+    });
+
+    return results;
+  },
+});
+
+export const resumeOverdueTask = mutation({
+  args: {
+    taskId: v.id("tasks"),
+  },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Only admins/managers can resume tasks");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    await ctx.db.patch(taskId, { overdueAcknowledged: true });
+
+    await ctx.db.insert("notifications", {
+      recipientId: task.assigneeId,
+      type: "task_status_changed",
+      title: "Tasks resumed",
+      message: `Your tasks have been resumed by ${user.name ?? user.email ?? "a manager"} after overdue review for "${task.title}"`,
+      briefId: task.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("activityLog", {
+      briefId: task.briefId,
+      taskId,
+      userId,
+      action: "resumed_overdue",
+      details: JSON.stringify({ assigneeId: task.assigneeId }),
+      timestamp: Date.now(),
+    });
+  },
+});
+
+export const extendTaskDeadline = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    newDeadline: v.number(),
+  },
+  handler: async (ctx, { taskId, newDeadline }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Only admins/managers can extend deadlines");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    const originalDeadline = task.originalDeadline ?? task.deadline;
+
+    await ctx.db.patch(taskId, {
+      deadline: newDeadline,
+      deadlineExtended: true,
+      originalDeadline,
+      overdueAcknowledged: true,
+    });
+
+    await ctx.db.insert("notifications", {
+      recipientId: task.assigneeId,
+      type: "deadline_extended",
+      title: "Deadline extended",
+      message: `The deadline for "${task.title}" has been extended to ${new Date(newDeadline).toLocaleString()}`,
+      briefId: task.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("activityLog", {
+      briefId: task.briefId,
+      taskId,
+      userId,
+      action: "extended_deadline",
+      details: JSON.stringify({ originalDeadline, newDeadline }),
+      timestamp: Date.now(),
+    });
+  },
+});
+
+export const listOverdueTasksForManager = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+
+    const now = Date.now();
+    const allTasks = await ctx.db.query("tasks").collect();
+    const overdueTasks = allTasks.filter(
+      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
+    );
+
+    if (overdueTasks.length === 0) return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const users = await ctx.db.query("users").collect();
+
+    return overdueTasks.map((task) => {
+      const brief = briefs.find((b) => b._id === task.briefId);
+      const assignee = users.find((u) => u._id === task.assigneeId);
+      return {
+        _id: task._id,
+        title: task.title,
+        deadline: task.deadline!,
+        briefTitle: brief?.title ?? "Unknown",
+        briefId: task.briefId,
+        brandId: brief?.brandId,
+        assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+        assigneeId: task.assigneeId,
+        deadlineExtended: task.deadlineExtended ?? false,
+        originalDeadline: task.originalDeadline,
+      };
+    });
+  },
+});
+
+export const contactManagerForOverdue = mutation({
+  args: {
+    taskId: v.id("tasks"),
+  },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    const user = await ctx.db.get(userId);
+    const brief = await ctx.db.get(task.briefId);
+
+    const managerId = brief?.assignedManagerId;
+    if (!managerId) throw new Error("No brand manager found for this task");
+
+    await ctx.db.insert("notifications", {
+      recipientId: managerId,
+      type: "overdue_contact",
+      title: "Overdue task - Employee contact",
+      message: `${user?.name ?? user?.email ?? "An employee"} is requesting a review for overdue task "${task.title}" in "${brief?.title ?? "a brief"}"`,
+      briefId: task.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
   },
 });

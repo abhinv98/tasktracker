@@ -177,7 +177,7 @@ export const createBrief = mutation({
       }
     }
 
-    if (args.briefType === "single_task" && taskAssigneeId && taskDuration && taskDurationMinutes) {
+    if (args.briefType === "single_task" && taskAssigneeId) {
       const taskId = await ctx.db.insert("tasks", {
         briefId,
         title: taskTitle || args.title,
@@ -186,8 +186,8 @@ export const createBrief = mutation({
         assignedBy: userId,
         status: "pending",
         sortOrder: 1000,
-        duration: taskDuration,
-        durationMinutes: taskDurationMinutes,
+        ...(taskDuration ? { duration: taskDuration } : {}),
+        ...(taskDurationMinutes ? { durationMinutes: taskDurationMinutes } : {}),
         ...(args.deadline ? { deadline: args.deadline } : {}),
         assignedAt: Date.now(),
         ...(taskClientFacing ? { clientFacing: true } : {}),
@@ -523,7 +523,7 @@ export const getBriefGraphData = query({
       const members = memberIds.map((userId) => {
         const user = users.find((u) => u._id === userId);
         const userTasks = tasks.filter((t) => t.assigneeId === userId);
-        const totalMinutes = userTasks.reduce((s, t) => s + t.durationMinutes, 0);
+        const totalMinutes = userTasks.reduce((s, t) => s + (t.durationMinutes ?? 0), 0);
         return {
           user: user!,
           taskCount: userTasks.length,

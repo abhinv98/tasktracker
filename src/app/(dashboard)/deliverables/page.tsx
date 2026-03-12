@@ -32,11 +32,14 @@ export default function DeliverablesPage() {
   const mainAssigneeRejectMut = useMutation(api.approvals.mainAssigneeReject);
   const passSubTaskToTeamLeadMut = useMutation(api.approvals.passSubTaskToTeamLead);
   const sendToClientMut = useMutation(api.jsr.sendToClient);
+  const reassignAfterClientFeedback = useMutation(api.approvals.reassignAfterClientFeedback);
 
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
   const [deletingDeliverableId, setDeletingDeliverableId] = useState<string | null>(null);
+  const [reassignTarget, setReassignTarget] = useState<Record<string, string>>({});
+  const [reassignNote, setReassignNote] = useState<Record<string, string>>({});
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
 
@@ -772,6 +775,13 @@ export default function DeliverablesPage() {
 
               <p className="text-[12px] text-[var(--text-secondary)] mb-2">{d.message}</p>
 
+              {/* Client note for feedback deliverables */}
+              {d.clientNote && (d.clientStatus === "client_changes_requested" || d.clientStatus === "client_denied") && (
+                <div className={`mb-2 p-2 rounded-md border text-[11px] ${d.clientStatus === "client_denied" ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                  <span className="font-semibold">Client remarks:</span> {d.clientNote}
+                </div>
+              )}
+
               {d.link && (
                 <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin)] hover:underline mb-2">
                   <ExternalLink className="h-3 w-3" />
@@ -781,21 +791,65 @@ export default function DeliverablesPage() {
 
               {renderFiles(d.files ?? [])}
 
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                {d._sendToClient ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        await sendToClientMut({ deliverableId: d._id as Id<"deliverables"> });
-                      } catch {}
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Send to Client
-                  </button>
+              <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                {d._clientFeedback ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={reassignTarget[d._id] ?? ""}
+                        onChange={(e) => setReassignTarget((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                      >
+                        <option value="">Select team member to reassign...</option>
+                        {(d.teamMembers ?? []).map((m: any) => (
+                          <option key={m._id} value={m._id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      value={reassignNote[d._id] ?? ""}
+                      onChange={(e) => setReassignNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                      placeholder="Add notes for the assignee (optional)..."
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[40px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    />
+                    <button
+                      disabled={!reassignTarget[d._id]}
+                      onClick={async () => {
+                        const target = reassignTarget[d._id];
+                        if (!target) return;
+                        try {
+                          const taskId = (d as any).taskId;
+                          await reassignAfterClientFeedback({
+                            taskId: taskId as Id<"tasks">,
+                            newAssigneeId: target as Id<"users">,
+                            note: reassignNote[d._id] || undefined,
+                          });
+                          setReassignTarget((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
+                          setReassignNote((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
+                        } catch {}
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Send Back to Team Member
+                    </button>
+                  </div>
+                ) : d._sendToClient ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await sendToClientMut({ deliverableId: d._id as Id<"deliverables"> });
+                        } catch {}
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Send to Client
+                    </button>
+                  </div>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleApprove(d._id)}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
@@ -814,7 +868,7 @@ export default function DeliverablesPage() {
                         Request Changes
                       </button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </Card>

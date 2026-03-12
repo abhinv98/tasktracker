@@ -102,12 +102,11 @@ export default defineSchema({
       v.literal("done")
     ),
     sortOrder: v.number(),
-    duration: v.string(),
-    durationMinutes: v.number(),
+    duration: v.optional(v.string()),
+    durationMinutes: v.optional(v.number()),
     deadline: v.optional(v.number()),
     completedAt: v.optional(v.number()),
     blockedBy: v.optional(v.array(v.id("tasks"))),
-    // Content calendar metadata (only set for tasks in content_calendar briefs)
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),
     postDate: v.optional(v.string()),
@@ -117,6 +116,9 @@ export default defineSchema({
     clientFacing: v.optional(v.boolean()),
     needsClientInput: v.optional(v.boolean()),
     clientInputMessage: v.optional(v.string()),
+    deadlineExtended: v.optional(v.boolean()),
+    originalDeadline: v.optional(v.number()),
+    overdueAcknowledged: v.optional(v.boolean()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -248,7 +250,9 @@ export default defineSchema({
       v.literal("client_approved"),
       v.literal("client_changes_requested"),
       v.literal("client_denied"),
-      v.literal("client_input_requested")
+      v.literal("client_input_requested"),
+      v.literal("overdue_contact"),
+      v.literal("deadline_extended")
     ),
     title: v.string(),
     message: v.string(),

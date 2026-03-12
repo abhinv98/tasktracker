@@ -303,6 +303,64 @@ export const listManagerDeliverables = query({
       })
     );
 
+    // Client feedback deliverables (changes requested or denied by client)
+    const briefTeams = await ctx.db.query("briefTeams").collect();
+    const allUserTeams = await ctx.db.query("userTeams").collect();
+
+    const clientFeedback = allDeliverables.filter((d) => {
+      if (d.clientStatus !== "client_changes_requested" && d.clientStatus !== "client_denied") return false;
+      if (d.status === "rejected") return false;
+      const task = tasks.find((t) => t._id === d.taskId);
+      const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+      return brief?.brandId && myBrandIds.has(brief.brandId);
+    });
+
+    const clientFeedbackResults = await Promise.all(
+      clientFeedback.map(async (d) => {
+        const task = tasks.find((t) => t._id === d.taskId);
+        const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+        const brand = brief?.brandId ? brands.find((b) => b._id === brief.brandId) : null;
+        const submitter = users.find((u) => u._id === d.submittedBy);
+
+        const bTeams = briefTeams.filter((bt) => bt.briefId === brief?._id);
+        const teamMemberIds = new Set<string>();
+        for (const bt of bTeams) {
+          const members = allUserTeams.filter((ut) => ut.teamId === bt.teamId);
+          for (const m of members) teamMemberIds.add(m.userId);
+        }
+        const teamMembersList = [...teamMemberIds].map((id) => {
+          const u = users.find((usr) => usr._id === id);
+          return u ? { _id: u._id, name: u.name ?? u.email ?? "Unknown" } : null;
+        }).filter(Boolean);
+
+        let files: { name: string; url: string }[] = [];
+        if (d.fileIds && d.fileIds.length > 0) {
+          files = (await Promise.all(
+            d.fileIds.map(async (fileId, idx) => {
+              const url = await ctx.storage.getUrl(fileId);
+              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
+            })
+          )).filter((f) => f.url);
+        }
+
+        return {
+          ...d,
+          submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          taskTitle: task?.title ?? "Unknown",
+          briefTitle: brief?.title ?? "Unknown",
+          briefId: brief?._id,
+          brandName: brand?.name ?? "No Brand",
+          brandId: brief?.brandId,
+          files,
+          taskClientFacing: task?.clientFacing ?? false,
+          clientStatus: d.clientStatus,
+          clientNote: d.clientNote ?? null,
+          teamMembers: teamMembersList,
+          _clientFeedback: true as const,
+        };
+      })
+    );
+
     const readyToSend = allDeliverables.filter((d) => {
       if (d.status !== "approved") return false;
       const task = tasks.find((t) => t._id === d.taskId);
@@ -343,7 +401,7 @@ export const listManagerDeliverables = query({
       })
     );
 
-    return [...results, ...sendToClientResults];
+    return [...results, ...sendToClientResults, ...clientFeedbackResults];
   },
 });
 
@@ -484,6 +542,7 @@ export const teamLeadApprove = mutation({
 
     const user = await ctx.db.get(userId);
     const task = await ctx.db.get(deliverable.taskId);
+    const brief = task ? await ctx.db.get(task.briefId) : null;
     await ctx.db.insert("notifications", {
       recipientId: deliverable.submittedBy,
       type: "deliverable_approved",
@@ -495,6 +554,17 @@ export const teamLeadApprove = mutation({
       read: false,
       createdAt: Date.now(),
     });
+
+    if (task) {
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId,
+        action: "team_lead_approved",
+        details: JSON.stringify({ taskTitle: task.title, briefTitle: brief?.title }),
+        timestamp: Date.now(),
+      });
+    }
   },
 });
 
@@ -865,6 +935,17 @@ export const approveDeliverable = mutation({
       read: false,
       createdAt: Date.now(),
     });
+
+    if (task) {
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId,
+        action: "deliverable_approved_internally",
+        details: JSON.stringify({ taskTitle: task.title, briefTitle: brief?.title, clientFacing: task.clientFacing }),
+        timestamp: Date.now(),
+      });
+    }
   },
 });
 
@@ -922,6 +1003,83 @@ export const rejectDeliverable = mutation({
       triggeredBy: userId,
       read: false,
       createdAt: Date.now(),
+    });
+  },
+});
+
+export const reassignAfterClientFeedback = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    newAssigneeId: v.id("users"),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { taskId, newAssigneeId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Only admins/managers can reassign");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    const brief = await ctx.db.get(task.briefId);
+
+    const oldAssigneeId = task.assigneeId;
+    await ctx.db.patch(taskId, {
+      assigneeId: newAssigneeId,
+      status: "in-progress",
+      assignedAt: Date.now(),
+    });
+
+    // Reset the latest deliverable so it goes through the flow again
+    const deliverables = await ctx.db
+      .query("deliverables")
+      .withIndex("by_task", (q) => q.eq("taskId", taskId))
+      .collect();
+    const latestDeliverable = deliverables
+      .filter((d) => d.clientStatus === "client_changes_requested" || d.clientStatus === "client_denied")
+      .sort((a, b) => b.submittedAt - a.submittedAt)[0];
+
+    if (latestDeliverable) {
+      await ctx.db.patch(latestDeliverable._id, {
+        status: "rejected",
+        clientStatus: undefined,
+      });
+    }
+
+    const newAssignee = await ctx.db.get(newAssigneeId);
+    await ctx.db.insert("notifications", {
+      recipientId: newAssigneeId,
+      type: "task_assigned",
+      title: "Task reassigned after client feedback",
+      message: `You have been assigned "${task.title}" for revisions${note ? `: ${note}` : ""}`,
+      briefId: task.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    if (oldAssigneeId !== newAssigneeId) {
+      await ctx.db.insert("notifications", {
+        recipientId: oldAssigneeId,
+        type: "task_status_changed",
+        title: "Task reassigned",
+        message: `"${task.title}" was reassigned to ${newAssignee?.name ?? newAssignee?.email ?? "another team member"} after client feedback`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    await ctx.db.insert("activityLog", {
+      briefId: task.briefId,
+      taskId,
+      userId,
+      action: "reassigned_after_client_feedback",
+      details: JSON.stringify({ from: oldAssigneeId, to: newAssigneeId, note }),
+      timestamp: Date.now(),
     });
   },
 });

@@ -65,8 +65,7 @@ export default function BriefsPage() {
   // Single task brief fields
   const [stAssignee, setStAssignee] = useState("");
   const [stTeamId, setStTeamId] = useState("");
-  const [stDurVal, setStDurVal] = useState("2");
-  const [stDurUnit, setStDurUnit] = useState<"m" | "h" | "d">("h");
+  const [stDeadlineTime, setStDeadlineTime] = useState("");
   const allUsers = useQuery(api.users.listAllUsers);
   const allTeams = useQuery(api.teams.listTeams, {});
   const stTeamMembers = useQuery(
@@ -155,8 +154,7 @@ export default function BriefsPage() {
     setBriefMode("master");
     setStAssignee("");
     setStTeamId("");
-    setStDurVal("2");
-    setStDurUnit("h");
+    setStDeadlineTime("");
     setShowModal(true);
   }
 
@@ -164,24 +162,27 @@ export default function BriefsPage() {
     e.preventDefault();
     try {
       const isSingle = briefMode === "single";
-      const numVal = parseInt(stDurVal, 10);
-      const taskDuration = isSingle ? `${numVal}${stDurUnit}` : undefined;
-      const taskDurationMinutes = isSingle && taskDuration ? parseDuration(taskDuration) : undefined;
 
       type BriefType = "developmental" | "designing" | "video_editing" | "content_calendar" | "copywriting" | "single_task";
+
+      let finalDeadline = deadline;
+      if (isSingle && deadline !== undefined && stDeadlineTime) {
+        const [hh, mm] = stDeadlineTime.split(":").map(Number);
+        const d = new Date(deadline);
+        d.setHours(hh, mm, 0, 0);
+        finalDeadline = d.getTime();
+      }
 
       await createBrief({
         title,
         description,
         ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
-        ...(deadline !== undefined ? { deadline } : {}),
+        ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
         briefType: isSingle ? "single_task" as BriefType : (briefType || undefined) as BriefType | undefined,
         ...(isSingle && stAssignee ? {
           taskTitle: title,
           taskAssigneeId: stAssignee as Id<"users">,
-          taskDuration,
-          taskDurationMinutes,
           taskClientFacing: clientFacing || undefined,
         } : {}),
         ...(isSingle && stTeamId ? { teamIds: [stTeamId as Id<"teams">] } : {}),
@@ -197,8 +198,7 @@ export default function BriefsPage() {
       setClientFacing(false);
       setStAssignee("");
       setStTeamId("");
-      setStDurVal("2");
-      setStDurUnit("h");
+      setStDeadlineTime("");
       toast("success", isSingle ? "Single task brief created" : "Brief created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
@@ -583,34 +583,27 @@ export default function BriefsPage() {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Duration</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="number"
-                        min="1"
-                        value={stDurVal}
-                        onChange={(e) => setStDurVal(e.target.value)}
-                        required
-                        className="w-20 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      />
-                      <select
-                        value={stDurUnit}
-                        onChange={(e) => setStDurUnit(e.target.value as "m" | "h" | "d")}
-                        className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      >
-                        <option value="m">Minutes</option>
-                        <option value="h">Hours</option>
-                        <option value="d">Days</option>
-                      </select>
-                    </div>
-                  </div>
                 </>
               )}
 
               <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Deadline (optional)</label>
-                <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
+                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                  {briefMode === "single" ? "Deadline" : "Deadline (optional)"}
+                </label>
+                <div className="flex gap-1.5">
+                  <div className="flex-1">
+                    <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
+                  </div>
+                  {briefMode === "single" && (
+                    <input
+                      type="time"
+                      value={stDeadlineTime}
+                      onChange={(e) => setStDeadlineTime(e.target.value)}
+                      className="w-28 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      placeholder="HH:MM"
+                    />
+                  )}
+                </div>
               </div>
               <div>
                 <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Brand</label>

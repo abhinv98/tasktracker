@@ -39,14 +39,34 @@ export const checkDeadlines = internalMutation({
         }
       }
 
-      // Overdue - notify the manager
+      // Overdue - notify the manager, assignor, and team lead
       if (task.deadline < now) {
         const brief = await ctx.db.get(task.briefId);
-        if (brief?.assignedManagerId) {
+        const recipientIds = new Set<string>();
+
+        if (brief?.assignedManagerId) recipientIds.add(brief.assignedManagerId);
+        if (task.assignedBy) recipientIds.add(task.assignedBy);
+
+        // For helper tasks, also notify team lead
+        if (task.parentTaskId) {
+          const assigneeTeams = await ctx.db
+            .query("userTeams")
+            .withIndex("by_user", (q: any) => q.eq("userId", task.assigneeId))
+            .collect();
+          const teams = await Promise.all(assigneeTeams.map((ut: any) => ctx.db.get(ut.teamId)));
+          for (const team of teams) {
+            if (team?.leadId) recipientIds.add(team.leadId);
+          }
+        }
+
+        // Also notify the assignee
+        recipientIds.add(task.assigneeId);
+
+        for (const recipientId of recipientIds) {
           const recentNotifs = await ctx.db
             .query("notifications")
             .withIndex("by_recipient", (q) =>
-              q.eq("recipientId", brief.assignedManagerId!)
+              q.eq("recipientId", recipientId as any)
             )
             .collect();
           const alreadySent = recentNotifs.some(
@@ -57,7 +77,7 @@ export const checkDeadlines = internalMutation({
           );
           if (!alreadySent) {
             await ctx.db.insert("notifications", {
-              recipientId: brief.assignedManagerId,
+              recipientId: recipientId as any,
               type: "deadline_reminder",
               title: "Task overdue",
               message: `"${task.title}" is past its deadline`,
