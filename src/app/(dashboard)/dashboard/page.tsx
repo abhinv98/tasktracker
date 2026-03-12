@@ -251,34 +251,32 @@ export default function DashboardPage() {
               <AlertTriangle className="h-4 w-4" />
               Overdue Alerts ({overdueTasksForManager!.length})
             </h2>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {overdueTasksForManager!.map((ot: any) => (
                 <Card key={ot._id} className={`p-4 border-l-4 ${ot.alertType === "unassigned" ? "border-l-amber-500" : "border-l-red-500"}`}>
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-[13px] text-[var(--text-primary)]">{ot.title}</p>
-                      {ot.alertType === "unassigned" ? (
-                        <p className="text-[11px] text-amber-700 mt-0.5 font-medium">
-                          This brief has passed its deadline but no tasks have been assigned. Please assign someone to this brief quickly.
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                          {ot.briefTitle} &middot; Assigned to <span className="font-semibold">{ot.assigneeName}</span>
-                        </p>
-                      )}
-                      <p className="text-[11px] text-red-600 mt-0.5">
-                        <Clock className="inline h-3 w-3 mr-0.5" />
-                        Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
-                        {" "}({Math.round((Date.now() - ot.deadline) / (1000 * 60 * 60))}h overdue)
+                  <div className="mb-2">
+                    <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">{ot.title}</p>
+                    {ot.alertType === "unassigned" ? (
+                      <p className="text-[11px] text-amber-700 mt-0.5 font-medium">
+                        No tasks assigned. Please assign someone quickly.
                       </p>
-                      {ot.deadlineExtended && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
-                          EXTENDED
-                        </span>
-                      )}
-                    </div>
+                    ) : (
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">
+                        {ot.briefTitle} &middot; <span className="font-semibold">{ot.assigneeName}</span>
+                      </p>
+                    )}
+                    <p className="text-[11px] text-red-600 mt-0.5">
+                      <Clock className="inline h-3 w-3 mr-0.5" />
+                      {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
+                      {" "}({Math.round((Date.now() - ot.deadline) / (1000 * 60 * 60))}h overdue)
+                    </p>
+                    {ot.deadlineExtended && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
+                        EXTENDED
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {ot.alertType === "unassigned" ? (
                       <button
                         onClick={() => router.push(`/brief/${ot.briefId}`)}
@@ -289,61 +287,61 @@ export default function DashboardPage() {
                       </button>
                     ) : (
                       <>
-                    <button
-                      onClick={async () => {
-                        await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
-                      }}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
-                    >
-                      <Play className="h-3 w-3" />
-                      Resume
-                    </button>
-                    {extendingTaskId === ot._id ? (
-                      <div className="flex items-center gap-1.5 flex-1">
-                        <div className="flex-1">
-                          <DatePicker value={extendDeadline} onChange={setExtendDeadline} placeholder="New deadline" />
-                        </div>
-                        <input
-                          type="time"
-                          value={extendDeadlineTime}
-                          onChange={(e) => setExtendDeadlineTime(e.target.value)}
-                          className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-                        />
                         <button
                           onClick={async () => {
-                            if (!extendDeadline) return;
-                            let finalDeadline = extendDeadline;
-                            if (extendDeadlineTime) {
-                              const [hh, mm] = extendDeadlineTime.split(":").map(Number);
-                              const d = new Date(extendDeadline);
-                              d.setHours(hh, mm, 0, 0);
-                              finalDeadline = d.getTime();
-                            }
-                            await extendTaskDeadline({ taskId: ot._id as Id<"tasks">, newDeadline: finalDeadline });
-                            setExtendingTaskId(null);
-                            setExtendDeadline(undefined);
-                            setExtendDeadlineTime("");
+                            await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
                           }}
-                          className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                         >
-                          Save
+                          <Play className="h-3 w-3" />
+                          Resume
                         </button>
-                        <button
-                          onClick={() => { setExtendingTaskId(null); setExtendDeadline(undefined); setExtendDeadlineTime(""); }}
-                          className="px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setExtendingTaskId(ot._id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
-                      >
-                        <CalendarClock className="h-3 w-3" />
-                        Extend Deadline
-                      </button>
-                    )}
+                        {extendingTaskId === ot._id ? (
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <div className="flex-1 min-w-[100px]">
+                              <DatePicker value={extendDeadline} onChange={setExtendDeadline} placeholder="New deadline" />
+                            </div>
+                            <input
+                              type="time"
+                              value={extendDeadlineTime}
+                              onChange={(e) => setExtendDeadlineTime(e.target.value)}
+                              className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                            />
+                            <button
+                              onClick={async () => {
+                                if (!extendDeadline) return;
+                                let finalDeadline = extendDeadline;
+                                if (extendDeadlineTime) {
+                                  const [hh, mm] = extendDeadlineTime.split(":").map(Number);
+                                  const d = new Date(extendDeadline);
+                                  d.setHours(hh, mm, 0, 0);
+                                  finalDeadline = d.getTime();
+                                }
+                                await extendTaskDeadline({ taskId: ot._id as Id<"tasks">, newDeadline: finalDeadline });
+                                setExtendingTaskId(null);
+                                setExtendDeadline(undefined);
+                                setExtendDeadlineTime("");
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => { setExtendingTaskId(null); setExtendDeadline(undefined); setExtendDeadlineTime(""); }}
+                              className="px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setExtendingTaskId(ot._id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                          >
+                            <CalendarClock className="h-3 w-3" />
+                            Extend Deadline
+                          </button>
+                        )}
                       </>
                     )}
                   </div>

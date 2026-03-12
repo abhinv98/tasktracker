@@ -49,10 +49,10 @@ export default function DeliverablesPage() {
   const [submitLink, setSubmitLink] = useState("");
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
 
+  const allTeams = useQuery(api.teams.listTeams, {});
   const role = user?.role ?? "employee";
   const isAdmin = role === "admin";
-  const isTeamLead = (teamLeadPending ?? []).length >= 0 && teamLeadPending !== undefined;
-  const hasTeamLeadRole = (teamLeadPending ?? []).length > 0 || teamLeadPending !== undefined;
+  const isActualTeamLead = (allTeams ?? []).some((t: any) => t.leadId === user?._id);
   const isBrandManager = (myBrandIds ?? []).length > 0;
 
   const hasHelperReviews = (mainAssigneePending ?? []).length > 0;
@@ -69,7 +69,7 @@ export default function DeliverablesPage() {
     });
   }
 
-  if (hasTeamLeadRole && role !== "employee") {
+  if (isActualTeamLead) {
     availableTabs.push({
       id: "team_approvals",
       label: "Team Approvals",

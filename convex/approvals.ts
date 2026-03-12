@@ -41,7 +41,10 @@ export const listDeliverables = query({
         .withIndex("by_task", (q) => q.eq("taskId", taskId))
         .collect();
     } else {
-      deliverables = await ctx.db.query("deliverables").collect();
+      deliverables = await ctx.db
+        .query("deliverables")
+        .withIndex("by_submittedBy", (q) => q.eq("submittedBy", userId))
+        .collect();
     }
 
     const users = await ctx.db.query("users").collect();
