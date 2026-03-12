@@ -119,6 +119,8 @@ export default defineSchema({
     deadlineExtended: v.optional(v.boolean()),
     originalDeadline: v.optional(v.number()),
     overdueAcknowledged: v.optional(v.boolean()),
+    overdueContacted: v.optional(v.boolean()),
+    overdueContactDenied: v.optional(v.boolean()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])

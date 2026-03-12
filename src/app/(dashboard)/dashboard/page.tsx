@@ -85,11 +85,17 @@ export default function DashboardPage() {
 
     const overdueTasksForManager = useQuery(api.tasks.listOverdueTasksForManager);
     const actionNeededTasks = useQuery(api.tasks.listActionNeededTasks);
+    const adminOverdueHalt = useQuery(api.tasks.getOverdueHaltStatus);
     const resumeOverdueTask = useMutation(api.tasks.resumeOverdueTask);
     const extendTaskDeadline = useMutation(api.tasks.extendTaskDeadline);
+    const confirmOverdueContact = useMutation(api.tasks.confirmOverdueContact);
+    const adminContactManager = useMutation(api.tasks.contactManagerForOverdue);
+    const [adminContactedTasks, setAdminContactedTasks] = useState<Set<string>>(new Set());
     const [extendingTaskId, setExtendingTaskId] = useState<string | null>(null);
     const [extendDeadline, setExtendDeadline] = useState<number | undefined>(undefined);
     const [extendDeadlineTime, setExtendDeadlineTime] = useState("");
+
+    const adminIsHalted = adminOverdueHalt && adminOverdueHalt.length > 0;
 
     const adminActiveTasks = (tasks ?? []).filter((t) => t.status !== "done");
 
@@ -102,7 +108,62 @@ export default function DashboardPage() {
     }
 
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="p-4 sm:p-6 lg:p-8 relative">
+        {/* Admin Overdue Halt Overlay (when admin is assigned to overdue tasks but is not the brand manager) */}
+        {adminIsHalted && (
+          <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-[18px] text-[var(--text-primary)]">Tasks Halted</h2>
+                  <p className="text-[13px] text-[var(--text-secondary)]">
+                    You have overdue tasks that need attention
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {adminOverdueHalt!.map((ot) => (
+                  <div key={ot._id} className="p-3 rounded-lg border border-red-200 bg-red-50">
+                    <p className="font-semibold text-[13px] text-red-800">{ot.title}</p>
+                    <p className="text-[11px] text-red-600 mt-0.5">
+                      {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        Brand Manager: <span className="font-semibold">{ot.managerName}</span>
+                      </p>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await adminContactManager({ taskId: ot._id as Id<"tasks"> });
+                            setAdminContactedTasks((prev) => new Set(prev).add(ot._id));
+                          } catch {}
+                        }}
+                        disabled={ot.overdueContacted || adminContactedTasks.has(ot._id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        <Phone className="h-3 w-3" />
+                        {ot.overdueContacted || adminContactedTasks.has(ot._id) ? "Contacted" : "Contact Manager"}
+                      </button>
+                    </div>
+                    {ot.overdueContacted && !adminContactedTasks.has(ot._id) && (
+                      <p className="text-[10px] text-amber-700 mt-1.5 bg-amber-50 rounded px-2 py-1">
+                        Waiting for the brand manager to confirm your contact and resume tasks.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)] text-center">
+                All your tasks are halted until the brand manager resumes them.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 sm:mb-8">
           <div>
             <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
@@ -276,6 +337,32 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
+                  {ot.alertType !== "unassigned" && ot.overdueContacted && (
+                    <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-[11px] font-medium text-blue-800 mb-1.5">
+                        <Phone className="inline h-3 w-3 mr-0.5" />
+                        {ot.assigneeName} has contacted you. Have you had the meeting?
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: true });
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: false });
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-colors"
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {ot.alertType === "unassigned" ? (
                       <button
@@ -629,7 +716,7 @@ export default function DashboardPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const overdueStatus = useQuery(api.tasks.getOverdueHaltStatus);
   const contactManager = useMutation(api.tasks.contactManagerForOverdue);
-  const [contactedTasks, setContactedTasks] = useState<Set<string>>(new Set());
+  const [justContactedTasks, setJustContactedTasks] = useState<Set<string>>(new Set());
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -659,32 +746,45 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {overdueStatus.map((ot) => (
-                <div key={ot._id} className="p-3 rounded-lg border border-red-200 bg-red-50">
-                  <p className="font-semibold text-[13px] text-red-800">{ot.title}</p>
-                  <p className="text-[11px] text-red-600 mt-0.5">
-                    {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
-                  </p>
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-[11px] text-[var(--text-secondary)]">
-                      Brand Manager: <span className="font-semibold">{ot.managerName}</span>
+              {overdueStatus.map((ot) => {
+                const isContacted = ot.overdueContacted || justContactedTasks.has(ot._id);
+                return (
+                  <div key={ot._id} className="p-3 rounded-lg border border-red-200 bg-red-50">
+                    <p className="font-semibold text-[13px] text-red-800">{ot.title}</p>
+                    <p className="text-[11px] text-red-600 mt-0.5">
+                      {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
                     </p>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await contactManager({ taskId: ot._id as Id<"tasks"> });
-                          setContactedTasks((prev) => new Set(prev).add(ot._id));
-                        } catch {}
-                      }}
-                      disabled={contactedTasks.has(ot._id)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {contactedTasks.has(ot._id) ? "Contacted" : "Contact Manager"}
-                    </button>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-[11px] text-[var(--text-secondary)]">
+                        Brand Manager: <span className="font-semibold">{ot.managerName}</span>
+                      </p>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await contactManager({ taskId: ot._id as Id<"tasks"> });
+                            setJustContactedTasks((prev) => new Set(prev).add(ot._id));
+                          } catch {}
+                        }}
+                        disabled={isContacted}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        <Phone className="h-3 w-3" />
+                        {isContacted ? "Contacted" : "Contact Manager"}
+                      </button>
+                    </div>
+                    {isContacted && (
+                      <p className="text-[10px] text-amber-700 mt-1.5 bg-amber-50 rounded px-2 py-1">
+                        Waiting for the brand manager to confirm and resume your tasks.
+                      </p>
+                    )}
+                    {!isContacted && ot.overdueContactDenied && (
+                      <p className="text-[10px] text-red-700 mt-1.5 bg-red-100 rounded px-2 py-1">
+                        It seems you still have not had the meeting with the brand manager. Please contact them to resume your tasks.
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <p className="text-[11px] text-[var(--text-muted)] text-center">

@@ -607,7 +607,7 @@ export const getOverdueHaltStatus = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "employee") return null;
+    if (!user) return null;
 
     const now = Date.now();
     const myTasks = await ctx.db
@@ -621,11 +621,26 @@ export const getOverdueHaltStatus = query({
 
     if (overdueTasks.length === 0) return null;
 
+    // Exclude tasks where the user is the brand manager for that task's brand
+    const myBrandAssignments = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_manager", (q) => q.eq("managerId", userId))
+      .collect();
+    const myManagedBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+
     const briefs = await Promise.all(overdueTasks.map((t) => ctx.db.get(t.briefId)));
     const users = await ctx.db.query("users").collect();
 
-    const results = overdueTasks.map((task, i) => {
+    const filtered = overdueTasks.filter((task, i) => {
       const brief = briefs[i];
+      if (brief?.brandId && myManagedBrandIds.has(brief.brandId)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) return null;
+
+    const results = filtered.map((task) => {
+      const brief = briefs[overdueTasks.indexOf(task)];
       const manager = brief?.assignedManagerId
         ? users.find((u) => u._id === brief.assignedManagerId)
         : null;
@@ -637,6 +652,8 @@ export const getOverdueHaltStatus = query({
         briefId: task.briefId,
         managerName: manager?.name ?? manager?.email ?? "Brand Manager",
         managerId: brief?.assignedManagerId ?? null,
+        overdueContacted: task.overdueContacted ?? false,
+        overdueContactDenied: task.overdueContactDenied ?? false,
       };
     });
 
@@ -787,6 +804,7 @@ export const listOverdueTasksForManager = query({
         assigneeId: task.assigneeId,
         deadlineExtended: task.deadlineExtended ?? false,
         originalDeadline: task.originalDeadline,
+        overdueContacted: task.overdueContacted ?? false,
         alertType: "overdue" as const,
       };
     });
@@ -802,6 +820,7 @@ export const listOverdueTasksForManager = query({
       assigneeId: null as string | null,
       deadlineExtended: false,
       originalDeadline: undefined as number | undefined,
+      overdueContacted: false,
       alertType: "unassigned" as const,
     }));
 
@@ -891,16 +910,50 @@ export const contactManagerForOverdue = mutation({
     const managerId = brief?.assignedManagerId;
     if (!managerId) throw new Error("No brand manager found for this task");
 
+    await ctx.db.patch(taskId, { overdueContacted: true, overdueContactDenied: false });
+
     await ctx.db.insert("notifications", {
       recipientId: managerId,
       type: "overdue_contact",
-      title: "Overdue task - Employee contact",
-      message: `${user?.name ?? user?.email ?? "An employee"} is requesting a review for overdue task "${task.title}" in "${brief?.title ?? "a brief"}"`,
+      title: "Overdue task - Team member contact",
+      message: `${user?.name ?? user?.email ?? "A team member"} is requesting a review for overdue task "${task.title}" in "${brief?.title ?? "a brief"}"`,
       briefId: task.briefId,
       taskId,
       triggeredBy: userId,
       read: false,
       createdAt: Date.now(),
     });
+  },
+});
+
+export const confirmOverdueContact = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    confirmed: v.boolean(),
+  },
+  handler: async (ctx, { taskId, confirmed }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Only admins/managers can confirm contact");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    if (!confirmed) {
+      await ctx.db.patch(taskId, { overdueContacted: false, overdueContactDenied: true });
+
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "overdue_contact",
+        title: "Meeting required",
+        message: `The brand manager has not received your contact regarding overdue task "${task.title}". Please reach out to the brand manager to resume your tasks.`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
   },
 });
