@@ -846,7 +846,7 @@ export default function BriefPage() {
                                 </div>
                               ) : (
                                 <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                                  {assignee.name ?? assignee.email} &middot; {task.duration}
+                                  {assignee.name ?? assignee.email}{task.duration ? ` · ${task.duration}` : ""}
                                 </p>
                               )}
                               {(() => {
@@ -904,7 +904,7 @@ export default function BriefPage() {
                             </div>
                           ) : (
                             <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                              {assignee.name ?? assignee.email} &middot; {task.duration}
+                              {assignee.name ?? assignee.email}{task.duration ? ` · ${task.duration}` : ""}
                             </p>
                           )}
                           {(() => {

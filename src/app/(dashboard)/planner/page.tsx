@@ -322,7 +322,7 @@ export default function PlannerPage() {
     const task = (userTasks ?? []).find((t) => t._id === taskId);
     if (!task) return;
     // Cap block duration to remaining work hours (max WORK_MINUTES)
-    const blockDuration = Math.min(task.durationMinutes, WORK_MINUTES);
+    const blockDuration = Math.min(task.durationMinutes ?? 60, WORK_MINUTES);
     const startMin = findNextFreeSlot(blockDuration);
     setQuickAddTime(startMin);
     setQuickAddEndTime(Math.min(startMin + blockDuration, END_HOUR * 60));
@@ -395,7 +395,7 @@ export default function PlannerPage() {
     if (!viewingUserId) return;
     const task = (userTasks ?? []).find((t) => t._id === taskId);
     if (!task) return;
-    const blockDuration = Math.min(task.durationMinutes, WORK_MINUTES);
+    const blockDuration = Math.min(task.durationMinutes ?? 60, WORK_MINUTES);
     const startMin = findNextFreeSlot(blockDuration);
     const endMin = Math.min(startMin + blockDuration, END_HOUR * 60);
     try {
@@ -974,7 +974,7 @@ export default function PlannerPage() {
                       const task = availableTasks.find((t) => t._id === e.target.value);
                       if (task) {
                         setQuickAddTitle(task.title);
-                        setQuickAddEndTime(Math.min(quickAddTime + task.durationMinutes, END_HOUR * 60));
+                        setQuickAddEndTime(Math.min(quickAddTime + (task.durationMinutes ?? 60), END_HOUR * 60));
                       }
                     }}
                     className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"

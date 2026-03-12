@@ -222,8 +222,8 @@ export default defineSchema({
       v.object({
         title: v.string(),
         description: v.optional(v.string()),
-        duration: v.string(),
-        durationMinutes: v.number(),
+        duration: v.optional(v.string()),
+        durationMinutes: v.optional(v.number()),
       })
     ),
     createdBy: v.id("users"),

@@ -772,7 +772,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                           {st.description ?? st.title}
                         </p>
                         <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                          {st.assigneeName} &middot; {st.duration}
+                          {st.assigneeName}{st.duration ? ` · ${st.duration}` : ""}
                         </p>
                       </div>
                       <span

@@ -55,7 +55,7 @@ export const getDashboardAnalytics = query({
         0
       );
       const estimatedMinutes = empTasks.reduce(
-        (sum, t) => sum + t.durationMinutes,
+        (sum, t) => sum + (t.durationMinutes ?? 0),
         0
       );
       return {
