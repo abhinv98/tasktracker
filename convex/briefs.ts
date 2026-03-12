@@ -44,8 +44,19 @@ export const listBriefs = query({
         .filter(Boolean);
       const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
       const doneCount = tasksInBrief.filter((t) => t.status === "done").length;
+
+      // For single_task briefs, use the task's deadline (which may have been extended)
+      let effectiveDeadline = b.deadline;
+      if (b.briefType === "single_task" && tasksInBrief.length > 0) {
+        const taskDeadline = tasksInBrief[0].deadline;
+        if (taskDeadline !== undefined) {
+          effectiveDeadline = taskDeadline;
+        }
+      }
+
       return {
         ...b,
+        deadline: effectiveDeadline,
         managerName: manager?.name ?? manager?.email,
         teamNames,
         taskCount: tasksInBrief.length,

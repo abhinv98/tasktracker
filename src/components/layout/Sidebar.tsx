@@ -13,6 +13,7 @@ import {
   Archive,
   UserCircle,
   FileCheck,
+  CheckCircle2,
   Tag,
   BarChart3,
   TrendingUp,
@@ -42,13 +43,14 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/overview": BarChart3,
   "/analytics": TrendingUp,
   "/discussions": MessageCircle,
-  "/planner": CalendarDays,
+  // "/planner": CalendarDays,
   "/messages": MessageSquare,
   "/teams": Users,
   "/users": Shield,
   "/archive": Archive,
   "/profile": UserCircle,
   "/deliverables": FileCheck,
+  "/approved-work": CheckCircle2,
   "/worklog": ClipboardList,
   "/content-calendar": CalendarRange,
   "/history": BookOpen,
@@ -71,7 +73,7 @@ const ADMIN_NAV: NavCategory[] = [
   {
     category: "Planning",
     items: [
-      { href: "/planner", label: "Planner" },
+      // { href: "/planner", label: "Planner" },
       { href: "/content-calendar", label: "Content Calendar" },
       { href: "/messages", label: "Messages" },
     ],
@@ -88,6 +90,7 @@ const ADMIN_NAV: NavCategory[] = [
     category: "Management",
     items: [
       { href: "/deliverables", label: "Deliverables" },
+      { href: "/approved-work", label: "Approved Work" },
       { href: "/worklog", label: "Work Log" },
       { href: "/teams", label: "Teams" },
       { href: "/users", label: "Users & Roles" },
@@ -112,7 +115,7 @@ const MANAGER_NAV: NavCategory[] = [
   {
     category: "Planning",
     items: [
-      { href: "/planner", label: "Planner" },
+      // { href: "/planner", label: "Planner" },
       { href: "/content-calendar", label: "Content Calendar" },
       { href: "/messages", label: "Messages" },
     ],
@@ -128,6 +131,7 @@ const MANAGER_NAV: NavCategory[] = [
     category: "Management",
     items: [
       { href: "/deliverables", label: "Deliverables" },
+      { href: "/approved-work", label: "Approved Work" },
       { href: "/teams", label: "Teams" },
       { href: "/archive", label: "Archive" },
     ],
@@ -150,7 +154,7 @@ const EMPLOYEE_NAV: NavCategory[] = [
   {
     category: "Planning",
     items: [
-      { href: "/planner", label: "Planner" },
+      // { href: "/planner", label: "Planner" },
       { href: "/messages", label: "Messages" },
     ],
   },

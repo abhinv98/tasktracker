@@ -705,6 +705,12 @@ export const extendTaskDeadline = mutation({
       overdueAcknowledged: true,
     });
 
+    // Also update the brief's deadline for single_task briefs
+    const brief = await ctx.db.get(task.briefId);
+    if (brief?.briefType === "single_task") {
+      await ctx.db.patch(task.briefId, { deadline: newDeadline });
+    }
+
     await ctx.db.insert("notifications", {
       recipientId: task.assigneeId,
       type: "deadline_extended",
@@ -800,6 +806,72 @@ export const listOverdueTasksForManager = query({
     }));
 
     return [...taskResults, ...briefResults];
+  },
+});
+
+export const listActionNeededTasks = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+
+    const allTasks = await ctx.db.query("tasks").collect();
+    const briefs = await ctx.db.query("briefs").collect();
+    const brands = await ctx.db.query("brands").collect();
+    const users = await ctx.db.query("users").collect();
+
+    const myBrandAssignments = await ctx.db
+      .query("brandManagers")
+      .withIndex("by_manager", (q) => q.eq("managerId", userId))
+      .collect();
+    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+
+    const myBriefIds = new Set(
+      briefs
+        .filter(
+          (b) =>
+            b.assignedManagerId === userId ||
+            (b.brandId && myBrandIds.has(b.brandId))
+        )
+        .map((b) => b._id)
+    );
+
+    const actionTasks = allTasks.filter((t) => {
+      if (!myBriefIds.has(t.briefId)) return false;
+      if (t.status === "done") return false;
+      const noAssignee = !t.assigneeId;
+      const noDeadline = t.deadline === undefined || t.deadline === null;
+      return noAssignee || noDeadline;
+    });
+
+    return actionTasks.map((t) => {
+      const brief = briefs.find((b) => b._id === t.briefId);
+      const brand = brief?.brandId
+        ? brands.find((b) => b._id === brief.brandId)
+        : null;
+      const assignee = t.assigneeId
+        ? users.find((u) => u._id === t.assigneeId)
+        : null;
+
+      const noAssignee = !t.assigneeId;
+      const noDeadline = t.deadline === undefined || t.deadline === null;
+      let category: "no_assignee" | "no_deadline" | "neither";
+      if (noAssignee && noDeadline) category = "neither";
+      else if (noAssignee) category = "no_assignee";
+      else category = "no_deadline";
+
+      return {
+        _id: t._id,
+        title: t.title,
+        briefId: t.briefId,
+        briefTitle: brief?.title ?? "Unknown",
+        brandName: brand?.name ?? "No Brand",
+        category,
+        assigneeName: assignee?.name ?? assignee?.email ?? null,
+        deadline: t.deadline ?? null,
+      };
+    });
   },
 });
 

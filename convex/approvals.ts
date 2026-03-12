@@ -429,6 +429,110 @@ export const getTeamLeadPendingCount = query({
   },
 });
 
+// ─── Approved Work Queries ──────────────────────────
+
+export const listClientApprovedDeliverables = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const approved = allDeliverables.filter(
+      (d) => d.clientStatus === "client_approved"
+    );
+    if (approved.length === 0) return [];
+
+    const tasks = await ctx.db.query("tasks").collect();
+    const briefs = await ctx.db.query("briefs").collect();
+    const brands = await ctx.db.query("brands").collect();
+    const users = await ctx.db.query("users").collect();
+
+    const results = await Promise.all(
+      approved.map(async (d) => {
+        const task = tasks.find((t) => t._id === d.taskId);
+        const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+        const brand = brief?.brandId
+          ? brands.find((b) => b._id === brief.brandId)
+          : null;
+        const manager = brief?.assignedManagerId
+          ? users.find((u) => u._id === brief.assignedManagerId)
+          : null;
+        const submitter = users.find((u) => u._id === d.submittedBy);
+
+        let files: { name: string; url: string }[] = [];
+        if (d.fileIds && d.fileIds.length > 0) {
+          files = (
+            await Promise.all(
+              d.fileIds.map(async (fileId, idx) => {
+                const url = await ctx.storage.getUrl(fileId);
+                return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
+              })
+            )
+          ).filter((f) => f.url);
+        }
+
+        return {
+          _id: d._id,
+          taskTitle: task?.title ?? "Unknown",
+          briefTitle: brief?.title ?? "Unknown",
+          briefId: brief?._id,
+          brandName: brand?.name ?? "No Brand",
+          brandId: brief?.brandId,
+          managerName: manager?.name ?? manager?.email ?? "Unknown",
+          managerId: brief?.assignedManagerId,
+          submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          submittedAt: d.submittedAt,
+          clientReviewedAt: d.clientReviewedAt,
+          clientNote: d.clientNote,
+          message: d.message,
+          link: d.link,
+          files,
+        };
+      })
+    );
+
+    return results.sort(
+      (a, b) => (b.clientReviewedAt ?? 0) - (a.clientReviewedAt ?? 0)
+    );
+  },
+});
+
+export const getApprovedWorkStats = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const allBriefs = await ctx.db.query("briefs").collect();
+    const allTasks = await ctx.db.query("tasks").collect();
+
+    const sentToClient = allDeliverables.filter(
+      (d) => d.clientStatus !== undefined
+    ).length;
+    const clientApproved = allDeliverables.filter(
+      (d) => d.clientStatus === "client_approved"
+    ).length;
+
+    const totalBriefs = allBriefs.length;
+
+    const clientFacingTaskBriefIds = new Set(
+      allTasks.filter((t) => t.clientFacing).map((t) => t.briefId)
+    );
+    const clientBriefs = allBriefs.filter((b) =>
+      clientFacingTaskBriefIds.has(b._id)
+    ).length;
+    const internalBriefs = totalBriefs - clientBriefs;
+
+    return {
+      sentToClient,
+      clientApproved,
+      totalBriefs,
+      clientBriefs,
+      internalBriefs,
+    };
+  },
+});
+
 // ─── Mutations ──────────────────────────────────────
 
 export const submitDeliverable = mutation({

@@ -2,11 +2,11 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, TaskDetailModal, DatePicker } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock } from "lucide-react";
+import { Card, TaskDetailModal, DatePicker } from "@/components/ui";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -59,36 +59,6 @@ export default function DashboardPage() {
   const allUsers = useQuery(api.users.listAllUsers);
   const role = user?.role ?? "employee";
 
-  const [selectedBriefId, setSelectedBriefId] = useState<Id<"briefs"> | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const selectedBrief = useQuery(
-    api.briefs.getBrief,
-    selectedBriefId ? { briefId: selectedBriefId } : "skip"
-  );
-
-  function openBriefPanel(briefId: Id<"briefs">) {
-    setSelectedBriefId(briefId);
-    // Small delay for mount animation
-    requestAnimationFrame(() => setPanelOpen(true));
-  }
-
-  function closeBriefPanel() {
-    setPanelOpen(false);
-    setTimeout(() => setSelectedBriefId(null), 200);
-  }
-
-  // Close on escape
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") closeBriefPanel();
-    }
-    if (selectedBriefId) {
-      document.addEventListener("keydown", handleKey);
-    }
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [selectedBriefId]);
 
   const activeBriefs = (briefs ?? []).filter(
     (b) => !["archived", "completed"].includes(b.status)
@@ -97,78 +67,6 @@ export default function DashboardPage() {
   const displayName = user?.name ?? user?.email?.split("@")[0] ?? "there";
   const greeting = getGreeting();
 
-  // Helper to get user name from ID
-  function getUserName(userId: string): string {
-    if (!allUsers) return "Unknown";
-    const u = allUsers.find((u) => u._id === userId);
-    return u?.name ?? u?.email?.split("@")[0] ?? "Unknown";
-  }
-
-  // Build the tree structure for the selected brief
-  function renderTaskTree() {
-    if (!selectedBrief) return null;
-    const tasksList = selectedBrief.tasks ?? [];
-    
-    // Group by status
-    const grouped: Record<string, typeof tasksList> = {};
-    for (const task of tasksList) {
-      if (!grouped[task.status]) grouped[task.status] = [];
-      grouped[task.status].push(task);
-    }
-
-    const statusKeys = Object.keys(grouped).sort(
-      (a, b) => (STATUS_CONFIG[a]?.order ?? 99) - (STATUS_CONFIG[b]?.order ?? 99)
-    );
-
-    if (statusKeys.length === 0) {
-      return (
-        <div className="text-[13px] text-[var(--text-muted)] font-mono px-1">
-          └── No tasks yet
-        </div>
-      );
-    }
-
-    return (
-      <div className="font-mono text-[13px] leading-relaxed text-[var(--text-primary)]">
-        {statusKeys.map((status, statusIdx) => {
-          const config = STATUS_CONFIG[status] ?? { color: "var(--text-muted)", label: status, order: 99 };
-          const statusTasks = grouped[status];
-          const isLastStatus = statusIdx === statusKeys.length - 1;
-          const connector = isLastStatus ? "└── " : "├── ";
-          const childPrefix = isLastStatus ? "    " : "│   ";
-
-          return (
-            <div key={status}>
-              <div className="flex items-center gap-1">
-                <span className="text-[var(--text-muted)] select-none">{connector}</span>
-                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: config.color }} />
-                <span className="font-semibold text-[var(--text-secondary)]">{config.label}</span>
-                <span className="text-[var(--text-disabled)]">({statusTasks.length})</span>
-              </div>
-              {statusTasks.map((task, taskIdx) => {
-                const isLastTask = taskIdx === statusTasks.length - 1;
-                const taskConnector = isLastTask ? "└── " : "├── ";
-                return (
-                  <div key={task._id} className="flex items-start gap-1">
-                    <span className="text-[var(--text-muted)] select-none whitespace-pre">{childPrefix}{taskConnector}</span>
-                    <span className="text-[var(--text-primary)] break-words">{task.title}</span>
-                    <span className="text-[var(--text-disabled)] whitespace-nowrap ml-1">
-                      — @{getUserName(task.assigneeId)}
-                    </span>
-                    {task.deadline && (
-                      <span className="text-[var(--accent-admin)] whitespace-nowrap ml-1">
-                        (Due {new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })})
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
 
   // ═══════════════════════════════════════════
   // ADMIN DASHBOARD
@@ -186,6 +84,7 @@ export default function DashboardPage() {
     const [adminSelectedTaskId, setAdminSelectedTaskId] = useState<string | null>(null);
 
     const overdueTasksForManager = useQuery(api.tasks.listOverdueTasksForManager);
+    const actionNeededTasks = useQuery(api.tasks.listActionNeededTasks);
     const resumeOverdueTask = useMutation(api.tasks.resumeOverdueTask);
     const extendTaskDeadline = useMutation(api.tasks.extendTaskDeadline);
     const [extendingTaskId, setExtendingTaskId] = useState<string | null>(null);
@@ -266,28 +165,51 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Brand Overview Shortcut */}
-        <Card
-          hover
-          accent="admin"
-          onClick={() => router.push("/overview")}
-          className="mb-6 sm:mb-8 cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-[var(--accent-admin)]" />
+        {/* Brand Overview & Briefs Overview Shortcuts */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 sm:mb-8">
+          <Card
+            hover
+            accent="admin"
+            onClick={() => router.push("/overview")}
+            className="cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-[var(--accent-admin)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                  Brand Overview
+                </h3>
+                <p className="text-[12px] text-[var(--text-secondary)]">
+                  View all brands, managers, and task progress
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
-                Brand Overview
-              </h3>
-              <p className="text-[12px] text-[var(--text-secondary)]">
-                View all brands, managers, and task progress at a glance
-              </p>
+          </Card>
+          <Card
+            hover
+            accent="employee"
+            onClick={() => router.push("/briefs")}
+            className="cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[var(--accent-employee-dim)] flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-[var(--accent-employee)]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                  Briefs Overview
+                </h3>
+                <p className="text-[12px] text-[var(--text-secondary)]">
+                  Browse all briefs, tasks, and deadlines
+                </p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
             </div>
-            <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-          </div>
-        </Card>
+          </Card>
+        </div>
 
         {/* Client Approval Status */}
         {clientApprovalCounts && (clientApprovalCounts.approved > 0 || clientApprovalCounts.pendingClient > 0 || clientApprovalCounts.changesRequested > 0 || clientApprovalCounts.denied > 0) && (
@@ -427,6 +349,67 @@ export default function DashboardPage() {
                   </div>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action Needed Grid */}
+        {(actionNeededTasks ?? []).length > 0 && (
+          <div className="mb-6 sm:mb-8">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
+              <Info className="h-4 w-4 text-blue-500" />
+              Action Needed ({actionNeededTasks!.length})
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {actionNeededTasks!.map((t: any) => {
+                const borderColor =
+                  t.category === "neither"
+                    ? "border-l-red-500"
+                    : t.category === "no_assignee"
+                      ? "border-l-amber-500"
+                      : "border-l-blue-500";
+                const label =
+                  t.category === "neither"
+                    ? "No Assignee & No Deadline"
+                    : t.category === "no_assignee"
+                      ? "No Assignee"
+                      : "No Deadline";
+                const labelColor =
+                  t.category === "neither"
+                    ? "text-red-600 bg-red-50"
+                    : t.category === "no_assignee"
+                      ? "text-amber-600 bg-amber-50"
+                      : "text-blue-600 bg-blue-50";
+                const IconComp = t.category === "no_deadline" ? CalendarOff : UserX;
+
+                return (
+                  <Card key={t._id} className={`p-4 border-l-4 ${borderColor}`}>
+                    <div className="flex items-start gap-2 mb-2">
+                      <IconComp className="h-4 w-4 mt-0.5 shrink-0 text-[var(--text-muted)]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
+                          {t.title}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                          {t.briefTitle} &middot; {t.brandName}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColor}`}>
+                        {label}
+                      </span>
+                      <button
+                        onClick={() => router.push(`/brief/${t.briefId}`)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                      >
+                        Take Action
+                        <ArrowRight className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}
@@ -630,64 +613,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-          <h2 className="font-semibold text-[14px] text-[var(--text-secondary)]">
-            Briefs Overview
-          </h2>
-          <Button variant="primary" onClick={() => router.push("/briefs")}>
-            Create Brief
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {(briefs ?? [])
-            .filter((b) => b.status !== "archived")
-            .sort((a, b) => a.globalPriority - b.globalPriority)
-            .map((brief) => (
-              <Card
-                key={brief._id}
-                onClick={() => openBriefPanel(brief._id)}
-                hover
-                accent={brief.status === "active" ? "employee" : brief.status === "draft" ? undefined : "manager"}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)] truncate flex-1">
-                    {brief.title}
-                  </h3>
-                  <Badge variant="neutral">{brief.status}</Badge>
-                </div>
-                {brief.managerName && (
-                  <p className="text-[12px] text-[var(--text-secondary)] mb-2">
-                    Manager: {brief.managerName}
-                  </p>
-                )}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[var(--accent-employee)]"
-                      style={{ width: `${brief.progress ?? 0}%` }}
-                    />
-                  </div>
-                  <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                    {brief.doneCount ?? 0}/{brief.taskCount ?? 0}
-                  </span>
-                </div>
-                {(brief.teamNames?.length ?? 0) > 0 && (
-                  <div className="flex gap-1 flex-wrap mt-2">
-                    {brief.teamNames?.filter((name): name is string => !!name).map((name) => (
-                      <Badge key={name} variant="neutral">{name}</Badge>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            ))}
-          {(briefs ?? []).filter((b) => b.status !== "archived").length === 0 && (
-            <p className="text-[13px] text-[var(--text-muted)] col-span-full">
-              No briefs yet. Create one to get started.
-            </p>
-          )}
-        </div>
-
         {/* Admin Task Detail Modal */}
         {adminSelectedTaskId && (
           <TaskDetailModal
@@ -696,122 +621,6 @@ export default function DashboardPage() {
           />
         )}
 
-        {/* ═══ Brief Slide-in Panel ═══ */}
-        {selectedBriefId && (
-          <>
-            {/* Backdrop */}
-            <div
-              className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-200 ${
-                panelOpen ? "opacity-100" : "opacity-0"
-              }`}
-              onClick={closeBriefPanel}
-            />
-
-            {/* Panel */}
-            <div
-              ref={panelRef}
-              className={`fixed right-0 top-0 h-full w-full sm:w-[420px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
-                panelOpen ? "translate-x-0" : "translate-x-full"
-              }`}
-            >
-              {/* Panel Header */}
-              <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--border)] shrink-0">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-sm bg-[var(--accent-admin)]" />
-                  <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
-                    {selectedBrief?.title ?? "Loading..."}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {selectedBrief && (
-                    <Badge variant="neutral">{selectedBrief.status}</Badge>
-                  )}
-                  <button
-                    onClick={closeBriefPanel}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Panel Body */}
-              <div className="flex-1 overflow-y-auto px-5 py-5">
-                {selectedBrief === undefined ? (
-                  <p className="text-[13px] text-[var(--text-muted)]">Loading brief data...</p>
-                ) : selectedBrief === null ? (
-                  <p className="text-[13px] text-[var(--text-muted)]">Brief not found.</p>
-                ) : (
-                  <>
-                    {/* Brief description */}
-                    {selectedBrief.description && (
-                      <p className="text-[13px] text-[var(--text-secondary)] mb-4 leading-relaxed">
-                        {selectedBrief.description}
-                      </p>
-                    )}
-
-                    {/* Manager */}
-                    {selectedBrief.manager && (
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-[12px] text-[var(--text-muted)]">Manager:</span>
-                        <Badge variant="manager">
-                          {selectedBrief.manager.name ?? selectedBrief.manager.email}
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Progress */}
-                    <div className="mb-5">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[12px] font-medium text-[var(--text-secondary)]">Progress</span>
-                        <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">
-                          {Math.round(selectedBrief.progress)}%
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent-employee)] transition-all"
-                          style={{ width: `${selectedBrief.progress}%` }}
-                        />
-                      </div>
-                      <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                        {selectedBrief.doneCount}/{selectedBrief.taskCount} tasks completed
-                      </p>
-                    </div>
-
-                    {/* Task Tree */}
-                    <div className="mb-4">
-                      <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] mb-3 uppercase tracking-wider">
-                        Task Structure
-                      </h3>
-                      <div className="bg-[var(--bg-hover)] rounded-lg p-4 overflow-x-auto">
-                        <div className="font-mono text-[13px] text-[var(--text-primary)] mb-2 font-semibold">
-                          {selectedBrief.title}
-                        </div>
-                        {renderTaskTree()}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Panel Footer */}
-              <div className="px-5 py-4 border-t border-[var(--border)] shrink-0">
-                <Button
-                  variant="primary"
-                  className="w-full"
-                  onClick={() => {
-                    closeBriefPanel();
-                    router.push(`/brief/${selectedBriefId}`);
-                  }}
-                >
-                  View Complete Brief
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
       </div>
     );
   }
