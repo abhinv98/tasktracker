@@ -248,7 +248,7 @@ export default function ContentCalendarPage() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-white shrink-0">
         <div className="flex items-center gap-4">
@@ -355,9 +355,9 @@ export default function ContentCalendarPage() {
               );
             })()}
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-px mb-px">
+            <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-10 bg-white">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                <div key={d} className="text-center py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide bg-white">
                   {d}
                 </div>
               ))}
