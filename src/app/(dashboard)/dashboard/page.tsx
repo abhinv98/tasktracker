@@ -92,6 +92,7 @@ export default function DashboardPage() {
     const adminContactManager = useMutation(api.tasks.contactManagerForOverdue);
     const [adminContactedTasks, setAdminContactedTasks] = useState<Set<string>>(new Set());
     const deleteTask = useMutation(api.tasks.deleteTask);
+    const deleteBrief = useMutation(api.briefs.deleteBrief);
     const [extendingTaskId, setExtendingTaskId] = useState<string | null>(null);
     const [extendDeadline, setExtendDeadline] = useState<number | undefined>(undefined);
     const [extendDeadlineTime, setExtendDeadlineTime] = useState("");
@@ -368,19 +369,29 @@ export default function DashboardPage() {
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {ot.alertType === "unassigned" ? (
-                      <button
-                        onClick={() => {
-                          if (ot.briefType === "content_calendar" && ot.brandId) {
-                            router.push(`/content-calendar?brand=${ot.brandId}`);
-                          } else {
-                            router.push(`/brief/${ot.briefId}`);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                        {ot.briefType === "content_calendar" ? "Open Calendar" : "Assign Tasks"}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => {
+                            if (ot.briefType === "content_calendar" && ot.brandId) {
+                              router.push(`/content-calendar?brand=${ot.brandId}`);
+                            } else {
+                              router.push(`/brief/${ot.briefId}`);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+                        >
+                          <ArrowRight className="h-3 w-3" />
+                          {ot.briefType === "content_calendar" ? "Open Calendar" : "Assign Tasks"}
+                        </button>
+                        {resolvingTaskId !== ot._id && (
+                          <button
+                            onClick={() => setResolvingTaskId(ot._id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </>
                     ) : (
                       <>
                         <button
@@ -449,13 +460,19 @@ export default function DashboardPage() {
                       </>
                     )}
                   </div>
-                  {resolvingTaskId === ot._id && ot.alertType !== "unassigned" && (
+                  {resolvingTaskId === ot._id && (
                     <div className="mt-2 p-2.5 rounded-lg bg-gray-50 border border-[var(--border-subtle)]">
-                      <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">Is this task already done?</p>
+                      <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">
+                        {ot.alertType === "unassigned" ? "Delete this brief and all its data?" : "Is this task already done?"}
+                      </p>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={async () => {
-                            await deleteTask({ taskId: ot._id as Id<"tasks"> });
+                            if (ot.alertType === "unassigned") {
+                              await deleteBrief({ briefId: ot.briefId as Id<"briefs"> });
+                            } else {
+                              await deleteTask({ taskId: ot._id as Id<"tasks"> });
+                            }
                             setResolvingTaskId(null);
                           }}
                           className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
