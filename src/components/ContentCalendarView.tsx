@@ -296,6 +296,25 @@ export function ContentCalendarView({
         <div
           className={`flex-1 overflow-auto bg-[var(--bg-primary)] ${selectedTask ? "border-r border-[var(--border)]" : ""}`}
         >
+          {(() => {
+            const incomplete = (tasks ?? []).filter((t: any) => !t.assigneeId || !t.deadline);
+            const noAssignee = incomplete.filter((t: any) => !t.assigneeId).length;
+            const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
+            if (incomplete.length === 0) return null;
+            return (
+              <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+                <span className="text-[12px] font-semibold text-amber-800">
+                  {incomplete.length} task{incomplete.length !== 1 ? "s" : ""} need attention
+                </span>
+                <span className="text-[11px] text-amber-700">
+                  {noAssignee > 0 && `${noAssignee} unassigned`}
+                  {noAssignee > 0 && noDeadline > 0 && " · "}
+                  {noDeadline > 0 && `${noDeadline} no deadline`}
+                </span>
+                <span className="text-[10px] text-amber-600 ml-auto">Click a row to assign</span>
+              </div>
+            );
+          })()}
           <table className="w-full min-w-[900px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-[var(--bg-primary)] border-b border-[var(--border)]">
@@ -337,7 +356,9 @@ export function ContentCalendarView({
                     className={`border-b border-[var(--border-subtle)] cursor-pointer transition-colors ${
                       isSelected
                         ? "bg-[var(--accent-admin-dim)]"
-                        : "hover:bg-[var(--bg-hover)]"
+                        : (!task.assigneeId || !task.deadline)
+                          ? "bg-amber-50/50 hover:bg-amber-50"
+                          : "hover:bg-[var(--bg-hover)]"
                     }`}
                   >
                     <td className="px-4 py-2.5">
@@ -388,16 +409,22 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <div>
-                        <span className="text-[12px] text-[var(--text-primary)]">
-                          {task.assigneeName}
+                      {task.assigneeId ? (
+                        <div>
+                          <span className="text-[12px] text-[var(--text-primary)]">
+                            {task.assigneeName}
+                          </span>
+                          {task.assigneeDesignation && (
+                            <p className="text-[10px] text-[var(--text-muted)]">
+                              {task.assigneeDesignation}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
+                          Unassigned
                         </span>
-                        {task.assigneeDesignation && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            {task.assigneeDesignation}
-                          </p>
-                        )}
-                      </div>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       {task.deadline ? (
@@ -415,8 +442,8 @@ export function ContentCalendarView({
                           )}
                         </span>
                       ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">
-                          —
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
+                          No Deadline
                         </span>
                       )}
                     </td>

@@ -14,6 +14,7 @@ import {
   Calendar,
   Link2,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import {
   DndContext,
@@ -331,6 +332,26 @@ export default function ContentCalendarPage() {
         <div className="flex-1 flex overflow-hidden">
           {/* Calendar Grid */}
           <div className={`flex-1 overflow-auto p-4 ${selectedTask ? "border-r border-[var(--border)]" : ""}`}>
+            {(() => {
+              const incomplete = (tasks ?? []).filter((t: any) => !t.assigneeId || !t.deadline);
+              const noAssignee = incomplete.filter((t: any) => !t.assigneeId).length;
+              const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
+              if (incomplete.length === 0) return null;
+              return (
+                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                  <span className="text-[12px] font-semibold text-amber-800">
+                    {incomplete.length} task{incomplete.length !== 1 ? "s" : ""} need attention
+                  </span>
+                  <span className="text-[11px] text-amber-700">
+                    {noAssignee > 0 && `${noAssignee} unassigned`}
+                    {noAssignee > 0 && noDeadline > 0 && " · "}
+                    {noDeadline > 0 && `${noDeadline} no deadline`}
+                  </span>
+                  <span className="text-[10px] text-amber-600 ml-auto">Click a task to assign</span>
+                </div>
+              );
+            })()}
             {/* Weekday Headers */}
             <div className="grid grid-cols-7 gap-px mb-px">
               {WEEKDAYS.map((d) => (
@@ -705,6 +726,9 @@ function DraggableTaskCard({
         <span className="text-[var(--text-muted)] truncate">
           {task.platform}
         </span>
+        {(!task.assigneeId || !task.deadline) && (
+          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={!task.assigneeId && !task.deadline ? "Unassigned & No Deadline" : !task.assigneeId ? "Unassigned" : "No Deadline"} />
+        )}
       </div>
     </button>
   );
