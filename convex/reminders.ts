@@ -51,11 +51,13 @@ export const checkDeadlines = internalMutation({
         if (task.parentTaskId) {
           const assigneeTeams = await ctx.db
             .query("userTeams")
-            .withIndex("by_user", (q: any) => q.eq("userId", task.assigneeId))
+            .withIndex("by_user", (q) => q.eq("userId", task.assigneeId))
             .collect();
-          const teams = await Promise.all(assigneeTeams.map((ut: any) => ctx.db.get(ut.teamId)));
-          for (const team of teams) {
-            if (team?.leadId) recipientIds.add(team.leadId);
+          for (const ut of assigneeTeams) {
+            const team = await ctx.db.get(ut.teamId);
+            if (team && "leadId" in team && team.leadId) {
+              recipientIds.add(team.leadId as string);
+            }
           }
         }
 
