@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2 } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 
@@ -43,6 +43,22 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
   const deliverables = useQuery(api.approvals.listDeliverables, taskId ? { taskId } : "skip");
   const dailySummaries = useQuery(api.taskDailySummaries.listSummaries, taskId ? { taskId } : "skip");
   const subTasks = useQuery(api.tasks.getSubTasks, taskId ? { parentTaskId: taskId } : "skip");
+  const graphData = useQuery(api.briefs.getBriefGraphData, { briefId: brief._id });
+  const createSubTask = useMutation(api.tasks.createSubTask);
+
+  const [showAddHelper, setShowAddHelper] = useState(false);
+  const [helperAssignee, setHelperAssignee] = useState("");
+  const [helperDesc, setHelperDesc] = useState("");
+  const [helperDurVal, setHelperDurVal] = useState("2");
+  const [helperDurUnit, setHelperDurUnit] = useState<"m" | "h" | "d">("h");
+  const [isCreatingSubTask, setIsCreatingSubTask] = useState(false);
+
+  const teamMembers = useMemo(() => {
+    if (!graphData?.teams) return [];
+    return graphData.teams.flatMap((t: any) =>
+      t.members.map((m: any) => m.user).filter(Boolean)
+    );
+  }, [graphData]);
 
   const assigneeName = useMemo(() => {
     if (!task || !tasksData?.byTeam) return "Unassigned";
@@ -124,12 +140,109 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
           )}
         </div>
 
-        {/* Sub-tasks */}
-        {subTasks && subTasks.length > 0 && (
-          <div>
-            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <ClipboardList className="w-3.5 h-3.5" /> Sub-Tasks ({subTasks.length})
+        {/* Sub-tasks / Helpers */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide flex items-center gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5" /> Sub-Tasks ({subTasks?.length ?? 0})
             </p>
+            {isAdmin && task.status !== "done" && (
+              <button
+                onClick={() => setShowAddHelper(!showAddHelper)}
+                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+              >
+                <UserPlus className="h-3 w-3" />
+                Add Helper
+              </button>
+            )}
+          </div>
+
+          {showAddHelper && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!helperAssignee || !helperDesc.trim() || isCreatingSubTask || !taskId) return;
+                setIsCreatingSubTask(true);
+                try {
+                  const dur = `${helperDurVal}${helperDurUnit}`;
+                  const durMin = parseDuration(dur);
+                  await createSubTask({
+                    parentTaskId: taskId,
+                    assigneeId: helperAssignee as Id<"users">,
+                    description: helperDesc.trim(),
+                    duration: dur,
+                    durationMinutes: durMin,
+                  });
+                  setHelperAssignee("");
+                  setHelperDesc("");
+                  setHelperDurVal("2");
+                  setHelperDurUnit("h");
+                  setShowAddHelper(false);
+                } finally {
+                  setIsCreatingSubTask(false);
+                }
+              }}
+              className="space-y-2 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] mb-3"
+            >
+              <select
+                value={helperAssignee}
+                onChange={(e) => setHelperAssignee(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                required
+              >
+                <option value="">Select team member...</option>
+                {teamMembers.map((u: any) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name ?? u.email ?? "Unknown"}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                value={helperDesc}
+                onChange={(e) => setHelperDesc(e.target.value)}
+                placeholder="Describe the sub-task..."
+                className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[50px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                required
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={helperDurVal}
+                  onChange={(e) => setHelperDurVal(e.target.value)}
+                  className="w-16 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                  required
+                />
+                <select
+                  value={helperDurUnit}
+                  onChange={(e) => setHelperDurUnit(e.target.value as "m" | "h" | "d")}
+                  className="px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                >
+                  <option value="m">Min</option>
+                  <option value="h">Hrs</option>
+                  <option value="d">Days</option>
+                </select>
+                <div className="flex-1" />
+                <button
+                  type="submit"
+                  disabled={isCreatingSubTask}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-50"
+                >
+                  {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+                  {isCreatingSubTask ? "Adding..." : "Add Helper"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddHelper(false)}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {subTasks && subTasks.length > 0 ? (
             <div className="space-y-1.5">
               {subTasks.map((st: any) => (
                 <div key={st._id} className="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)]">
@@ -144,8 +257,10 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-[12px] text-[var(--text-muted)]">No helpers added yet.</p>
+          )}
+        </div>
 
         {/* Daily Summaries */}
         <div>

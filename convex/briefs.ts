@@ -116,6 +116,7 @@ export const createBrief = mutation({
     taskDuration: v.optional(v.string()),
     taskDurationMinutes: v.optional(v.number()),
     taskClientFacing: v.optional(v.boolean()),
+    teamIds: v.optional(v.array(v.id("teams"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -137,7 +138,7 @@ export const createBrief = mutation({
       if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
     }
 
-    const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, taskClientFacing, ...briefArgs } = args;
+    const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, taskClientFacing, teamIds, ...briefArgs } = args;
 
     const briefId = await ctx.db.insert("briefs", {
       ...briefArgs,
@@ -154,6 +155,27 @@ export const createBrief = mutation({
       details: JSON.stringify({ title: args.title }),
       timestamp: Date.now(),
     });
+
+    if (teamIds && teamIds.length > 0) {
+      for (const teamId of teamIds) {
+        await ctx.db.insert("briefTeams", { briefId, teamId });
+      }
+      const teams = await Promise.all(teamIds.map((id) => ctx.db.get(id)));
+      for (const team of teams) {
+        if (team?.leadId && team.leadId !== userId) {
+          await ctx.db.insert("notifications", {
+            recipientId: team.leadId,
+            type: "team_added",
+            title: "Team added to brief",
+            message: `Your team ${team.name} was added to a brief "${args.title}"`,
+            briefId,
+            triggeredBy: userId,
+            read: false,
+            createdAt: Date.now(),
+          });
+        }
+      }
+    }
 
     if (args.briefType === "single_task" && taskAssigneeId && taskDuration && taskDurationMinutes) {
       const taskId = await ctx.db.insert("tasks", {

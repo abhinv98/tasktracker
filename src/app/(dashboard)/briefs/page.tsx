@@ -184,6 +184,7 @@ export default function BriefsPage() {
           taskDurationMinutes,
           taskClientFacing: clientFacing || undefined,
         } : {}),
+        ...(isSingle && stTeamId ? { teamIds: [stTeamId as Id<"teams">] } : {}),
       });
       setShowModal(false);
       setTitle("");
