@@ -262,7 +262,7 @@ export const setSuperAdmins = internalMutation({
     let updated = 0;
     for (const u of allUsers) {
       const name = (u.name ?? "").toLowerCase();
-      if (name.includes("mayur") || name.includes("vivek")) {
+      if (name.includes("mayur") || name.includes("vivek") || name.includes("abhinav")) {
         await ctx.db.patch(u._id, { isSuperAdmin: true });
         updated++;
       }

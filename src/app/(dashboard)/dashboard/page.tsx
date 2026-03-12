@@ -100,6 +100,22 @@ export default function DashboardPage() {
 
     const adminIsHalted = adminOverdueHalt && adminOverdueHalt.length > 0;
 
+    const isSuperAdmin = user?.isSuperAdmin === true;
+    const myBrandIdSet = new Set(myBrandIds ?? []);
+    const scopedBriefs = isSuperAdmin
+      ? (briefs ?? [])
+      : (briefs ?? []).filter((b: any) => b.brandId && myBrandIdSet.has(b.brandId));
+    const scopedActiveBriefs = scopedBriefs.filter(
+      (b) => !["archived", "completed"].includes(b.status)
+    ).length;
+    const scopedOpenTasks = scopedBriefs.reduce(
+      (acc, b) =>
+        acc +
+        ((b as { taskCount?: number }).taskCount ?? 0) -
+        ((b as { doneCount?: number }).doneCount ?? 0),
+      0
+    );
+
     const adminActiveTasks = (tasks ?? []).filter((t) => t.status !== "done");
 
     function toggleTeam(teamId: string) {
@@ -139,7 +155,7 @@ export default function DashboardPage() {
               Active Briefs
             </p>
             <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {activeBriefs}
+              {scopedActiveBriefs}
             </p>
           </Card>
           <Card accent="manager">
@@ -147,21 +163,15 @@ export default function DashboardPage() {
               Open Tasks
             </p>
             <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {(briefs ?? []).reduce(
-                (acc, b) =>
-                  acc +
-                  ((b as { taskCount?: number }).taskCount ?? 0) -
-                  ((b as { doneCount?: number }).doneCount ?? 0),
-                0
-              )}
+              {scopedOpenTasks}
             </p>
           </Card>
           <Card accent="employee">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
-              Teams
+              {isSuperAdmin ? "Teams" : "My Brands"}
             </p>
             <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {teams?.length ?? 0}
+              {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
             </p>
           </Card>
           <Card>
