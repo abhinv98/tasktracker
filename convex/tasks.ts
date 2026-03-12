@@ -709,7 +709,7 @@ export const extendTaskDeadline = mutation({
       recipientId: task.assigneeId,
       type: "deadline_extended",
       title: "Deadline extended",
-      message: `The deadline for "${task.title}" has been extended to ${new Date(newDeadline).toLocaleString()}`,
+      message: `The deadline for "${task.title}" has been extended to ${new Date(newDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata" })} ${new Date(newDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })}`,
       briefId: task.briefId,
       taskId,
       triggeredBy: userId,
