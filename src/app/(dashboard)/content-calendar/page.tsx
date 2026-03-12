@@ -101,6 +101,7 @@ export default function ContentCalendarPage() {
   const user = useQuery(api.users.getCurrentUser);
   const brands = useQuery(api.brands.listBrands);
   const allUsers = useQuery(api.users.listAllUsers);
+  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const createBrand = useMutation(api.brands.createBrand);
   const createEntry = useMutation(api.contentCalendar.createEntryForBrand);
   const updateTask = useMutation(api.tasks.updateTask);
@@ -439,6 +440,7 @@ export default function ContentCalendarPage() {
               isEditable={isEditable}
               employees={employees}
               managersAndAdmins={admins}
+              haltedUserIds={haltedUserIds}
               onClose={() => setSelectedTaskId(null)}
               updateTask={updateTask}
               updateTaskStatus={updateTaskStatus}
@@ -536,7 +538,7 @@ export default function ContentCalendarPage() {
                   <option value="">Unassigned</option>
                   {employees.map((emp: any) => (
                     <option key={emp._id} value={emp._id}>
-                      {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}
+                      {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
                     </option>
                   ))}
                 </select>
@@ -835,6 +837,7 @@ function TaskDetailSidebar({
   isEditable,
   employees,
   managersAndAdmins,
+  haltedUserIds,
   onClose,
   updateTask,
   updateTaskStatus,
@@ -845,6 +848,7 @@ function TaskDetailSidebar({
   isEditable: boolean;
   employees: any[];
   managersAndAdmins: any[];
+  haltedUserIds: string[];
   onClose: () => void;
   updateTask: any;
   updateTaskStatus: any;
@@ -1108,7 +1112,7 @@ function TaskDetailSidebar({
               <option value="">Unassigned</option>
               {employees.map((emp: any) => (
                 <option key={emp._id} value={emp._id}>
-                  {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}
+                  {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
                 </option>
               ))}
             </select>

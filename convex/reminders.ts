@@ -94,12 +94,11 @@ export const checkDeadlines = internalMutation({
       }
     }
 
-    // Check brief deadlines
+    // Check brief deadlines - notify brand managers + super admins only
     const briefs = await ctx.db.query("briefs").collect();
-    const admins = await ctx.db
-      .query("users")
-      .withIndex("by_role", (q) => q.eq("role", "admin"))
-      .collect();
+    const allUsers = await ctx.db.query("users").collect();
+    const superAdmins = allUsers.filter((u) => u.isSuperAdmin === true);
+    const allBrandManagers = await ctx.db.query("brandManagers").collect();
 
     for (const brief of briefs) {
       if (
@@ -110,10 +109,20 @@ export const checkDeadlines = internalMutation({
         continue;
 
       if (brief.deadline < now) {
-        for (const admin of admins) {
+        // Find recipients: brand managers for this brief's brand + super admins
+        const recipientIds = new Set<string>();
+        for (const sa of superAdmins) recipientIds.add(sa._id);
+        if (brief.brandId) {
+          for (const bm of allBrandManagers) {
+            if (bm.brandId === brief.brandId) recipientIds.add(bm.managerId);
+          }
+        }
+        if (brief.assignedManagerId) recipientIds.add(brief.assignedManagerId);
+
+        for (const recipientId of recipientIds) {
           const recentNotifs = await ctx.db
             .query("notifications")
-            .withIndex("by_recipient", (q) => q.eq("recipientId", admin._id))
+            .withIndex("by_recipient", (q) => q.eq("recipientId", recipientId as any))
             .collect();
           const alreadySent = recentNotifs.some(
             (n) =>
@@ -124,7 +133,7 @@ export const checkDeadlines = internalMutation({
           );
           if (!alreadySent) {
             await ctx.db.insert("notifications", {
-              recipientId: admin._id,
+              recipientId: recipientId as any,
               type: "deadline_reminder",
               title: "Brief overdue",
               message: `Brief "${brief.title}" has passed its deadline`,

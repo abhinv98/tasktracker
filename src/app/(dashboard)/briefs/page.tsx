@@ -68,6 +68,7 @@ export default function BriefsPage() {
   const [stDeadlineTime, setStDeadlineTime] = useState("");
   const allUsers = useQuery(api.users.listAllUsers);
   const allTeams = useQuery(api.teams.listTeams, {});
+  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const stTeamMembers = useQuery(
     api.teams.getTeamMembers,
     stTeamId ? { teamId: stTeamId as Id<"teams"> } : "skip"
@@ -741,10 +742,15 @@ export default function BriefsPage() {
                       <option value="">{stTeamId ? "Select team member..." : "Select a team first"}</option>
                       {(stTeamMembers ?? []).map((m: any) => (
                         <option key={m._id} value={m._id}>
-                          {m.name ?? m.email}{m.role === "admin" ? " (Admin)" : m.designation ? ` — ${m.designation}` : ""}
+                          {m.name ?? m.email}{m.role === "admin" ? " (Admin)" : m.designation ? ` — ${m.designation}` : ""}{haltedUserIds.includes(m._id) ? " ⚠ HALTED" : ""}
                         </option>
                       ))}
                     </select>
+                    {stAssignee && haltedUserIds.includes(stAssignee) && (
+                      <p className="text-[11px] text-red-600 mt-1 font-medium">
+                        Warning: This user&apos;s tasks are currently halted due to overdue work. The task will be locked until the brand manager resumes.
+                      </p>
+                    )}
                   </div>
                 </>
               )}

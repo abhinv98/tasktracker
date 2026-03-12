@@ -22,6 +22,7 @@ export default defineSchema({
     ),
     avatarUrl: v.optional(v.string()),
     designation: v.optional(v.string()),
+    isSuperAdmin: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
@@ -121,6 +122,7 @@ export default defineSchema({
     overdueAcknowledged: v.optional(v.boolean()),
     overdueContacted: v.optional(v.boolean()),
     overdueContactDenied: v.optional(v.boolean()),
+    haltLocked: v.optional(v.boolean()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])

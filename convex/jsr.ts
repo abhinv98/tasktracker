@@ -384,20 +384,18 @@ export const addClientTask = mutation({
       createdAt: Date.now(),
     });
 
-    // Notify admins and brand managers
-    const admins = await ctx.db
-      .query("users")
-      .withIndex("by_role", (q) => q.eq("role", "admin"))
-      .collect();
+    // Notify brand managers + super admins (not all admins)
     const brandManagers = await ctx.db
       .query("brandManagers")
       .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
       .collect();
+    const allUsers = await ctx.db.query("users").collect();
+    const superAdmins = allUsers.filter((u) => u.isSuperAdmin === true);
     const brand = await ctx.db.get(jsrLink.brandId);
     const brandName = brand?.name ?? "Unknown";
 
     const recipientIds = new Set<string>();
-    for (const a of admins) recipientIds.add(a._id);
+    for (const sa of superAdmins) recipientIds.add(sa._id);
     for (const bm of brandManagers) recipientIds.add(bm.managerId);
 
     // Use the JSR link creator as triggeredBy since there's no auth user

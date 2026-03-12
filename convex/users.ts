@@ -255,6 +255,22 @@ export const generateProfileUploadUrl = mutation({
   },
 });
 
+export const setSuperAdmins = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allUsers = await ctx.db.query("users").collect();
+    let updated = 0;
+    for (const u of allUsers) {
+      const name = (u.name ?? "").toLowerCase();
+      if (name.includes("mayur") || name.includes("vivek")) {
+        await ctx.db.patch(u._id, { isSuperAdmin: true });
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});
+
 export const migrateManagersToAdmin = internalMutation({
   args: {},
   handler: async (ctx) => {

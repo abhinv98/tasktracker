@@ -351,6 +351,7 @@ export default function BriefPage() {
   const graphData = useQuery(api.briefs.getBriefGraphData, { briefId });
   const teamsForBrief = useQuery(api.briefs.getTeamsForBrief, { briefId });
   const employees = useQuery(api.users.listEmployees);
+  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const user = useQuery(api.users.getCurrentUser);
 
   const createTask = useMutation(api.tasks.createTask);
@@ -681,9 +682,14 @@ export default function BriefPage() {
                   >
                     <option value="">{teamsForBrief?.length ? "Select employee" : "Assign teams first"}</option>
                     {filteredEmployees.map((e) => (
-                      <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}</option>
+                      <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}{haltedUserIds.includes(e._id) ? " ⚠ HALTED" : ""}</option>
                     ))}
                   </select>
+                  {taskAssignee && haltedUserIds.includes(taskAssignee) && (
+                    <p className="text-[10px] text-red-600 mt-1 font-medium">
+                      Warning: This user&apos;s tasks are currently halted. The task will be locked until resumed.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>

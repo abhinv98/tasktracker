@@ -85,6 +85,7 @@ export function ContentCalendarView({
 }: ContentCalendarViewProps) {
   const sheets = useQuery(api.contentCalendar.listSheets, { briefId });
   const allUsers = useQuery(api.users.listAllUsers, {});
+  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const user = useQuery(api.users.getCurrentUser);
   const brandManagers = useQuery(
     api.brands.getManagersForBrand,
@@ -482,6 +483,7 @@ export function ContentCalendarView({
             isEditable={isEditable}
             employees={employees}
             admins={admins}
+            haltedUserIds={haltedUserIds}
             onClose={() => setSelectedTaskId(null)}
             updateTask={updateTask}
             updateTaskStatus={updateTaskStatus}
@@ -682,7 +684,7 @@ export function ContentCalendarView({
                     {employees.map((emp: any) => (
                       <option key={emp._id} value={emp._id}>
                         {emp.name ?? emp.email}
-                        {emp.designation ? ` — ${emp.designation}` : ""}
+                        {emp.designation ? ` — ${emp.designation}` : ""}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
                       </option>
                     ))}
                   </select>
@@ -754,6 +756,7 @@ function DetailSidebar({
   isEditable,
   employees,
   admins,
+  haltedUserIds,
   onClose,
   updateTask,
   updateTaskStatus,
@@ -764,6 +767,7 @@ function DetailSidebar({
   isEditable: boolean;
   employees: any[];
   admins: any[];
+  haltedUserIds: string[];
   onClose: () => void;
   updateTask: any;
   updateTaskStatus: any;
@@ -1159,7 +1163,7 @@ function DetailSidebar({
               {employees.map((emp: any) => (
                 <option key={emp._id} value={emp._id}>
                   {emp.name ?? emp.email}
-                  {emp.designation ? ` — ${emp.designation}` : ""}
+                  {emp.designation ? ` — ${emp.designation}` : ""}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
                 </option>
               ))}
             </select>

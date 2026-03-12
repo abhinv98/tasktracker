@@ -6,7 +6,7 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, TaskDetailModal, DatePicker } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff } from "lucide-react";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2 } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -91,9 +91,11 @@ export default function DashboardPage() {
     const confirmOverdueContact = useMutation(api.tasks.confirmOverdueContact);
     const adminContactManager = useMutation(api.tasks.contactManagerForOverdue);
     const [adminContactedTasks, setAdminContactedTasks] = useState<Set<string>>(new Set());
+    const deleteTask = useMutation(api.tasks.deleteTask);
     const [extendingTaskId, setExtendingTaskId] = useState<string | null>(null);
     const [extendDeadline, setExtendDeadline] = useState<number | undefined>(undefined);
     const [extendDeadlineTime, setExtendDeadlineTime] = useState("");
+    const [resolvingTaskId, setResolvingTaskId] = useState<string | null>(null);
 
     const adminIsHalted = adminOverdueHalt && adminOverdueHalt.length > 0;
 
@@ -429,9 +431,45 @@ export default function DashboardPage() {
                             Extend Deadline
                           </button>
                         )}
+                        {resolvingTaskId !== ot._id && (
+                          <button
+                            onClick={() => setResolvingTaskId(ot._id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
+                  {resolvingTaskId === ot._id && ot.alertType !== "unassigned" && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-gray-50 border border-[var(--border-subtle)]">
+                      <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">Is this task already done?</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            await deleteTask({ taskId: ot._id as Id<"tasks"> });
+                            setResolvingTaskId(null);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                        >
+                          Yes, Delete
+                        </button>
+                        <button
+                          onClick={() => { router.push(`/brief/${ot.briefId}`); setResolvingTaskId(null); }}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                        >
+                          No, Continue
+                        </button>
+                        <button
+                          onClick={() => setResolvingTaskId(null)}
+                          className="px-2 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </Card>
               ))}
             </div>
@@ -484,14 +522,52 @@ export default function DashboardPage() {
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColor}`}>
                         {label}
                       </span>
-                      <button
-                        onClick={() => router.push(`/brief/${t.briefId}`)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
-                      >
-                        Take Action
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => router.push(`/brief/${t.briefId}`)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                        >
+                          Take Action
+                          <ArrowRight className="h-3 w-3" />
+                        </button>
+                        {resolvingTaskId !== t._id && (
+                          <button
+                            onClick={() => setResolvingTaskId(t._id)}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
+                    {resolvingTaskId === t._id && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-gray-50 border border-[var(--border-subtle)]">
+                        <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">Is this task already done?</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              await deleteTask({ taskId: t._id as Id<"tasks"> });
+                              setResolvingTaskId(null);
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                          >
+                            Yes, Delete
+                          </button>
+                          <button
+                            onClick={() => { router.push(`/brief/${t.briefId}`); setResolvingTaskId(null); }}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                          >
+                            No, Continue
+                          </button>
+                          <button
+                            onClick={() => setResolvingTaskId(null)}
+                            className="px-2 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </Card>
                 );
               })}

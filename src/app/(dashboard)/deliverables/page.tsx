@@ -50,6 +50,7 @@ export default function DeliverablesPage() {
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
 
   const allTeams = useQuery(api.teams.listTeams, {});
+  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const role = user?.role ?? "employee";
   const isAdmin = role === "admin";
   const isActualTeamLead = (allTeams ?? []).some((t: any) => t.leadId === user?._id);
@@ -802,7 +803,7 @@ export default function DeliverablesPage() {
                       >
                         <option value="">Select team member to reassign...</option>
                         {(d.teamMembers ?? []).map((m: any) => (
-                          <option key={m._id} value={m._id}>{m.name}</option>
+                          <option key={m._id} value={m._id}>{m.name}{haltedUserIds.includes(m._id) ? " ⚠ HALTED" : ""}</option>
                         ))}
                       </select>
                     </div>
