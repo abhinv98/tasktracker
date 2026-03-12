@@ -6,7 +6,7 @@ import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, TaskDetailModal, DatePicker } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2 } from "lucide-react";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -365,14 +365,25 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )}
+                  {ot.briefType === "content_calendar" && (
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                      <Calendar className="h-2.5 w-2.5" /> Content Calendar
+                    </p>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {ot.alertType === "unassigned" ? (
                       <button
-                        onClick={() => router.push(`/brief/${ot.briefId}`)}
+                        onClick={() => {
+                          if (ot.briefType === "content_calendar" && ot.brandId) {
+                            router.push(`/content-calendar?brand=${ot.brandId}`);
+                          } else {
+                            router.push(`/brief/${ot.briefId}`);
+                          }
+                        }}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
                       >
                         <ArrowRight className="h-3 w-3" />
-                        Assign Tasks
+                        {ot.briefType === "content_calendar" ? "Open Calendar" : "Assign Tasks"}
                       </button>
                     ) : (
                       <>
@@ -456,7 +467,14 @@ export default function DashboardPage() {
                           Yes, Delete
                         </button>
                         <button
-                          onClick={() => { router.push(`/brief/${ot.briefId}`); setResolvingTaskId(null); }}
+                          onClick={() => {
+                            if (ot.briefType === "content_calendar" && ot.brandId) {
+                              router.push(`/content-calendar?brand=${ot.brandId}`);
+                            } else {
+                              router.push(`/brief/${ot.briefId}`);
+                            }
+                            setResolvingTaskId(null);
+                          }}
                           className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                         >
                           No, Continue
@@ -518,16 +536,27 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
+                    {t.briefType === "content_calendar" && (
+                      <p className="text-[10px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                        <Calendar className="h-2.5 w-2.5" /> Content Calendar
+                      </p>
+                    )}
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColor}`}>
                         {label}
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => router.push(`/brief/${t.briefId}`)}
+                          onClick={() => {
+                            if (t.briefType === "content_calendar" && t.brandId) {
+                              router.push(`/content-calendar?brand=${t.brandId}`);
+                            } else {
+                              router.push(`/brief/${t.briefId}`);
+                            }
+                          }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
                         >
-                          Take Action
+                          {t.briefType === "content_calendar" ? "Open Calendar" : "Take Action"}
                           <ArrowRight className="h-3 w-3" />
                         </button>
                         {resolvingTaskId !== t._id && (
@@ -554,7 +583,14 @@ export default function DashboardPage() {
                             Yes, Delete
                           </button>
                           <button
-                            onClick={() => { router.push(`/brief/${t.briefId}`); setResolvingTaskId(null); }}
+                            onClick={() => {
+                              if (t.briefType === "content_calendar" && t.brandId) {
+                                router.push(`/content-calendar?brand=${t.brandId}`);
+                              } else {
+                                router.push(`/brief/${t.briefId}`);
+                              }
+                              setResolvingTaskId(null);
+                            }}
                             className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                           >
                             No, Continue

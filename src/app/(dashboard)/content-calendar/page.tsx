@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Card, useToast } from "@/components/ui";
@@ -77,10 +78,11 @@ const MONTHS = [
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function ContentCalendarPage() {
+  const searchParams = useSearchParams();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedBrandId, setSelectedBrandId] = useState<string>("");
+  const [selectedBrandId, setSelectedBrandId] = useState<string>(searchParams.get("brand") ?? "");
   const [showCreateBrand, setShowCreateBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState("");
   const [newBrandColor, setNewBrandColor] = useState(BRAND_COLORS[0]);
