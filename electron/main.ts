@@ -49,7 +49,6 @@ function createWindow() {
     mainWindow = null;
   });
 
-  injectNotificationBridge(mainWindow);
 }
 
 function createAppMenu() {
@@ -152,47 +151,3 @@ function showNativeNotification(title: string, body: string) {
   }
 }
 
-function injectNotificationBridge(win: BrowserWindow) {
-  const script = `
-    (function() {
-      if (window.__electronNotifBridge) return;
-      window.__electronNotifBridge = true;
-
-      let prevCount = -1;
-      let initialized = false;
-
-      function checkBadge() {
-        try {
-          const badge = document.querySelector('button .absolute.rounded-full');
-          const count = badge ? parseInt(badge.textContent || '0', 10) : 0;
-
-          if (prevCount === -1) {
-            prevCount = count;
-            initialized = true;
-            return;
-          }
-
-          if (count > prevCount && initialized && window.electronAPI) {
-            const diff = count - prevCount;
-            window.electronAPI.showNotification(
-              'The Ecultify',
-              diff === 1 ? 'You have a new notification' : 'You have ' + diff + ' new notifications'
-            );
-          }
-          prevCount = count;
-        } catch(e) {}
-      }
-
-      setInterval(checkBadge, 3000);
-    })();
-  `;
-
-  const inject = () => {
-    setTimeout(() => {
-      win.webContents.executeJavaScript(script).catch(() => {});
-    }, 4000);
-  };
-
-  win.webContents.on("did-finish-load", inject);
-  win.webContents.on("did-navigate-in-page", inject);
-}
