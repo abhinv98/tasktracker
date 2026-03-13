@@ -6,8 +6,6 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
-import { ChatBubble } from "@/components/chat/ChatBubble";
-import { ChatPanel } from "@/components/chat/ChatPanel";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
 const ADMIN_ONLY_ROUTES = ["/users", "/worklog"];
@@ -22,7 +20,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Close sidebar on route change (mobile)
@@ -73,7 +70,6 @@ export default function DashboardLayout({
       // Escape = close panels
       if (e.key === "Escape") {
         if (searchOpen) setSearchOpen(false);
-        else if (chatOpen) setChatOpen(false);
         return;
       }
 
@@ -84,7 +80,7 @@ export default function DashboardLayout({
         return;
       }
     },
-    [searchOpen, chatOpen]
+    [searchOpen]
   );
 
   useEffect(() => {
@@ -126,9 +122,6 @@ export default function DashboardLayout({
       {/* Command Palette */}
       <CommandPalette isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
-      {/* AI Chat */}
-      <ChatBubble isOpen={chatOpen} onClick={() => setChatOpen(!chatOpen)} />
-      <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }
