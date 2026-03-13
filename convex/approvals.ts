@@ -149,7 +149,10 @@ export const listTeamLeadPendingApprovals = query({
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
     const pending = allDeliverables.filter(
-      (d) => d.teamLeadStatus === "pending" && teamMemberIds.has(d.submittedBy)
+      (d) =>
+        (d.teamLeadStatus === "pending" ||
+          (d.teamLeadStatus === "approved" && !d.passedToManagerAt)) &&
+        teamMemberIds.has(d.submittedBy)
     );
 
     const users = await ctx.db.query("users").collect();
@@ -176,6 +179,10 @@ export const listTeamLeadPendingApprovals = query({
             return mgr ? { _id: mgr._id, name: mgr.name ?? mgr.email ?? "Unknown" } : null;
           })
           .filter(Boolean);
+
+        const isAlsoBrandManager = brandManagerEntries.some(
+          (bm) => bm.managerId === userId
+        );
 
         let files: { name: string; url: string }[] = [];
         if (d.fileIds && d.fileIds.length > 0) {
@@ -211,6 +218,7 @@ export const listTeamLeadPendingApprovals = query({
           brandName: brand?.name ?? "No Brand",
           brandId: brief?.brandId,
           brandManagers,
+          isAlsoBrandManager,
           files,
           isSubTask,
           parentTaskTitle,
@@ -771,7 +779,173 @@ export const passToManager = mutation({
   },
 });
 
+export const teamLeadAndManagerApprove = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { deliverableId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
+    if (!teamInfo || teamInfo.leadId !== userId) {
+      throw new Error("Only the team lead can approve this deliverable");
+    }
+
+    const task = await ctx.db.get(deliverable.taskId);
+    const brief = task ? await ctx.db.get(task.briefId) : null;
+
+    if (!brief?.brandId) {
+      throw new Error("Brief has no brand assigned — cannot do brand manager approval");
+    }
+
+    const isManager = await isBrandManager(ctx, userId, brief.brandId);
+    if (!isManager) {
+      throw new Error("You are not the brand manager for this brief");
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(deliverableId, {
+      teamLeadStatus: "approved",
+      teamLeadReviewedBy: userId,
+      teamLeadReviewNote: note,
+      teamLeadReviewedAt: now,
+      passedToManagerBy: userId,
+      passedToManagerAt: now,
+      status: "approved",
+      reviewedBy: userId,
+      reviewNote: note,
+      reviewedAt: now,
+    });
+
+    if (task) {
+      if (task.clientFacing) {
+        await ctx.db.patch(deliverable.taskId, { status: "review" });
+      } else {
+        await ctx.db.patch(deliverable.taskId, {
+          status: "done",
+          completedAt: now,
+        });
+      }
+    }
+
+    const user = await ctx.db.get(userId);
+    await ctx.db.insert("notifications", {
+      recipientId: deliverable.submittedBy,
+      type: "deliverable_approved",
+      title: "Deliverable fully approved",
+      message: `${user?.name ?? "Your manager"} approved your deliverable for "${task?.title ?? "a task"}" as both team lead and brand manager${task?.clientFacing ? " (pending client review)" : ""}`,
+      briefId: task?.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: now,
+    });
+
+    if (task) {
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId,
+        action: "deliverable_approved_internally",
+        details: JSON.stringify({
+          taskTitle: task.title,
+          briefTitle: brief?.title,
+          clientFacing: task.clientFacing,
+          dualRole: true,
+        }),
+        timestamp: now,
+      });
+    }
+  },
+});
+
 // ─── Sub-task: main assignee review queries & mutations ─────
+
+export const managerApproveFromTeamLead = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { deliverableId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.teamLeadStatus !== "approved") {
+      throw new Error("Deliverable must be approved by team lead first");
+    }
+
+    const task = await ctx.db.get(deliverable.taskId);
+    const brief = task ? await ctx.db.get(task.briefId) : null;
+
+    if (!brief?.brandId) {
+      throw new Error("Brief has no brand assigned");
+    }
+
+    const isManager = await isBrandManager(ctx, userId, brief.brandId);
+    if (!isManager) {
+      throw new Error("You are not the brand manager for this brief");
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(deliverableId, {
+      passedToManagerBy: userId,
+      passedToManagerAt: now,
+      status: "approved",
+      reviewedBy: userId,
+      reviewNote: note,
+      reviewedAt: now,
+    });
+
+    if (task) {
+      if (task.clientFacing) {
+        await ctx.db.patch(deliverable.taskId, { status: "review" });
+      } else {
+        await ctx.db.patch(deliverable.taskId, {
+          status: "done",
+          completedAt: now,
+        });
+      }
+    }
+
+    const user = await ctx.db.get(userId);
+    await ctx.db.insert("notifications", {
+      recipientId: deliverable.submittedBy,
+      type: "deliverable_approved",
+      title: "Deliverable approved by brand manager",
+      message: `${user?.name ?? "Brand manager"} approved your deliverable for "${task?.title ?? "a task"}"${task?.clientFacing ? " (pending client review)" : ""}`,
+      briefId: task?.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: now,
+    });
+
+    if (task) {
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId,
+        action: "deliverable_approved_internally",
+        details: JSON.stringify({
+          taskTitle: task.title,
+          briefTitle: brief?.title,
+          clientFacing: task.clientFacing,
+        }),
+        timestamp: now,
+      });
+    }
+  },
+});
 
 export const listMainAssigneePendingReviews = query({
   handler: async (ctx) => {

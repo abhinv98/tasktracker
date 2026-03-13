@@ -28,6 +28,8 @@ export default function DeliverablesPage() {
   const teamLeadApproveMut = useMutation(api.approvals.teamLeadApprove);
   const teamLeadRejectMut = useMutation(api.approvals.teamLeadReject);
   const passToManagerMut = useMutation(api.approvals.passToManager);
+  const teamLeadAndManagerApproveMut = useMutation(api.approvals.teamLeadAndManagerApprove);
+  const managerApproveFromTeamLeadMut = useMutation(api.approvals.managerApproveFromTeamLead);
   const mainAssigneeApproveMut = useMutation(api.approvals.mainAssigneeApprove);
   const mainAssigneeRejectMut = useMutation(api.approvals.mainAssigneeReject);
   const passSubTaskToTeamLeadMut = useMutation(api.approvals.passSubTaskToTeamLead);
@@ -124,6 +126,14 @@ export default function DeliverablesPage() {
 
   async function handlePassToManager(deliverableId: string) {
     await passToManagerMut({ deliverableId: deliverableId as any });
+  }
+
+  async function handleTeamLeadAndManagerApprove(deliverableId: string) {
+    await teamLeadAndManagerApproveMut({ deliverableId: deliverableId as any });
+  }
+
+  async function handleManagerApproveFromTeamLead(deliverableId: string) {
+    await managerApproveFromTeamLeadMut({ deliverableId: deliverableId as any });
   }
 
   async function handleMainAssigneeApprove(deliverableId: string) {
@@ -666,8 +676,17 @@ export default function DeliverablesPage() {
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                     >
                       <Check className="h-3.5 w-3.5" />
-                      Approve
+                      Approve as Team Lead
                     </button>
+                    {d.isAlsoBrandManager && (
+                      <button
+                        onClick={() => handleTeamLeadAndManagerApprove(d._id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Approve as TL & Brand Manager
+                      </button>
+                    )}
                     {showRejectForm === d._id ? (
                       renderRejectForm(d._id, handleTeamLeadReject)
                     ) : (
@@ -684,19 +703,31 @@ export default function DeliverablesPage() {
 
                 {d.teamLeadStatus === "approved" && !d.passedToManagerAt && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--accent-employee)] font-medium">Approved by you</span>
-                    {(d.brandManagers ?? []).map((mgr: any) => (
+                    <span className="text-[11px] text-[var(--accent-employee)] font-medium">TL Approved</span>
+                    {d.isAlsoBrandManager ? (
                       <button
-                        key={mgr._id}
-                        onClick={() => handlePassToManager(d._id)}
+                        onClick={() => handleManagerApproveFromTeamLead(d._id)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                       >
-                        <ArrowRight className="h-3.5 w-3.5" />
-                        Pass to {mgr.name}
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Approve as Brand Manager
                       </button>
-                    ))}
-                    {(d.brandManagers ?? []).length === 0 && (
-                      <span className="text-[11px] text-[var(--text-muted)]">No brand manager assigned</span>
+                    ) : (
+                      <>
+                        {(d.brandManagers ?? []).map((mgr: any) => (
+                          <button
+                            key={mgr._id}
+                            onClick={() => handlePassToManager(d._id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                          >
+                            <ArrowRight className="h-3.5 w-3.5" />
+                            Pass to {mgr.name}
+                          </button>
+                        ))}
+                        {(d.brandManagers ?? []).length === 0 && (
+                          <span className="text-[11px] text-[var(--text-muted)]">No brand manager assigned</span>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
