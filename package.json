@@ -2,11 +2,17 @@
   "name": "tasktracker",
   "version": "0.1.0",
   "private": true,
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "electron:build": "vite build --config electron/vite.config.ts",
+    "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && npm run electron:build && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "dist:mac": "npm run electron:build && electron-builder --mac --publish never",
+    "dist:win": "npm run electron:build && electron-builder --win --publish never",
+    "dist:all": "npm run electron:build && electron-builder --mac --win --publish never"
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
@@ -25,9 +31,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.1.2",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.0.12",
+    "electron-updater": "^6.6.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^5.4.21",
+    "wait-on": "^8.0.3"
   }
 }
