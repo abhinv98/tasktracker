@@ -10,9 +10,9 @@
     "lint": "eslint",
     "electron:build": "vite build --config electron/vite.config.ts",
     "electron:dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && npm run electron:build && env -u ELECTRON_RUN_AS_NODE electron .\"",
-    "dist:mac": "npm run electron:build && electron-builder --mac --publish never",
-    "dist:win": "npm run electron:build && electron-builder --win --publish never",
-    "dist:all": "npm run electron:build && electron-builder --mac --win --publish never"
+    "dist:mac": "npm run electron:build && electron-builder --mac --publish always",
+    "dist:win": "npm run electron:build && electron-builder --win --publish always",
+    "dist:all": "npm run electron:build && electron-builder --mac --win --publish always"
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
