@@ -620,6 +620,10 @@ export const submitDeliverable = mutation({
       ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
     });
 
+    if (task.status !== "done" && task.status !== "review") {
+      await ctx.db.patch(taskId, { status: "review" });
+    }
+
     const user = await ctx.db.get(userId);
 
     if (isSubTask && parentTask) {

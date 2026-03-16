@@ -24,18 +24,21 @@ function parseDuration(str: string): number {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending: { label: "Pending", color: "var(--text-secondary)" },
   todo: { label: "To Do", color: "var(--text-secondary)" },
   "in-progress": { label: "In Progress", color: "var(--accent-manager)" },
   review: { label: "Review", color: "var(--accent-admin)" },
   done: { label: "Done", color: "var(--accent-employee)" },
 };
 
-function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
+function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTask, onUpdateStatus }: {
   brief: any;
   tasks: any[];
   tasksData: any;
   isAdmin: boolean;
   user: any;
+  onOpenTask: (taskId: string) => void;
+  onUpdateStatus: (taskId: Id<"tasks">, newStatus: "pending" | "in-progress" | "review" | "done") => void;
 }) {
   const task = tasks[0];
   const taskId = task?._id as Id<"tasks"> | undefined;
@@ -93,11 +96,36 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user }: {
       {/* Left: Task Details + Daily Summaries */}
       <div className="border-r border-[var(--border)] overflow-auto p-5 space-y-5">
         <div>
-          <h2 className="font-semibold text-[16px] text-[var(--text-primary)] mb-1">{task.title}</h2>
-          <span
-            className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
-            style={{ color: statusStyle.color, backgroundColor: `color-mix(in srgb, ${statusStyle.color} 12%, transparent)` }}
-          >{statusStyle.label}</span>
+          <button
+            onClick={() => onOpenTask(task._id)}
+            className="font-semibold text-[16px] text-[var(--text-primary)] mb-1 hover:text-[var(--accent-admin)] transition-colors text-left"
+          >
+            {task.title}
+          </button>
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
+              style={{ color: statusStyle.color, backgroundColor: `color-mix(in srgb, ${statusStyle.color} 12%, transparent)` }}
+            >{statusStyle.label}</span>
+            {task.status !== "done" && (() => {
+              const nextMap: Record<string, { status: "in-progress" | "review" | "done"; label: string }> = {
+                pending: { status: "in-progress", label: "In Progress" },
+                "in-progress": { status: "review", label: "Review" },
+                review: { status: "done", label: "Done" },
+              };
+              const next = nextMap[task.status];
+              if (!next) return null;
+              if (next.status === "done" && !isAdmin) return null;
+              return (
+                <button
+                  onClick={() => onUpdateStatus(task._id, next.status)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors"
+                >
+                  Move to {next.label} &rarr;
+                </button>
+              );
+            })()}
+          </div>
         </div>
 
         {task.description && (
@@ -577,6 +605,15 @@ export default function BriefPage() {
           tasksData={tasksData}
           isAdmin={!!isAdmin}
           user={user}
+          onOpenTask={(taskId) => setSelectedTaskId(taskId)}
+          onUpdateStatus={async (taskId, newStatus) => {
+            try {
+              await updateTaskStatus({ taskId, newStatus });
+              toast("success", `Task moved to ${newStatus}`);
+            } catch (err) {
+              toast("error", err instanceof Error ? err.message : "Failed to update status");
+            }
+          }}
         />
       ) : (
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">

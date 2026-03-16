@@ -256,7 +256,7 @@ export default function DeliverablesPage() {
         <h1 className="font-bold text-[20px] text-[var(--text-primary)] tracking-tight">
           Deliverables
         </h1>
-        {role === "employee" && (
+        {(myTasks ?? []).some((t) => t.status !== "done") && (
           <Button variant="primary" onClick={() => setShowSubmit(!showSubmit)}>
             Submit Deliverable
           </Button>
