@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
+import { getDisplayRole } from "@/lib/roles";
 
 interface SidebarProps {
   user: Doc<"users">;
@@ -307,7 +308,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               {user.name ?? user.email}
             </p>
             <p className="text-[10px] text-[var(--text-disabled)] capitalize">
-              {role}
+              {getDisplayRole(user)}
             </p>
           </div>
         </div>

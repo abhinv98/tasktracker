@@ -70,6 +70,12 @@ export const updateUserRole = mutation({
     if (!currentUser || currentUser.role !== "admin") {
       throw new Error("Only admins can change roles");
     }
+
+    const targetUser = await ctx.db.get(userId);
+    if (targetUser?.isSuperAdmin && !currentUser.isSuperAdmin) {
+      throw new Error("Only super admins can modify super admin roles");
+    }
+
     if (userId === currentUserId && newRole !== "admin") {
       const admins = await ctx.db
         .query("users")
@@ -159,8 +165,10 @@ export const deleteUser = mutation({
     if (!currentUser || currentUser.role !== "admin") throw new Error("Only admins can delete users");
     if (targetUserId === currentUserId) throw new Error("Cannot delete yourself");
 
-    // Check if user is last admin
     const targetUser = await ctx.db.get(targetUserId);
+    if (targetUser?.isSuperAdmin && !currentUser.isSuperAdmin) {
+      throw new Error("Only super admins can delete super admin accounts");
+    }
     if (targetUser?.role === "admin") {
       const admins = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "admin")).collect();
       if (admins.length <= 1) throw new Error("Cannot delete the last admin");

@@ -447,6 +447,18 @@ export const listClientApprovedDeliverables = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const currentUser = await ctx.db.get(userId);
+    if (!currentUser) return [];
+
+    let allowedBrandIds: Set<string> | null = null;
+    if (currentUser.role === "admin" && !currentUser.isSuperAdmin) {
+      const brandManagerLinks = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_manager", (q) => q.eq("managerId", userId))
+        .collect();
+      allowedBrandIds = new Set(brandManagerLinks.map((bm) => bm.brandId));
+    }
+
     const allDeliverables = await ctx.db.query("deliverables").collect();
     const approved = allDeliverables.filter(
       (d) => d.clientStatus === "client_approved"
@@ -462,6 +474,11 @@ export const listClientApprovedDeliverables = query({
       approved.map(async (d) => {
         const task = tasks.find((t) => t._id === d.taskId);
         const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+
+        if (allowedBrandIds && (!brief?.brandId || !allowedBrandIds.has(brief.brandId))) {
+          return null;
+        }
+
         const brand = brief?.brandId
           ? brands.find((b) => b._id === brief.brandId)
           : null;
@@ -502,9 +519,9 @@ export const listClientApprovedDeliverables = query({
       })
     );
 
-    return results.sort(
-      (a, b) => (b.clientReviewedAt ?? 0) - (a.clientReviewedAt ?? 0)
-    );
+    return results
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+      .sort((a, b) => (b.clientReviewedAt ?? 0) - (a.clientReviewedAt ?? 0));
   },
 });
 
@@ -513,23 +530,45 @@ export const getApprovedWorkStats = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
+    const currentUser = await ctx.db.get(userId);
+    if (!currentUser) return null;
+
+    let allowedBrandIds: Set<string> | null = null;
+    if (currentUser.role === "admin" && !currentUser.isSuperAdmin) {
+      const brandManagerLinks = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_manager", (q) => q.eq("managerId", userId))
+        .collect();
+      allowedBrandIds = new Set(brandManagerLinks.map((bm) => bm.brandId));
+    }
+
     const allDeliverables = await ctx.db.query("deliverables").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
     const allTasks = await ctx.db.query("tasks").collect();
 
-    const sentToClient = allDeliverables.filter(
+    const scopedBriefs = allowedBrandIds
+      ? allBriefs.filter((b) => b.brandId && allowedBrandIds!.has(b.brandId))
+      : allBriefs;
+    const scopedBriefIds = new Set(scopedBriefs.map((b) => b._id));
+    const scopedTasks = allTasks.filter((t) => scopedBriefIds.has(t.briefId));
+    const scopedTaskIds = new Set(scopedTasks.map((t) => t._id));
+    const scopedDeliverables = allowedBrandIds
+      ? allDeliverables.filter((d) => scopedTaskIds.has(d.taskId))
+      : allDeliverables;
+
+    const sentToClient = scopedDeliverables.filter(
       (d) => d.clientStatus !== undefined
     ).length;
-    const clientApproved = allDeliverables.filter(
+    const clientApproved = scopedDeliverables.filter(
       (d) => d.clientStatus === "client_approved"
     ).length;
 
-    const totalBriefs = allBriefs.length;
+    const totalBriefs = scopedBriefs.length;
 
     const clientFacingTaskBriefIds = new Set(
-      allTasks.filter((t) => t.clientFacing).map((t) => t.briefId)
+      scopedTasks.filter((t) => t.clientFacing).map((t) => t.briefId)
     );
-    const clientBriefs = allBriefs.filter((b) =>
+    const clientBriefs = scopedBriefs.filter((b) =>
       clientFacingTaskBriefIds.has(b._id)
     ).length;
     const internalBriefs = totalBriefs - clientBriefs;

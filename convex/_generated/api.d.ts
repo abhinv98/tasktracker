@@ -27,6 +27,7 @@ import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
 import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
+import type * as meetingMinutes from "../meetingMinutes.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordChange from "../passwordChange.js";
 import type * as reminders from "../reminders.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   dm: typeof dm;
   http: typeof http;
   jsr: typeof jsr;
+  meetingMinutes: typeof meetingMinutes;
   notifications: typeof notifications;
   passwordChange: typeof passwordChange;
   reminders: typeof reminders;

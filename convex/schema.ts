@@ -457,6 +457,22 @@ export default defineSchema({
   })
     .index("by_brief", ["briefId"]),
 
+  // ─── MEETING MINUTES (MOM) ──────────────
+  meetingMinutes: defineTable({
+    brandId: v.id("brands"),
+    title: v.string(),
+    meetingDate: v.number(),
+    attendees: v.optional(v.array(v.string())),
+    content: v.string(),
+    transcriptFileId: v.optional(v.id("_storage")),
+    transcriptFileName: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_brand_date", ["brandId", "meetingDate"]),
+
   // ─── JSR LINKS ────────────────────────
   jsrLinks: defineTable({
     brandId: v.id("brands"),

@@ -204,6 +204,59 @@ export const getBrandOverview = query({
   },
 });
 
+// Internal JSR: team member task breakdown for a brand
+export const getBrandTeamOverview = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const brandBriefs = briefs.filter((b) => b.brandId === brandId && b.status !== "archived");
+    const briefIds = new Set(brandBriefs.map((b) => b._id));
+
+    const tasks = await ctx.db.query("tasks").collect();
+    const brandTasks = tasks.filter((t) => briefIds.has(t.briefId));
+
+    const users = await ctx.db.query("users").collect();
+    const teams = await ctx.db.query("teams").collect();
+    const userTeams = await ctx.db.query("userTeams").collect();
+
+    return brandTasks.map((task) => {
+      const brief = brandBriefs.find((b) => b._id === task.briefId);
+      const assignee = users.find((u) => u._id === task.assigneeId);
+      const manager = brief?.assignedManagerId
+        ? users.find((u) => u._id === brief.assignedManagerId)
+        : null;
+
+      const assigneeTeamLinks = userTeams.filter((ut) => ut.userId === task.assigneeId);
+      const assigneeTeams = assigneeTeamLinks
+        .map((ut) => teams.find((t) => t._id === ut.teamId))
+        .filter(Boolean);
+      const teamLead = assigneeTeams.length > 0
+        ? users.find((u) => u._id === assigneeTeams[0]!.leadId)
+        : null;
+
+      return {
+        _id: task._id,
+        taskTitle: task.title,
+        taskStatus: task.status,
+        deadline: task.deadline,
+        briefTitle: brief?.title ?? "Unknown",
+        briefId: task.briefId,
+        assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+        assigneeId: task.assigneeId,
+        managerName: manager?.name ?? manager?.email ?? "—",
+        managerId: brief?.assignedManagerId,
+        teamLeadName: teamLead?.name ?? teamLead?.email ?? "—",
+        teamName: assigneeTeams[0]?.name ?? "—",
+      };
+    });
+  },
+});
+
 // Create brand (admin only)
 export const createBrand = mutation({
   args: {

@@ -6,7 +6,12 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
-import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit } from "lucide-react";
+import ClientJsrTab from "@/components/brand/ClientJsrTab";
+import InternalJsrTab from "@/components/brand/InternalJsrTab";
+import MomTab from "@/components/brand/MomTab";
+
+type BrandTab = "overview" | "client-jsr" | "internal-jsr" | "mom";
 
 export default function BrandDetailPage() {
   const params = useParams();
@@ -99,6 +104,9 @@ export default function BrandDetailPage() {
   const sendToClientMut = useMutation(api.jsr.sendToClient);
   const [clientInputTaskId, setClientInputTaskId] = useState<string | null>(null);
   const [clientInputMsg, setClientInputMsg] = useState("");
+
+  // Tabs
+  const [activeTab, setActiveTab] = useState<BrandTab>("overview");
 
   // Drag & drop file upload
   const [dragOver, setDragOver] = useState(false);
@@ -409,7 +417,46 @@ export default function BrandDetailPage() {
         )}
       </div>
 
-      {/* ═══ TWO-COLUMN LAYOUT ═══ */}
+      {/* ═══ TAB BAR ═══ */}
+      <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-8 px-8">
+        {([
+          { id: "overview" as BrandTab, label: "Overview", icon: Briefcase },
+          { id: "client-jsr" as BrandTab, label: "Client JSR", icon: ExternalLink },
+          { id: "internal-jsr" as BrandTab, label: "Internal JSR", icon: Users },
+          { id: "mom" as BrandTab, label: "MOM", icon: FileEdit },
+        ]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === tab.id
+                ? "border-[var(--accent-admin)] text-[var(--accent-admin)]"
+                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
+            }`}
+          >
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══ TAB: CLIENT JSR ═══ */}
+      {activeTab === "client-jsr" && (
+        <ClientJsrTab brandId={brandId} brand={brand} canManageLinks={canManageLinks} />
+      )}
+
+      {/* ═══ TAB: INTERNAL JSR ═══ */}
+      {activeTab === "internal-jsr" && (
+        <InternalJsrTab brandId={brandId} />
+      )}
+
+      {/* ═══ TAB: MOM ═══ */}
+      {activeTab === "mom" && (
+        <MomTab brandId={brandId} isAdmin={isAdmin} isBrandManager={isBrandManager} />
+      )}
+
+      {/* ═══ TAB: OVERVIEW (TWO-COLUMN LAYOUT) ═══ */}
+      {activeTab === "overview" && (
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6">
 
         {/* ── LEFT COLUMN ── */}
@@ -547,7 +594,7 @@ export default function BrandDetailPage() {
                     </p>
                     <p className="text-[12px] text-[var(--text-secondary)]">{emp.email}</p>
                     <Badge variant={emp.role === "admin" ? "admin" : "employee"} className="mt-1">
-                      {emp.role}
+                      {emp.role === "admin" ? "Brand Manager" : "Employee"}
                     </Badge>
                   </Card>
                 ))}
@@ -1089,6 +1136,7 @@ export default function BrandDetailPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* ═══ CHAT SIDEBAR ═══ */}
       {chatSidebarOpen && (

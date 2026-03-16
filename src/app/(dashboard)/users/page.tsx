@@ -20,6 +20,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { Trash2, UserPlus, Copy, X, Check, Link2 } from "lucide-react";
+import { getDisplayRole } from "@/lib/roles";
 
 /* ─── Create-User Modal ─── */
 function CreateUserModal({ onClose }: { onClose: () => void }) {
@@ -174,7 +175,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
                   setRole(e.target.value as "admin" | "employee")
                 }
                 options={[
-                  { value: "admin", label: "Admin" },
+                  { value: "admin", label: "Brand Manager" },
                   { value: "employee", label: "Employee" },
                 ]}
               />
@@ -309,19 +310,25 @@ export default function UsersPage() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <select
-                    value={user.role ?? "employee"}
-                    onChange={(e) =>
-                      handleRoleChange(
-                        user._id,
-                        e.target.value as "admin" | "employee"
-                      )
-                    }
-                    className="bg-[var(--bg-input)] rounded-lg border border-[var(--border)] text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="employee">Employee</option>
-                  </select>
+                  {(user as any).isSuperAdmin ? (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                      Super Admin
+                    </span>
+                  ) : (
+                    <select
+                      value={user.role ?? "employee"}
+                      onChange={(e) =>
+                        handleRoleChange(
+                          user._id,
+                          e.target.value as "admin" | "employee"
+                        )
+                      }
+                      className="bg-[var(--bg-input)] rounded-lg border border-[var(--border)] text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="admin">Brand Manager</option>
+                      <option value="employee">Employee</option>
+                    </select>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1 flex-wrap">

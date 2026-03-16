@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Badge, Button, Card, Input, useToast } from "@/components/ui";
 import { Camera, X, Loader2 } from "lucide-react";
+import { getDisplayRole } from "@/lib/roles";
 
 export default function ProfilePage() {
   const user = useQuery(api.users.getCurrentUser);
@@ -221,7 +222,7 @@ export default function ProfilePage() {
               Role
             </label>
             <Badge variant={user.role === "admin" ? "admin" : "employee"}>
-              {user.role ?? "employee"}
+              {getDisplayRole(user)}
             </Badge>
           </div>
           <Button type="submit" variant="primary">
