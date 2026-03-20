@@ -299,12 +299,12 @@ export default function DashboardPage() {
                     </div>
                     {isContacted && (
                       <p className="text-[10px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
-                        Waiting for the brand manager to confirm and resume your tasks.
+                        Waiting for the brand manager to confirm.
                       </p>
                     )}
                     {!isContacted && ot.overdueContactDenied && (
                       <p className="text-[10px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
-                        It seems you still have not had the meeting with the brand manager. Please contact them to resume your tasks.
+                        It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
                       </p>
                     )}
                   </Card>
@@ -909,12 +909,12 @@ export default function DashboardPage() {
                   </div>
                   {isContacted && (
                     <p className="text-[10px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
-                      Waiting for the brand manager to confirm and resume your tasks.
+                      Waiting for the brand manager to confirm.
                     </p>
                   )}
                   {!isContacted && ot.overdueContactDenied && (
                     <p className="text-[10px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
-                      It seems you still have not had the meeting with the brand manager. Please contact them to resume your tasks.
+                      It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
                     </p>
                   )}
                 </Card>

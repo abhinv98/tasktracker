@@ -35,6 +35,7 @@ export default function DeliverablesPage() {
   const passSubTaskToTeamLeadMut = useMutation(api.approvals.passSubTaskToTeamLead);
   const sendToClientMut = useMutation(api.jsr.sendToClient);
   const reassignAfterClientFeedback = useMutation(api.approvals.reassignAfterClientFeedback);
+  const forwardToTeamMemberMut = useMutation(api.approvals.forwardToTeamMember);
 
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
@@ -42,6 +43,9 @@ export default function DeliverablesPage() {
   const [deletingDeliverableId, setDeletingDeliverableId] = useState<string | null>(null);
   const [reassignTarget, setReassignTarget] = useState<Record<string, string>>({});
   const [reassignNote, setReassignNote] = useState<Record<string, string>>({});
+  const [forwardingDeliverableId, setForwardingDeliverableId] = useState<string | null>(null);
+  const [forwardTargetUser, setForwardTargetUser] = useState<Record<string, string>>({});
+  const [forwardNote, setForwardNote] = useState<Record<string, string>>({});
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
 
@@ -52,7 +56,7 @@ export default function DeliverablesPage() {
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
 
   const allTeams = useQuery(api.teams.listTeams, {});
-  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
+  const allUsers = useQuery(api.users.listAllUsers, {});
   const role = user?.role ?? "employee";
   const isAdmin = role === "admin";
   const isActualTeamLead = (allTeams ?? []).some((t: any) => t.leadId === user?._id);
@@ -834,7 +838,7 @@ export default function DeliverablesPage() {
                       >
                         <option value="">Select team member to reassign...</option>
                         {(d.teamMembers ?? []).map((m: any) => (
-                          <option key={m._id} value={m._id}>{m.name}{haltedUserIds.includes(m._id) ? " ⚠ HALTED" : ""}</option>
+                          <option key={m._id} value={m._id}>{m.name}</option>
                         ))}
                       </select>
                     </div>
@@ -881,24 +885,126 @@ export default function DeliverablesPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleApprove(d._id)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      Approve (Final)
-                    </button>
-                    {showRejectForm === d._id ? (
-                      renderRejectForm(d._id, handleReject)
-                    ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setShowRejectForm(d._id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                        onClick={() => handleApprove(d._id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                       >
-                        <X className="h-3.5 w-3.5" />
-                        Request Changes
+                        <Check className="h-3.5 w-3.5" />
+                        Approve (Final)
                       </button>
+                      {showRejectForm === d._id ? (
+                        renderRejectForm(d._id, handleReject)
+                      ) : (
+                        <button
+                          onClick={() => setShowRejectForm(d._id)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Request Changes
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setForwardingDeliverableId(forwardingDeliverableId === d._id ? null : d._id)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                          forwardingDeliverableId === d._id
+                            ? "bg-[var(--accent-admin)] text-white"
+                            : "border border-[var(--accent-admin)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)]"
+                        }`}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Pass to Team Member
+                      </button>
+                    </div>
+
+                    {forwardingDeliverableId === d._id && (
+                      <div className="space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                        <select
+                          value={forwardTargetUser[d._id] ?? ""}
+                          onChange={(e) => setForwardTargetUser((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                        >
+                          <option value="">Select team member...</option>
+                          {(() => {
+                            const users = allUsers ?? [];
+                            const grouped: Record<string, { _id: string; name: string }[]> = {};
+                            const noTeam: { _id: string; name: string }[] = [];
+                            for (const u of users) {
+                              if (u._id === user?._id) continue;
+                              const label = u.name ?? u.email ?? "Unknown";
+                              if ((u as any).teams?.length > 0) {
+                                for (const t of (u as any).teams) {
+                                  const teamName = t.name ?? "Unknown Team";
+                                  if (!grouped[teamName]) grouped[teamName] = [];
+                                  grouped[teamName].push({ _id: u._id, name: label });
+                                }
+                              } else {
+                                noTeam.push({ _id: u._id, name: label });
+                              }
+                            }
+                            return (
+                              <>
+                                {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([teamName, members]) => (
+                                  <optgroup key={teamName} label={teamName}>
+                                    {members.map((m) => (
+                                      <option key={m._id} value={m._id}>
+                                        {m.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                                {noTeam.length > 0 && (
+                                  <optgroup label="No Team">
+                                    {noTeam.map((m) => (
+                                      <option key={m._id} value={m._id}>
+                                        {m.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </select>
+                        <textarea
+                          value={forwardNote[d._id] ?? ""}
+                          onChange={(e) => setForwardNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                          placeholder="Describe what this team member should work on..."
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[60px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                          required
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            disabled={!forwardTargetUser[d._id] || !forwardNote[d._id]?.trim()}
+                            onClick={async () => {
+                              const target = forwardTargetUser[d._id];
+                              const note = forwardNote[d._id]?.trim();
+                              if (!target || !note) return;
+                              try {
+                                await forwardToTeamMemberMut({
+                                  deliverableId: d._id as Id<"deliverables">,
+                                  targetUserId: target as Id<"users">,
+                                  note,
+                                });
+                                setForwardingDeliverableId(null);
+                                setForwardTargetUser((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
+                                setForwardNote((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
+                              } catch {}
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                          >
+                            <ArrowRight className="h-3.5 w-3.5" />
+                            Forward
+                          </button>
+                          <button
+                            onClick={() => setForwardingDeliverableId(null)}
+                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

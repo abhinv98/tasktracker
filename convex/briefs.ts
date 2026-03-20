@@ -189,16 +189,6 @@ export const createBrief = mutation({
     }
 
     if (args.briefType === "single_task" && taskAssigneeId) {
-      // Check if assignee is halted
-      const now = Date.now();
-      const assigneeTasks = await ctx.db
-        .query("tasks")
-        .withIndex("by_assignee", (q) => q.eq("assigneeId", taskAssigneeId))
-        .collect();
-      const assigneeHalted = assigneeTasks.some(
-        (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
-      );
-
       const taskId = await ctx.db.insert("tasks", {
         briefId,
         title: taskTitle || args.title,
@@ -212,35 +202,19 @@ export const createBrief = mutation({
         ...(args.deadline ? { deadline: args.deadline } : {}),
         assignedAt: Date.now(),
         ...(taskClientFacing ? { clientFacing: true } : {}),
-        ...(assigneeHalted ? { haltLocked: true } : {}),
       });
 
       await ctx.db.insert("notifications", {
         recipientId: taskAssigneeId,
         type: "task_assigned",
         title: "Task assigned",
-        message: `You were assigned "${taskTitle || args.title}"${assigneeHalted ? " (your tasks are currently halted)" : ""}`,
+        message: `You were assigned "${taskTitle || args.title}"`,
         briefId,
         taskId,
         triggeredBy: userId,
         read: false,
         createdAt: Date.now(),
       });
-
-      if (assigneeHalted && assignedManagerId && assignedManagerId !== userId) {
-        const assignee = await ctx.db.get(taskAssigneeId);
-        const assigneeName = assignee?.name ?? assignee?.email ?? "A team member";
-        await ctx.db.insert("notifications", {
-          recipientId: assignedManagerId,
-          type: "task_status_changed",
-          title: "Task assigned to halted user",
-          message: `"${taskTitle || args.title}" was assigned to ${assigneeName} whose tasks are currently halted`,
-          briefId,
-          triggeredBy: userId,
-          read: false,
-          createdAt: Date.now(),
-        });
-      }
     }
 
     return briefId;

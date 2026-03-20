@@ -107,47 +107,24 @@ export const createTask = mutation({
       : 0;
     const sortOrder = maxOrder + 1000;
 
-    const halted = await isUserHalted(ctx, args.assigneeId);
-
     const taskId = await ctx.db.insert("tasks", {
       ...args,
       assignedBy: userId,
       status: "pending",
       sortOrder,
-      ...(halted ? { haltLocked: true } : {}),
     });
 
     await ctx.db.insert("notifications", {
       recipientId: args.assigneeId,
       type: "task_assigned",
       title: "Task assigned",
-      message: `You were assigned: ${args.title}${halted ? " (your tasks are currently halted)" : ""}`,
+      message: `You were assigned: ${args.title}`,
       briefId: args.briefId,
       taskId,
       triggeredBy: userId,
       read: false,
       createdAt: Date.now(),
     });
-
-    if (halted) {
-      const brief = await ctx.db.get(args.briefId);
-      const managerId = brief?.assignedManagerId;
-      const assignee = await ctx.db.get(args.assigneeId);
-      const assigneeName = assignee?.name ?? assignee?.email ?? "A team member";
-      if (managerId && managerId !== userId) {
-        await ctx.db.insert("notifications", {
-          recipientId: managerId,
-          type: "task_status_changed",
-          title: "Task assigned to halted user",
-          message: `"${args.title}" was assigned to ${assigneeName} whose tasks are currently halted`,
-          briefId: args.briefId,
-          taskId,
-          triggeredBy: userId,
-          read: false,
-          createdAt: Date.now(),
-        });
-      }
-    }
 
     await ctx.db.insert("activityLog", {
       briefId: args.briefId,
@@ -262,10 +239,6 @@ export const updateTaskStatus = mutation({
     const canUpdate =
       task.assigneeId === userId || user?.role === "admin";
     if (!canUpdate) throw new Error("Not authorized");
-
-    if (task.haltLocked) {
-      throw new Error("This task is locked because the assignee has halted tasks. The brand manager must resume before status changes.");
-    }
 
     if (newStatus === "done" && user?.role !== "admin") {
       throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
@@ -491,8 +464,6 @@ export const createSubTask = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
 
-    const halted = await isUserHalted(ctx, args.assigneeId);
-
     const taskId = await ctx.db.insert("tasks", {
       briefId: parentTask.briefId,
       title: `${parentTask.title} — Sub-task`,
@@ -505,40 +476,19 @@ export const createSubTask = mutation({
       ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
       ...(args.deadline ? { deadline: args.deadline } : {}),
       parentTaskId: args.parentTaskId,
-      ...(halted ? { haltLocked: true } : {}),
     });
 
     await ctx.db.insert("notifications", {
       recipientId: args.assigneeId,
       type: "task_assigned",
       title: "Sub-task assigned",
-      message: `You were added as a helper on "${parentTask.title}"${halted ? " (your tasks are currently halted)" : ""}`,
+      message: `You were added as a helper on "${parentTask.title}"`,
       briefId: parentTask.briefId,
       taskId,
       triggeredBy: userId,
       read: false,
       createdAt: Date.now(),
     });
-
-    if (halted) {
-      const brief = await ctx.db.get(parentTask.briefId);
-      const managerId = brief?.assignedManagerId;
-      const assignee = await ctx.db.get(args.assigneeId);
-      const assigneeName = assignee?.name ?? assignee?.email ?? "A team member";
-      if (managerId && managerId !== userId) {
-        await ctx.db.insert("notifications", {
-          recipientId: managerId,
-          type: "task_status_changed",
-          title: "Sub-task assigned to halted user",
-          message: `A sub-task for "${parentTask.title}" was assigned to ${assigneeName} whose tasks are currently halted`,
-          briefId: parentTask.briefId,
-          taskId,
-          triggeredBy: userId,
-          read: false,
-          createdAt: Date.now(),
-        });
-      }
-    }
 
     return taskId;
   },
@@ -650,36 +600,7 @@ export const updateTaskBlockers = mutation({
   },
 });
 
-// ─── HALTED USER CHECK ───────────────────────────
-
-export const getHaltedUserIds = query({
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const now = Date.now();
-    const allTasks = await ctx.db.query("tasks").collect();
-    const haltedIds = new Set<string>();
-    for (const t of allTasks) {
-      if (t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true) {
-        haltedIds.add(t.assigneeId);
-      }
-    }
-    return [...haltedIds];
-  },
-});
-
-async function isUserHalted(ctx: any, assigneeId: string): Promise<boolean> {
-  const now = Date.now();
-  const tasks = await ctx.db
-    .query("tasks")
-    .withIndex("by_assignee", (q: any) => q.eq("assigneeId", assigneeId))
-    .collect();
-  return tasks.some(
-    (t: any) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
-  );
-}
-
-// ─── OVERDUE HALT FLOW ────────────────────────────
+// ─── OVERDUE COMMUNICATION FLOW ──────────────────
 
 export const getOverdueHaltStatus = query({
   handler: async (ctx) => {
@@ -755,22 +676,11 @@ export const resumeOverdueTask = mutation({
 
     await ctx.db.patch(taskId, { overdueAcknowledged: true });
 
-    // Unlock all haltLocked tasks for this assignee
-    const assigneeTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_assignee", (q) => q.eq("assigneeId", task.assigneeId))
-      .collect();
-    for (const t of assigneeTasks) {
-      if (t.haltLocked) {
-        await ctx.db.patch(t._id, { haltLocked: false });
-      }
-    }
-
     await ctx.db.insert("notifications", {
       recipientId: task.assigneeId,
       type: "task_status_changed",
-      title: "Tasks resumed",
-      message: `Your tasks have been resumed by ${user.name ?? user.email ?? "a manager"} after overdue review for "${task.title}"`,
+      title: "Overdue task acknowledged",
+      message: `${user.name ?? user.email ?? "A manager"} has acknowledged overdue task "${task.title}"`,
       briefId: task.briefId,
       taskId,
       triggeredBy: userId,
@@ -811,17 +721,6 @@ export const extendTaskDeadline = mutation({
       originalDeadline,
       overdueAcknowledged: true,
     });
-
-    // Unlock all haltLocked tasks for this assignee
-    const assigneeTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_assignee", (q) => q.eq("assigneeId", task.assigneeId))
-      .collect();
-    for (const t of assigneeTasks) {
-      if (t.haltLocked) {
-        await ctx.db.patch(t._id, { haltLocked: false });
-      }
-    }
 
     // Also update the brief's deadline for single_task briefs
     const brief = await ctx.db.get(task.briefId);
@@ -1045,14 +944,28 @@ export const confirmOverdueContact = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
 
-    if (!confirmed) {
+    if (confirmed) {
+      await ctx.db.patch(taskId, { overdueContacted: false, overdueContactDenied: false });
+
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "overdue_contact",
+        title: "Contact acknowledged",
+        message: `${user.name ?? user.email ?? "The brand manager"} has confirmed your contact regarding overdue task "${task.title}"`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    } else {
       await ctx.db.patch(taskId, { overdueContacted: false, overdueContactDenied: true });
 
       await ctx.db.insert("notifications", {
         recipientId: task.assigneeId,
         type: "overdue_contact",
         title: "Meeting required",
-        message: `The brand manager has not received your contact regarding overdue task "${task.title}". Please reach out to the brand manager to resume your tasks.`,
+        message: `The brand manager has not received your contact regarding overdue task "${task.title}". Please reach out to them.`,
         briefId: task.briefId,
         taskId,
         triggeredBy: userId,

@@ -98,7 +98,6 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
 
   const subTasks = useQuery(api.tasks.getSubTasks, { parentTaskId: taskId as Id<"tasks"> });
   const createSubTask = useMutation(api.tasks.createSubTask);
-  const haltedUserIds = useQuery(api.tasks.getHaltedUserIds) ?? [];
   const briefId = detail?.task?.briefId;
   const graphData = useQuery(
     api.briefs.getBriefGraphData,
@@ -433,7 +432,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                       <option value="">Select employee</option>
                       {editAllMembers.map((emp) => (
                         <option key={emp._id} value={emp._id}>
-                          {(emp.name ?? emp.email ?? "Unknown") as string}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
+                          {(emp.name ?? emp.email ?? "Unknown") as string}
                         </option>
                       ))}
                     </select>
@@ -728,7 +727,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                       .filter((u) => u._id !== task.assigneeId)
                       .map((u) => (
                         <option key={u._id} value={u._id}>
-                          {(u.name ?? u.email ?? "Unknown") as string}{haltedUserIds.includes(u._id) ? " ⚠ HALTED" : ""}
+                          {(u.name ?? u.email ?? "Unknown") as string}
                         </option>
                       ))}
                   </select>
@@ -1083,13 +1082,10 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                     <option value="">Select employee</option>
                     {editFilteredEmployees.map((emp) => (
                       <option key={emp._id} value={emp._id}>
-                        {(emp.name ?? emp.email ?? "Unknown") as string}{haltedUserIds.includes(emp._id) ? " ⚠ HALTED" : ""}
+                        {(emp.name ?? emp.email ?? "Unknown") as string}
                       </option>
                     ))}
                   </select>
-                  {editAssignee && haltedUserIds.includes(editAssignee) && (
-                    <p className="text-[10px] text-red-600 mt-1 font-medium">Warning: This user is currently halted.</p>
-                  )}
                 </div>
                 <div>
                   <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5">Deadline</label>

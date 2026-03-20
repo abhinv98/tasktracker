@@ -1408,6 +1408,100 @@ export const reassignAfterClientFeedback = mutation({
   },
 });
 
+export const forwardToTeamMember = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    targetUserId: v.id("users"),
+    note: v.string(),
+  },
+  handler: async (ctx, { deliverableId, targetUserId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    const task = await ctx.db.get(deliverable.taskId);
+    if (!task) throw new Error("Task not found");
+    const brief = await ctx.db.get(task.briefId);
+
+    if (!brief?.brandId) {
+      throw new Error("Brief has no brand assigned");
+    }
+
+    const isManager = await isBrandManager(ctx, userId, brief.brandId);
+    if (!isManager) {
+      throw new Error("Only the brand manager can forward deliverables");
+    }
+
+    const oldAssigneeId = task.assigneeId;
+
+    await ctx.db.patch(deliverableId, {
+      status: "rejected",
+      reviewedBy: userId,
+      reviewNote: note,
+      reviewedAt: Date.now(),
+      teamLeadStatus: undefined,
+      teamLeadReviewedBy: undefined,
+      teamLeadReviewNote: undefined,
+      teamLeadReviewedAt: undefined,
+      passedToManagerBy: undefined,
+      passedToManagerAt: undefined,
+    });
+
+    await ctx.db.patch(task._id, {
+      assigneeId: targetUserId,
+      status: "in-progress",
+      assignedAt: Date.now(),
+    });
+
+    const user = await ctx.db.get(userId);
+    const targetUser = await ctx.db.get(targetUserId);
+
+    await ctx.db.insert("notifications", {
+      recipientId: targetUserId,
+      type: "task_assigned",
+      title: "Deliverable forwarded to you",
+      message: `${user?.name ?? "Brand manager"} forwarded a deliverable for "${task.title}" to you: ${note}`,
+      briefId: task.briefId,
+      taskId: task._id,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    if (oldAssigneeId !== targetUserId) {
+      await ctx.db.insert("notifications", {
+        recipientId: oldAssigneeId,
+        type: "task_status_changed",
+        title: "Task reassigned",
+        message: `"${task.title}" was forwarded to ${targetUser?.name ?? targetUser?.email ?? "another team member"} by ${user?.name ?? "brand manager"}`,
+        briefId: task.briefId,
+        taskId: task._id,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    await ctx.db.insert("activityLog", {
+      briefId: task.briefId,
+      taskId: task._id,
+      userId,
+      action: "forwarded_to_team_member",
+      details: JSON.stringify({
+        from: oldAssigneeId,
+        to: targetUserId,
+        targetName: targetUser?.name ?? targetUser?.email,
+        note,
+        taskTitle: task.title,
+        briefTitle: brief?.title,
+      }),
+      timestamp: Date.now(),
+    });
+  },
+});
+
 export const deleteDeliverable = mutation({
   args: { deliverableId: v.id("deliverables") },
   handler: async (ctx, { deliverableId }) => {
