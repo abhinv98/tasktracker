@@ -71,6 +71,7 @@ export const getEmployeeReport = query({
           _id: t._id,
           title: t.title,
           status: t.status,
+          assignedAt: t.assignedAt ?? (t as any)._creationTime,
           deadline: t.deadline,
           completedAt: t.completedAt,
           briefTitle: brief?.title ?? "Unknown",

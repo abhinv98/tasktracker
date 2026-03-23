@@ -460,6 +460,7 @@ export default function WorkLogPage() {
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Task</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Brief</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Status</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Assigned</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Deadline</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Time</th>
                             </tr>
@@ -487,6 +488,13 @@ export default function WorkLogPage() {
                                     >
                                       {sc?.label ?? task.status}
                                     </span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {task.assignedAt ? (
+                                      <span className="text-[11px] text-[var(--text-secondary)]">
+                                        {new Date(task.assignedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                      </span>
+                                    ) : "—"}
                                   </td>
                                   <td className="px-3 py-2">
                                     {task.deadline ? (
