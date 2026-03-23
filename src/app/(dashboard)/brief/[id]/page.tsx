@@ -5,10 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 
@@ -411,11 +411,9 @@ export default function BriefPage() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showTemplatePrompt, setShowTemplatePrompt] = useState(false);
 
   const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
-  const saveAsTemplate = useMutation(api.templates.saveAsTemplate);
 
   const briefTeamsList = graphData?.teams ?? [];
   const employeesInBriefTeams =
@@ -597,14 +595,17 @@ export default function BriefPage() {
           >
             <FileDown className="h-4 w-4" />
           </button>
-          {/* Save as template */}
-          {isAdmin && allTasks.length > 0 && (
+          {/* Edit brief */}
+          {isAdmin && brief.status !== "archived" && (
             <button
-              onClick={() => setShowTemplatePrompt(true)}
+              onClick={() => {
+                const titleInput = document.querySelector<HTMLInputElement>('header input[class*="font-semibold"]');
+                if (titleInput) { titleInput.focus(); titleInput.select(); }
+              }}
               className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
-              title="Save as template"
+              title="Edit brief"
             >
-              <Save className="h-4 w-4" />
+              <Pencil className="h-4 w-4" />
             </button>
           )}
           {isAdmin && (
@@ -1120,22 +1121,6 @@ export default function BriefPage() {
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
-      {/* Save as Template Prompt */}
-      <PromptModal
-        open={showTemplatePrompt}
-        title="Save as Template"
-        message="Enter a name for this template."
-        placeholder="Template name"
-        defaultValue={brief?.title ?? ""}
-        confirmLabel="Save"
-        confirmingLabel="Saving..."
-        onConfirm={async (name) => {
-          await saveAsTemplate({ briefId, name });
-          toast("success", "Saved as template");
-          setShowTemplatePrompt(false);
-        }}
-        onCancel={() => setShowTemplatePrompt(false)}
-      />
 
       {selectedTaskId && (
         <TaskDetailModal

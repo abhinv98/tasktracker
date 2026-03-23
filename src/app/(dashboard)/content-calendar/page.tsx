@@ -887,6 +887,8 @@ function TaskDetailSidebar({
   const [editAssignee, setEditAssignee] = useState(task.assigneeId ?? "");
   const [editAssignor, setEditAssignor] = useState(task.assignedBy ?? "");
   const [editDescription, setEditDescription] = useState(task.description ?? "");
+  const [editCreativeCopy, setEditCreativeCopy] = useState(task.creativeCopy ?? "");
+  const [editCaption, setEditCaption] = useState(task.caption ?? "");
   const [saving, setSaving] = useState(false);
 
   const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
@@ -930,6 +932,8 @@ function TaskDetailSidebar({
       if (editContentType !== (task.contentType ?? "")) updates.contentType = editContentType;
       if (editPostDate !== (task.postDate ?? "")) updates.postDate = editPostDate;
       if (editDescription !== (task.description ?? "")) updates.description = editDescription;
+      if (editCreativeCopy !== (task.creativeCopy ?? "")) updates.creativeCopy = editCreativeCopy;
+      if (editCaption !== (task.caption ?? "")) updates.caption = editCaption;
       if (editAssignee && editAssignee !== task.assigneeId) updates.assigneeId = editAssignee;
       if (editAssignor && editAssignor !== task.assignedBy) updates.assignedBy = editAssignor;
       if (editDeadline) {
@@ -1005,6 +1009,26 @@ function TaskDetailSidebar({
             <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} placeholder="Add description..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
           ) : (
             <p className="text-[13px] text-[var(--text-secondary)]">{task.description || "No description"}</p>
+          )}
+        </div>
+
+        {/* Creative Copy */}
+        <div>
+          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Creative Copy</label>
+          {isEditable ? (
+            <textarea value={editCreativeCopy} onChange={(e) => setEditCreativeCopy(e.target.value)} rows={3} placeholder="Add creative copy..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
+          ) : (
+            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">{task.creativeCopy || "No creative copy"}</p>
+          )}
+        </div>
+
+        {/* Caption */}
+        <div>
+          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Caption</label>
+          {isEditable ? (
+            <textarea value={editCaption} onChange={(e) => setEditCaption(e.target.value)} rows={3} placeholder="Add caption..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
+          ) : (
+            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">{task.caption || "No caption"}</p>
           )}
         </div>
 
