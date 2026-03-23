@@ -110,6 +110,7 @@ export default defineSchema({
     durationMinutes: v.optional(v.number()),
     deadline: v.optional(v.number()),
     completedAt: v.optional(v.number()),
+    submittedForReviewAt: v.optional(v.number()),
     blockedBy: v.optional(v.array(v.id("tasks"))),
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),

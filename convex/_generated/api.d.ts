@@ -29,6 +29,7 @@ import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
+import type * as migrations_backfillReviewAt from "../migrations/backfillReviewAt.js";
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_checkTimeEntries from "../migrations/checkTimeEntries.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   jsr: typeof jsr;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   meetingMinutes: typeof meetingMinutes;
+  "migrations/backfillReviewAt": typeof migrations_backfillReviewAt;
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/checkTimeEntries": typeof migrations_checkTimeEntries;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;

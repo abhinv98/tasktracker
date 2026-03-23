@@ -271,6 +271,7 @@ export const updateTaskStatus = mutation({
     await ctx.db.patch(taskId, {
       status: newStatus,
       ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
+      ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
     });
 
     if (task.assignedBy !== userId) {

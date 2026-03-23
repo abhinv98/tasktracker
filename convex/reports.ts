@@ -74,16 +74,26 @@ export const getEmployeeReport = query({
         const taskTimeHours = (t.completedAt && tAssignedAt)
           ? Math.round(((t.completedAt - tAssignedAt) / (1000 * 60 * 60)) * 10) / 10
           : null;
+        const submittedForReviewAt = t.submittedForReviewAt ?? null;
+        const employeeTimeHours = (submittedForReviewAt && tAssignedAt)
+          ? Math.round(((submittedForReviewAt - tAssignedAt) / (1000 * 60 * 60)) * 10) / 10
+          : null;
+        const approvalTimeHours = (t.completedAt && submittedForReviewAt)
+          ? Math.round(((t.completedAt - submittedForReviewAt) / (1000 * 60 * 60)) * 10) / 10
+          : null;
         return {
           _id: t._id,
           title: t.title,
           status: t.status,
           assignedAt: tAssignedAt,
+          submittedForReviewAt,
           deadline: t.deadline,
           completedAt: t.completedAt,
           briefTitle: brief?.title ?? "Unknown",
           briefId: t.briefId,
           taskTimeHours,
+          employeeTimeHours,
+          approvalTimeHours,
           deadlineExtended: t.deadlineExtended ?? false,
           originalDeadline: t.originalDeadline,
         };

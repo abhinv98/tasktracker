@@ -622,7 +622,12 @@ export const submitDeliverable = mutation({
     });
 
     if (task.status !== "done" && task.status !== "review") {
-      await ctx.db.patch(taskId, { status: "review" });
+      await ctx.db.patch(taskId, {
+        status: "review",
+        ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
+      });
+    } else if (!task.submittedForReviewAt) {
+      await ctx.db.patch(taskId, { submittedForReviewAt: Date.now() });
     }
 
     const user = await ctx.db.get(userId);
