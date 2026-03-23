@@ -134,10 +134,10 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
           </div>
         </div>
 
-        {task.description && (
+        {(task.description || brief.description) && (
           <div>
             <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-1">Description</p>
-            <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{task.description}</p>
+            <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{task.description || brief.description}</p>
           </div>
         )}
 

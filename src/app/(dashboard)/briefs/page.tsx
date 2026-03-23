@@ -189,6 +189,7 @@ export default function BriefsPage() {
         briefType: resolvedBriefType,
         ...(isSingle && stAssignee ? {
           taskTitle: title,
+          taskDescription: description,
           taskAssigneeId: stAssignee as Id<"users">,
           taskClientFacing: clientFacing || undefined,
         } : {}),
