@@ -411,6 +411,7 @@ export default function BriefPage() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditMenu, setShowEditMenu] = useState(false);
 
   const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
@@ -597,16 +598,66 @@ export default function BriefPage() {
           </button>
           {/* Edit brief */}
           {isAdmin && brief.status !== "archived" && (
-            <button
-              onClick={() => {
-                const titleInput = document.querySelector<HTMLInputElement>('header input[class*="font-semibold"]');
-                if (titleInput) { titleInput.focus(); titleInput.select(); }
-              }}
-              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
-              title="Edit brief"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowEditMenu(!showEditMenu)}
+                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
+                title="Edit brief"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              {showEditMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowEditMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-xl shadow-xl border border-[var(--border)] py-1 min-w-[240px] max-w-[320px] max-h-[400px] overflow-auto animate-scaleIn">
+                    {/* Brief fields */}
+                    <div className="px-3 py-1.5">
+                      <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Brief</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowEditMenu(false);
+                        const titleInput = document.querySelector<HTMLInputElement>('header input[class*="font-semibold"]');
+                        if (titleInput) { titleInput.focus(); titleInput.select(); }
+                      }}
+                      className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2"
+                    >
+                      <Pencil className="h-3 w-3 text-[var(--text-muted)]" />
+                      Edit Brief Title & Description
+                    </button>
+
+                    {/* Tasks / Events */}
+                    {allTasks.length > 0 && (
+                      <>
+                        <div className="border-t border-[var(--border-subtle)] mt-1" />
+                        <div className="px-3 py-1.5">
+                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                            {brief.briefType === "content_calendar" ? "Calendar Events" : "Tasks"}
+                          </p>
+                        </div>
+                        {allTasks.map((task) => {
+                          const sc = task.status === "done" ? "#10b981" : task.status === "in-progress" ? "#f59e0b" : task.status === "review" ? "#8b5cf6" : "#6b7280";
+                          return (
+                            <button
+                              key={task._id}
+                              onClick={() => {
+                                setShowEditMenu(false);
+                                setSelectedTaskId(task._id);
+                              }}
+                              className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2"
+                            >
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc }} />
+                              <span className="truncate flex-1">{task.title}</span>
+                              <span className="text-[10px] text-[var(--text-muted)] shrink-0 capitalize">{task.status}</span>
+                            </button>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           )}
           {isAdmin && (
             <button
