@@ -93,7 +93,8 @@ export function DatePicker({
     setViewDate(new Date(viewYear, viewMonth + 1, 1));
   }
   function selectDay(d: Date) {
-    onChange(d.getTime());
+    const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    onChange(endOfDay.getTime());
     setOpen(false);
   }
   function clear() {

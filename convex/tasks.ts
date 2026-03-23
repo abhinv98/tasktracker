@@ -5,9 +5,17 @@ import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
-  const h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
-  if (h === 0 && m === 0 && s === 0) {
-    d.setHours(23, 59, 59, 999);
+  const uh = d.getUTCHours(), um = d.getUTCMinutes(), us = d.getUTCSeconds();
+  // Midnight UTC
+  if (uh === 0 && um === 0 && us === 0) {
+    d.setUTCHours(23, 59, 59, 999);
+    return d.getTime();
+  }
+  // Midnight IST (UTC+5:30) = 18:30:00 UTC previous day
+  if (uh === 18 && um === 30 && us === 0) {
+    // Move to 23:59:59 IST same day = 18:29:59 UTC next day
+    d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCHours(18, 29, 59, 999);
     return d.getTime();
   }
   return deadline;
