@@ -199,10 +199,12 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const isAssignee = user._id === task.assigneeId;
   const isAdmin = user.role === "admin";
-  const isLocked = task.status === "done" || (task.deadline != null && task.deadline < Date.now());
-  const canUpdateStatus = (isAssignee || isAdmin) && !isLocked;
+  const isOverdue = task.deadline != null && task.deadline < Date.now() && task.status !== "done";
+  const isDelivered = task.status === "done";
+  const isEditLocked = isDelivered || isOverdue;
+  const canUpdateStatus = (isAssignee || isAdmin) && !isDelivered;
   const rawNext = STATUS_FLOW[status];
-  const nextStatus = isLocked ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
+  const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
   async function handleStatusUpdate() {
     if (!nextStatus || isUpdatingStatus) return;
@@ -345,7 +347,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
             </p>
           </div>
           <div className="flex items-center gap-1">
-            {isAdmin && !isLocked && (
+            {isAdmin && !isEditLocked && (
               <button
                 onClick={openEditForm}
                 className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -480,9 +482,9 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
               >
                 {statusInfo.label}
               </span>
-              {isLocked && (
+              {isDelivered && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
-                  🔒 {task.status === "done" ? "Delivered" : "Past deadline"}
+                  🔒 Delivered
                 </span>
               )}
               {canUpdateStatus && nextStatus && status !== "done" && (
@@ -841,13 +843,18 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                 onSubmit={handleSubmitDeliverable}
                 className="space-y-2.5 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]"
               >
-                <textarea
-                  value={deliverableMessage}
-                  onChange={(e) => setDeliverableMessage(e.target.value)}
-                  placeholder="Describe what you're delivering..."
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] min-h-[70px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-                  required
-                />
+                <div>
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-1 block">
+                    Description <span className="text-[var(--danger)]">*</span>
+                  </label>
+                  <textarea
+                    value={deliverableMessage}
+                    onChange={(e) => setDeliverableMessage(e.target.value)}
+                    placeholder="Describe what you're delivering..."
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] min-h-[70px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    required
+                  />
+                </div>
                 <div className="flex items-center gap-2">
                   <Link2 className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                   <input

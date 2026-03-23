@@ -90,7 +90,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   }
 
   const statusStyle = STATUS_LABELS[task.status] ?? { label: task.status, color: "var(--text-secondary)" };
-  const isLocked = task.status === "done" || (task.deadline && task.deadline < Date.now());
+  const isDelivered = task.status === "done";
 
   return (
     <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden">
@@ -108,12 +108,12 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
               style={{ color: statusStyle.color, backgroundColor: `color-mix(in srgb, ${statusStyle.color} 12%, transparent)` }}
             >{statusStyle.label}</span>
-            {isLocked && (
+            {isDelivered && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
-                🔒 {task.status === "done" ? "Delivered" : "Past deadline"}
+                🔒 Delivered
               </span>
             )}
-            {!isLocked && task.status !== "done" && (() => {
+            {!isDelivered && task.status !== "done" && (() => {
               const nextMap: Record<string, { status: "in-progress" | "review" | "done"; label: string }> = {
                 pending: { status: "in-progress", label: "In Progress" },
                 "in-progress": { status: "review", label: "Review" },
