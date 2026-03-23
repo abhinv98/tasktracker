@@ -5,8 +5,8 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
-import { Trash2, Calendar, Copy, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2 } from "lucide-react";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
 const STATUS_COLORS = BRIEF_STATUS_COLORS;
@@ -67,19 +67,13 @@ export default function BriefsPage() {
     stTeamId ? { teamId: stTeamId as Id<"teams"> } : "skip"
   );
 
-  const templates = useQuery(api.templates.listTemplates);
-  const createFromTemplate = useMutation(api.templates.createFromTemplate);
-  const deleteTemplate = useMutation(api.templates.deleteTemplate);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [deletingBriefId, setDeletingBriefId] = useState<Id<"briefs"> | null>(null);
-  const [deletingTemplateId, setDeletingTemplateId] = useState<Id<"briefTemplates"> | null>(null);
-  const [templateForBrief, setTemplateForBrief] = useState<Id<"briefTemplates"> | null>(null);
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
 
   const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [briefsTab, setBriefsTab] = useState<"active" | "completed">("active");
 
   function toggleBrand(id: string) {
     setExpandedBrands((prev) => {
@@ -130,8 +124,10 @@ export default function BriefsPage() {
 
   const activeBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status !== "completed"), [briefs]);
   const completedBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status === "completed"), [briefs]);
-  const brandFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands]);
+  const activeFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands]);
   const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands]);
+  const brandFolders = briefsTab === "active" ? activeFolders : completedFolders;
+  const displayedBriefs = briefsTab === "active" ? activeBriefs : completedBriefs;
 
 
   function parseDuration(str: string): number {
@@ -227,50 +223,40 @@ export default function BriefsPage() {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2">
-            {(templates ?? []).length > 0 && (
-              <div className="relative">
-                <Button variant="secondary" onClick={() => setShowTemplates(!showTemplates)}>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                  From Template
-                </Button>
-                {showTemplates && (
-                  <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl border border-[var(--border)] shadow-lg z-20 py-1">
-                    {templates?.map((t) => (
-                      <div key={t._id} className="flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-hover)]">
-                        <button
-                          onClick={() => {
-                            setTemplateForBrief(t._id);
-                            setShowTemplates(false);
-                          }}
-                          className="flex-1 text-left text-[13px] text-[var(--text-primary)]"
-                        >
-                          {t.name}
-                          <span className="block text-[11px] text-[var(--text-muted)]">
-                            {t.tasks.length} tasks
-                          </span>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingTemplateId(t._id);
-                            setShowTemplates(false);
-                          }}
-                          className="text-[var(--text-muted)] hover:text-[var(--danger)] p-1"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
             <Button variant="primary" onClick={() => openCreateModalForBrand()}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Create Brief
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-4">
+        <button
+          onClick={() => setBriefsTab("active")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            briefsTab === "active"
+              ? "bg-white shadow-sm text-[var(--text-primary)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <Briefcase className="h-3.5 w-3.5" />
+          Active
+          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{activeBriefs.length}</span>
+        </button>
+        <button
+          onClick={() => setBriefsTab("completed")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            briefsTab === "completed"
+              ? "bg-white shadow-sm text-[var(--text-primary)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Completed
+          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -319,7 +305,7 @@ export default function BriefsPage() {
           </button>
         </div>
         <span className="text-[11px] text-[var(--text-muted)]">
-          {briefs?.length ?? 0} brief{(briefs?.length ?? 0) !== 1 ? "s" : ""}
+          {displayedBriefs.length} brief{displayedBriefs.length !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -501,57 +487,6 @@ export default function BriefsPage() {
             </Card>
           )}
 
-          {/* Completed Briefs Section */}
-          {completedBriefs.length > 0 && (
-            <div className="mt-6">
-              <button
-                onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors w-full"
-              >
-                {showCompleted ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />}
-                <CheckCircle2 className="h-4 w-4 text-[#10b981]" />
-                <span className="font-semibold text-[14px] text-[var(--text-primary)]">Completed Briefs</span>
-                <span className="text-[11px] text-[var(--text-muted)] tabular-nums">{completedBriefs.length}</span>
-              </button>
-              {showCompleted && completedFolders.map((folder) => (
-                <Card key={`completed-${folder.brandId}`} className="p-0 overflow-hidden mt-2">
-                  <div className="flex items-center gap-3 px-4 py-2" style={{ borderLeft: `4px solid ${folder.brandColor}` }}>
-                    <FolderOpen className="h-4 w-4 shrink-0" style={{ color: folder.brandColor }} />
-                    <span className="font-semibold text-[13px] text-[var(--text-primary)] flex-1">{folder.brandName}</span>
-                    <span className="text-[11px] text-[var(--text-muted)]">{folder.briefs.length}</span>
-                  </div>
-                  <div className="border-t border-[var(--border)] overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableHead>Title</TableHead>
-                        <TableHead className="hidden md:table-cell">Manager</TableHead>
-                        <TableHead>Deadline</TableHead>
-                        <TableHead className="hidden sm:table-cell">Progress</TableHead>
-                      </TableHeader>
-                      <TableBody>
-                        {folder.briefs.map((brief) => (
-                          <TableRow key={brief._id} onClick={() => router.push(`/brief/${brief._id}`)}>
-                            <TableCell className="font-semibold">{brief.title}</TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              {(brief as any).managerName ? <Badge variant="manager">{(brief as any).managerName}</Badge> : "—"}
-                            </TableCell>
-                            <TableCell>
-                              {brief.deadline ? <span className="text-[12px] text-[var(--text-secondary)]">{formatDate(brief.deadline)}</span> : "—"}
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${(brief as any).progress ?? 0}%`, backgroundColor: "#10b981" }} />
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -914,43 +849,6 @@ export default function BriefsPage() {
         onCancel={() => setDeletingBriefId(null)}
       />
 
-      {/* Delete Template Confirmation */}
-      <ConfirmModal
-        open={!!deletingTemplateId}
-        title="Delete Template"
-        message="Are you sure you want to delete this template?"
-        confirmLabel="Delete"
-        confirmingLabel="Deleting..."
-        variant="danger"
-        onConfirm={async () => {
-          if (!deletingTemplateId) return;
-          await deleteTemplate({ templateId: deletingTemplateId });
-          toast("success", "Template deleted");
-          setDeletingTemplateId(null);
-        }}
-        onCancel={() => setDeletingTemplateId(null)}
-      />
-
-      {/* Create from Template Prompt */}
-      <PromptModal
-        open={!!templateForBrief}
-        title="Create Brief from Template"
-        message="Enter a title for the new brief."
-        placeholder="Brief title"
-        confirmLabel="Create"
-        confirmingLabel="Creating..."
-        onConfirm={async (name) => {
-          if (!templateForBrief) return;
-          try {
-            const id = await createFromTemplate({ templateId: templateForBrief, title: name });
-            router.push(`/brief/${id}`);
-          } catch (err) {
-            toast("error", err instanceof Error ? err.message : "Failed");
-          }
-          setTemplateForBrief(null);
-        }}
-        onCancel={() => setTemplateForBrief(null)}
-      />
     </div>
   );
 }
