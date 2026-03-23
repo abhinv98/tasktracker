@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2 } from "lucide-react";
+import { Trash2, Calendar, Columns3, List, Lock, FileDown, Save, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 
@@ -97,12 +97,18 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
       {/* Left: Task Details + Daily Summaries */}
       <div className="border-r border-[var(--border)] overflow-auto p-5 space-y-5">
         <div>
-          <button
-            onClick={() => onOpenTask(task._id)}
-            className="font-semibold text-[16px] text-[var(--text-primary)] mb-1 hover:text-[var(--accent-admin)] transition-colors text-left"
-          >
-            {task.title}
-          </button>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-semibold text-[16px] text-[var(--text-primary)]">{task.title}</h2>
+            {isAdmin && !isDelivered && (
+              <button
+                onClick={() => onOpenTask(task._id)}
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                title="Edit task"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
