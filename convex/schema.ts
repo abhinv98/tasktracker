@@ -57,7 +57,10 @@ export default defineSchema({
       v.literal("in-progress"),
       v.literal("review"),
       v.literal("completed"),
-      v.literal("archived")
+      v.literal("archived"),
+      v.literal("rejected"),
+      v.literal("on_hold"),
+      v.literal("sent_to_client")
     ),
     briefType: v.optional(
       v.union(
@@ -123,6 +126,8 @@ export default defineSchema({
     overdueContacted: v.optional(v.boolean()),
     overdueContactDenied: v.optional(v.boolean()),
     haltLocked: v.optional(v.boolean()),
+    creativeCopy: v.optional(v.string()),
+    caption: v.optional(v.string()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])

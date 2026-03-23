@@ -17,15 +17,15 @@ import {
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: "To Do", color: "var(--text-secondary)" },
-  "in-progress": { label: "In Progress", color: "var(--accent-manager)" },
-  review: { label: "Review", color: "var(--accent-admin)" },
-  done: { label: "Done", color: "var(--accent-employee)" },
+  pending: { label: "To Do", color: "#6b7280" },
+  "in-progress": { label: "In Progress", color: "#f59e0b" },
+  review: { label: "Review", color: "#8b5cf6" },
+  done: { label: "Done", color: "#10b981" },
 };
 
 const DELIVERABLE_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "Pending", color: "var(--accent-admin)", bg: "var(--accent-admin-dim)" },
-  approved: { label: "Approved", color: "var(--accent-employee)", bg: "var(--accent-employee-dim)" },
+  pending: { label: "Pending", color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
+  approved: { label: "Approved", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
   rejected: { label: "Rejected", color: "var(--danger)", bg: "var(--danger-dim)" },
 };
 
@@ -195,10 +195,10 @@ export default function HistoryPage() {
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-employee)]" />
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">Tasks Done</p>
           </div>
-          <p className="font-bold text-[24px] text-[var(--accent-employee)] tabular-nums">
+          <p className="font-bold text-[24px] tabular-nums" style={{ color: "#10b981" }}>
             {completedTasks}<span className="text-[14px] text-[var(--text-muted)]">/{totalTasks}</span>
           </p>
         </Card>

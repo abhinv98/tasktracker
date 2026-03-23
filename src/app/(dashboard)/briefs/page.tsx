@@ -6,16 +6,10 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PromptModal, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
-import { Trash2, Calendar, Copy, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed } from "lucide-react";
+import { Trash2, Calendar, Copy, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2 } from "lucide-react";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "var(--text-secondary)",
-  active: "var(--accent-employee)",
-  "in-progress": "var(--accent-manager)",
-  review: "var(--accent-admin)",
-  completed: "var(--accent-employee)",
-  archived: "var(--text-disabled)",
-};
+const STATUS_COLORS = BRIEF_STATUS_COLORS;
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-US", {
@@ -58,7 +52,7 @@ export default function BriefsPage() {
   );
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
   const [briefType, setBriefType] = useState<string>("");
-  const [briefMode, setBriefMode] = useState<"master" | "single">("master");
+  const [briefMode, setBriefMode] = useState<"master" | "single" | "content_calendar">("master");
 
   const [clientFacing, setClientFacing] = useState(false);
 
@@ -85,6 +79,7 @@ export default function BriefsPage() {
 
   const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
+  const [showCompleted, setShowCompleted] = useState(false);
 
   function toggleBrand(id: string) {
     setExpandedBrands((prev) => {
@@ -94,9 +89,9 @@ export default function BriefsPage() {
     });
   }
 
-  const brandFolders = useMemo(() => {
-    if (!briefs) return [];
-    const sorted = [...briefs].sort((a, b) => a.globalPriority - b.globalPriority);
+  function buildFolders(briefsList: typeof briefs) {
+    if (!briefsList || briefsList.length === 0) return [];
+    const sorted = [...briefsList].sort((a, b) => a.globalPriority - b.globalPriority);
     const grouped = new Map<string, typeof sorted>();
 
     for (const brief of sorted) {
@@ -131,7 +126,12 @@ export default function BriefsPage() {
     }
 
     return folders;
-  }, [briefs, brands]);
+  }
+
+  const activeBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status !== "completed"), [briefs]);
+  const completedBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status === "completed"), [briefs]);
+  const brandFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands]);
+  const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands]);
 
 
   function parseDuration(str: string): number {
@@ -163,6 +163,7 @@ export default function BriefsPage() {
     e.preventDefault();
     try {
       const isSingle = briefMode === "single";
+      const isContentCal = briefMode === "content_calendar";
 
       type BriefType = "developmental" | "designing" | "video_editing" | "content_calendar" | "copywriting" | "single_task";
 
@@ -174,13 +175,18 @@ export default function BriefsPage() {
         finalDeadline = d.getTime();
       }
 
+      let resolvedBriefType: BriefType | undefined;
+      if (isSingle) resolvedBriefType = "single_task";
+      else if (isContentCal) resolvedBriefType = "content_calendar";
+      else resolvedBriefType = (briefType || undefined) as BriefType | undefined;
+
       await createBrief({
         title,
         description,
         ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
-        briefType: isSingle ? "single_task" as BriefType : (briefType || undefined) as BriefType | undefined,
+        briefType: resolvedBriefType,
         ...(isSingle && stAssignee ? {
           taskTitle: title,
           taskAssigneeId: stAssignee as Id<"users">,
@@ -442,20 +448,21 @@ export default function BriefsPage() {
                               </TableCell>
                               <TableCell>
                                 <span
-                                  className="font-medium text-[12px] capitalize"
+                                  className="font-medium text-[12px]"
                                   style={{
-                                    color: STATUS_COLORS[brief.status] ?? "var(--text-secondary)",
+                                    color: STATUS_COLORS[brief.status] ?? "#6b7280",
                                   }}
                                 >
-                                  {brief.status}
+                                  {BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
                                 </span>
                               </TableCell>
                               <TableCell className="hidden sm:table-cell">
                                 <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                                   <div
-                                    className="h-full rounded-full bg-[var(--accent-employee)]"
+                                    className="h-full rounded-full"
                                     style={{
                                       width: `${(brief as { progress?: number }).progress ?? 0}%`,
+                                      backgroundColor: "#10b981",
                                     }}
                                   />
                                 </div>
@@ -491,6 +498,58 @@ export default function BriefsPage() {
                 {filterManagerId ? "No briefs found for this manager." : "No briefs yet. Create one to get started."}
               </p>
             </Card>
+          )}
+
+          {/* Completed Briefs Section */}
+          {completedBriefs.length > 0 && (
+            <div className="mt-6">
+              <button
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors w-full"
+              >
+                {showCompleted ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />}
+                <CheckCircle2 className="h-4 w-4 text-[#10b981]" />
+                <span className="font-semibold text-[14px] text-[var(--text-primary)]">Completed Briefs</span>
+                <span className="text-[11px] text-[var(--text-muted)] tabular-nums">{completedBriefs.length}</span>
+              </button>
+              {showCompleted && completedFolders.map((folder) => (
+                <Card key={`completed-${folder.brandId}`} className="p-0 overflow-hidden mt-2">
+                  <div className="flex items-center gap-3 px-4 py-2" style={{ borderLeft: `4px solid ${folder.brandColor}` }}>
+                    <FolderOpen className="h-4 w-4 shrink-0" style={{ color: folder.brandColor }} />
+                    <span className="font-semibold text-[13px] text-[var(--text-primary)] flex-1">{folder.brandName}</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">{folder.briefs.length}</span>
+                  </div>
+                  <div className="border-t border-[var(--border)] overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableHead>Title</TableHead>
+                        <TableHead className="hidden md:table-cell">Manager</TableHead>
+                        <TableHead>Deadline</TableHead>
+                        <TableHead className="hidden sm:table-cell">Progress</TableHead>
+                      </TableHeader>
+                      <TableBody>
+                        {folder.briefs.map((brief) => (
+                          <TableRow key={brief._id} onClick={() => router.push(`/brief/${brief._id}`)}>
+                            <TableCell className="font-semibold">{brief.title}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {(brief as any).managerName ? <Badge variant="manager">{(brief as any).managerName}</Badge> : "—"}
+                            </TableCell>
+                            <TableCell>
+                              {brief.deadline ? <span className="text-[12px] text-[var(--text-secondary)]">{formatDate(brief.deadline)}</span> : "—"}
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${(brief as any).progress ?? 0}%`, backgroundColor: "#10b981" }} />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -587,17 +646,17 @@ export default function BriefsPage() {
                             </TableCell>
                             <TableCell>
                               <span
-                                className="font-medium text-[12px] capitalize"
-                                style={{ color: STATUS_COLORS[brief.status] ?? "var(--text-secondary)" }}
+                                className="font-medium text-[12px]"
+                                style={{ color: STATUS_COLORS[brief.status] ?? "#6b7280" }}
                               >
-                                {brief.status}
+                                {BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
                               </span>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
                               <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-[var(--accent-employee)]"
-                                  style={{ width: `${(brief as { progress?: number }).progress ?? 0}%` }}
+                                  className="h-full rounded-full"
+                                  style={{ width: `${(brief as { progress?: number }).progress ?? 0}%`, backgroundColor: "#10b981" }}
                                 />
                               </div>
                             </TableCell>
@@ -663,7 +722,16 @@ export default function BriefsPage() {
                       briefMode === "single" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
                     }`}
                   >
-                    Single Task Brief
+                    Single Task
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBriefMode("content_calendar")}
+                    className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                      briefMode === "content_calendar" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
+                    }`}
+                  >
+                    Content Calendar
                   </button>
                 </div>
               </div>

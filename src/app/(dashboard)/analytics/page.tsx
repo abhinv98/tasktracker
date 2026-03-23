@@ -55,7 +55,7 @@ export default function AnalyticsPage() {
               { key: "pending", label: "Pending", color: "var(--text-secondary)" },
               { key: "in-progress", label: "In Progress", color: "var(--accent-manager)" },
               { key: "review", label: "Review", color: "var(--accent-admin)" },
-              { key: "done", label: "Done", color: "var(--accent-employee)" },
+              { key: "done", label: "Done", color: "#10b981" },
             ].map(({ key, label, color }) => {
               const count = data.tasksByStatus[key] ?? 0;
               const pct = data.totalTasks > 0 ? (count / data.totalTasks) * 100 : 0;
@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
               { key: "active", label: "Active", color: "var(--accent-manager)" },
               { key: "in-progress", label: "In Progress", color: "var(--accent-admin)" },
               { key: "review", label: "Review", color: "#d4a017" },
-              { key: "completed", label: "Completed", color: "var(--accent-employee)" },
+              { key: "completed", label: "Completed", color: "#10b981" },
               { key: "archived", label: "Archived", color: "var(--text-disabled)" },
             ].map(({ key, label, color }) => {
               const count = data.briefsByStatus[key] ?? 0;

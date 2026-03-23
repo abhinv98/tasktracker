@@ -53,8 +53,8 @@ const STATUS_CONFIG: Record<
 > = {
   pending: {
     label: "To Do",
-    color: "var(--text-muted)",
-    bg: "var(--bg-hover)",
+    color: "#6b7280",
+    bg: "rgba(107,114,128,0.1)",
   },
   "in-progress": {
     label: "In Progress",
@@ -68,8 +68,8 @@ const STATUS_CONFIG: Record<
   },
   done: {
     label: "Done",
-    color: "var(--accent-employee)",
-    bg: "var(--accent-employee-dim)",
+    color: "#10b981",
+    bg: "rgba(16,185,129,0.1)",
   },
 };
 
@@ -199,9 +199,10 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const isAssignee = user._id === task.assigneeId;
   const isAdmin = user.role === "admin";
-  const canUpdateStatus = isAssignee || isAdmin;
+  const isLocked = task.status === "done" || (task.deadline != null && task.deadline < Date.now());
+  const canUpdateStatus = (isAssignee || isAdmin) && !isLocked;
   const rawNext = STATUS_FLOW[status];
-  const nextStatus = (rawNext === "done" && !isAdmin) ? null : rawNext;
+  const nextStatus = isLocked ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
   async function handleStatusUpdate() {
     if (!nextStatus || isUpdatingStatus) return;
@@ -344,7 +345,7 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
             </p>
           </div>
           <div className="flex items-center gap-1">
-            {isAdmin && (
+            {isAdmin && !isLocked && (
               <button
                 onClick={openEditForm}
                 className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -479,6 +480,11 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
               >
                 {statusInfo.label}
               </span>
+              {isLocked && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
+                  🔒 {task.status === "done" ? "Delivered" : "Past deadline"}
+                </span>
+              )}
               {canUpdateStatus && nextStatus && status !== "done" && (
                 <button
                   onClick={handleStatusUpdate}
@@ -555,6 +561,28 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
                 </h4>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                   {task.description}
+                </p>
+              </div>
+            )}
+
+            {/* Creative Copy & Caption (content calendar tasks) */}
+            {task.creativeCopy && (
+              <div>
+                <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
+                  Creative Copy
+                </h4>
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                  {task.creativeCopy}
+                </p>
+              </div>
+            )}
+            {task.caption && (
+              <div>
+                <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
+                  Caption
+                </h4>
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                  {task.caption}
                 </p>
               </div>
             )}

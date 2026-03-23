@@ -8,7 +8,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
-const ADMIN_ONLY_ROUTES = ["/users", "/worklog"];
+const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics"];
 
 export default function DashboardLayout({

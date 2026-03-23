@@ -24,11 +24,11 @@ function parseDuration(str: string): number {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "Pending", color: "var(--text-secondary)" },
-  todo: { label: "To Do", color: "var(--text-secondary)" },
-  "in-progress": { label: "In Progress", color: "var(--accent-manager)" },
-  review: { label: "Review", color: "var(--accent-admin)" },
-  done: { label: "Done", color: "var(--accent-employee)" },
+  pending: { label: "Pending", color: "#6b7280" },
+  todo: { label: "To Do", color: "#6b7280" },
+  "in-progress": { label: "In Progress", color: "#f59e0b" },
+  review: { label: "Review", color: "#8b5cf6" },
+  done: { label: "Done", color: "#10b981" },
 };
 
 function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTask, onUpdateStatus }: {
@@ -90,6 +90,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   }
 
   const statusStyle = STATUS_LABELS[task.status] ?? { label: task.status, color: "var(--text-secondary)" };
+  const isLocked = task.status === "done" || (task.deadline && task.deadline < Date.now());
 
   return (
     <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 overflow-hidden">
@@ -107,7 +108,12 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
               style={{ color: statusStyle.color, backgroundColor: `color-mix(in srgb, ${statusStyle.color} 12%, transparent)` }}
             >{statusStyle.label}</span>
-            {task.status !== "done" && (() => {
+            {isLocked && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
+                🔒 {task.status === "done" ? "Delivered" : "Past deadline"}
+              </span>
+            )}
+            {!isLocked && task.status !== "done" && (() => {
               const nextMap: Record<string, { status: "in-progress" | "review" | "done"; label: string }> = {
                 pending: { status: "in-progress", label: "In Progress" },
                 "in-progress": { status: "review", label: "Review" },
@@ -501,9 +507,21 @@ export default function BriefPage() {
             <ArrowLeft className="h-3.5 w-3.5" /> Briefs
           </button>
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" aria-hidden />
-          <h1 className="font-semibold text-[15px] sm:text-[16px] text-[var(--text-primary)] truncate">
-            {brief.title}
-          </h1>
+          {isAdmin && brief.status !== "archived" ? (
+            <input
+              className="font-semibold text-[15px] sm:text-[16px] text-[var(--text-primary)] truncate bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--accent-admin)] focus:outline-none px-1 -ml-1 min-w-0"
+              defaultValue={brief.title}
+              onBlur={(e) => {
+                const val = e.target.value.trim();
+                if (val && val !== brief.title) updateBrief({ briefId, title: val });
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+          ) : (
+            <h1 className="font-semibold text-[15px] sm:text-[16px] text-[var(--text-primary)] truncate">
+              {brief.title}
+            </h1>
+          )}
           <Badge
             variant={
               brief.status === "archived"
@@ -556,6 +574,9 @@ export default function BriefPage() {
                 <option value="in-progress">In Progress</option>
                 <option value="review">Review</option>
                 <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+                <option value="on_hold">On Hold</option>
+                <option value="sent_to_client">Sent to Client</option>
               </select>
               <Button variant="secondary" onClick={handleArchive}>
                 Archive
@@ -771,11 +792,21 @@ export default function BriefPage() {
               <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
                 {brief.title}
               </h2>
-              {brief.description && (
+              {isAdmin && brief.status !== "archived" ? (
+                <textarea
+                  className="w-full text-[13px] text-[var(--text-secondary)] leading-relaxed bg-transparent border border-transparent hover:border-[var(--border)] focus:border-[var(--accent-admin)] focus:outline-none rounded-lg px-2 py-1 -ml-2 resize-none"
+                  defaultValue={brief.description}
+                  rows={2}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    if (val !== brief.description) updateBrief({ briefId, description: val });
+                  }}
+                />
+              ) : brief.description ? (
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
                   {brief.description}
                 </p>
-              )}
+              ) : null}
             </div>
 
             {/* Progress bar */}

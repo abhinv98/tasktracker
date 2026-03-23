@@ -2,6 +2,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+function normalizeDeadlineToEndOfDay(deadline: number): number {
+  const d = new Date(deadline);
+  const h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+  if (h === 0 && m === 0 && s === 0) {
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }
+  return deadline;
+}
+
 export const listTasksForBrief = query({
   args: { briefId: v.id("briefs") },
   handler: async (ctx, { briefId }) => {
@@ -87,6 +97,8 @@ export const createTask = mutation({
     contentType: v.optional(v.string()),
     postDate: v.optional(v.string()),
     clientFacing: v.optional(v.boolean()),
+    creativeCopy: v.optional(v.string()),
+    caption: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -106,6 +118,10 @@ export const createTask = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
     const sortOrder = maxOrder + 1000;
+
+    if (args.deadline !== undefined) {
+      args.deadline = normalizeDeadlineToEndOfDay(args.deadline);
+    }
 
     const taskId = await ctx.db.insert("tasks", {
       ...args,
@@ -153,6 +169,9 @@ export const updateTask = mutation({
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),
     postDate: v.optional(v.string()),
+    clientFacing: v.optional(v.boolean()),
+    creativeCopy: v.optional(v.string()),
+    caption: v.optional(v.string()),
   },
   handler: async (ctx, { taskId, clearDeadline, ...fields }) => {
     const userId = await getAuthUserId(ctx);
@@ -170,12 +189,15 @@ export const updateTask = mutation({
     if (fields.description !== undefined) updates.description = fields.description;
     if (fields.duration !== undefined) updates.duration = fields.duration;
     if (fields.durationMinutes !== undefined) updates.durationMinutes = fields.durationMinutes;
-    if (fields.deadline !== undefined) updates.deadline = fields.deadline;
+    if (fields.deadline !== undefined) updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
     if (clearDeadline) updates.deadline = undefined;
     if (fields.assignedBy !== undefined) updates.assignedBy = fields.assignedBy;
     if (fields.platform !== undefined) updates.platform = fields.platform;
     if (fields.contentType !== undefined) updates.contentType = fields.contentType;
     if (fields.postDate !== undefined) updates.postDate = fields.postDate;
+    if (fields.clientFacing !== undefined) updates.clientFacing = fields.clientFacing;
+    if (fields.creativeCopy !== undefined) updates.creativeCopy = fields.creativeCopy;
+    if (fields.caption !== undefined) updates.caption = fields.caption;
 
     if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
       updates.assigneeId = fields.assigneeId;
@@ -464,6 +486,7 @@ export const createSubTask = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
 
+    const subDeadline = args.deadline ? normalizeDeadlineToEndOfDay(args.deadline) : undefined;
     const taskId = await ctx.db.insert("tasks", {
       briefId: parentTask.briefId,
       title: `${parentTask.title} — Sub-task`,
@@ -474,7 +497,7 @@ export const createSubTask = mutation({
       sortOrder: maxOrder + 1000,
       ...(args.duration ? { duration: args.duration } : {}),
       ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
-      ...(args.deadline ? { deadline: args.deadline } : {}),
+      ...(subDeadline ? { deadline: subDeadline } : {}),
       parentTaskId: args.parentTaskId,
     });
 
@@ -551,6 +574,7 @@ export const createEmployeeTask = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
 
+    const empDeadline = args.deadline ? normalizeDeadlineToEndOfDay(args.deadline) : undefined;
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,
       title: args.title,
@@ -561,7 +585,7 @@ export const createEmployeeTask = mutation({
       sortOrder: maxOrder + 1000,
       ...(args.duration ? { duration: args.duration } : {}),
       ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
-      ...(args.deadline ? { deadline: args.deadline } : {}),
+      ...(empDeadline ? { deadline: empDeadline } : {}),
       assignedAt: Date.now(),
     });
 
@@ -714,9 +738,10 @@ export const extendTaskDeadline = mutation({
     if (!task) throw new Error("Task not found");
 
     const originalDeadline = task.originalDeadline ?? task.deadline;
+    const normalizedNewDeadline = normalizeDeadlineToEndOfDay(newDeadline);
 
     await ctx.db.patch(taskId, {
-      deadline: newDeadline,
+      deadline: normalizedNewDeadline,
       deadlineExtended: true,
       originalDeadline,
       overdueAcknowledged: true,
@@ -725,7 +750,7 @@ export const extendTaskDeadline = mutation({
     // Also update the brief's deadline for single_task briefs
     const brief = await ctx.db.get(task.briefId);
     if (brief?.briefType === "single_task") {
-      await ctx.db.patch(task.briefId, { deadline: newDeadline });
+      await ctx.db.patch(task.briefId, { deadline: normalizedNewDeadline });
     }
 
     await ctx.db.insert("notifications", {

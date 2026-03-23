@@ -2,6 +2,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+function normalizeDeadlineToEndOfDay(deadline: number): number {
+  const d = new Date(deadline);
+  const h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+  if (h === 0 && m === 0 && s === 0) {
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }
+  return deadline;
+}
+
 export const listBriefs = query({
   args: {
     status: v.optional(v.string()),
@@ -151,6 +161,10 @@ export const createBrief = mutation({
 
     const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, taskClientFacing, teamIds, ...briefArgs } = args;
 
+    if (briefArgs.deadline !== undefined) {
+      briefArgs.deadline = normalizeDeadlineToEndOfDay(briefArgs.deadline);
+    }
+
     const briefId = await ctx.db.insert("briefs", {
       ...briefArgs,
       ...(assignedManagerId ? { assignedManagerId } : {}),
@@ -189,6 +203,7 @@ export const createBrief = mutation({
     }
 
     if (args.briefType === "single_task" && taskAssigneeId) {
+      const taskDeadline = briefArgs.deadline;
       const taskId = await ctx.db.insert("tasks", {
         briefId,
         title: taskTitle || args.title,
@@ -199,7 +214,7 @@ export const createBrief = mutation({
         sortOrder: 1000,
         ...(taskDuration ? { duration: taskDuration } : {}),
         ...(taskDurationMinutes ? { durationMinutes: taskDurationMinutes } : {}),
-        ...(args.deadline ? { deadline: args.deadline } : {}),
+        ...(taskDeadline ? { deadline: taskDeadline } : {}),
         assignedAt: Date.now(),
         ...(taskClientFacing ? { clientFacing: true } : {}),
       });
@@ -234,7 +249,8 @@ export const updateBrief = mutation({
         v.literal("developmental"),
         v.literal("designing"),
         v.literal("video_editing"),
-        v.literal("content_calendar")
+        v.literal("content_calendar"),
+        v.literal("copywriting")
       )
     ),
   },
@@ -255,7 +271,7 @@ export const updateBrief = mutation({
     if (fields.status !== undefined) updates.status = fields.status;
     if (fields.assignedManagerId !== undefined)
       updates.assignedManagerId = fields.assignedManagerId;
-    if (fields.deadline !== undefined) updates.deadline = fields.deadline;
+    if (fields.deadline !== undefined) updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
     if (fields.briefType !== undefined) updates.briefType = fields.briefType;
 
     if (Object.keys(updates).length > 0) {

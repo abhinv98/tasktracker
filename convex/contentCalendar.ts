@@ -358,6 +358,8 @@ export const createCalendarEntry = mutation({
     contentType: v.string(),
     postDate: v.string(),
     deadline: v.optional(v.number()),
+    creativeCopy: v.optional(v.string()),
+    caption: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -402,6 +404,8 @@ export const createCalendarEntry = mutation({
       platform: args.platform,
       contentType: args.contentType,
       postDate: args.postDate,
+      ...(args.creativeCopy ? { creativeCopy: args.creativeCopy } : {}),
+      ...(args.caption ? { caption: args.caption } : {}),
       ...(args.assigneeId ? { assignedAt: Date.now() } : {}),
     });
 

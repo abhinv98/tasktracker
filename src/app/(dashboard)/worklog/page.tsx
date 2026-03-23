@@ -2,17 +2,14 @@
 
 import { useQuery } from "convex/react";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search } from "lucide-react";
+import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
-const STATUS_COLORS: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "Pending", color: "var(--text-secondary)", bg: "var(--bg-hover)" },
-  "in-progress": { label: "In Progress", color: "var(--accent-manager)", bg: "color-mix(in srgb, var(--accent-manager) 10%, transparent)" },
-  review: { label: "Review", color: "var(--accent-admin)", bg: "color-mix(in srgb, var(--accent-admin) 10%, transparent)" },
-  done: { label: "Done", color: "var(--accent-employee)", bg: "color-mix(in srgb, var(--accent-employee) 10%, transparent)" },
-};
+const STATUS_COLORS = TASK_STATUS_CONFIG;
 
 const LOAD_COLORS: Record<string, { label: string; color: string }> = {
   idle: { label: "Idle", color: "#9ca3af" },
@@ -42,16 +39,19 @@ function shiftDate(dateStr: string, days: number): string {
 }
 
 const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
-  "in-progress": { color: "var(--accent-manager)", label: "In Progress", order: 1 },
-  pending: { color: "var(--text-secondary)", label: "To Do", order: 2 },
-  review: { color: "var(--accent-admin)", label: "Review", order: 3 },
-  done: { color: "var(--accent-employee)", label: "Done", order: 4 },
+  "in-progress": { color: "#f59e0b", label: "In Progress", order: 1 },
+  pending: { color: "#6b7280", label: "To Do", order: 2 },
+  review: { color: "#8b5cf6", label: "Review", order: 3 },
+  done: { color: "#10b981", label: "Done", order: 4 },
 };
 
 export default function WorkLogPage() {
+  const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
   const [activeTab, setActiveTab] = useState<"worklog" | "manifest" | "teamload">("worklog");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterSearch, setFilterSearch] = useState("");
 
   const [selectedMemberId, setSelectedMemberId] = useState<Id<"users"> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -183,7 +183,7 @@ export default function WorkLogPage() {
               </Card>
               <Card>
                 <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completed</p>
-                <p className="font-bold text-[28px] text-[var(--accent-employee)] mt-1 tabular-nums">
+                <p className="font-bold text-[28px] mt-1 tabular-nums" style={{ color: "#10b981" }}>
                   {worklog.summary.completedTasks}
                 </p>
               </Card>
@@ -198,9 +198,53 @@ export default function WorkLogPage() {
             </div>
           )}
 
+          {/* Filters */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder="Search employee..."
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] w-[180px]"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="in-progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            {(filterSearch || filterStatus) && (
+              <button onClick={() => { setFilterSearch(""); setFilterStatus(""); }} className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline">
+                Clear Filters
+              </button>
+            )}
+          </div>
+
           {/* Employee Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {[...(worklog?.employees ?? [])].sort((a, b) => b.totalTasks - a.totalTasks).map((emp) => (
+            {[...(worklog?.employees ?? [])]
+              .filter((emp) => {
+                if (filterSearch) {
+                  const name = (emp.user.name ?? emp.user.email ?? "").toLowerCase();
+                  if (!name.includes(filterSearch.toLowerCase())) return false;
+                }
+                if (filterStatus) {
+                  if (!emp.tasks.some((t: any) => t.status === filterStatus)) return false;
+                }
+                return true;
+              })
+              .sort((a, b) => b.totalTasks - a.totalTasks).map((emp) => (
               <Card key={emp.user._id} className={emp.totalTasks === 0 ? "opacity-50" : ""}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
@@ -224,16 +268,21 @@ export default function WorkLogPage() {
                 </div>
                 {emp.tasks.length > 0 ? (
                   <div className="flex flex-col gap-1.5">
-                    {emp.tasks.map((task: any) => {
+                    {emp.tasks
+                      .filter((task: any) => !filterStatus || task.status === filterStatus)
+                      .map((task: any) => {
                       const statusInfo = STATUS_COLORS[task.status];
+                      const deadlineDate = task.deadline ? new Date(task.deadline) : null;
+                      const isTaskOverdue = deadlineDate && deadlineDate.getTime() < Date.now() && task.status !== "done";
                       return (
                         <div
                           key={task._id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+                          onClick={() => router.push(`/brief/${task.briefId}`)}
+                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                         >
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: statusInfo?.color ?? "var(--text-muted)" }}
+                            style={{ backgroundColor: statusInfo?.color ?? "#6b7280" }}
                           />
                           <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">
                             {task.title}
@@ -241,6 +290,12 @@ export default function WorkLogPage() {
                           <span className="text-[10px] text-[var(--text-muted)] shrink-0">
                             {task.briefTitle}
                           </span>
+                          {deadlineDate && (
+                            <span className={`text-[10px] flex items-center gap-0.5 shrink-0 ${isTaskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
+                              <Calendar className="h-2.5 w-2.5" />
+                              {deadlineDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
                           <span
                             className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
                             style={{ color: statusInfo?.color, backgroundColor: statusInfo?.bg }}

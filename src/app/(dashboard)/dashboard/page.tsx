@@ -42,10 +42,10 @@ function ActivityFeed() {
 }
 
 const STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
-  "in-progress": { color: "var(--accent-manager)", label: "In Progress", order: 1 },
-  pending: { color: "var(--text-secondary)", label: "Pending", order: 2 },
-  review: { color: "var(--accent-admin)", label: "Review", order: 3 },
-  done: { color: "var(--accent-employee)", label: "Done", order: 4 },
+  "in-progress": { color: "#f59e0b", label: "In Progress", order: 1 },
+  pending: { color: "#6b7280", label: "Pending", order: 2 },
+  review: { color: "#8b5cf6", label: "Review", order: 3 },
+  done: { color: "#10b981", label: "Done", order: 4 },
 };
 
 export default function DashboardPage() {
@@ -150,7 +150,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card accent="admin">
+          <Card accent="admin" hover onClick={() => router.push("/briefs")} className="cursor-pointer">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
               Active Briefs
             </p>
@@ -158,7 +158,7 @@ export default function DashboardPage() {
               {scopedActiveBriefs}
             </p>
           </Card>
-          <Card accent="manager">
+          <Card accent="manager" hover onClick={() => router.push("/worklog")} className="cursor-pointer">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
               Open Tasks
             </p>
@@ -166,7 +166,7 @@ export default function DashboardPage() {
               {scopedOpenTasks}
             </p>
           </Card>
-          <Card accent="employee">
+          <Card accent="employee" hover onClick={() => router.push(isSuperAdmin ? "/teams" : "/brands?filter=mine")} className="cursor-pointer">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
               {isSuperAdmin ? "Teams" : "My Brands"}
             </p>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
               {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
             </p>
           </Card>
-          <Card>
+          <Card hover onClick={() => router.push("/users")} className="cursor-pointer">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
               Employees
             </p>
@@ -718,7 +718,7 @@ export default function DashboardPage() {
                 </button>
               )}
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
               {(teamLeadOverview ?? []).map((teamData: any) => {
                 const isExpanded = expandedTeams.has(teamData.team._id);
                 const totalTasks = teamData.members.reduce(
@@ -730,7 +730,7 @@ export default function DashboardPage() {
                 const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
                 return (
-                  <Card key={teamData.team._id} className="p-0 overflow-hidden">
+                  <Card key={teamData.team._id} className="p-0 overflow-hidden min-w-[350px] snap-start shrink-0">
                     <div
                       className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                       style={{ borderLeft: `4px solid ${teamData.team.color}` }}
