@@ -201,8 +201,9 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const isAdmin = user.role === "admin";
   const isOverdue = task.deadline != null && task.deadline < Date.now() && task.status !== "done";
   const isDelivered = task.status === "done";
+  const isBriefOnHold = brief?.status === "on_hold";
   const isEditLocked = isDelivered || isOverdue;
-  const canUpdateStatus = (isAssignee || isAdmin) && !isDelivered;
+  const canUpdateStatus = (isAssignee || isAdmin) && !isDelivered && !isBriefOnHold;
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
@@ -485,6 +486,11 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
               {isDelivered && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
                   🔒 Task Done by Employee
+                </span>
+              )}
+              {isBriefOnHold && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
+                  ⏸ Brief On Hold
                 </span>
               )}
               {canUpdateStatus && nextStatus && status !== "done" && (

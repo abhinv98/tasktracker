@@ -668,6 +668,11 @@ export default function DashboardPage() {
                               EXTENDED
                             </span>
                           )}
+                          {(task as any).briefStatus === "on_hold" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                              ⏸ ON HOLD
+                            </span>
+                          )}
                           <h3 className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
                             {task.title}
                           </h3>
@@ -945,6 +950,11 @@ export default function DashboardPage() {
                     {(task as any).deadlineExtended && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
                         EXTENDED
+                      </span>
+                    )}
+                    {(task as any).briefStatus === "on_hold" && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                        ⏸ ON HOLD
                       </span>
                     )}
                     <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
