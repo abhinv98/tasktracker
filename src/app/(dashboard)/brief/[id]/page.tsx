@@ -116,7 +116,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
             >{statusStyle.label}</span>
             {isDelivered && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
-                🔒 Delivered
+                🔒 Task Done by Employee
               </span>
             )}
             {!isDelivered && task.status !== "done" && (() => {

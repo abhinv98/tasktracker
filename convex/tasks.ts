@@ -286,7 +286,9 @@ export const updateTaskStatus = mutation({
       });
     }
 
-    await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
+    if (newStatus !== "done") {
+      await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
+    }
 
     if (brief?.briefType !== "single_task") {
       const allTasks = await ctx.db

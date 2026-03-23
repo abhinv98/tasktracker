@@ -29,6 +29,7 @@ import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
+import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
 import type * as migrations_normalizeDeadlines from "../migrations/normalizeDeadlines.js";
 import type * as migrations_syncSingleTaskBriefs from "../migrations/syncSingleTaskBriefs.js";
 import type * as notifications from "../notifications.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   jsr: typeof jsr;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   meetingMinutes: typeof meetingMinutes;
+  "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;
   "migrations/normalizeDeadlines": typeof migrations_normalizeDeadlines;
   "migrations/syncSingleTaskBriefs": typeof migrations_syncSingleTaskBriefs;
   notifications: typeof notifications;
