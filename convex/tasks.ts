@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -285,18 +286,9 @@ export const updateTaskStatus = mutation({
       });
     }
 
-    if (brief?.briefType === "single_task") {
-      const TASK_TO_BRIEF_STATUS: Record<string, string> = {
-        "pending": "active",
-        "in-progress": "in-progress",
-        "review": "review",
-        "done": "completed",
-      };
-      const mappedStatus = TASK_TO_BRIEF_STATUS[newStatus];
-      if (mappedStatus && brief.status !== mappedStatus) {
-        await ctx.db.patch(task.briefId, { status: mappedStatus as any });
-      }
-    } else {
+    await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
+
+    if (brief?.briefType !== "single_task") {
       const allTasks = await ctx.db
         .query("tasks")
         .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))

@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
 
 // ─── Helper: find team lead for a user ─────────────
 async function findTeamLeadForUser(ctx: any, userId: string) {
@@ -869,11 +870,13 @@ export const teamLeadAndManagerApprove = mutation({
     if (task) {
       if (task.clientFacing) {
         await ctx.db.patch(deliverable.taskId, { status: "review" });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
       } else {
         await ctx.db.patch(deliverable.taskId, {
           status: "done",
           completedAt: now,
         });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
       }
     }
 
@@ -952,11 +955,13 @@ export const managerApproveFromTeamLead = mutation({
     if (task) {
       if (task.clientFacing) {
         await ctx.db.patch(deliverable.taskId, { status: "review" });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
       } else {
         await ctx.db.patch(deliverable.taskId, {
           status: "done",
           completedAt: now,
         });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
       }
     }
 
@@ -1240,11 +1245,13 @@ export const approveDeliverable = mutation({
     if (task) {
       if (task.clientFacing) {
         await ctx.db.patch(deliverable.taskId, { status: "review" });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
       } else {
         await ctx.db.patch(deliverable.taskId, {
           status: "done",
           completedAt: Date.now(),
         });
+        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
       }
     }
 
