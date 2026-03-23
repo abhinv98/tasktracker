@@ -72,7 +72,7 @@ export const listTasksForUser = query({
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((t) => {
         const brief = briefs.find((b) => b._id === t.briefId);
-        return { ...t, briefName: brief?.title, briefStatus: brief?.status };
+        return { ...t, briefName: brief?.title, briefStatus: brief?.status, briefDescription: brief?.description };
       });
   },
 });

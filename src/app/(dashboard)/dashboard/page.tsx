@@ -680,8 +680,8 @@ export default function DashboardPage() {
                         <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                           {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                         </p>
-                        {task.description && (
-                          <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description}</p>
+                        {(task.description || (task as any).briefDescription) && (
+                          <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description || (task as any).briefDescription}</p>
                         )}
                       </div>
                       <span
@@ -967,8 +967,8 @@ export default function DashboardPage() {
                   <p className="text-[12px] text-[var(--text-secondary)] mt-1">
                     {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
                   </p>
-                  {task.description && (
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description}</p>
+                  {(task.description || (task as any).briefDescription) && (
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description || (task as any).briefDescription}</p>
                   )}
                 </div>
                 <span

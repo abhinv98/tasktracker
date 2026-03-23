@@ -34,6 +34,7 @@ import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlin
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_checkTimeEntries from "../migrations/checkTimeEntries.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
+import type * as migrations_findUser from "../migrations/findUser.js";
 import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
 import type * as migrations_fixDeadlines from "../migrations/fixDeadlines.js";
 import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/checkTimeEntries": typeof migrations_checkTimeEntries;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;
+  "migrations/findUser": typeof migrations_findUser;
   "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
   "migrations/fixDeadlines": typeof migrations_fixDeadlines;
   "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;

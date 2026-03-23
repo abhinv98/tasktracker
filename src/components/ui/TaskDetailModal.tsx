@@ -583,13 +583,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             </div>
 
             {/* Description */}
-            {task.description && (
+            {(task.description || brief?.description) && (
               <div>
                 <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
                   Description
                 </h4>
-                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">
-                  {task.description}
+                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                  {task.description || brief?.description}
                 </p>
               </div>
             )}
