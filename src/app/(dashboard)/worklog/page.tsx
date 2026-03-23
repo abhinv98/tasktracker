@@ -462,6 +462,7 @@ export default function WorkLogPage() {
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Status</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Assigned</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Deadline</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Marked Done</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Time</th>
                             </tr>
                           </thead>
@@ -500,6 +501,13 @@ export default function WorkLogPage() {
                                     {task.deadline ? (
                                       <span className={`text-[11px] ${isOverdue ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                                         {new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                      </span>
+                                    ) : "—"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {task.completedAt ? (
+                                      <span className="text-[11px] text-[var(--accent-employee)]">
+                                        {new Date(task.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                       </span>
                                     ) : "—"}
                                   </td>
