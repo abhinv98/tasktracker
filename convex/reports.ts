@@ -49,6 +49,11 @@ export const getEmployeeReport = query({
       );
       const totalMinutes = timeEntries.reduce((sum, te) => sum + (te.durationMinutes ?? 0), 0);
 
+      const totalTimeFromTasks = completedTasks
+        .filter((t) => t.completedAt && t.assignedAt)
+        .reduce((sum, t) => sum + (t.completedAt! - t.assignedAt!), 0);
+      const totalTaskHours = Math.round((totalTimeFromTasks / (1000 * 60 * 60)) * 10) / 10;
+
       const briefIds = [...new Set(tasksInRange.map((t) => t.briefId))];
 
       const deliverables = allDeliverables.filter(
@@ -65,18 +70,20 @@ export const getEmployeeReport = query({
 
       const taskDetails = tasksInRange.map((t) => {
         const brief = allBriefs.find((b) => b._id === t.briefId);
-        const taskTimeEntries = timeEntries.filter((te) => te.taskId === t._id);
-        const taskMinutes = taskTimeEntries.reduce((sum, te) => sum + (te.durationMinutes ?? 0), 0);
+        const tAssignedAt = t.assignedAt ?? (t as any)._creationTime;
+        const taskTimeHours = (t.completedAt && tAssignedAt)
+          ? Math.round(((t.completedAt - tAssignedAt) / (1000 * 60 * 60)) * 10) / 10
+          : null;
         return {
           _id: t._id,
           title: t.title,
           status: t.status,
-          assignedAt: t.assignedAt ?? (t as any)._creationTime,
+          assignedAt: tAssignedAt,
           deadline: t.deadline,
           completedAt: t.completedAt,
           briefTitle: brief?.title ?? "Unknown",
           briefId: t.briefId,
-          timeSpentMinutes: taskMinutes,
+          taskTimeHours,
         };
       });
 
@@ -92,6 +99,7 @@ export const getEmployeeReport = query({
         completedTasks: completedTasks.length,
         overdueTasks: overdueTasks.length,
         totalMinutes,
+        totalTaskHours,
         briefCount: briefIds.length,
         deliverableCount: deliverables.length,
         approvedDeliverableCount: approvedDeliverables.length,

@@ -430,7 +430,7 @@ export default function WorkLogPage() {
                         <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       </div>
                       <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
-                        {Math.round(emp.totalMinutes / 60)}h
+                        {emp.totalTaskHours ?? 0}h
                       </p>
                       <p className="text-[10px] text-[var(--text-muted)]">Time Spent</p>
                     </div>
@@ -513,7 +513,7 @@ export default function WorkLogPage() {
                                   </td>
                                   <td className="px-3 py-2">
                                     <span className="text-[11px] text-[var(--text-muted)]">
-                                      {task.timeSpentMinutes > 0 ? `${Math.round(task.timeSpentMinutes)}m` : "—"}
+                                      {task.taskTimeHours != null ? `${task.taskTimeHours}h` : "—"}
                                     </span>
                                   </td>
                                 </tr>
