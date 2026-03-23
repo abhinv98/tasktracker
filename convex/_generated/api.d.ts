@@ -31,6 +31,7 @@ import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
+import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
 import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
 import type * as migrations_mergeAccounts from "../migrations/mergeAccounts.js";
 import type * as migrations_normalizeDeadlines from "../migrations/normalizeDeadlines.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   meetingMinutes: typeof meetingMinutes;
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;
+  "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
   "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;
   "migrations/mergeAccounts": typeof migrations_mergeAccounts;
   "migrations/normalizeDeadlines": typeof migrations_normalizeDeadlines;

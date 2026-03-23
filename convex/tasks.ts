@@ -287,7 +287,9 @@ export const updateTaskStatus = mutation({
       });
     }
 
-    if (newStatus !== "done") {
+    if (newStatus === "done" && user?.role === "admin") {
+      await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
+    } else if (newStatus !== "done") {
       await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
     }
 
@@ -297,7 +299,9 @@ export const updateTaskStatus = mutation({
         .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
         .collect();
       const allDone = allTasks.every((t) => t._id === taskId ? newStatus === "done" : t.status === "done");
-      if (allDone && brief) {
+      if (allDone && brief && user?.role === "admin") {
+        await ctx.db.patch(task.briefId, { status: "completed" as any });
+      } else if (allDone && brief) {
         await ctx.db.patch(task.briefId, { status: "review" });
       }
     }
