@@ -285,13 +285,26 @@ export const updateTaskStatus = mutation({
       });
     }
 
-    const allTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
-      .collect();
-    const allDone = allTasks.every((t) => t._id === taskId ? newStatus === "done" : t.status === "done");
-    if (allDone && brief) {
-      await ctx.db.patch(task.briefId, { status: "review" });
+    if (brief?.briefType === "single_task") {
+      const TASK_TO_BRIEF_STATUS: Record<string, string> = {
+        "pending": "active",
+        "in-progress": "in-progress",
+        "review": "review",
+        "done": "completed",
+      };
+      const mappedStatus = TASK_TO_BRIEF_STATUS[newStatus];
+      if (mappedStatus && brief.status !== mappedStatus) {
+        await ctx.db.patch(task.briefId, { status: mappedStatus as any });
+      }
+    } else {
+      const allTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
+        .collect();
+      const allDone = allTasks.every((t) => t._id === taskId ? newStatus === "done" : t.status === "done");
+      if (allDone && brief) {
+        await ctx.db.patch(task.briefId, { status: "review" });
+      }
     }
 
     await ctx.db.insert("activityLog", {
