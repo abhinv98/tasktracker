@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
 const STATUS_COLORS = TASK_STATUS_CONFIG;
@@ -32,6 +32,12 @@ function getTodayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function getMonthAgoStr(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + days);
@@ -48,10 +54,21 @@ const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order
 export default function WorkLogPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
-  const [activeTab, setActiveTab] = useState<"worklog" | "manifest" | "teamload">("worklog");
+  const [activeTab, setActiveTab] = useState<"worklog" | "reports" | "teamload">("worklog");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterSearch, setFilterSearch] = useState("");
+
+  const allUsers = useQuery(api.users.listAllUsers);
+  const employees = (allUsers ?? []).filter((u) => u.role === "employee");
+  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
+  const [reportStartDate, setReportStartDate] = useState(getMonthAgoStr());
+  const [reportEndDate, setReportEndDate] = useState(getTodayStr());
+  const report = useQuery(api.reports.getEmployeeReport, {
+    ...(selectedEmployee ? { employeeId: selectedEmployee as Id<"users"> } : {}),
+    startDate: reportStartDate,
+    endDate: reportEndDate,
+  });
 
   const [selectedMemberId, setSelectedMemberId] = useState<Id<"users"> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -83,7 +100,6 @@ export default function WorkLogPage() {
   }, [selectedMemberId]);
 
   const worklog = useQuery(api.worklog.getEmployeeWorkLog, { date: selectedDate });
-  const manifest = useQuery(api.worklog.getTaskManifest);
   const teamLoad = useQuery(api.worklog.getTeamLoadView);
 
   if (!user || user.role !== "admin") {
@@ -109,7 +125,7 @@ export default function WorkLogPage() {
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
         {[
           { key: "worklog" as const, label: "Daily Work Log", icon: Calendar },
-          { key: "manifest" as const, label: "Task Manifest", icon: Briefcase },
+          { key: "reports" as const, label: "Reports", icon: FileBarChart },
           { key: "teamload" as const, label: "Team Load", icon: Users },
         ].map(({ key, label, icon: Icon }) => (
           <button
@@ -329,97 +345,183 @@ export default function WorkLogPage() {
         </div>
       )}
 
-      {activeTab === "manifest" && (
+      {activeTab === "reports" && (
         <div>
-          <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-x-auto">
-            <table className="w-full min-w-[700px]">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Employee</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Brief</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Brand</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Type</th>
-                  <th className="text-center px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Tasks</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-[var(--text-secondary)]">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(manifest ?? []).flatMap((emp) =>
-                  emp.briefs.map((brief: any, idx: number) => (
-                    <tr key={`${emp.user._id}-${brief.briefId}`} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors">
-                      {idx === 0 && (
-                        <td
-                          className="px-4 py-2.5 align-top"
-                          rowSpan={emp.briefs.length}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center shrink-0">
-                              <span className="text-[10px] font-bold text-[var(--accent-admin)]">
-                                {(emp.user.name ?? emp.user.email ?? "?")[0]?.toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-[12px] text-[var(--text-primary)]">
-                                {emp.user.name ?? emp.user.email}
-                              </p>
-                              <p className="text-[10px] text-[var(--text-muted)]">
-                                {emp.totalTasks} tasks ({emp.completedTasks} done)
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                      )}
-                      <td className="px-4 py-2.5">
-                        <span className="font-medium text-[12px] text-[var(--text-primary)]">
-                          {brief.briefTitle}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md"
-                          style={{
-                            color: brief.brandColor,
-                            backgroundColor: brief.brandColor + "15",
-                          }}
-                        >
-                          {brief.brandName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="text-[11px] text-[var(--text-secondary)]">
-                          {brief.briefType
-                            ? brief.briefType === "content_calendar" ? "Content Calendar"
-                              : brief.briefType === "video_editing" ? "Video Editing"
-                              : brief.briefType === "developmental" ? "Developmental"
-                              : brief.briefType === "designing" ? "Designing"
-                              : brief.briefType
-                            : "—"
-                          }
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className="text-[12px] text-[var(--text-primary)] font-medium tabular-nums">
-                          {brief.doneTasks}/{brief.totalTasks}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant={brief.status === "active" ? "employee" : brief.status === "in-progress" ? "manager" : "neutral"}>
-                          {brief.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-                {(manifest ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]">
-                      No active task assignments found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          {/* Report Filters */}
+          <div className="flex items-center gap-4 mb-6 flex-wrap">
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Employee</label>
+              <select
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
+              >
+                <option value="">All Employees</option>
+                {employees.map((emp) => (
+                  <option key={emp._id} value={emp._id}>{emp.name ?? emp.email}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Start Date</label>
+              <input
+                type="date"
+                value={reportStartDate}
+                onChange={(e) => setReportStartDate(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">End Date</label>
+              <input
+                type="date"
+                value={reportEndDate}
+                onChange={(e) => setReportEndDate(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            </div>
           </div>
+
+          {/* Report Cards */}
+          {report?.employees && report.employees.length > 0 ? (
+            <div className="flex flex-col gap-6">
+              {report.employees.map((emp: any) => (
+                <Card key={emp.employee._id} className="p-0 overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+                    <div className="w-10 h-10 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
+                      <span className="text-[14px] font-bold text-[var(--accent-admin)]">
+                        {(emp.employee.name ?? emp.employee.email ?? "?")[0]?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[15px] text-[var(--text-primary)]">
+                        {emp.employee.name ?? emp.employee.email}
+                      </p>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        {emp.employee.designation ?? emp.employee.role}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-5">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <FileText className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{emp.totalTasks}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Total Tasks</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
+                      </div>
+                      <p className="font-bold text-[24px] tabular-nums" style={{ color: "#10b981" }}>{emp.completedTasks}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Completed</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-[var(--danger)]" />
+                      </div>
+                      <p className="font-bold text-[24px] text-[var(--danger)] tabular-nums">{emp.overdueTasks}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Overdue</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
+                        {Math.round(emp.totalMinutes / 60)}h
+                      </p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Time Spent</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Briefcase className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{emp.briefCount}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Briefs</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{emp.avgCompletionHours}h</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Avg Completion</p>
+                    </div>
+                  </div>
+
+                  {emp.tasks.length > 0 && (
+                    <div className="px-5 pb-5">
+                      <h3 className="text-[12px] font-semibold text-[var(--text-secondary)] mb-2">Task Breakdown</h3>
+                      <div className="rounded-lg border border-[var(--border)] overflow-hidden">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="bg-[var(--bg-hover)]">
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Task</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Brief</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Status</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Deadline</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {emp.tasks.map((task: any) => {
+                              const sc = TASK_STATUS_CONFIG[task.status];
+                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done";
+                              return (
+                                <tr
+                                  key={task._id}
+                                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer transition-colors"
+                                  onClick={() => router.push(`/brief/${task.briefId}`)}
+                                >
+                                  <td className="px-3 py-2">
+                                    <span className="text-[12px] text-[var(--text-primary)] font-medium">{task.title}</span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="text-[11px] text-[var(--text-secondary)]">{task.briefTitle}</span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span
+                                      className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                      style={{ color: sc?.color, backgroundColor: sc?.bg }}
+                                    >
+                                      {sc?.label ?? task.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {task.deadline ? (
+                                      <span className={`text-[11px] ${isOverdue ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
+                                        {new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                      </span>
+                                    ) : "—"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span className="text-[11px] text-[var(--text-muted)]">
+                                      {task.timeSpentMinutes > 0 ? `${Math.round(task.timeSpentMinutes)}m` : "—"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          ) : report?.employees && report.employees.length === 0 ? (
+            <Card>
+              <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
+                No data found for the selected filters.
+              </p>
+            </Card>
+          ) : (
+            <Card>
+              <p className="text-[13px] text-[var(--text-muted)] text-center py-8">Loading...</p>
+            </Card>
+          )}
         </div>
       )}
 

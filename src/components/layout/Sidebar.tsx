@@ -87,7 +87,6 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/brands", label: "Brands" },
       { href: "/overview", label: "Brand Overview" },
       { href: "/analytics", label: "Analytics" },
-      { href: "/reports", label: "Reports" },
     ],
   },
   {
