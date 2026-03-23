@@ -203,6 +203,7 @@ export const updateTask = mutation({
     if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
       updates.assigneeId = fields.assigneeId;
       updates.assignedAt = Date.now();
+      updates.status = "pending";
       await ctx.db.insert("notifications", {
         recipientId: task.assigneeId,
         type: "task_status_changed",

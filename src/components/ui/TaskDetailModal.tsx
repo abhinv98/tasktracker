@@ -45,6 +45,7 @@ function parseDuration(str: string): number {
 interface TaskDetailModalProps {
   taskId: string;
   onClose: () => void;
+  autoEdit?: boolean;
 }
 
 const STATUS_CONFIG: Record<
@@ -79,7 +80,7 @@ const STATUS_FLOW: Record<string, string> = {
   review: "done",
 };
 
-export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
+export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalProps) {
   const detail = useQuery(api.tasks.getTaskDetail, {
     taskId: taskId as Id<"tasks">,
   });
@@ -157,7 +158,27 @@ export function TaskDetailModal({ taskId, onClose }: TaskDetailModalProps) {
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
   const [editingSummaryText, setEditingSummaryText] = useState("");
 
-  // Escape to close
+  const [autoEditTriggered, setAutoEditTriggered] = useState(false);
+
+  useEffect(() => {
+    if (autoEdit && detail?.task && !autoEditTriggered && !showEditForm) {
+      const task = detail.task;
+      setEditTitle(task.title);
+      setEditDesc(task.description ?? "");
+      setEditTeamFilter("");
+      setEditAssignee(task.assigneeId);
+      setEditDeadline(task.deadline);
+      if (task.deadline) {
+        const d = new Date(task.deadline);
+        setEditDeadlineTime(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+      } else {
+        setEditDeadlineTime("");
+      }
+      setShowEditForm(true);
+      setAutoEditTriggered(true);
+    }
+  }, [autoEdit, detail, autoEditTriggered, showEditForm]);
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();

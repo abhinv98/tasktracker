@@ -410,6 +410,7 @@ export default function BriefPage() {
   const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [autoEditTask, setAutoEditTask] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditMenu, setShowEditMenu] = useState(false);
 
@@ -642,6 +643,7 @@ export default function BriefPage() {
                               key={task._id}
                               onClick={() => {
                                 setShowEditMenu(false);
+                                setAutoEditTask(true);
                                 setSelectedTaskId(task._id);
                               }}
                               className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2"
@@ -1176,7 +1178,8 @@ export default function BriefPage() {
       {selectedTaskId && (
         <TaskDetailModal
           taskId={selectedTaskId}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); setAutoEditTask(false); }}
+          autoEdit={autoEditTask}
         />
       )}
     </div>
