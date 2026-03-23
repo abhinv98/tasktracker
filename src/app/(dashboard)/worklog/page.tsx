@@ -464,6 +464,7 @@ export default function WorkLogPage() {
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Deadline</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Marked Done</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Time</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Remarks</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -515,6 +516,30 @@ export default function WorkLogPage() {
                                     <span className="text-[11px] text-[var(--text-muted)]">
                                       {task.taskTimeHours != null ? `${task.taskTimeHours}h` : "—"}
                                     </span>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex flex-wrap gap-1">
+                                      {task.deadlineExtended && (
+                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+                                          EXTENDED
+                                        </span>
+                                      )}
+                                      {isOverdue && (
+                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
+                                          OVERDUE
+                                        </span>
+                                      )}
+                                      {task.status === "done" && task.deadline && task.completedAt && task.completedAt > task.deadline && (
+                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                                          LATE
+                                        </span>
+                                      )}
+                                      {task.status === "done" && task.deadline && task.completedAt && task.completedAt <= task.deadline && (
+                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">
+                                          ON TIME
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );

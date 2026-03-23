@@ -84,6 +84,8 @@ export const getEmployeeReport = query({
           briefTitle: brief?.title ?? "Unknown",
           briefId: t.briefId,
           taskTimeHours,
+          deadlineExtended: t.deadlineExtended ?? false,
+          originalDeadline: t.originalDeadline,
         };
       });
 
