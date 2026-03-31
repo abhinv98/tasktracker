@@ -138,6 +138,7 @@ export const createBrief = mutation({
     taskDurationMinutes: v.optional(v.number()),
     taskClientFacing: v.optional(v.boolean()),
     teamIds: v.optional(v.array(v.id("teams"))),
+    creativesRequired: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -159,15 +160,31 @@ export const createBrief = mutation({
       if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
     }
 
-    const { taskTitle, taskDescription, taskAssigneeId, taskDuration, taskDurationMinutes, taskClientFacing, teamIds, ...briefArgs } = args;
+    const {
+      taskTitle,
+      taskDescription,
+      taskAssigneeId,
+      taskDuration,
+      taskDurationMinutes,
+      taskClientFacing,
+      teamIds,
+      creativesRequired: creativesRequiredArg,
+      ...briefArgs
+    } = args;
 
     if (briefArgs.deadline !== undefined) {
       briefArgs.deadline = normalizeDeadlineToEndOfDay(briefArgs.deadline);
     }
 
+    const creativesRequired =
+      creativesRequiredArg !== undefined && creativesRequiredArg >= 1
+        ? Math.min(99, Math.floor(creativesRequiredArg))
+        : undefined;
+
     const briefId = await ctx.db.insert("briefs", {
       ...briefArgs,
       ...(assignedManagerId ? { assignedManagerId } : {}),
+      ...(creativesRequired !== undefined ? { creativesRequired } : {}),
       status: args.briefType === "single_task" ? "active" : "draft",
       createdBy: userId,
       globalPriority,
@@ -250,9 +267,11 @@ export const updateBrief = mutation({
         v.literal("designing"),
         v.literal("video_editing"),
         v.literal("content_calendar"),
-        v.literal("copywriting")
+        v.literal("copywriting"),
+        v.literal("single_task")
       )
     ),
+    creativesRequired: v.optional(v.number()),
   },
   handler: async (ctx, { briefId, ...fields }) => {
     const userId = await getAuthUserId(ctx);
@@ -273,6 +292,11 @@ export const updateBrief = mutation({
       updates.assignedManagerId = fields.assignedManagerId;
     if (fields.deadline !== undefined) updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
     if (fields.briefType !== undefined) updates.briefType = fields.briefType;
+    if (fields.creativesRequired !== undefined) {
+      const n = fields.creativesRequired;
+      updates.creativesRequired =
+        n >= 1 ? Math.min(99, Math.floor(n)) : undefined;
+    }
 
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(briefId, updates);

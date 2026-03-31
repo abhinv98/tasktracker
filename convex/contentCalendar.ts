@@ -127,6 +127,7 @@ export const createEntryForBrand = mutation({
     contentType: v.string(),
     postDate: v.string(),
     deadline: v.optional(v.number()),
+    handoffTargetTeamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -181,6 +182,7 @@ export const createEntryForBrand = mutation({
       contentType: args.contentType,
       postDate: args.postDate,
       ...(args.assigneeId ? { assignedAt: Date.now() } : {}),
+      ...(args.handoffTargetTeamId ? { handoffTargetTeamId: args.handoffTargetTeamId } : {}),
     });
 
     if (args.assigneeId) {
@@ -360,6 +362,7 @@ export const createCalendarEntry = mutation({
     deadline: v.optional(v.number()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    handoffTargetTeamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -407,6 +410,7 @@ export const createCalendarEntry = mutation({
       ...(args.creativeCopy ? { creativeCopy: args.creativeCopy } : {}),
       ...(args.caption ? { caption: args.caption } : {}),
       ...(args.assigneeId ? { assignedAt: Date.now() } : {}),
+      ...(args.handoffTargetTeamId ? { handoffTargetTeamId: args.handoffTargetTeamId } : {}),
     });
 
     if (args.assigneeId) {

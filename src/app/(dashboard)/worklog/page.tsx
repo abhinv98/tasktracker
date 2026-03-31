@@ -60,7 +60,7 @@ export default function WorkLogPage() {
   const [filterSearch, setFilterSearch] = useState("");
 
   const allUsers = useQuery(api.users.listAllUsers);
-  const employees = (allUsers ?? []).filter((u) => u.role === "employee");
+  const employees = (allUsers ?? []).filter((u) => u.name || u.email);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [reportStartDate, setReportStartDate] = useState(getMonthAgoStr());
   const [reportEndDate, setReportEndDate] = useState(getTodayStr());
@@ -270,10 +270,17 @@ export default function WorkLogPage() {
                       </span>
                     </div>
                     <div>
-                      <p className="font-medium text-[13px] text-[var(--text-primary)]">
-                        {emp.user.name ?? emp.user.email ?? "Unknown"}
-                      </p>
-                      <p className="text-[11px] text-[var(--text-muted)] capitalize">{emp.user.role}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                          {emp.user.name ?? emp.user.email ?? "Unknown"}
+                        </p>
+                        {emp.user.role === "admin" && (
+                          <span className="px-1 py-0.5 rounded text-[8px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]">
+                            {emp.user.isSuperAdmin ? "SA" : "ADM"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)]">{emp.user.designation ?? emp.user.role}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-[11px]">
@@ -356,9 +363,11 @@ export default function WorkLogPage() {
                 onChange={(e) => setSelectedEmployee(e.target.value)}
                 className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
               >
-                <option value="">All Employees</option>
+                <option value="">All Team Members</option>
                 {employees.map((emp) => (
-                  <option key={emp._id} value={emp._id}>{emp.name ?? emp.email}</option>
+                  <option key={emp._id} value={emp._id}>
+                    {emp.name ?? emp.email}{emp.role === "admin" ? " (Admin)" : (emp as any).isSuperAdmin ? " (Super Admin)" : ""}
+                  </option>
                 ))}
               </select>
             </div>
@@ -394,9 +403,16 @@ export default function WorkLogPage() {
                       </span>
                     </div>
                     <div>
-                      <p className="font-semibold text-[15px] text-[var(--text-primary)]">
-                        {emp.employee.name ?? emp.employee.email}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-[15px] text-[var(--text-primary)]">
+                          {emp.employee.name ?? emp.employee.email}
+                        </p>
+                        {emp.employee.role === "admin" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]">
+                            {emp.employee.isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-[var(--text-muted)]">
                         {emp.employee.designation ?? emp.employee.role}
                       </p>

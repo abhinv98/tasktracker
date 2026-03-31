@@ -44,6 +44,15 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   const taskId = task?._id as Id<"tasks"> | undefined;
 
   const deliverables = useQuery(api.approvals.listDeliverables, taskId ? { taskId } : "skip");
+  const creativesRequired = Math.min(
+    99,
+    Math.max(1, (brief as { creativesRequired?: number }).creativesRequired ?? 1)
+  );
+  const sortedDeliverables = useMemo(
+    () => [...(deliverables ?? [])].sort((a: any, b: any) => a.submittedAt - b.submittedAt),
+    [deliverables]
+  );
+  const emptyDeliverableSlots = Math.max(0, creativesRequired - sortedDeliverables.length);
   const dailySummaries = useQuery(api.taskDailySummaries.listSummaries, taskId ? { taskId } : "skip");
   const subTasks = useQuery(api.tasks.getSubTasks, taskId ? { parentTaskId: taskId } : "skip");
   const graphData = useQuery(api.briefs.getBriefGraphData, { briefId: brief._id });
@@ -328,39 +337,60 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
       <div className="overflow-auto p-5 space-y-5">
         {/* Deliverables */}
         <div>
-          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <Paperclip className="w-3.5 h-3.5" /> Deliverables ({deliverables?.length ?? 0})
+          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-0.5 flex items-center gap-1.5">
+            <Paperclip className="w-3.5 h-3.5" /> Deliverables
           </p>
-          {deliverables && deliverables.length > 0 ? (
-            <div className="space-y-2">
-              {deliverables.map((d: any) => {
-                const badgeColor =
-                  d.status === "approved" ? "var(--accent-employee)" :
-                  d.status === "rejected" ? "#dc2626" :
-                  d.status === "changes_requested" ? "#f59e0b" :
-                  "var(--text-secondary)";
-                return (
-                  <Card key={d._id} className="!p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="truncate mr-2">
-                        <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.fileName ?? "Deliverable"}</p>
-                        <p className="text-[10px] text-[var(--text-muted)]">
-                          by {d.submitterName ?? "Unknown"} · {new Date(d.submittedAt ?? d._creationTime).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 font-medium text-[10px] rounded-full"
-                        style={{ color: badgeColor, backgroundColor: `color-mix(in srgb, ${badgeColor} 12%, transparent)` }}
-                      >{d.status}</span>
+          <p className="text-[10px] text-[var(--text-muted)] mb-2">
+            {sortedDeliverables.length} / {creativesRequired} creative{creativesRequired !== 1 ? "s" : ""} submitted
+          </p>
+          <div className="space-y-2">
+            {sortedDeliverables.map((d: any, idx: number) => {
+              const badgeColor =
+                d.status === "approved" ? "var(--accent-employee)" :
+                d.status === "rejected" ? "#dc2626" :
+                d.status === "changes_requested" ? "#f59e0b" :
+                "var(--text-secondary)";
+              return (
+                <Card key={d._id} className="!p-3">
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                    Creative {idx + 1}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <div className="truncate mr-2">
+                      <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.message ?? d.fileName ?? "Deliverable"}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        by {d.submitterName ?? "Unknown"} · {new Date(d.submittedAt ?? d._creationTime).toLocaleDateString()}
+                      </p>
                     </div>
-                    {d.note && <p className="text-[11px] text-[var(--text-secondary)] mt-1">{d.note}</p>}
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-[12px] text-[var(--text-muted)]">No deliverables submitted yet.</p>
-          )}
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 font-medium text-[10px] rounded-full"
+                      style={{ color: badgeColor, backgroundColor: `color-mix(in srgb, ${badgeColor} 12%, transparent)` }}
+                    >{d.status}</span>
+                  </div>
+                  {(d.note || d.reviewNote) && (
+                    <p className="text-[11px] text-[var(--text-secondary)] mt-1">{d.note ?? d.reviewNote}</p>
+                  )}
+                </Card>
+              );
+            })}
+            {Array.from({ length: emptyDeliverableSlots }).map((_, j) => {
+              const n = sortedDeliverables.length + j + 1;
+              return (
+                <div
+                  key={`slot-${n}`}
+                  className="rounded-lg border border-dashed border-[var(--border)] p-3 bg-[var(--bg-hover)]/40"
+                >
+                  <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+                    Creative {n}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>
+                </div>
+              );
+            })}
+            {sortedDeliverables.length === 0 && emptyDeliverableSlots === 0 && (
+              <p className="text-[12px] text-[var(--text-muted)]">No deliverables submitted yet.</p>
+            )}
+          </div>
         </div>
 
         {/* Attachments */}
@@ -408,6 +438,7 @@ export default function BriefPage() {
   const [taskDeadline, setTaskDeadline] = useState<number | undefined>(undefined);
   const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
   const [taskClientFacing, setTaskClientFacing] = useState(false);
+  const [taskHandoffTeam, setTaskHandoffTeam] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [autoEditTask, setAutoEditTask] = useState(false);
@@ -457,6 +488,7 @@ export default function BriefPage() {
         assigneeId: taskAssignee as Id<"users">,
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
         ...(taskClientFacing ? { clientFacing: true } : {}),
+        ...(taskHandoffTeam ? { handoffTargetTeamId: taskHandoffTeam as Id<"teams"> } : {}),
       });
       setTaskTitle("");
       setTaskDesc("");
@@ -465,6 +497,7 @@ export default function BriefPage() {
       setTaskDeadline(undefined);
       setTaskDeadlineTime("");
       setTaskClientFacing(false);
+      setTaskHandoffTeam("");
       toast("success", "Task created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create task");
@@ -830,6 +863,22 @@ export default function BriefPage() {
                   />
                   <span className="text-[11px] font-medium text-[var(--text-secondary)]">Client-facing task</span>
                 </label>
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Handoff Team (optional)</label>
+                  <select
+                    value={taskHandoffTeam}
+                    onChange={(e) => setTaskHandoffTeam(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">No handoff</option>
+                    {(allTeams ?? []).map((t) => (
+                      <option key={t._id} value={t._id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                    On approval, deliverable will be handed off to this team
+                  </p>
+                </div>
                 <Button type="submit" variant="primary" className="mt-2">
                   Assign Task
                 </Button>

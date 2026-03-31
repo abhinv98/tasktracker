@@ -253,12 +253,13 @@ export const listManagerDeliverables = query({
     const brands = await ctx.db.query("brands").collect();
     const allTeams = await ctx.db.query("teams").collect();
 
+    // TL-approved deliverables for this brand: include both "awaiting pass to manager" and "with manager"
     const passed = allDeliverables.filter((d) => {
-      if (d.teamLeadStatus !== "approved" || !d.passedToManagerAt) return false;
+      if (d.teamLeadStatus !== "approved") return false;
       if (d.status === "approved" || d.status === "rejected") return false;
       const task = tasks.find((t) => t._id === d.taskId);
       const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
-      return brief?.brandId && myBrandIds.has(brief.brandId);
+      return !!(brief?.brandId && myBrandIds.has(brief.brandId));
     });
 
     const results = await Promise.all(
@@ -311,6 +312,7 @@ export const listManagerDeliverables = query({
           files,
           taskClientFacing: task?.clientFacing ?? false,
           clientStatus: d.clientStatus,
+          awaitingHandoff: !d.passedToManagerAt,
         };
       })
     );
@@ -791,18 +793,24 @@ export const passToManager = mutation({
       throw new Error("Deliverable must be approved by team lead first");
     }
 
+    const task = await ctx.db.get(deliverable.taskId);
+    const brief = task ? await ctx.db.get(task.briefId) : null;
+
     const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    if (!teamInfo || teamInfo.leadId !== userId) {
-      throw new Error("Only the team lead can pass this deliverable to the manager");
+    const isTeamLead = !!(teamInfo && teamInfo.leadId === userId);
+    const isBm =
+      brief?.brandId && (await isBrandManager(ctx, userId, brief.brandId));
+
+    if (!isTeamLead && !isBm) {
+      throw new Error(
+        "Only the team lead or brand manager can pass this deliverable to the manager"
+      );
     }
 
     await ctx.db.patch(deliverableId, {
       passedToManagerBy: userId,
       passedToManagerAt: Date.now(),
     });
-
-    const task = await ctx.db.get(deliverable.taskId);
-    const brief = task ? await ctx.db.get(task.briefId) : null;
 
     if (brief?.brandId) {
       const brandManagers = await ctx.db
@@ -1534,5 +1542,234 @@ export const deleteDeliverable = mutation({
     }
 
     await ctx.db.delete(deliverableId);
+  },
+});
+
+// ─── DELIVERABLE HANDOFF (cross-team pipeline) ──────────
+
+export const handoffDeliverable = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    targetTeamId: v.id("teams"),
+    targetAssigneeId: v.id("users"),
+    deadline: v.optional(v.number()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { deliverableId, targetTeamId, targetAssigneeId, deadline, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    // Only approved deliverables can be handed off
+    if (deliverable.status !== "approved" && deliverable.clientStatus !== "client_approved") {
+      throw new Error("Deliverable must be approved before handoff");
+    }
+
+    const sourceTask = await ctx.db.get(deliverable.taskId);
+    if (!sourceTask) throw new Error("Source task not found");
+    const sourceBrief = await ctx.db.get(sourceTask.briefId);
+    if (!sourceBrief) throw new Error("Source brief not found");
+
+    // Authorization: admin or brand manager
+    const user = await ctx.db.get(userId);
+    let authorized = user?.role === "admin";
+    if (!authorized && sourceBrief.brandId) {
+      authorized = await isBrandManager(ctx, userId, sourceBrief.brandId);
+    }
+    if (!authorized) throw new Error("Only admins or brand managers can hand off deliverables");
+
+    const targetTeam = await ctx.db.get(targetTeamId);
+    if (!targetTeam) throw new Error("Target team not found");
+
+    // Determine whether to create task in same brief or new brief
+    const isSingleTask = sourceBrief.briefType === "single_task";
+    let targetBriefId: any;
+
+    if (isSingleTask) {
+      // Create a new single_task brief
+      const allBriefs = await ctx.db.query("briefs").collect();
+      const globalPriority = allBriefs.length + 1;
+
+      targetBriefId = await ctx.db.insert("briefs", {
+        title: `${sourceBrief.title} → ${targetTeam.name} Handoff`,
+        description: `Handoff from "${sourceBrief.title}". ${note ?? ""}`.trim(),
+        status: "active",
+        briefType: "single_task",
+        createdBy: userId,
+        assignedManagerId: sourceBrief.assignedManagerId,
+        globalPriority,
+        brandId: sourceBrief.brandId,
+        ...(deadline ? { deadline } : {}),
+      });
+
+      // Link the target team to the new brief
+      await ctx.db.insert("briefTeams", { briefId: targetBriefId, teamId: targetTeamId });
+    } else {
+      // For master briefs, create task within the same brief
+      targetBriefId = sourceBrief._id;
+
+      // Ensure team is linked to the brief
+      const existingBriefTeams = await ctx.db
+        .query("briefTeams")
+        .withIndex("by_brief", (q: any) => q.eq("briefId", targetBriefId))
+        .collect();
+      const teamAlreadyLinked = existingBriefTeams.some((bt: any) => bt.teamId === targetTeamId);
+      if (!teamAlreadyLinked) {
+        await ctx.db.insert("briefTeams", { briefId: targetBriefId, teamId: targetTeamId });
+      }
+    }
+
+    // Build reference links from the source deliverable
+    const referenceLinks: string[] = [];
+    if (deliverable.link) referenceLinks.push(deliverable.link);
+
+    // Get file URLs from source deliverable
+    let sourceFileIds: any[] = [];
+    let sourceFileNames: string[] = [];
+    if (deliverable.fileIds && deliverable.fileIds.length > 0) {
+      sourceFileIds = deliverable.fileIds;
+      sourceFileNames = deliverable.fileNames ?? deliverable.fileIds.map(() => "file");
+      for (let i = 0; i < deliverable.fileIds.length; i++) {
+        const url = await ctx.storage.getUrl(deliverable.fileIds[i]);
+        if (url) referenceLinks.push(url);
+      }
+    }
+
+    // Calculate sort order for the new task
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee_sort", (q: any) => q.eq("assigneeId", targetAssigneeId))
+      .collect();
+    const maxOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t: any) => t.sortOrder))
+      : 0;
+
+    // Create the handoff task
+    const targetTaskId = await ctx.db.insert("tasks", {
+      briefId: targetBriefId,
+      title: `[Handoff] ${sourceTask.title}`,
+      description: `Handed off from "${sourceTask.title}"${sourceBrief.title !== sourceTask.title ? ` (${sourceBrief.title})` : ""}.\n\n${note ?? ""}${deliverable.message ? `\n\nOriginal deliverable note: ${deliverable.message}` : ""}`.trim(),
+      assigneeId: targetAssigneeId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxOrder + 1000,
+      ...(deadline ? { deadline } : {}),
+      ...(sourceTask.clientFacing ? { clientFacing: true } : {}),
+      ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+      assignedAt: Date.now(),
+      sourceDeliverableId: deliverableId,
+      handoffSourceTaskId: sourceTask._id,
+    });
+
+    // Record the handoff
+    await ctx.db.insert("deliverableHandoffs", {
+      sourceDeliverableId: deliverableId,
+      sourceTaskId: sourceTask._id,
+      sourceBriefId: sourceBrief._id,
+      targetTaskId,
+      targetBriefId,
+      targetTeamId,
+      handedOffBy: userId,
+      handedOffAt: Date.now(),
+      note,
+    });
+
+    // Notify the target assignee
+    await ctx.db.insert("notifications", {
+      recipientId: targetAssigneeId,
+      type: "task_assigned",
+      title: "Handoff task assigned",
+      message: `${user?.name ?? "Someone"} handed off "${sourceTask.title}" to you for ${targetTeam.name}`,
+      briefId: targetBriefId,
+      taskId: targetTaskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    // Notify the target team lead
+    if (targetTeam.leadId && targetTeam.leadId !== userId && targetTeam.leadId !== targetAssigneeId) {
+      await ctx.db.insert("notifications", {
+        recipientId: targetTeam.leadId,
+        type: "team_added",
+        title: "Handoff task added to your team",
+        message: `"${sourceTask.title}" was handed off to ${targetTeam.name}`,
+        briefId: targetBriefId,
+        taskId: targetTaskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    // Activity log
+    await ctx.db.insert("activityLog", {
+      briefId: sourceBrief._id,
+      taskId: sourceTask._id,
+      userId,
+      action: "deliverable_handed_off",
+      details: JSON.stringify({
+        targetTeam: targetTeam.name,
+        targetAssigneeId,
+        targetTaskId,
+        targetBriefId,
+        note,
+      }),
+      timestamp: Date.now(),
+    });
+
+    return { targetTaskId, targetBriefId };
+  },
+});
+
+export const getHandoffHistory = query({
+  args: { taskId: v.optional(v.id("tasks")), deliverableId: v.optional(v.id("deliverables")) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    let handoffs: any[] = [];
+    if (args.taskId) {
+      const asSource = await ctx.db
+        .query("deliverableHandoffs")
+        .withIndex("by_source_task", (q) => q.eq("sourceTaskId", args.taskId!))
+        .collect();
+      const asTarget = await ctx.db
+        .query("deliverableHandoffs")
+        .withIndex("by_target_task", (q) => q.eq("targetTaskId", args.taskId!))
+        .collect();
+      handoffs = [...asSource, ...asTarget];
+    } else if (args.deliverableId) {
+      handoffs = await ctx.db
+        .query("deliverableHandoffs")
+        .withIndex("by_source_deliverable", (q) => q.eq("sourceDeliverableId", args.deliverableId!))
+        .collect();
+    }
+
+    const users = await ctx.db.query("users").collect();
+    const teams = await ctx.db.query("teams").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+    const briefs = await ctx.db.query("briefs").collect();
+
+    return handoffs.map((h: any) => {
+      const handedOffByUser = users.find((u) => u._id === h.handedOffBy);
+      const team = teams.find((t) => t._id === h.targetTeamId);
+      const sourceTask = tasks.find((t) => t._id === h.sourceTaskId);
+      const targetTask = tasks.find((t) => t._id === h.targetTaskId);
+      const sourceBrief = briefs.find((b) => b._id === h.sourceBriefId);
+      const targetBrief = briefs.find((b) => b._id === h.targetBriefId);
+      return {
+        ...h,
+        handedOffByName: handedOffByUser?.name ?? handedOffByUser?.email ?? "Unknown",
+        targetTeamName: team?.name ?? "Unknown",
+        sourceTaskTitle: sourceTask?.title ?? "Unknown",
+        targetTaskTitle: targetTask?.title ?? "Unknown",
+        targetTaskStatus: targetTask?.status ?? "unknown",
+        sourceBriefTitle: sourceBrief?.title ?? "Unknown",
+        targetBriefTitle: targetBrief?.title ?? "Unknown",
+      };
+    });
   },
 });

@@ -12,7 +12,8 @@ export const getEmployeeWorkLog = query({
     if (!user || user.role !== "admin") return null;
 
     const allUsers = await ctx.db.query("users").collect();
-    const employees = allUsers.filter((u) => u.role === "employee");
+    // Include ALL users (employees, admins, super admins) — not just employees
+    const employees = allUsers.filter((u) => u.name || u.email);
     const allTasks = await ctx.db.query("tasks").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
@@ -84,6 +85,8 @@ export const getEmployeeWorkLog = query({
           email: emp.email,
           role: emp.role,
           avatarUrl: emp.avatarUrl,
+          isSuperAdmin: emp.isSuperAdmin,
+          designation: emp.designation,
         },
         tasks,
         totalTasks: tasks.length,
@@ -126,7 +129,8 @@ export const getTaskManifest = query({
       (b) => !["archived", "completed"].includes(b.status)
     );
 
-    const employees = allUsers.filter((u) => u.role === "employee");
+    // Include ALL users, not just employees
+    const employees = allUsers.filter((u) => u.name || u.email);
 
     return employees.map((emp) => {
       const empTasks = allTasks.filter((t) => t.assigneeId === emp._id);
@@ -160,6 +164,8 @@ export const getTaskManifest = query({
           email: emp.email,
           role: emp.role,
           avatarUrl: emp.avatarUrl,
+          isSuperAdmin: emp.isSuperAdmin,
+          designation: emp.designation,
         },
         briefs: empBriefs,
         totalTasks: empTasks.length,

@@ -1,15 +1,18 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
-import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase } from "lucide-react";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
 const STATUS_COLORS = BRIEF_STATUS_COLORS;
+
+const STORAGE_BRIEF_DRAFT = "tasktracker_briefDraft";
+const STORAGE_BRIEFS_UI = "tasktracker_briefsUi";
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-US", {
@@ -55,6 +58,7 @@ export default function BriefsPage() {
   const [briefMode, setBriefMode] = useState<"master" | "single" | "content_calendar">("master");
 
   const [clientFacing, setClientFacing] = useState(false);
+  const [creativesRequired, setCreativesRequired] = useState(1);
 
   // Single task brief fields
   const [stAssignee, setStAssignee] = useState("");
@@ -74,6 +78,95 @@ export default function BriefsPage() {
   const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
   const [briefsTab, setBriefsTab] = useState<"active" | "completed">("active");
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_BRIEFS_UI);
+      if (!raw) return;
+      const o = JSON.parse(raw) as {
+        briefsTab?: string;
+        filterManagerId?: string;
+        viewMode?: string;
+        expandedBrandIds?: string[];
+      };
+      if (o.briefsTab === "active" || o.briefsTab === "completed") setBriefsTab(o.briefsTab);
+      if (typeof o.filterManagerId === "string") setFilterManagerId(o.filterManagerId);
+      if (o.viewMode === "folders" || o.viewMode === "all") setViewMode(o.viewMode);
+      if (Array.isArray(o.expandedBrandIds)) setExpandedBrands(new Set(o.expandedBrandIds));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        STORAGE_BRIEFS_UI,
+        JSON.stringify({
+          briefsTab,
+          filterManagerId,
+          viewMode,
+          expandedBrandIds: [...expandedBrands],
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [briefsTab, filterManagerId, viewMode, expandedBrands]);
+
+  const persistBriefDraft = useCallback(() => {
+    try {
+      sessionStorage.setItem(
+        STORAGE_BRIEF_DRAFT,
+        JSON.stringify({
+          title,
+          description,
+          brandId,
+          managerId,
+          deadline,
+          briefType,
+          briefMode,
+          clientFacing,
+          stAssignee,
+          stTeamId,
+          stDeadlineTime,
+          creativesRequired,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [
+    title,
+    description,
+    brandId,
+    managerId,
+    deadline,
+    briefType,
+    briefMode,
+    clientFacing,
+    stAssignee,
+    stTeamId,
+    stDeadlineTime,
+    creativesRequired,
+  ]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    persistBriefDraft();
+  }, [showModal, persistBriefDraft]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        persistBriefDraft();
+        setShowModal(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showModal, persistBriefDraft]);
 
   function toggleBrand(id: string) {
     setExpandedBrands((prev) => {
@@ -142,17 +235,66 @@ export default function BriefsPage() {
   }
 
   function openCreateModalForBrand(forBrandId?: string) {
-    setBrandId(forBrandId ?? "");
-    setManagerId("");
-    setTitle("");
-    setDescription("");
-    setDeadline(undefined);
-    setBriefType("");
-    setBriefMode("master");
-    setStAssignee("");
-    setStTeamId("");
-    setStDeadlineTime("");
+    try {
+      const raw = sessionStorage.getItem(STORAGE_BRIEF_DRAFT);
+      if (raw) {
+        const d = JSON.parse(raw) as Record<string, unknown>;
+        setTitle(typeof d.title === "string" ? d.title : "");
+        setDescription(typeof d.description === "string" ? d.description : "");
+        setBrandId(
+          forBrandId ??
+            (typeof d.brandId === "string" ? d.brandId : "")
+        );
+        setManagerId(typeof d.managerId === "string" ? d.managerId : "");
+        setDeadline(typeof d.deadline === "number" ? d.deadline : undefined);
+        setBriefType(typeof d.briefType === "string" ? d.briefType : "");
+        if (d.briefMode === "master" || d.briefMode === "single" || d.briefMode === "content_calendar") {
+          setBriefMode(d.briefMode);
+        } else {
+          setBriefMode("master");
+        }
+        setClientFacing(d.clientFacing === true);
+        setStAssignee(typeof d.stAssignee === "string" ? d.stAssignee : "");
+        setStTeamId(typeof d.stTeamId === "string" ? d.stTeamId : "");
+        setStDeadlineTime(typeof d.stDeadlineTime === "string" ? d.stDeadlineTime : "");
+        const cr = d.creativesRequired;
+        setCreativesRequired(
+          typeof cr === "number" && cr >= 1 && cr <= 99 ? Math.floor(cr) : 1
+        );
+      } else {
+        setBrandId(forBrandId ?? "");
+        setManagerId("");
+        setTitle("");
+        setDescription("");
+        setDeadline(undefined);
+        setBriefType("");
+        setBriefMode("master");
+        setStAssignee("");
+        setStTeamId("");
+        setStDeadlineTime("");
+        setClientFacing(false);
+        setCreativesRequired(1);
+      }
+    } catch {
+      setBrandId(forBrandId ?? "");
+      setManagerId("");
+      setTitle("");
+      setDescription("");
+      setDeadline(undefined);
+      setBriefType("");
+      setBriefMode("master");
+      setStAssignee("");
+      setStTeamId("");
+      setStDeadlineTime("");
+      setClientFacing(false);
+      setCreativesRequired(1);
+    }
     setShowModal(true);
+  }
+
+  function closeCreateModal() {
+    persistBriefDraft();
+    setShowModal(false);
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -176,6 +318,11 @@ export default function BriefsPage() {
       else if (isContentCal) resolvedBriefType = "content_calendar";
       else resolvedBriefType = (briefType || undefined) as BriefType | undefined;
 
+      const cr =
+        creativesRequired >= 1 && creativesRequired <= 99
+          ? Math.floor(creativesRequired)
+          : 1;
+
       await createBrief({
         title,
         description,
@@ -183,6 +330,7 @@ export default function BriefsPage() {
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
         briefType: resolvedBriefType,
+        creativesRequired: cr,
         ...(isSingle && stAssignee ? {
           taskTitle: title,
           taskDescription: description,
@@ -191,6 +339,11 @@ export default function BriefsPage() {
         } : {}),
         ...(isSingle && stTeamId ? { teamIds: [stTeamId as Id<"teams">] } : {}),
       });
+      try {
+        sessionStorage.removeItem(STORAGE_BRIEF_DRAFT);
+      } catch {
+        /* ignore */
+      }
       setShowModal(false);
       setTitle("");
       setDescription("");
@@ -203,6 +356,7 @@ export default function BriefsPage() {
       setStAssignee("");
       setStTeamId("");
       setStDeadlineTime("");
+      setCreativesRequired(1);
       toast("success", isSingle ? "Single task brief created" : "Brief created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
@@ -632,11 +786,27 @@ export default function BriefsPage() {
 
       {/* Create Brief Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h2 className="font-semibold text-[18px] text-[var(--text-primary)] mb-4">
-              Create Brief
-            </h2>
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeCreateModal();
+          }}
+        >
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+            <div className="flex items-start justify-between gap-2 mb-4">
+              <h2 className="font-semibold text-[18px] text-[var(--text-primary)]">
+                Create Brief
+              </h2>
+              <button
+                type="button"
+                onClick={closeCreateModal}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               {/* Brief Mode Toggle */}
               <div>
@@ -819,9 +989,29 @@ export default function BriefsPage() {
                   <p className="text-[11px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
                 </div>
               </label>
+              <div>
+                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                  Creatives required
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={creativesRequired}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isNaN(v)) setCreativesRequired(1);
+                    else setCreativesRequired(Math.min(99, Math.max(1, v)));
+                  }}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  Designer sees separate deliverable slots (e.g. 4 creatives = 4).
+                </p>
+              </div>
               <div className="flex gap-2">
                 <Button type="submit" variant="primary">Create</Button>
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button type="button" variant="secondary" onClick={closeCreateModal}>Cancel</Button>
               </div>
             </form>
           </Card>

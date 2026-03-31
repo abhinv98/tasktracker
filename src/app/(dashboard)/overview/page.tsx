@@ -126,25 +126,25 @@ export default function OverviewPage() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-[var(--text-muted)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts.pending}</span> pending
+                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.pending ?? 0}</span> pending
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-[var(--accent-manager)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts["in-progress"]}</span> in progress
+                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.["in-progress"] ?? 0}</span> in progress
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Eye className="h-4 w-4 text-[var(--accent-admin)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts.review}</span> in review
+                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.review ?? 0}</span> in review
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts.done}</span> done
+                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.done ?? 0}</span> done
                   </span>
                 </div>
               </div>

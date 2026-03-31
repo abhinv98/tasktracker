@@ -24,7 +24,7 @@ export default function ReportsPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
   const allUsers = useQuery(api.users.listAllUsers);
-  const employees = (allUsers ?? []).filter((u) => u.role === "employee");
+  const employees = (allUsers ?? []).filter((u) => u.name || u.email);
 
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [startDate, setStartDate] = useState(getMonthAgoStr());
@@ -64,9 +64,11 @@ export default function ReportsPage() {
             onChange={(e) => setSelectedEmployee(e.target.value)}
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
           >
-            <option value="">All Employees</option>
+            <option value="">All Team Members</option>
             {employees.map((emp) => (
-              <option key={emp._id} value={emp._id}>{emp.name ?? emp.email}</option>
+              <option key={emp._id} value={emp._id}>
+                {emp.name ?? emp.email}{emp.role === "admin" ? " (Admin)" : (emp as any).isSuperAdmin ? " (Super Admin)" : ""}
+              </option>
             ))}
           </select>
         </div>
@@ -103,9 +105,16 @@ export default function ReportsPage() {
                   </span>
                 </div>
                 <div>
-                  <p className="font-semibold text-[15px] text-[var(--text-primary)]">
-                    {emp.employee.name ?? emp.employee.email}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-[15px] text-[var(--text-primary)]">
+                      {emp.employee.name ?? emp.employee.email}
+                    </p>
+                    {emp.employee.role === "admin" && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]">
+                        {emp.employee.isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-[var(--text-muted)]">
                     {emp.employee.designation ?? emp.employee.role}
                   </p>

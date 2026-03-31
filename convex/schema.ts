@@ -79,6 +79,8 @@ export default defineSchema({
     archivedAt: v.optional(v.number()),
     archivedBy: v.optional(v.id("users")),
     brandId: v.optional(v.id("brands")),
+    /** Expected number of creative deliverables (e.g. 4 static posts). Default UI treats missing as 1. */
+    creativesRequired: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_manager", ["assignedManagerId"])
@@ -129,6 +131,12 @@ export default defineSchema({
     haltLocked: v.optional(v.boolean()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    /** Pre-configured: which team should receive handoff when this task's deliverable is approved */
+    handoffTargetTeamId: v.optional(v.id("teams")),
+    /** If this task was created via handoff, the source deliverable */
+    sourceDeliverableId: v.optional(v.id("deliverables")),
+    /** If this task was created via handoff, the source task it was handed off from */
+    handoffSourceTaskId: v.optional(v.id("tasks")),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -528,6 +536,22 @@ export default defineSchema({
   })
     .index("by_brand", ["brandId"])
     .index("by_jsr_link", ["jsrLinkId"]),
+
+  // ─── DELIVERABLE HANDOFFS (cross-team pipeline) ──
+  deliverableHandoffs: defineTable({
+    sourceDeliverableId: v.id("deliverables"),
+    sourceTaskId: v.id("tasks"),
+    sourceBriefId: v.id("briefs"),
+    targetTaskId: v.id("tasks"),
+    targetBriefId: v.id("briefs"),
+    targetTeamId: v.id("teams"),
+    handedOffBy: v.id("users"),
+    handedOffAt: v.number(),
+    note: v.optional(v.string()),
+  })
+    .index("by_source_deliverable", ["sourceDeliverableId"])
+    .index("by_target_task", ["targetTaskId"])
+    .index("by_source_task", ["sourceTaskId"]),
 
   // ─── JSR REMARKS (client comments on deliverables) ──
   jsrRemarks: defineTable({

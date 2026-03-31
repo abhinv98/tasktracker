@@ -15,7 +15,8 @@ export const getEmployeeReport = query({
     if (!user || user.role !== "admin") return null;
 
     const allUsers = await ctx.db.query("users").collect();
-    const employees = allUsers.filter((u) => u.role === "employee");
+    // Include ALL users (employees, admins, super admins)
+    const employees = allUsers.filter((u) => u.name || u.email);
 
     const allTasks = await ctx.db.query("tasks").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
@@ -106,6 +107,7 @@ export const getEmployeeReport = query({
           email: emp.email,
           role: emp.role,
           designation: emp.designation,
+          isSuperAdmin: (emp as any).isSuperAdmin,
         },
         totalTasks: tasksInRange.length,
         completedTasks: completedTasks.length,

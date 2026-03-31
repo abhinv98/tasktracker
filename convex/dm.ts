@@ -83,6 +83,35 @@ export const getContacts = query({
       });
     }
 
+    const selfUser = allUsers.find((u) => u._id === authId);
+    if (selfUser) {
+      const selfThread = await ctx.db
+        .query("directMessages")
+        .withIndex("by_sender_recipient", (q) =>
+          q.eq("senderId", authId).eq("recipientId", authId)
+        )
+        .collect();
+      const unreadCount = selfThread.filter((m) => !m.readAt).length;
+      let lastMessage: string | null = null;
+      let lastMessageTime: number | null = null;
+      if (selfThread.length > 0) {
+        const last = selfThread.reduce((a, b) =>
+          a.createdAt > b.createdAt ? a : b
+        );
+        lastMessage = last.content;
+        lastMessageTime = last.createdAt;
+      }
+      contacts.push({
+        _id: authId,
+        name: "Saved messages",
+        role: selfUser.role ?? "employee",
+        avatarUrl: selfUser.avatarUrl ?? selfUser.image ?? null,
+        lastMessage,
+        lastMessageTime,
+        unreadCount,
+      });
+    }
+
     // Sort: unread first, then by last message time (most recent first)
     contacts.sort((a, b) => {
       if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
@@ -105,6 +134,25 @@ export const getConversation = query({
   handler: async (ctx, { otherUserId }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return [];
+
+    if (otherUserId === authId) {
+      const selfMsgs = await ctx.db
+        .query("directMessages")
+        .withIndex("by_sender_recipient", (q) =>
+          q.eq("senderId", authId).eq("recipientId", authId)
+        )
+        .collect();
+      const allMessages = [...selfMsgs].sort((a, b) => a.createdAt - b.createdAt);
+      return allMessages.map((m) => ({
+        _id: m._id,
+        senderId: m.senderId,
+        recipientId: m.recipientId,
+        content: m.content,
+        createdAt: m.createdAt,
+        readAt: m.readAt,
+        isMine: true,
+      }));
+    }
 
     // Messages sent by me to them
     const sentByMe = await ctx.db
@@ -179,16 +227,17 @@ export const sendMessage = mutation({
       createdAt: Date.now(),
     });
 
-    // Create a notification for the recipient
-    await ctx.db.insert("notifications", {
-      recipientId,
-      type: "direct_message",
-      title: "New message",
-      message: `${sender?.name ?? sender?.email ?? "Someone"}: ${content.trim().slice(0, 100)}`,
-      triggeredBy: authId,
-      read: false,
-      createdAt: Date.now(),
-    });
+    if (recipientId !== authId) {
+      await ctx.db.insert("notifications", {
+        recipientId,
+        type: "direct_message",
+        title: "New message",
+        message: `${sender?.name ?? sender?.email ?? "Someone"}: ${content.trim().slice(0, 100)}`,
+        triggeredBy: authId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
   },
 });
 

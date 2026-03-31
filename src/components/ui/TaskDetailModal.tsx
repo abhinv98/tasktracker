@@ -225,6 +225,17 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const isBriefOnHold = brief?.status === "on_hold";
   const isEditLocked = isDelivered || isOverdue;
   const canUpdateStatus = (isAssignee || isAdmin) && !isDelivered && !isBriefOnHold;
+  const canReassignTask =
+    isAdmin ||
+    brief?.assignedManagerId === user._id ||
+    (task.assignedBy === user._id && brief?.briefType === "single_task");
+  const showReassignBanner =
+    canReassignTask &&
+    ((!assignee && isAdmin) || (assignee && showReassign));
+  const creativesRequired = Math.min(
+    99,
+    Math.max(1, (brief as { creativesRequired?: number } | null)?.creativesRequired ?? 1)
+  );
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
@@ -327,6 +338,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     }
   }
 
+  const sortedDeliverables = [...(deliverables ?? [])].sort(
+    (a, b) => a.submittedAt - b.submittedAt
+  );
+  const emptySlots = Math.max(0, creativesRequired - sortedDeliverables.length);
+
   const DELIVERABLE_STATUS: Record<
     string,
     { label: string; color: string; bg: string }
@@ -423,10 +439,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             </div>
           )}
 
-          {/* Reassign banner for unassigned tasks */}
-          {!assignee && isAdmin && (
-            <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
-              {!showReassign ? (
+          {/* Reassign: unassigned (admin) or assignee handoff */}
+          {showReassignBanner && (
+            <div className={`px-5 py-3 border-b ${!assignee ? "bg-amber-50 border-amber-200" : "bg-sky-50 border-sky-200"}`}>
+              {!showReassign && !assignee ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
@@ -445,14 +461,20 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                    <p className="text-[13px] text-amber-700 font-medium">Select a new assignee</p>
+                    <UserPlus className={`h-4 w-4 shrink-0 ${!assignee ? "text-amber-500" : "text-sky-600"}`} />
+                    <p className={`text-[13px] font-medium ${!assignee ? "text-amber-700" : "text-sky-800"}`}>
+                      Select a new assignee
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <select
                       value={reassignTarget}
                       onChange={(e) => setReassignTarget(e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      className={`flex-1 px-3 py-1.5 rounded-lg border bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-2 ${
+                        !assignee
+                          ? "border-amber-300 focus:ring-amber-400"
+                          : "border-sky-300 focus:ring-sky-400"
+                      }`}
                     >
                       <option value="">Select employee</option>
                       {editAllMembers.map((emp) => (
@@ -477,14 +499,23 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         }
                       }}
                       disabled={!reassignTarget || isReassigning}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors disabled:opacity-50"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white transition-colors disabled:opacity-50 ${
+                        !assignee ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
+                      }`}
                     >
                       {isReassigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                       {isReassigning ? "Saving..." : "Confirm"}
                     </button>
                     <button
-                      onClick={() => { setShowReassign(false); setReassignTarget(""); }}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-amber-700 border border-amber-300 bg-white hover:bg-amber-50 transition-colors"
+                      onClick={() => {
+                        setShowReassign(false);
+                        setReassignTarget("");
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border bg-white transition-colors ${
+                        !assignee
+                          ? "text-amber-700 border-amber-300 hover:bg-amber-50"
+                          : "text-sky-800 border-sky-300 hover:bg-sky-100"
+                      }`}
                     >
                       Cancel
                     </button>
@@ -537,11 +568,21 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
             {/* Meta grid */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-                <User className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)] flex-wrap">
+                <User className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                 <span>
                   {assignee?.name ?? assignee?.email ?? "Unassigned"}
                 </span>
+                {assignee && canReassignTask && !showReassign && (
+                  <button
+                    type="button"
+                    onClick={() => setShowReassign(true)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100"
+                  >
+                    <UserPlus className="h-3 w-3" />
+                    Reassign
+                  </button>
+                )}
               </div>
               {task.duration && (
                 <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
@@ -849,10 +890,16 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
           {/* Deliverables section */}
           <div className="p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
-                Deliverables ({deliverables?.length ?? 0})
-              </h4>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+                  Deliverables
+                </h4>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  {deliverables?.length ?? 0} / {creativesRequired} creative
+                  {(creativesRequired ?? 1) !== 1 ? "s" : ""} submitted
+                </p>
+              </div>
               {isAssignee && status !== "done" && (
                 <button
                   onClick={() => setShowDeliverableForm(!showDeliverableForm)}
@@ -950,7 +997,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
             {/* Deliverables list */}
             <div className="space-y-2">
-              {deliverables?.map((d) => {
+              {sortedDeliverables.map((d, idx) => {
                 const ds =
                   DELIVERABLE_STATUS[d.status ?? "pending"] ??
                   DELIVERABLE_STATUS.pending;
@@ -959,6 +1006,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     key={d._id}
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
                   >
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                      Creative {idx + 1}
+                    </p>
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <span className="text-[12px] text-[var(--text-secondary)]">
                         {d.submitterName} &middot;{" "}
@@ -1060,7 +1110,21 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   </div>
                 );
               })}
-              {(!deliverables || deliverables.length === 0) && (
+              {Array.from({ length: emptySlots }).map((_, j) => {
+                const n = sortedDeliverables.length + j + 1;
+                return (
+                  <div
+                    key={`empty-creative-${n}`}
+                    className="p-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)]/40"
+                  >
+                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+                      Creative {n}
+                    </p>
+                    <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>
+                  </div>
+                );
+              })}
+              {sortedDeliverables.length === 0 && emptySlots === 0 && (
                 <p className="text-[11px] text-[var(--text-muted)]">
                   No deliverables submitted yet.
                 </p>

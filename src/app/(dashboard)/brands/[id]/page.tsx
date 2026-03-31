@@ -930,7 +930,10 @@ export default function BrandDetailPage() {
                 {brand.briefs.map((brief) => (
                   <div
                     key={brief._id}
-                    onClick={() => router.push(`/brief/${brief._id}`)}
+                    onClick={() => {
+                      router.push("/briefs");
+                      queueMicrotask(() => router.push(`/brief/${brief._id}`));
+                    }}
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] hover:border-[var(--accent-admin)] cursor-pointer transition-all"
                   >
                     <div className="flex items-center justify-between mb-1.5">

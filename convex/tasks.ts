@@ -108,6 +108,7 @@ export const createTask = mutation({
     clientFacing: v.optional(v.boolean()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    handoffTargetTeamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -181,8 +182,10 @@ export const updateTask = mutation({
     clientFacing: v.optional(v.boolean()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    handoffTargetTeamId: v.optional(v.id("teams")),
+    clearHandoffTarget: v.optional(v.boolean()),
   },
-  handler: async (ctx, { taskId, clearDeadline, ...fields }) => {
+  handler: async (ctx, { taskId, clearDeadline, clearHandoffTarget, ...fields }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const task = await ctx.db.get(taskId);
@@ -207,6 +210,8 @@ export const updateTask = mutation({
     if (fields.clientFacing !== undefined) updates.clientFacing = fields.clientFacing;
     if (fields.creativeCopy !== undefined) updates.creativeCopy = fields.creativeCopy;
     if (fields.caption !== undefined) updates.caption = fields.caption;
+    if (fields.handoffTargetTeamId !== undefined) updates.handoffTargetTeamId = fields.handoffTargetTeamId;
+    if (clearHandoffTarget) updates.handoffTargetTeamId = undefined;
 
     if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
       updates.assigneeId = fields.assigneeId;
@@ -371,7 +376,14 @@ export const reassignTask = mutation({
     if (!task) throw new Error("Task not found");
     const brief = await ctx.db.get(task.briefId);
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
+    const assignorCanReassign =
+      task.assignedBy === userId && brief?.briefType === "single_task";
+    if (
+      !user ||
+      (user.role !== "admin" &&
+        brief?.assignedManagerId !== userId &&
+        !assignorCanReassign)
+    ) {
       throw new Error("Not authorized");
     }
 
@@ -678,7 +690,9 @@ export const getOverdueHaltStatus = query({
 
     const filtered = overdueTasks.filter((task, i) => {
       const brief = briefs[i];
-      if (brief?.brandId && myManagedBrandIds.has(brief.brandId)) return false;
+      if (!brief) return false;
+      if (brief.status === "completed" || brief.status === "archived") return false;
+      if (brief.brandId && myManagedBrandIds.has(brief.brandId)) return false;
       return true;
     });
 
@@ -823,9 +837,22 @@ export const listOverdueTasksForManager = query({
         .map((b) => b._id)
     );
 
-    const overdueTasks = allTasks.filter(
-      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true && myBriefIds.has(t.briefId)
-    );
+    const overdueTasks = allTasks.filter((t) => {
+      if (
+        !(
+          t.deadline &&
+          t.deadline < now &&
+          t.status !== "done" &&
+          t.overdueAcknowledged !== true &&
+          myBriefIds.has(t.briefId)
+        )
+      ) {
+        return false;
+      }
+      const brief = briefs.find((b) => b._id === t.briefId);
+      if (brief?.status === "completed" || brief?.status === "archived") return false;
+      return true;
+    });
 
     // Also check briefs with deadlines that have NO tasks assigned yet
     const overdueBriefsNoTasks = briefs.filter((b) => {
