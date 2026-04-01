@@ -96,6 +96,7 @@ export function ContentCalendarView({
   const updateTask = useMutation(api.tasks.updateTask);
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const deleteTask = useMutation(api.tasks.deleteTask);
+  const toggleBreakDay = useMutation(api.contentCalendar.toggleBreakDay);
 
   const { toast } = useToast();
 
@@ -118,6 +119,7 @@ export function ContentCalendarView({
   const [newDeadline, setNewDeadline] = useState("");
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 
   const currentSheetMonth =
     activeSheet ??
@@ -127,6 +129,12 @@ export function ContentCalendarView({
     api.contentCalendar.listTasksForSheet,
     currentSheetMonth ? { briefId, month: currentSheetMonth } : "skip"
   );
+
+  const breakDays = useQuery(
+    api.contentCalendar.listBreakDays,
+    currentSheetMonth ? { briefId, month: currentSheetMonth } : "skip"
+  );
+  const breakDaySet = new Set(breakDays ?? []);
 
   const employees = (allUsers ?? []).filter(
     (u: any) => u.role === "employee"
@@ -270,24 +278,91 @@ export function ContentCalendarView({
         </h3>
         <div className="flex items-center gap-2">
           {isEditable && currentSheetMonth && (
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (currentSheetMonth) {
-                  const [y, m] = currentSheetMonth.split("-").map(Number);
-                  const firstDay = `${currentSheetMonth}-01`;
-                  setNewPostDate(firstDay);
-                }
-                setShowAddEntry(true);
-              }}
-              className="text-[12px] px-3 py-1.5 h-auto"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Add Entry
-            </Button>
+            <>
+              <Button
+                variant={showBreakDayPicker ? "destructive" : "secondary"}
+                onClick={() => setShowBreakDayPicker((v) => !v)}
+                className="text-[12px] px-3 py-1.5 h-auto"
+              >
+                <Calendar className="h-3.5 w-3.5 mr-1" />
+                {showBreakDayPicker ? "Done" : "Break Days"}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (currentSheetMonth) {
+                    const [y, m] = currentSheetMonth.split("-").map(Number);
+                    const firstDay = `${currentSheetMonth}-01`;
+                    setNewPostDate(firstDay);
+                  }
+                  setShowAddEntry(true);
+                }}
+                className="text-[12px] px-3 py-1.5 h-auto"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Entry
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Break Day Picker */}
+      {showBreakDayPicker && currentSheetMonth && (
+        <div className="px-4 py-3 border-b border-[var(--border)] bg-red-50/40 shrink-0">
+          <p className="text-[11px] font-semibold text-red-700 mb-2">
+            Click a day to toggle it as a break day (red = break)
+          </p>
+          {(() => {
+            const [y, m] = currentSheetMonth.split("-").map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            const firstDow = new Date(y, m - 1, 1).getDay(); // 0=Sun
+            const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const cells: (number | null)[] = [];
+            for (let i = 0; i < firstDow; i++) cells.push(null);
+            for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+            while (cells.length % 7 !== 0) cells.push(null);
+            return (
+              <div className="grid grid-cols-7 gap-1 max-w-[420px]">
+                {weekdays.map((wd) => (
+                  <div key={wd} className="text-center text-[10px] font-semibold text-[var(--text-muted)] py-0.5">
+                    {wd}
+                  </div>
+                ))}
+                {cells.map((day, i) => {
+                  if (day === null) return <div key={`empty-${i}`} />;
+                  const dateStr = `${currentSheetMonth}-${String(day).padStart(2, "0")}`;
+                  const isBreak = breakDaySet.has(dateStr);
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() =>
+                        toggleBreakDay({ briefId, date: dateStr })
+                          .then((r) =>
+                            toast(
+                              "success",
+                              r.added
+                                ? `Marked ${dateStr} as break`
+                                : `Removed break from ${dateStr}`
+                            )
+                          )
+                          .catch(() => toast("error", "Failed to toggle break day"))
+                      }
+                      className={`rounded-md text-[12px] font-medium py-1.5 transition-colors ${
+                        isBreak
+                          ? "bg-red-500 text-white hover:bg-red-600"
+                          : "bg-white text-[var(--text-primary)] hover:bg-red-100 border border-[var(--border-subtle)]"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Spreadsheet + Sidebar */}
       <div className="flex-1 flex overflow-hidden">
@@ -348,6 +423,7 @@ export function ContentCalendarView({
                   : null;
                 const si = statusInfo(task.status);
                 const isSelected = selectedTaskId === task._id;
+                const isBreakDay = task.postDate && breakDaySet.has(task.postDate);
                 return (
                   <tr
                     key={task._id}
@@ -355,20 +431,29 @@ export function ContentCalendarView({
                     className={`border-b border-[var(--border-subtle)] cursor-pointer transition-colors ${
                       isSelected
                         ? "bg-[var(--accent-admin-dim)]"
-                        : (!task.assigneeId || !task.deadline)
-                          ? "bg-amber-50/50 hover:bg-amber-50"
-                          : "hover:bg-[var(--bg-hover)]"
+                        : isBreakDay
+                          ? "bg-red-100 hover:bg-red-200"
+                          : (!task.assigneeId || !task.deadline)
+                            ? "bg-amber-50/50 hover:bg-amber-50"
+                            : "hover:bg-[var(--bg-hover)]"
                     }`}
                   >
                     <td className="px-4 py-2.5">
                       {pd ? (
-                        <div>
-                          <span className="text-[12px] font-medium text-[var(--text-primary)]">
-                            {pd.display}
-                          </span>
-                          <span className="text-[10px] text-[var(--text-muted)] ml-1">
-                            {pd.weekday}
-                          </span>
+                        <div className="flex items-center gap-1.5">
+                          <div>
+                            <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                              {pd.display}
+                            </span>
+                            <span className="text-[10px] text-[var(--text-muted)] ml-1">
+                              {pd.weekday}
+                            </span>
+                          </div>
+                          {isBreakDay && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white bg-red-500">
+                              BREAK
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-[12px] text-[var(--text-muted)]">

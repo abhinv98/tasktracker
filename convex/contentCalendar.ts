@@ -203,6 +203,60 @@ export const createEntryForBrand = mutation({
   },
 });
 
+// ─── BREAK DAYS ─────────────────────────────────
+
+export const listBreakDays = query({
+  args: {
+    briefId: v.id("briefs"),
+    month: v.string(), // "YYYY-MM"
+  },
+  handler: async (ctx, { briefId, month }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const all = await ctx.db
+      .query("contentCalendarBreakDays")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    return all
+      .filter((bd) => bd.date.startsWith(month))
+      .map((bd) => bd.date);
+  },
+});
+
+export const toggleBreakDay = mutation({
+  args: {
+    briefId: v.id("briefs"),
+    date: v.string(), // "YYYY-MM-DD"
+  },
+  handler: async (ctx, { briefId, date }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can manage break days");
+
+    const existing = await ctx.db
+      .query("contentCalendarBreakDays")
+      .withIndex("by_brief_date", (q) =>
+        q.eq("briefId", briefId).eq("date", date)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+      return { added: false };
+    } else {
+      await ctx.db.insert("contentCalendarBreakDays", {
+        briefId,
+        date,
+        createdBy: userId,
+        createdAt: Date.now(),
+      });
+      return { added: true };
+    }
+  },
+});
+
 // ─── SHEET MANAGEMENT ───────────────────────────
 
 export const listSheets = query({

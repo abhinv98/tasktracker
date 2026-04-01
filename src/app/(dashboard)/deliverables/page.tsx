@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Card, Badge, Button, ConfirmModal } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
-  Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch
+  Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
 } from "lucide-react";
 import { FilePreviewModal } from "@/components/ui/FilePreviewModal";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -875,7 +875,12 @@ export default function DeliverablesPage() {
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                {d._sendToClient ? (
+                {d.isHandedOff ? (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
+                    Handed Off{d.handoffTargetTeamName ? ` → ${d.handoffTargetTeamName}` : ""}
+                    {d.hasIncompleteChainTasks ? " (in progress)" : " ✓"}
+                  </span>
+                ) : d._sendToClient ? (
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 shrink-0">
                     Ready to Send to Client
                   </span>
@@ -1010,47 +1015,71 @@ export default function DeliverablesPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleApprove(d._id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        Approve (Final)
-                      </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Bug 4 fix: Only show Approve Final if no incomplete chain tasks */}
+                      {!d.hasIncompleteChainTasks ? (
+                        <>
+                          {d.status !== "approved" && (
+                            <button
+                              onClick={() => handleApprove(d._id)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              Approve
+                            </button>
+                          )}
+                          {d.status === "approved" && !d.isHandedOff && (
+                            <span className="text-[11px] text-[var(--accent-employee)] font-medium flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Approved
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Chain tasks in progress — final approval pending
+                        </span>
+                      )}
                       {showRejectForm === d._id ? (
                         renderRejectForm(d._id, handleReject)
                       ) : (
+                        !d.isHandedOff && !d.hasIncompleteChainTasks && d.status !== "approved" && (
+                          <button
+                            onClick={() => setShowRejectForm(d._id)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Request Changes
+                          </button>
+                        )
+                      )}
+                      {!d.isHandedOff && (
                         <button
-                          onClick={() => setShowRejectForm(d._id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                          onClick={() => setForwardingDeliverableId(forwardingDeliverableId === d._id ? null : d._id)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                            forwardingDeliverableId === d._id
+                              ? "bg-[var(--accent-admin)] text-white"
+                              : "border border-[var(--accent-admin)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)]"
+                          }`}
                         >
-                          <X className="h-3.5 w-3.5" />
-                          Request Changes
+                          <Users className="h-3.5 w-3.5" />
+                          Pass to Team Member
                         </button>
                       )}
-                      <button
-                        onClick={() => setForwardingDeliverableId(forwardingDeliverableId === d._id ? null : d._id)}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
-                          forwardingDeliverableId === d._id
-                            ? "bg-[var(--accent-admin)] text-white"
-                            : "border border-[var(--accent-admin)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)]"
-                        }`}
-                      >
-                        <Users className="h-3.5 w-3.5" />
-                        Pass to Team Member
-                      </button>
-                      <button
-                        onClick={() => { setHandoffDeliverableId(handoffDeliverableId === d._id ? null : d._id); setForwardingDeliverableId(null); }}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
-                          handoffDeliverableId === d._id
-                            ? "bg-indigo-600 text-white"
-                            : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                        }`}
-                      >
-                        <GitBranch className="h-3.5 w-3.5" />
-                        Hand Off to Team
-                      </button>
+                      {/* Bug 5 fix: Handoff only shows for approved deliverables with handoff target */}
+                      {(d.status === "approved" || d.taskHasHandoffTarget) && !d.isHandedOff && (
+                        <button
+                          onClick={() => { setHandoffDeliverableId(handoffDeliverableId === d._id ? null : d._id); setForwardingDeliverableId(null); }}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                            handoffDeliverableId === d._id
+                              ? "bg-indigo-600 text-white"
+                              : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                          }`}
+                        >
+                          <GitBranch className="h-3.5 w-3.5" />
+                          Hand Off to Team
+                        </button>
+                      )}
                     </div>
 
                     {forwardingDeliverableId === d._id && (

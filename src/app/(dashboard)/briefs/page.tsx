@@ -67,7 +67,7 @@ export default function BriefsPage() {
   const [briefMode, setBriefMode] = useState<"master" | "single" | "content_calendar">("master");
 
   const [clientFacing, setClientFacing] = useState(false);
-  const [creativesRequired, setCreativesRequired] = useState(1);
+  const [creativesRequired, setCreativesRequired] = useState<number | string>(1);
 
   // Single task brief fields
   const [stAssignee, setStAssignee] = useState("");
@@ -328,11 +328,12 @@ export default function BriefsPage() {
       else resolvedBriefType = (briefType || undefined) as BriefType | undefined;
 
       const includeCreatives = showCreativesRequiredField(briefMode, briefType);
+      const crNum = typeof creativesRequired === "number" ? creativesRequired : parseInt(String(creativesRequired), 10) || 1;
       const cr =
         includeCreatives &&
-        creativesRequired >= 1 &&
-        creativesRequired <= 99
-          ? Math.floor(creativesRequired)
+        crNum >= 1 &&
+        crNum <= 99
+          ? Math.floor(crNum)
           : undefined;
 
       await createBrief({
@@ -1012,9 +1013,15 @@ export default function BriefsPage() {
                     max={99}
                     value={creativesRequired}
                     onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (Number.isNaN(v)) setCreativesRequired(1);
-                      else setCreativesRequired(Math.min(99, Math.max(1, v)));
+                      const raw = e.target.value;
+                      if (raw === "") { setCreativesRequired(""); return; }
+                      const v = parseInt(raw, 10);
+                      if (!Number.isNaN(v)) setCreativesRequired(Math.min(99, Math.max(1, v)));
+                    }}
+                    onBlur={() => {
+                      if (creativesRequired === "" || Number.isNaN(Number(creativesRequired))) {
+                        setCreativesRequired(1);
+                      }
                     }}
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />

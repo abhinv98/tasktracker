@@ -460,6 +460,16 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_brand", ["brandId"]),
 
+  // ─── CONTENT CALENDAR BREAK DAYS ──────────────
+  contentCalendarBreakDays: defineTable({
+    briefId: v.id("briefs"),
+    date: v.string(), // "YYYY-MM-DD"
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_brief_date", ["briefId", "date"]),
+
   // ─── CONTENT CALENDAR SHEETS (month tabs) ───
   contentCalendarSheets: defineTable({
     briefId: v.id("briefs"),

@@ -298,6 +298,37 @@ export const listManagerDeliverables = query({
           files = files.filter((f) => f.url);
         }
 
+        // Check if this deliverable has been handed off already
+        const handoffs = await ctx.db
+          .query("deliverableHandoffs")
+          .withIndex("by_source_deliverable", (q) => q.eq("sourceDeliverableId", d._id))
+          .collect();
+        const isHandedOff = handoffs.length > 0;
+        const handoffTargetTeamName = isHandedOff
+          ? allTeams.find((t) => t._id === handoffs[0].targetTeamId)?.name ?? null
+          : null;
+
+        // Check if the task is marked for handoff
+        const taskHasHandoffTarget = !!task?.handoffTargetTeamId;
+
+        // Check if there are chain tasks (handoff tasks) from this source task that aren't done
+        let hasIncompleteChainTasks = false;
+        if (task) {
+          const sourceHandoffs = await ctx.db
+            .query("deliverableHandoffs")
+            .withIndex("by_source_task", (q) => q.eq("sourceTaskId", task._id))
+            .collect();
+          if (sourceHandoffs.length > 0) {
+            for (const h of sourceHandoffs) {
+              const chainTask = await ctx.db.get(h.targetTaskId);
+              if (chainTask && chainTask.status !== "done") {
+                hasIncompleteChainTasks = true;
+                break;
+              }
+            }
+          }
+        }
+
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -313,6 +344,10 @@ export const listManagerDeliverables = query({
           taskClientFacing: task?.clientFacing ?? false,
           clientStatus: d.clientStatus,
           awaitingHandoff: !d.passedToManagerAt,
+          isHandedOff,
+          handoffTargetTeamName,
+          taskHasHandoffTarget,
+          hasIncompleteChainTasks,
         };
       })
     );
@@ -881,15 +916,24 @@ export const teamLeadAndManagerApprove = mutation({
     });
 
     if (task) {
-      if (task.clientFacing) {
-        await ctx.db.patch(deliverable.taskId, { status: "review" });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-      } else {
-        await ctx.db.patch(deliverable.taskId, {
-          status: "done",
-          completedAt: now,
-        });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+      // Check if ALL creative-slot deliverables are approved before marking task done
+      const allTaskDeliverables = await ctx.db
+        .query("deliverables")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .collect();
+      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
+
+      if (allApproved) {
+        if (task.clientFacing) {
+          await ctx.db.patch(deliverable.taskId, { status: "review" });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
+        } else {
+          await ctx.db.patch(deliverable.taskId, {
+            status: "done",
+            completedAt: now,
+          });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+        }
       }
     }
 
@@ -966,15 +1010,24 @@ export const managerApproveFromTeamLead = mutation({
     });
 
     if (task) {
-      if (task.clientFacing) {
-        await ctx.db.patch(deliverable.taskId, { status: "review" });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-      } else {
-        await ctx.db.patch(deliverable.taskId, {
-          status: "done",
-          completedAt: now,
-        });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+      // Check if ALL creative-slot deliverables are approved before marking task done
+      const allTaskDeliverables = await ctx.db
+        .query("deliverables")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .collect();
+      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
+
+      if (allApproved) {
+        if (task.clientFacing) {
+          await ctx.db.patch(deliverable.taskId, { status: "review" });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
+        } else {
+          await ctx.db.patch(deliverable.taskId, {
+            status: "done",
+            completedAt: now,
+          });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+        }
       }
     }
 
@@ -1256,15 +1309,24 @@ export const approveDeliverable = mutation({
     });
 
     if (task) {
-      if (task.clientFacing) {
-        await ctx.db.patch(deliverable.taskId, { status: "review" });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-      } else {
-        await ctx.db.patch(deliverable.taskId, {
-          status: "done",
-          completedAt: Date.now(),
-        });
-        await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+      // Check if ALL creative-slot deliverables are approved before marking task done
+      const allTaskDeliverables = await ctx.db
+        .query("deliverables")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .collect();
+      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
+
+      if (allApproved) {
+        if (task.clientFacing) {
+          await ctx.db.patch(deliverable.taskId, { status: "review" });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
+        } else {
+          await ctx.db.patch(deliverable.taskId, {
+            status: "done",
+            completedAt: Date.now(),
+          });
+          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+        }
       }
     }
 
@@ -1649,31 +1711,62 @@ export const handoffDeliverable = mutation({
       }
     }
 
-    // Calculate sort order for the new task
-    const existingTasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_assignee_sort", (q: any) => q.eq("assigneeId", targetAssigneeId))
+    // Check if a handoff task already exists for the same source task + target team
+    // (prevents duplication when handing off multiple creative deliverables)
+    const existingHandoffs = await ctx.db
+      .query("deliverableHandoffs")
+      .withIndex("by_source_task", (q: any) => q.eq("sourceTaskId", sourceTask._id))
       .collect();
-    const maxOrder = existingTasks.length
-      ? Math.max(...existingTasks.map((t: any) => t.sortOrder))
-      : 0;
+    const existingHandoffForTeam = existingHandoffs.find(
+      (h: any) => h.targetTeamId === targetTeamId && h.targetBriefId === targetBriefId
+    );
+    let targetTaskId: any;
+    let reusingExistingTask = false;
 
-    // Create the handoff task
-    const targetTaskId = await ctx.db.insert("tasks", {
-      briefId: targetBriefId,
-      title: `[Handoff] ${sourceTask.title}`,
-      description: `Handed off from "${sourceTask.title}"${sourceBrief.title !== sourceTask.title ? ` (${sourceBrief.title})` : ""}.\n\n${note ?? ""}${deliverable.message ? `\n\nOriginal deliverable note: ${deliverable.message}` : ""}`.trim(),
-      assigneeId: targetAssigneeId,
-      assignedBy: userId,
-      status: "pending",
-      sortOrder: maxOrder + 1000,
-      ...(deadline ? { deadline } : {}),
-      ...(sourceTask.clientFacing ? { clientFacing: true } : {}),
-      ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
-      assignedAt: Date.now(),
-      sourceDeliverableId: deliverableId,
-      handoffSourceTaskId: sourceTask._id,
-    });
+    if (existingHandoffForTeam) {
+      // Reuse the existing handoff task — just append reference links
+      const existingTask = await ctx.db.get(existingHandoffForTeam.targetTaskId);
+      if (existingTask && existingTask.status !== "done") {
+        targetTaskId = existingHandoffForTeam.targetTaskId;
+        reusingExistingTask = true;
+        // Merge new reference links into existing task
+        const existingLinks = existingTask.referenceLinks ?? [];
+        const newLinks = referenceLinks.filter((l: string) => !existingLinks.includes(l));
+        if (newLinks.length > 0) {
+          await ctx.db.patch(targetTaskId, {
+            referenceLinks: [...existingLinks, ...newLinks],
+          });
+        }
+      }
+    }
+
+    if (!reusingExistingTask) {
+      // Calculate sort order for the new task
+      const existingTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_assignee_sort", (q: any) => q.eq("assigneeId", targetAssigneeId))
+        .collect();
+      const maxOrder = existingTasks.length
+        ? Math.max(...existingTasks.map((t: any) => t.sortOrder))
+        : 0;
+
+      // Create the handoff task
+      targetTaskId = await ctx.db.insert("tasks", {
+        briefId: targetBriefId,
+        title: `[Handoff] ${sourceTask.title}`,
+        description: `Handed off from "${sourceTask.title}"${sourceBrief.title !== sourceTask.title ? ` (${sourceBrief.title})` : ""}.\n\n${note ?? ""}${deliverable.message ? `\n\nOriginal deliverable note: ${deliverable.message}` : ""}`.trim(),
+        assigneeId: targetAssigneeId,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: maxOrder + 1000,
+        ...(deadline ? { deadline } : {}),
+        ...(sourceTask.clientFacing ? { clientFacing: true } : {}),
+        ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+        assignedAt: Date.now(),
+        sourceDeliverableId: deliverableId,
+        handoffSourceTaskId: sourceTask._id,
+      });
+    }
 
     // Record the handoff
     await ctx.db.insert("deliverableHandoffs", {
@@ -1688,32 +1781,33 @@ export const handoffDeliverable = mutation({
       note,
     });
 
-    // Notify the target assignee
-    await ctx.db.insert("notifications", {
-      recipientId: targetAssigneeId,
-      type: "task_assigned",
-      title: "Handoff task assigned",
-      message: `${user?.name ?? "Someone"} handed off "${sourceTask.title}" to you for ${targetTeam.name}`,
-      briefId: targetBriefId,
-      taskId: targetTaskId,
-      triggeredBy: userId,
-      read: false,
-      createdAt: Date.now(),
-    });
-
-    // Notify the target team lead
-    if (targetTeam.leadId && targetTeam.leadId !== userId && targetTeam.leadId !== targetAssigneeId) {
+    // Notify only when a new task was created (not when reusing an existing handoff task)
+    if (!reusingExistingTask) {
       await ctx.db.insert("notifications", {
-        recipientId: targetTeam.leadId,
-        type: "team_added",
-        title: "Handoff task added to your team",
-        message: `"${sourceTask.title}" was handed off to ${targetTeam.name}`,
+        recipientId: targetAssigneeId,
+        type: "task_assigned",
+        title: "Handoff task assigned",
+        message: `${user?.name ?? "Someone"} handed off "${sourceTask.title}" to you for ${targetTeam.name}`,
         briefId: targetBriefId,
         taskId: targetTaskId,
         triggeredBy: userId,
         read: false,
         createdAt: Date.now(),
       });
+
+      if (targetTeam.leadId && targetTeam.leadId !== userId && targetTeam.leadId !== targetAssigneeId) {
+        await ctx.db.insert("notifications", {
+          recipientId: targetTeam.leadId,
+          type: "team_added",
+          title: "Handoff task added to your team",
+          message: `"${sourceTask.title}" was handed off to ${targetTeam.name}`,
+          briefId: targetBriefId,
+          taskId: targetTaskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
     }
 
     // Activity log
