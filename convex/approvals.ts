@@ -909,6 +909,81 @@ export const passToManager = mutation({
   },
 });
 
+/**
+ * Submit deliverable directly to Brand Manager, bypassing Team Lead.
+ * Used by the Content Calendar "Send to Brand Manager" flow.
+ */
+export const submitDeliverableDirectToManager = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    message: v.string(),
+    link: v.optional(v.string()),
+    fileIds: v.optional(v.array(v.id("_storage"))),
+    fileNames: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { taskId, message, link, fileIds, fileNames }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    const brief = await ctx.db.get(task.briefId);
+    if (!brief) throw new Error("Brief not found");
+
+    // Create deliverable with TL auto-approved and already passed to manager
+    const deliverableId = await ctx.db.insert("deliverables", {
+      taskId,
+      submittedBy: userId,
+      message,
+      link,
+      submittedAt: Date.now(),
+      status: "pending",
+      teamLeadStatus: "approved" as const,
+      teamLeadReviewedBy: userId,
+      teamLeadReviewedAt: Date.now(),
+      teamLeadReviewNote: "Sent directly to Brand Manager",
+      passedToManagerBy: userId,
+      passedToManagerAt: Date.now(),
+      ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
+      ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
+    });
+
+    // Move task to review
+    if (task.status !== "done" && task.status !== "review") {
+      await ctx.db.patch(taskId, {
+        status: "review",
+        ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
+      });
+    }
+
+    // Notify brand manager(s)
+    const user = await ctx.db.get(userId);
+    if (brief.brandId) {
+      const brandManagers = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
+        .collect();
+
+      for (const bm of brandManagers) {
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "deliverable_submitted",
+          title: "Deliverable sent directly for review",
+          message: `${user?.name ?? "Someone"} sent a deliverable for "${task.title}" directly for your review`,
+          briefId: task.briefId,
+          taskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+    }
+
+    return deliverableId;
+  },
+});
+
 export const teamLeadAndManagerApprove = mutation({
   args: {
     deliverableId: v.id("deliverables"),
@@ -1095,6 +1170,125 @@ export const managerApproveFromTeamLead = mutation({
         }),
         timestamp: now,
       });
+
+      // ── Auto-handoff for content calendar tasks ──────────
+      // When a content calendar task's deliverable is approved and the task
+      // has handoffTargetTeamId set, automatically create a handoff task
+      // carrying the creative copy + caption to the design team.
+      if (
+        brief?.briefType === "content_calendar" &&
+        task.handoffTargetTeamId &&
+        !task.clientFacing
+      ) {
+        const targetTeam = await ctx.db.get(task.handoffTargetTeamId);
+        if (targetTeam) {
+          // Find existing handoff task or create new one
+          const existingHandoffs = await ctx.db
+            .query("deliverableHandoffs")
+            .withIndex("by_source_task", (q: any) =>
+              q.eq("sourceTaskId", task._id)
+            )
+            .collect();
+          const alreadyHandedOff = existingHandoffs.some(
+            (h: any) => h.targetTeamId === task.handoffTargetTeamId
+          );
+
+          if (!alreadyHandedOff) {
+            const targetAssigneeId = targetTeam.leadId;
+
+            // Build note with creative copy + caption
+            const handoffNote = [
+              task.creativeCopy ? `Creative Copy:\n${task.creativeCopy}` : "",
+              task.caption ? `Caption:\n${task.caption}` : "",
+            ]
+              .filter(Boolean)
+              .join("\n\n");
+
+            // Build reference links from deliverable
+            const referenceLinks: string[] = [];
+            if (deliverable.link) referenceLinks.push(deliverable.link);
+            if (deliverable.fileIds) {
+              for (const fid of deliverable.fileIds) {
+                const url = await ctx.storage.getUrl(fid);
+                if (url) referenceLinks.push(url);
+              }
+            }
+
+            // Create handoff task in the same brief
+            const existingTasks = await ctx.db
+              .query("tasks")
+              .withIndex("by_assignee_sort", (q) =>
+                q.eq("assigneeId", targetAssigneeId)
+              )
+              .collect();
+            const maxOrder = existingTasks.length
+              ? Math.max(...existingTasks.map((t) => t.sortOrder))
+              : 0;
+
+            const handoffTaskId = await ctx.db.insert("tasks", {
+              briefId: task.briefId,
+              title: `[Design] ${task.title}`,
+              description: handoffNote || `Design handoff for: ${task.title}`,
+              assigneeId: targetAssigneeId,
+              assignedBy: userId,
+              status: "pending",
+              sortOrder: maxOrder + 1000,
+              creativeCopy: task.creativeCopy,
+              caption: task.caption,
+              handoffSourceTaskId: task._id,
+              ...(task.platform ? { platform: task.platform } : {}),
+              ...(task.contentType ? { contentType: task.contentType } : {}),
+              ...(task.postDate ? { postDate: task.postDate } : {}),
+              ...(task.deadline ? { deadline: task.deadline } : {}),
+              ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+            });
+
+            // Record the handoff
+            await ctx.db.insert("deliverableHandoffs", {
+              sourceDeliverableId: deliverableId,
+              sourceTaskId: task._id,
+              sourceBriefId: task.briefId,
+              targetTaskId: handoffTaskId,
+              targetBriefId: task.briefId,
+              targetTeamId: task.handoffTargetTeamId,
+              handedOffBy: userId,
+              handedOffAt: now,
+              note: handoffNote || undefined,
+            });
+
+            // Ensure target team is linked to brief
+            const existingBriefTeams = await ctx.db
+              .query("briefTeams")
+              .withIndex("by_brief", (q: any) =>
+                q.eq("briefId", task.briefId)
+              )
+              .collect();
+            if (
+              !existingBriefTeams.some(
+                (bt: any) => bt.teamId === task.handoffTargetTeamId
+              )
+            ) {
+              await ctx.db.insert("briefTeams", {
+                briefId: task.briefId,
+                teamId: task.handoffTargetTeamId!,
+              });
+            }
+
+            // Notify the design team member
+            await ctx.db.insert("notifications", {
+              recipientId: targetAssigneeId,
+              type: "task_assigned",
+              title: "Design handoff received",
+              message: `Creative copy for "${task.title}" has been approved and assigned to you for design.`,
+              briefId: task.briefId,
+              taskId: handoffTaskId,
+              triggeredBy: userId,
+              read: false,
+              createdAt: now,
+            });
+          }
+        }
+      }
     }
   },
 });

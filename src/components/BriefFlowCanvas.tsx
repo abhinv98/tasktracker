@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
@@ -12,6 +13,7 @@ import {
   MarkerType,
   Handle,
   Position,
+  useReactFlow,
   type Node,
   type Edge,
   type Connection,
@@ -64,6 +66,7 @@ interface BriefFlowCanvasProps {
   onCreateTask: (teamId: string) => void;
   onEditTask: (taskId: string) => void;
   onOpenTaskDetail: (taskId: string) => void;
+  onDragToCreate?: (sourceTaskId: string, teamId: string, position: { x: number; y: number }) => void;
 }
 
 /* ─── Status colors ──────────────────────────────── */
@@ -92,7 +95,7 @@ function TaskNode({ data }: { data: TaskData }) {
       {/* Card */}
       <div
         className="bg-white rounded-xl shadow-sm border-2 border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer min-w-[180px] max-w-[220px]"
-        onDoubleClick={() => data.onOpenDetail(data._id)}
+        onClick={() => data.onOpenDetail(data._id)}
       >
         {/* Color top bar */}
         <div
@@ -199,7 +202,15 @@ const nodeTypes: NodeTypes = {
 
 /* ─── Main Component ─────────────────────────────── */
 
-export function BriefFlowCanvas({
+export function BriefFlowCanvas(props: BriefFlowCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <BriefFlowCanvasInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function BriefFlowCanvasInner({
   briefId,
   teams,
   connections,
@@ -207,13 +218,16 @@ export function BriefFlowCanvas({
   onCreateTask,
   onEditTask,
   onOpenTaskDetail,
+  onDragToCreate,
 }: BriefFlowCanvasProps) {
+  const { screenToFlowPosition } = useReactFlow();
   const updatePositions = useMutation(api.tasks.updateTaskFlowPositions);
   const addConnection = useMutation(api.briefs.addTaskConnection);
   const removeConnection = useMutation(api.briefs.removeTaskConnection);
 
   const pendingPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectingNodeId = useRef<string | null>(null);
 
   // Build nodes from teams data
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -385,6 +399,52 @@ export function BriefFlowCanvas({
     [removeConnection]
   );
 
+  // Track connection drag start to know the source node
+  const onConnectStart = useCallback(
+    (_: any, params: { nodeId: string | null }) => {
+      connectingNodeId.current = params.nodeId;
+    },
+    []
+  );
+
+  // When connection is dropped on empty pane, trigger drag-to-create
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      if (!onDragToCreate || !connectingNodeId.current) {
+        connectingNodeId.current = null;
+        return;
+      }
+
+      // Check if dropped on the pane (not on a node handle)
+      const target = event.target as HTMLElement;
+      const isPane = target.classList.contains("react-flow__pane") ||
+        target.closest(".react-flow__pane");
+
+      if (isPane) {
+        const clientX = "clientX" in event ? event.clientX : event.touches[0].clientX;
+        const clientY = "clientY" in event ? event.clientY : event.touches[0].clientY;
+        const position = screenToFlowPosition({ x: clientX, y: clientY });
+
+        // Find the team for the source task
+        const sourceId = connectingNodeId.current;
+        let sourceTeamId = "";
+        for (const team of teams) {
+          if (team.tasks.some((t) => t._id === sourceId)) {
+            sourceTeamId = team.teamId;
+            break;
+          }
+        }
+
+        if (sourceTeamId) {
+          onDragToCreate(sourceId, sourceTeamId, { x: Math.round(position.x), y: Math.round(position.y) });
+        }
+      }
+
+      connectingNodeId.current = null;
+    },
+    [onDragToCreate, screenToFlowPosition, teams]
+  );
+
   return (
     <div className="w-full h-full">
       <ReactFlow
@@ -393,6 +453,8 @@ export function BriefFlowCanvas({
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
         onEdgesDelete={handleEdgesDelete}
         nodeTypes={nodeTypes}
         fitView

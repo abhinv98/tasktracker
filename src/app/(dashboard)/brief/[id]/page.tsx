@@ -440,6 +440,7 @@ export default function BriefPage() {
 
   // Task connections
   const taskConnections = useQuery(api.briefs.listTaskConnections, { briefId });
+  const addTaskConnection = useMutation(api.briefs.addTaskConnection);
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -458,6 +459,10 @@ export default function BriefPage() {
   const [panelMode, setPanelMode] = useState<"hidden" | "create" | "edit">("hidden");
   const [panelTeamId, setPanelTeamId] = useState<string>("");
   const [showTeamPicker, setShowTeamPicker] = useState(false);
+
+  // Drag-to-create: store pending connection source + position for new node
+  const [pendingConnectionSource, setPendingConnectionSource] = useState<string | null>(null);
+  const [pendingFlowPosition, setPendingFlowPosition] = useState<{ x: number; y: number } | null>(null);
 
   const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
@@ -829,12 +834,28 @@ export default function BriefPage() {
                   setTaskDeadlineTime("");
                   setTaskClientFacing(false);
                   setTaskHandoffTeam("");
+                  setPendingConnectionSource(null);
+                  setPendingFlowPosition(null);
                 }}
                 onEditTask={(taskId) => {
                   setAutoEditTask(true);
                   setSelectedTaskId(taskId);
                 }}
                 onOpenTaskDetail={(taskId) => setSelectedTaskId(taskId)}
+                onDragToCreate={(sourceTaskId, teamId, position) => {
+                  setPanelMode("create");
+                  setPanelTeamId(teamId);
+                  setTaskTeamFilter(teamId);
+                  setTaskTitle("");
+                  setTaskDesc("");
+                  setTaskAssignee("");
+                  setTaskDeadline(undefined);
+                  setTaskDeadlineTime("");
+                  setTaskClientFacing(false);
+                  setTaskHandoffTeam("");
+                  setPendingConnectionSource(sourceTaskId);
+                  setPendingFlowPosition(position);
+                }}
               />
             )}
           </div>
@@ -851,7 +872,7 @@ export default function BriefPage() {
               {panelMode === "create" ? "Create Task" : "Edit Task"}
             </h3>
             <button
-              onClick={() => { setPanelMode("hidden"); }}
+              onClick={() => { setPanelMode("hidden"); setPendingConnectionSource(null); setPendingFlowPosition(null); }}
               className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <X className="h-4 w-4" />
@@ -872,7 +893,7 @@ export default function BriefPage() {
                     finalDeadline = d.getTime();
                   }
                   try {
-                    await createTask({
+                    const newTaskId = await createTask({
                       briefId,
                       title: taskTitle,
                       description: taskDesc || undefined,
@@ -880,7 +901,22 @@ export default function BriefPage() {
                       ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
                       ...(taskClientFacing ? { clientFacing: true } : {}),
                       ...(taskHandoffTeam ? { handoffTargetTeamId: taskHandoffTeam as Id<"teams"> } : {}),
+                      ...(pendingFlowPosition ? { flowX: pendingFlowPosition.x, flowY: pendingFlowPosition.y } : {}),
                     });
+
+                    // Auto-connect if created via drag-to-create
+                    if (pendingConnectionSource && newTaskId) {
+                      try {
+                        await addTaskConnection({
+                          briefId,
+                          sourceTaskId: pendingConnectionSource as Id<"tasks">,
+                          targetTaskId: newTaskId,
+                        });
+                      } catch {
+                        // Connection failed silently — task was still created
+                      }
+                    }
+
                     setTaskTitle("");
                     setTaskDesc("");
                     setTaskAssignee("");
@@ -888,6 +924,8 @@ export default function BriefPage() {
                     setTaskDeadlineTime("");
                     setTaskClientFacing(false);
                     setTaskHandoffTeam("");
+                    setPendingConnectionSource(null);
+                    setPendingFlowPosition(null);
                     toast("success", "Task created");
                   } catch (err) {
                     toast("error", err instanceof Error ? err.message : "Failed to create task");

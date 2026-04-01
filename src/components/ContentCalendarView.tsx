@@ -16,6 +16,11 @@ import {
   Calendar,
   Link2,
   ExternalLink,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Users,
 } from "lucide-react";
 
 const PLATFORMS = [
@@ -90,6 +95,7 @@ export function ContentCalendarView({
     api.brands.getManagersForBrand,
     brandId ? { brandId } : "skip"
   );
+  const allTeams = useQuery(api.teams.listTeams, {});
   const createSheet = useMutation(api.contentCalendar.createSheet);
   const deleteSheetMut = useMutation(api.contentCalendar.deleteSheet);
   const createEntry = useMutation(api.contentCalendar.createCalendarEntry);
@@ -117,6 +123,7 @@ export function ContentCalendarView({
   const [newAssignee, setNewAssignee] = useState<string>("");
   const [newAssignor, setNewAssignor] = useState<string>("");
   const [newDeadline, setNewDeadline] = useState("");
+  const [newTeamFilter, setNewTeamFilter] = useState<string>("");
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
@@ -135,6 +142,12 @@ export function ContentCalendarView({
     currentSheetMonth ? { briefId, month: currentSheetMonth } : "skip"
   );
   const breakDaySet = new Set(breakDays ?? []);
+
+  // Team members for the selected team filter in the add entry form
+  const newTeamMembers = useQuery(
+    api.teams.getTeamMembers,
+    newTeamFilter ? { teamId: newTeamFilter as Id<"teams"> } : "skip"
+  );
 
   const employees = (allUsers ?? []).filter(
     (u: any) => u.role === "employee"
@@ -594,6 +607,9 @@ export function ContentCalendarView({
             isEditable={isEditable}
             employees={employees}
             admins={admins}
+            teams={allTeams ?? []}
+            briefId={briefId}
+            brandId={brandId}
             onClose={() => setSelectedTaskId(null)}
             updateTask={updateTask}
             updateTaskStatus={updateTaskStatus}
@@ -762,6 +778,27 @@ export function ContentCalendarView({
                   </select>
                 </div>
               </div>
+              {/* Team → Assignee flow */}
+              <div>
+                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                  Team
+                </label>
+                <select
+                  value={newTeamFilter}
+                  onChange={(e) => {
+                    setNewTeamFilter(e.target.value);
+                    setNewAssignee(""); // Reset assignee when team changes
+                  }}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                >
+                  <option value="">All Teams</option>
+                  {(allTeams ?? []).map((team: any) => (
+                    <option key={team._id} value={team._id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
@@ -791,7 +828,10 @@ export function ContentCalendarView({
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
                     <option value="">Unassigned</option>
-                    {employees.map((emp: any) => (
+                    {(newTeamFilter && newTeamMembers
+                      ? newTeamMembers
+                      : employees
+                    ).map((emp: any) => (
                       <option key={emp._id} value={emp._id}>
                         {emp.name ?? emp.email}
                         {emp.designation ? ` — ${emp.designation}` : ""}
@@ -866,6 +906,9 @@ function DetailSidebar({
   isEditable,
   employees,
   admins,
+  teams,
+  briefId,
+  brandId,
   onClose,
   updateTask,
   updateTaskStatus,
@@ -876,6 +919,9 @@ function DetailSidebar({
   isEditable: boolean;
   employees: any[];
   admins: any[];
+  teams: any[];
+  briefId: Id<"briefs">;
+  brandId?: Id<"brands">;
   onClose: () => void;
   updateTask: any;
   updateTaskStatus: any;
@@ -901,6 +947,19 @@ function DetailSidebar({
   const [editCreativeCopy, setEditCreativeCopy] = useState(task.creativeCopy ?? "");
   const [editCaption, setEditCaption] = useState(task.caption ?? "");
   const [saving, setSaving] = useState(false);
+  const [sidebarTeamFilter, setSidebarTeamFilter] = useState<string>("");
+  const [submittingTo, setSubmittingTo] = useState<"tl" | "bm" | null>(null);
+
+  // Query team members for sidebar team filter
+  const sidebarTeamMembers = useQuery(
+    api.teams.getTeamMembers,
+    sidebarTeamFilter ? { teamId: sidebarTeamFilter as Id<"teams"> } : "skip"
+  );
+
+  // Query deliverables for this task
+  const deliverables = useQuery(api.approvals.listDeliverables, { taskId: task._id });
+  const submitDeliverable = useMutation(api.approvals.submitDeliverable);
+  const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
 
   // Reference links
   const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
@@ -1302,7 +1361,29 @@ function DetailSidebar({
           )}
         </div>
 
-        {/* Assignee */}
+        {/* Team filter → Assignee */}
+        {isEditable && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Team
+            </label>
+            <select
+              value={sidebarTeamFilter}
+              onChange={(e) => {
+                setSidebarTeamFilter(e.target.value);
+                setEditAssignee(""); // Reset assignee when team changes
+              }}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            >
+              <option value="">All Teams</option>
+              {teams.map((team: any) => (
+                <option key={team._id} value={team._id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
             Assignee
@@ -1314,7 +1395,10 @@ function DetailSidebar({
               className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             >
               <option value="">Unassigned</option>
-              {employees.map((emp: any) => (
+              {(sidebarTeamFilter && sidebarTeamMembers
+                ? sidebarTeamMembers
+                : employees
+              ).map((emp: any) => (
                 <option key={emp._id} value={emp._id}>
                   {emp.name ?? emp.email}
                   {emp.designation ? ` — ${emp.designation}` : ""}
@@ -1376,12 +1460,12 @@ function DetailSidebar({
           )}
         </div>
 
-        {/* Status */}
+        {/* Status — both admins and assignees can change */}
         <div>
           <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
             Status
           </label>
-          {isEditable ? (
+          {(isEditable || (user && task.assigneeId === user._id)) ? (
             <select
               value={task.status}
               onChange={(e) =>
@@ -1409,6 +1493,179 @@ function DetailSidebar({
             <Badge variant="neutral">{si.label}</Badge>
           )}
         </div>
+
+        {/* Handoff target team (for auto-handoff after approval) */}
+        {isEditable && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Auto-Handoff to Team
+            </label>
+            <select
+              value={task.handoffTargetTeamId ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateTask({
+                  taskId: task._id,
+                  ...(val ? { handoffTargetTeamId: val } : { clearHandoffTarget: true }),
+                }).catch((err: any) =>
+                  toast("error", err instanceof Error ? err.message : "Failed to update")
+                );
+              }}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            >
+              <option value="">None (no auto-handoff)</option>
+              {teams.map((team: any) => (
+                <option key={team._id} value={team._id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-[9px] text-[var(--text-muted)] mt-0.5">
+              When approved, creative copy auto-sends to this team.
+            </p>
+          </div>
+        )}
+
+        {/* ── Deliverable Submission (Copy Team flow) ──────── */}
+        {task.assigneeId && (task.status === "in-progress" || task.status === "pending") && (
+          <div className="pt-3 border-t border-[var(--border)]">
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
+              Submit Deliverable
+            </label>
+            {(!editCreativeCopy?.trim() && !editCaption?.trim()) ? (
+              <p className="text-[11px] text-[var(--text-muted)] italic">
+                Fill in Creative Copy or Caption above to enable submission.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <button
+                  disabled={submittingTo === "tl"}
+                  onClick={async () => {
+                    setSubmittingTo("tl");
+                    try {
+                      // Save first if there are changes
+                      await handleSave();
+                      const msg = [
+                        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
+                        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
+                      ].filter(Boolean).join("\n\n");
+                      await submitDeliverable({
+                        taskId: task._id,
+                        message: msg,
+                      });
+                      toast("success", "Sent to Team Lead for review");
+                    } catch (err) {
+                      toast("error", err instanceof Error ? err.message : "Failed to submit");
+                    } finally {
+                      setSubmittingTo(null);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {submittingTo === "tl" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  Send to Team Lead
+                </button>
+                <button
+                  disabled={submittingTo === "bm"}
+                  onClick={async () => {
+                    setSubmittingTo("bm");
+                    try {
+                      await handleSave();
+                      const msg = [
+                        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
+                        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
+                      ].filter(Boolean).join("\n\n");
+                      await submitDirectToManager({
+                        taskId: task._id,
+                        message: msg,
+                      });
+                      toast("success", "Sent directly to Brand Manager");
+                    } catch (err) {
+                      toast("error", err instanceof Error ? err.message : "Failed to submit");
+                    } finally {
+                      setSubmittingTo(null);
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                >
+                  {submittingTo === "bm" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  Send to Brand Manager
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Approval Status ──────────────────────────────── */}
+        {deliverables && deliverables.length > 0 && (
+          <div className="pt-3 border-t border-[var(--border)]">
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
+              Approval Status
+            </label>
+            <div className="flex flex-col gap-2">
+              {[...deliverables].sort((a: any, b: any) => b.submittedAt - a.submittedAt).map((d: any) => {
+                const tlStatus = d.teamLeadStatus;
+                const bmStatus = d.status;
+                const isPassed = !!d.passedToManagerAt;
+                return (
+                  <div key={d._id} className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="text-[var(--text-muted)]">
+                        {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {/* Team Lead status */}
+                    <div className="flex items-center gap-1.5">
+                      {tlStatus === "approved" ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : tlStatus === "changes_requested" ? (
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                      ) : (
+                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                      )}
+                      <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                        Team Lead: {tlStatus === "approved" ? "Approved" : tlStatus === "changes_requested" ? "Changes Requested" : "Pending"}
+                      </span>
+                    </div>
+                    {d.teamLeadReviewNote && (
+                      <p className="text-[10px] text-[var(--text-secondary)] pl-5 italic">
+                        {d.teamLeadReviewNote}
+                      </p>
+                    )}
+                    {/* Brand Manager status */}
+                    {isPassed && (
+                      <div className="flex items-center gap-1.5">
+                        {bmStatus === "approved" ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : bmStatus === "rejected" ? (
+                          <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        )}
+                        <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                          Brand Manager: {bmStatus === "approved" ? "Approved" : bmStatus === "rejected" ? "Changes Requested" : "Pending"}
+                        </span>
+                      </div>
+                    )}
+                    {d.reviewNote && (
+                      <p className="text-[10px] text-[var(--text-secondary)] pl-5 italic">
+                        {d.reviewNote}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Save button */}
         {isEditable && (

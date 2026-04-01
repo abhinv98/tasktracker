@@ -109,6 +109,8 @@ export const createTask = mutation({
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
     handoffTargetTeamId: v.optional(v.id("teams")),
+    flowX: v.optional(v.number()),
+    flowY: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
