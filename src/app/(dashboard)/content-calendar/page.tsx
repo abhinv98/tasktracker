@@ -6,12 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Card, useToast } from "@/components/ui";
+import { ContentCalendarEntrySidebar } from "@/components/ContentCalendarView";
 import {
   Plus,
   X,
   ChevronLeft,
   ChevronRight,
-  Trash2,
   Calendar,
   Link2,
   ExternalLink,
@@ -98,17 +98,20 @@ export default function ContentCalendarPage() {
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [popoverDate, setPopoverDate] = useState<string | null>(null);
+  const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 
   const { toast } = useToast();
 
   const user = useQuery(api.users.getCurrentUser);
   const brands = useQuery(api.brands.listBrands);
   const allUsers = useQuery(api.users.listAllUsers);
+  const allTeams = useQuery(api.teams.listTeams, {});
   const createBrand = useMutation(api.brands.createBrand);
   const createEntry = useMutation(api.contentCalendar.createEntryForBrand);
   const updateTask = useMutation(api.tasks.updateTask);
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const deleteTask = useMutation(api.tasks.deleteTask);
+  const toggleBreakDayMut = useMutation(api.contentCalendar.toggleBreakDay);
 
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const tasks = useQuery(
@@ -116,6 +119,21 @@ export default function ContentCalendarPage() {
     selectedBrandId
       ? { brandId: selectedBrandId as Id<"brands">, month: monthStr }
       : "skip"
+  );
+
+  const calendarBriefId = useQuery(
+    api.contentCalendar.getCalendarBriefForBrand,
+    selectedBrandId ? { brandId: selectedBrandId as Id<"brands"> } : "skip"
+  );
+  const breakDaysForMonth = useQuery(
+    api.contentCalendar.listBreakDays,
+    calendarBriefId && monthStr
+      ? { briefId: calendarBriefId, month: monthStr }
+      : "skip"
+  );
+  const breakDaySet = useMemo(
+    () => new Set(breakDaysForMonth ?? []),
+    [breakDaysForMonth]
   );
 
   const brandManagers = useQuery(
@@ -295,8 +313,21 @@ export default function ContentCalendarPage() {
           </div>
         </div>
 
-        {/* Month Nav */}
+        {/* Month Nav + break days (same brief as list view) */}
         <div className="flex items-center gap-3">
+          {isEditable && calendarBriefId && (
+            <button
+              type="button"
+              onClick={() => setShowBreakDayPicker((v) => !v)}
+              className={`text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                showBreakDayPicker
+                  ? "border-red-300 bg-red-50 text-red-800"
+                  : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              }`}
+            >
+              {showBreakDayPicker ? "Done" : "Break days"}
+            </button>
+          )}
           <button
             onClick={prevMonth}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
@@ -353,6 +384,92 @@ export default function ContentCalendarPage() {
                 </div>
               );
             })()}
+            {!calendarBriefId && (
+              <p className="mb-3 text-[11px] text-[var(--text-muted)] px-1">
+                Add at least one calendar entry for this brand to load break days (same data as the brief Content Calendar).
+              </p>
+            )}
+            {showBreakDayPicker && calendarBriefId && (
+              <div className="mb-3 px-3 py-3 rounded-lg border border-red-200 bg-red-50/50">
+                <p className="text-[11px] text-red-800 mb-2">
+                  Click a day to toggle a break. This is the same brand calendar as Briefs → Content Calendar.
+                </p>
+                {(() => {
+                  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                  const cells: (number | null)[] = [];
+                  for (let i = 0; i < firstDay; i++) cells.push(null);
+                  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+                  while (cells.length % 7 !== 0) cells.push(null);
+                  return (
+                    <div className="grid grid-cols-7 gap-1 max-w-[420px]">
+                      {weekdays.map((wd) => (
+                        <div key={wd} className="text-center text-[10px] font-semibold text-[var(--text-muted)] py-0.5">
+                          {wd}
+                        </div>
+                      ))}
+                      {cells.map((day, i) => {
+                        if (day === null) return <div key={`empty-${i}`} />;
+                        const dateStr = `${monthStr}-${String(day).padStart(2, "0")}`;
+                        const isBreak = breakDaySet.has(dateStr);
+                        return (
+                          <button
+                            key={dateStr}
+                            type="button"
+                            onClick={() =>
+                              toggleBreakDayMut({
+                                briefId: calendarBriefId,
+                                date: dateStr,
+                              })
+                                .then((r) =>
+                                  toast(
+                                    "success",
+                                    r.added ? `Marked ${dateStr} as break` : `Removed break from ${dateStr}`
+                                  )
+                                )
+                                .catch(() => toast("error", "Failed to toggle break day"))
+                            }
+                            className={`rounded-md text-[12px] font-medium py-1.5 transition-colors ${
+                              isBreak
+                                ? "bg-red-500 text-white hover:bg-red-600"
+                                : "bg-white text-[var(--text-primary)] hover:bg-red-100 border border-[var(--border-subtle)]"
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+            {calendarBriefId && (
+              <div className="mb-3 px-2 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+                <p className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5">
+                  {MONTHS[month]} {year} — break days (red)
+                </p>
+                <div className="flex flex-wrap gap-1 max-w-full">
+                  {Array.from({ length: daysInMonth }, (_, i) => {
+                    const d = i + 1;
+                    const dateStr = `${monthStr}-${String(d).padStart(2, "0")}`;
+                    const isBreak = breakDaySet.has(dateStr);
+                    return (
+                      <div
+                        key={dateStr}
+                        title={dateStr}
+                        className={`w-7 h-7 flex items-center justify-center rounded text-[10px] font-medium shrink-0 ${
+                          isBreak
+                            ? "bg-red-500 text-white"
+                            : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+                        }`}
+                      >
+                        {d}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Weekday Headers */}
             <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-10 bg-white">
               {WEEKDAYS.map((d) => (
@@ -383,6 +500,7 @@ export default function ContentCalendarPage() {
                     dateStr={dateStr}
                     isToday={isToday}
                     isWeekend={isWeekend}
+                    isBreakDay={breakDaySet.has(dateStr)}
                     day={day}
                     isEditable={!!isEditable}
                     onAddClick={() => {
@@ -456,12 +574,16 @@ export default function ContentCalendarPage() {
 
           {/* Detail Sidebar */}
           {selectedTask && (
-            <TaskDetailSidebar
+            <ContentCalendarEntrySidebar
               key={selectedTask._id}
               task={selectedTask}
-              isEditable={isEditable}
+              isEditable={!!isEditable}
               employees={employees}
-              managersAndAdmins={admins}
+              admins={admins}
+              teams={allTeams ?? []}
+              briefId={selectedTask.briefId}
+              brandId={selectedBrandId as Id<"brands">}
+              currentSheetMonth={monthStr}
               onClose={() => setSelectedTaskId(null)}
               updateTask={updateTask}
               updateTaskStatus={updateTaskStatus}
@@ -635,6 +757,7 @@ function DroppableDayCell({
   dateStr,
   isToday,
   isWeekend,
+  isBreakDay,
   day,
   isEditable,
   onAddClick,
@@ -643,6 +766,7 @@ function DroppableDayCell({
   dateStr: string;
   isToday: boolean;
   isWeekend: boolean;
+  isBreakDay: boolean;
   day: number;
   isEditable: boolean;
   onAddClick: () => void;
@@ -655,16 +779,20 @@ function DroppableDayCell({
       ref={setNodeRef}
       className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group relative ${
         isWeekend ? "bg-[#fafafa]" : ""
-      } ${isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""} ${
-        isOver ? "!bg-[var(--accent-admin-dim)] ring-2 ring-inset ring-[var(--accent-admin)]" : ""
-      }`}
+      } ${isBreakDay ? "ring-2 ring-inset ring-red-400/80 bg-red-50/40" : ""} ${
+        isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""
+      } ${isOver ? "!bg-[var(--accent-admin-dim)] ring-2 ring-inset ring-[var(--accent-admin)]" : ""}`}
     >
       <div className="flex items-center justify-between mb-1">
-        <span className={`text-[12px] font-medium ${
-          isToday
-            ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
-            : "text-[var(--text-secondary)]"
-        }`}>
+        <span
+          className={`text-[12px] font-medium ${
+            isToday
+              ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
+              : isBreakDay
+                ? "bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center"
+                : "text-[var(--text-secondary)]"
+          }`}
+        >
           {day}
         </span>
         {isEditable && (
@@ -847,372 +975,3 @@ function DayPopover({
   );
 }
 
-/* ────── Task Detail Sidebar ────── */
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Planned" },
-  { value: "in-progress", label: "In Progress" },
-  { value: "review", label: "Review" },
-  { value: "done", label: "Published" },
-];
-
-function TaskDetailSidebar({
-  task,
-  isEditable,
-  employees,
-  managersAndAdmins,
-  onClose,
-  updateTask,
-  updateTaskStatus,
-  deleteTask,
-  toast,
-}: {
-  task: any;
-  isEditable: boolean;
-  employees: any[];
-  managersAndAdmins: any[];
-  onClose: () => void;
-  updateTask: any;
-  updateTaskStatus: any;
-  deleteTask: any;
-  toast: (type: "success" | "error" | "info", msg: string) => void;
-}) {
-  const [editTitle, setEditTitle] = useState(task.title);
-  const [editPlatform, setEditPlatform] = useState(task.platform ?? "");
-  const [editContentType, setEditContentType] = useState(task.contentType ?? "");
-  const [editPostDate, setEditPostDate] = useState(task.postDate ?? "");
-  const [editDeadline, setEditDeadline] = useState(
-    task.deadline ? new Date(task.deadline).toISOString().split("T")[0] : ""
-  );
-  const [editAssignee, setEditAssignee] = useState(task.assigneeId ?? "");
-  const [editAssignor, setEditAssignor] = useState(task.assignedBy ?? "");
-  const [editDescription, setEditDescription] = useState(task.description ?? "");
-  const [editCreativeCopy, setEditCreativeCopy] = useState(task.creativeCopy ?? "");
-  const [editCaption, setEditCaption] = useState(task.caption ?? "");
-  const [saving, setSaving] = useState(false);
-
-  const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
-  const [refLinks, setRefLinks] = useState<string[]>(task.referenceLinks ?? []);
-  const [newLink, setNewLink] = useState("");
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const user = useQuery(api.users.getCurrentUser);
-
-  async function handleAddLink() {
-    const link = newLink.trim();
-    if (!link) return;
-    const updated = [...refLinks, link];
-    setRefLinks(updated);
-    setNewLink("");
-    setShowLinkInput(false);
-    try {
-      await updateReferenceLinks({ taskId: task._id, referenceLinks: updated });
-    } catch {
-      setRefLinks(refLinks);
-    }
-  }
-
-  async function handleRemoveLink(index: number) {
-    const updated = refLinks.filter((_, i) => i !== index);
-    setRefLinks(updated);
-    try {
-      await updateReferenceLinks({ taskId: task._id, referenceLinks: updated });
-    } catch {
-      setRefLinks(refLinks);
-    }
-  }
-
-  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const updates: Record<string, any> = {};
-      if (editTitle !== task.title) updates.title = editTitle;
-      if (editPlatform !== (task.platform ?? "")) updates.platform = editPlatform;
-      if (editContentType !== (task.contentType ?? "")) updates.contentType = editContentType;
-      if (editPostDate !== (task.postDate ?? "")) updates.postDate = editPostDate;
-      if (editDescription !== (task.description ?? "")) updates.description = editDescription;
-      if (editCreativeCopy !== (task.creativeCopy ?? "")) updates.creativeCopy = editCreativeCopy;
-      if (editCaption !== (task.caption ?? "")) updates.caption = editCaption;
-      if (editAssignee && editAssignee !== task.assigneeId) updates.assigneeId = editAssignee;
-      if (editAssignor && editAssignor !== task.assignedBy) updates.assignedBy = editAssignor;
-      if (editDeadline) {
-        const ts = new Date(editDeadline + "T23:59:59").getTime();
-        if (ts !== task.deadline) updates.deadline = ts;
-      } else if (task.deadline) {
-        updates.clearDeadline = true;
-      }
-      if (Object.keys(updates).length > 0) {
-        await updateTask({ taskId: task._id, ...updates });
-        toast("success", "Entry updated");
-      } else {
-        toast("info", "No changes to save");
-      }
-    } catch (err: any) {
-      toast("error", err.message ?? "Failed to update");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete() {
-    try {
-      await deleteTask({ taskId: task._id });
-      onClose();
-      toast("success", "Entry deleted");
-    } catch (err: any) {
-      toast("error", err.message ?? "Failed to delete");
-    }
-  }
-
-  return (
-    <div className="w-[340px] shrink-0 bg-white flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }} />
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
-            Entry Details
-          </h3>
-        </div>
-        <div className="flex items-center gap-1">
-          {isEditable && (
-            <button
-              onClick={handleDelete}
-              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
-              title="Delete entry"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Title</label>
-          {isEditable ? (
-            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)] font-medium">{task.title}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Description</label>
-          {isEditable ? (
-            <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} placeholder="Add description..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)]">{task.description || "No description"}</p>
-          )}
-        </div>
-
-        {/* Creative Copy */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Creative Copy</label>
-          {isEditable ? (
-            <textarea value={editCreativeCopy} onChange={(e) => setEditCreativeCopy(e.target.value)} rows={3} placeholder="Add creative copy..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">{task.creativeCopy || "No creative copy"}</p>
-          )}
-        </div>
-
-        {/* Caption */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Caption</label>
-          {isEditable ? (
-            <textarea value={editCaption} onChange={(e) => setEditCaption(e.target.value)} rows={3} placeholder="Add caption..." className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">{task.caption || "No caption"}</p>
-          )}
-        </div>
-
-        {/* Reference Links */}
-        <div className="pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
-              <Link2 className="h-3.5 w-3.5" />
-              Reference Links
-            </label>
-            {isEditable && user?.role === "admin" && (
-              <button
-                onClick={() => setShowLinkInput(true)}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
-              >
-                <Plus className="h-3 w-3" />
-                Add Link
-              </button>
-            )}
-          </div>
-          {showLinkInput && (
-            <div className="flex gap-1.5 mb-2">
-              <input
-                value={newLink}
-                onChange={(e) => setNewLink(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLink(); } }}
-                placeholder="https://..."
-                autoFocus
-                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-              />
-              <button
-                onClick={handleAddLink}
-                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:opacity-90"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => { setShowLinkInput(false); setNewLink(""); }}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {refLinks.map((link, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 group">
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin)] hover:underline flex-1 min-w-0"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{link}</span>
-                </a>
-                {isEditable && user?.role === "admin" && (
-                  <button
-                    onClick={() => handleRemoveLink(idx)}
-                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            {refLinks.length === 0 && !showLinkInput && (
-              <p className="text-[11px] text-[var(--text-muted)]">No reference links added</p>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Platform</label>
-            {isEditable ? (
-              <select value={editPlatform} onChange={(e) => setEditPlatform(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]">
-                <option value="">—</option>
-                {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            ) : (
-              <p className="text-[13px] text-[var(--text-primary)]">{task.platform ?? "—"}</p>
-            )}
-          </div>
-          <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Content Type</label>
-            {isEditable ? (
-              <select value={editContentType} onChange={(e) => setEditContentType(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]">
-                <option value="">—</option>
-                {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            ) : (
-              <p className="text-[13px] text-[var(--text-primary)]">{task.contentType ?? "—"}</p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Go Live Date</label>
-          {isEditable ? (
-            <input type="date" value={editPostDate} onChange={(e) => setEditPostDate(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)]">{task.postDate ?? "—"}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Assignor</label>
-          {isEditable ? (
-            <select value={editAssignor} onChange={(e) => setEditAssignor(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]">
-              <option value="">Select assignor</option>
-              {managersAndAdmins.map((u: any) => (
-                <option key={u._id} value={u._id}>
-                  {u.name ?? u.email}{u.designation ? ` — ${u.designation}` : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)]">{task.assignorName ?? "—"}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Assignee</label>
-          {isEditable ? (
-            <select value={editAssignee} onChange={(e) => setEditAssignee(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]">
-              <option value="">Unassigned</option>
-              {employees.map((emp: any) => (
-                <option key={emp._id} value={emp._id}>
-                  {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div>
-              <p className="text-[13px] text-[var(--text-primary)]">{task.assigneeName}</p>
-              {task.assigneeDesignation && <p className="text-[11px] text-[var(--text-muted)]">{task.assigneeDesignation}</p>}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Assigned At</label>
-          <p className="text-[13px] text-[var(--text-primary)]">
-            {task.assignedAt
-              ? new Date(task.assignedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-              : "Not yet assigned"}
-          </p>
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Deadline</label>
-          {isEditable ? (
-            <input type="date" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]" />
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)]">
-              {task.deadline ? new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No deadline"}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">Status</label>
-          {isEditable ? (
-            <select
-              value={task.status}
-              onChange={(e) => updateTaskStatus({ taskId: task._id, newStatus: e.target.value }).catch((err: any) => toast("error", err.message ?? "Failed"))}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          ) : (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium" style={{ color: sc.dot, backgroundColor: sc.bg }}>
-              {sc.label}
-            </span>
-          )}
-        </div>
-
-        {isEditable && (
-          <Button variant="primary" className="w-full" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}

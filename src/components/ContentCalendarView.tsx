@@ -650,7 +650,7 @@ export function ContentCalendarView({
 
         {/* Detail Sidebar */}
         {selectedTask && (
-          <DetailSidebar
+          <ContentCalendarEntrySidebar
             key={selectedTask._id}
             task={selectedTask}
             isEditable={isEditable}
@@ -952,8 +952,8 @@ export function ContentCalendarView({
   );
 }
 
-/* ────── Detail Sidebar ────── */
-function DetailSidebar({
+/* ────── Entry detail sidebar (shared: brief Content Calendar + /content-calendar grid) ────── */
+export function ContentCalendarEntrySidebar({
   task,
   isEditable,
   employees,
@@ -1501,10 +1501,10 @@ function DetailSidebar({
               className="flex items-center gap-2 text-[12px] font-semibold text-[var(--accent-admin)] hover:underline"
             >
               <Users className="h-3.5 w-3.5" />
-              {showAssignTask ? "Hide Assign Task" : "Assign Task (linked)"}
+              {showAssignTask ? "Hide" : "Assign task to another team"}
             </button>
             <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              Creates a child task tagged for Content Calendar and this brand; appears on the assignee dashboard.
+              e.g. Copy or Design — creates a linked task with Content Calendar + brand context; assignee submits copy from their dashboard.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
