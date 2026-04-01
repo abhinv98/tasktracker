@@ -30,6 +30,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
+import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -232,10 +233,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const showReassignBanner =
     canReassignTask &&
     ((!assignee && isAdmin) || (assignee && showReassign));
-  const creativesRequired = Math.min(
-    99,
-    Math.max(1, (brief as { creativesRequired?: number } | null)?.creativesRequired ?? 1)
-  );
+  const showCreativeSlots = brief ? briefUsesCreativeSlots(brief) : false;
+  const creativesRequired = brief ? creativesSlotTarget(brief) : 1;
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
@@ -341,7 +340,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const sortedDeliverables = [...(deliverables ?? [])].sort(
     (a, b) => a.submittedAt - b.submittedAt
   );
-  const emptySlots = Math.max(0, creativesRequired - sortedDeliverables.length);
+  const emptySlots = showCreativeSlots
+    ? Math.max(0, creativesRequired - sortedDeliverables.length)
+    : 0;
 
   const DELIVERABLE_STATUS: Record<
     string,
@@ -896,8 +897,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   Deliverables
                 </h4>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  {deliverables?.length ?? 0} / {creativesRequired} creative
-                  {(creativesRequired ?? 1) !== 1 ? "s" : ""} submitted
+                  {showCreativeSlots
+                    ? `${deliverables?.length ?? 0} / ${creativesRequired} creative${creativesRequired !== 1 ? "s" : ""} submitted`
+                    : `${deliverables?.length ?? 0} deliverable${(deliverables?.length ?? 0) !== 1 ? "s" : ""} submitted`}
                 </p>
               </div>
               {isAssignee && status !== "done" && (
@@ -1007,7 +1009,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
                   >
                     <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
-                      Creative {idx + 1}
+                      {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                     </p>
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <span className="text-[12px] text-[var(--text-secondary)]">
@@ -1110,7 +1112,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   </div>
                 );
               })}
-              {Array.from({ length: emptySlots }).map((_, j) => {
+              {showCreativeSlots &&
+                Array.from({ length: emptySlots }).map((_, j) => {
                 const n = sortedDeliverables.length + j + 1;
                 return (
                   <div

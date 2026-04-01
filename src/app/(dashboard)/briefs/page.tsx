@@ -9,6 +9,15 @@ import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody,
 import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
+/** Designing / copywriting only (not content calendar). */
+function showCreativesRequiredField(
+  briefMode: "master" | "single" | "content_calendar",
+  briefType: string
+): boolean {
+  if (briefMode === "content_calendar") return false;
+  return briefType === "designing" || briefType === "copywriting";
+}
+
 const STATUS_COLORS = BRIEF_STATUS_COLORS;
 
 const STORAGE_BRIEF_DRAFT = "tasktracker_briefDraft";
@@ -318,10 +327,13 @@ export default function BriefsPage() {
       else if (isContentCal) resolvedBriefType = "content_calendar";
       else resolvedBriefType = (briefType || undefined) as BriefType | undefined;
 
+      const includeCreatives = showCreativesRequiredField(briefMode, briefType);
       const cr =
-        creativesRequired >= 1 && creativesRequired <= 99
+        includeCreatives &&
+        creativesRequired >= 1 &&
+        creativesRequired <= 99
           ? Math.floor(creativesRequired)
-          : 1;
+          : undefined;
 
       await createBrief({
         title,
@@ -330,7 +342,7 @@ export default function BriefsPage() {
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
         briefType: resolvedBriefType,
-        creativesRequired: cr,
+        ...(cr !== undefined ? { creativesRequired: cr } : {}),
         ...(isSingle && stAssignee ? {
           taskTitle: title,
           taskDescription: description,
@@ -989,26 +1001,28 @@ export default function BriefsPage() {
                   <p className="text-[11px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
                 </div>
               </label>
-              <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                  Creatives required
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={creativesRequired}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (Number.isNaN(v)) setCreativesRequired(1);
-                    else setCreativesRequired(Math.min(99, Math.max(1, v)));
-                  }}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                  Designer sees separate deliverable slots (e.g. 4 creatives = 4).
-                </p>
-              </div>
+              {showCreativesRequiredField(briefMode, briefType) && (
+                <div>
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                    Creatives required
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={creativesRequired}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (Number.isNaN(v)) setCreativesRequired(1);
+                      else setCreativesRequired(Math.min(99, Math.max(1, v)));
+                    }}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                    Designer sees separate deliverable slots (e.g. 4 creatives = 4). Shown for Designing and Copywriting only.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button type="submit" variant="primary">Create</Button>
                 <Button type="button" variant="secondary" onClick={closeCreateModal}>Cancel</Button>

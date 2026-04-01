@@ -11,6 +11,7 @@ import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
 import { Trash2, Calendar, Columns3, List, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
+import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -44,15 +45,15 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   const taskId = task?._id as Id<"tasks"> | undefined;
 
   const deliverables = useQuery(api.approvals.listDeliverables, taskId ? { taskId } : "skip");
-  const creativesRequired = Math.min(
-    99,
-    Math.max(1, (brief as { creativesRequired?: number }).creativesRequired ?? 1)
-  );
+  const showCreativeSlots = briefUsesCreativeSlots(brief);
+  const creativesRequired = creativesSlotTarget(brief);
   const sortedDeliverables = useMemo(
     () => [...(deliverables ?? [])].sort((a: any, b: any) => a.submittedAt - b.submittedAt),
     [deliverables]
   );
-  const emptyDeliverableSlots = Math.max(0, creativesRequired - sortedDeliverables.length);
+  const emptyDeliverableSlots = showCreativeSlots
+    ? Math.max(0, creativesRequired - sortedDeliverables.length)
+    : 0;
   const dailySummaries = useQuery(api.taskDailySummaries.listSummaries, taskId ? { taskId } : "skip");
   const subTasks = useQuery(api.tasks.getSubTasks, taskId ? { parentTaskId: taskId } : "skip");
   const graphData = useQuery(api.briefs.getBriefGraphData, { briefId: brief._id });
@@ -341,7 +342,9 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
             <Paperclip className="w-3.5 h-3.5" /> Deliverables
           </p>
           <p className="text-[10px] text-[var(--text-muted)] mb-2">
-            {sortedDeliverables.length} / {creativesRequired} creative{creativesRequired !== 1 ? "s" : ""} submitted
+            {showCreativeSlots
+              ? `${sortedDeliverables.length} / ${creativesRequired} creative${creativesRequired !== 1 ? "s" : ""} submitted`
+              : `${sortedDeliverables.length} deliverable${sortedDeliverables.length !== 1 ? "s" : ""} submitted`}
           </p>
           <div className="space-y-2">
             {sortedDeliverables.map((d: any, idx: number) => {
@@ -353,7 +356,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               return (
                 <Card key={d._id} className="!p-3">
                   <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
-                    Creative {idx + 1}
+                    {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                   </p>
                   <div className="flex items-center justify-between">
                     <div className="truncate mr-2">
@@ -373,7 +376,8 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
                 </Card>
               );
             })}
-            {Array.from({ length: emptyDeliverableSlots }).map((_, j) => {
+            {showCreativeSlots &&
+              Array.from({ length: emptyDeliverableSlots }).map((_, j) => {
               const n = sortedDeliverables.length + j + 1;
               return (
                 <div
