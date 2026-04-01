@@ -75,39 +75,35 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
 
-  // Filter contacts (Saved messages is searchable by your name, email, "saved", "notes", "self")
+  // Filter: name, role, email (API includes email so searching your first name finds you)
   const filteredContacts = useMemo(() => {
     if (!contacts) return [];
     if (!searchQuery.trim()) return contacts;
     const q = searchQuery.toLowerCase().trim();
     return contacts.filter((c) => {
-      if (c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)) {
-        return true;
-      }
-      const isSelfRow = user && String(c._id) === String(user._id);
-      if (!isSelfRow) return false;
-      if ("saved messages".includes(q) || q.includes("saved") || q.includes("note") || q.includes("self")) {
-        return true;
-      }
-      const name = (user.name ?? "").toLowerCase();
-      const email = (user.email ?? "").toLowerCase();
+      const email = ((c as { email?: string | null }).email ?? "").toLowerCase();
       const localPart = email.split("@")[0] ?? "";
-      if (name && name.includes(q)) return true;
-      if (email && email.includes(q)) return true;
-      if (localPart && localPart.includes(q)) return true;
-      return false;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.role.toLowerCase().includes(q) ||
+        (email && email.includes(q)) ||
+        (localPart && localPart.includes(q))
+      );
     });
-  }, [contacts, searchQuery, user]);
+  }, [contacts, searchQuery]);
 
-  /** Self-thread must work even while contacts load or if the API row is missing */
+  /** Self-thread works while contacts load (same display name as API: "Your name (You)") */
   const selectedContact = useMemo(() => {
     if (!selectedContactId || !user) return null;
     const fromList = contacts?.find((c) => String(c._id) === String(selectedContactId));
     if (fromList) return fromList;
     if (String(selectedContactId) === String(user._id)) {
+      const selfLabel =
+        user.name ?? user.email?.split("@")[0] ?? "You";
       return {
         _id: user._id,
-        name: "Saved messages",
+        name: `${selfLabel} (You)`,
+        email: user.email ?? null,
         role: user.role ?? "employee",
         avatarUrl: user.avatarUrl ?? user.image ?? null,
         lastMessage: null as string | null,
@@ -154,18 +150,9 @@ export default function MessagesPage() {
       <div className="w-80 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
         {/* Header */}
         <div className="px-4 py-3 border-b border-[var(--border)]">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-[var(--accent-admin)]" />
-              <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Messages</h1>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedContactId(user._id)}
-              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-90 transition-opacity"
-            >
-              Saved messages
-            </button>
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquare className="h-4 w-4 text-[var(--accent-admin)]" />
+            <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Messages</h1>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
@@ -173,7 +160,7 @@ export default function MessagesPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search people..."
+              placeholder="Search by name or email…"
               className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
           </div>
@@ -261,7 +248,11 @@ export default function MessagesPage() {
               )}
               <div>
                 <p className="text-[13px] font-semibold text-[var(--text-primary)]">{selectedContact.name}</p>
-                <p className="text-[10px] text-[var(--text-muted)] capitalize">{selectedContact.role}</p>
+                <p className="text-[10px] text-[var(--text-muted)] capitalize">
+                  {String(selectedContactId) === String(user._id)
+                    ? "Messages to yourself"
+                    : selectedContact.role}
+                </p>
               </div>
             </div>
 
@@ -332,7 +323,11 @@ export default function MessagesPage() {
                       handleSend();
                     }
                   }}
-                  placeholder={`Message ${selectedContact.name}...`}
+                  placeholder={
+                    String(selectedContactId) === String(user._id)
+                      ? "Write a note to yourself…"
+                      : `Message ${selectedContact.name}...`
+                  }
                   className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] resize-none"
                   rows={1}
                   style={{ maxHeight: 120 }}
@@ -354,16 +349,9 @@ export default function MessagesPage() {
               <MessageSquare className="h-7 w-7 text-[var(--text-muted)]" />
             </div>
             <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-1">Your Messages</h2>
-            <p className="text-[12px] text-[var(--text-muted)] max-w-[280px]">
-              Select a contact from the left to start a conversation. Messages are private between you and the recipient.
+            <p className="text-[12px] text-[var(--text-muted)] max-w-[300px]">
+              Select someone from the list, or search your own name to message yourself. Direct messages are private.
             </p>
-            <button
-              type="button"
-              onClick={() => setSelectedContactId(user._id)}
-              className="mt-4 px-4 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
-            >
-              Open saved messages (notes to self)
-            </button>
           </div>
         )}
       </div>

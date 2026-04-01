@@ -17,6 +17,7 @@ export const getContacts = query({
     const contacts: Array<{
       _id: string;
       name: string;
+      email: string | null;
       role: string;
       avatarUrl: string | null;
       lastMessage: string | null;
@@ -75,6 +76,7 @@ export const getContacts = query({
       contacts.push({
         _id: u._id,
         name: u.name ?? u.email ?? "Unknown",
+        email: u.email ?? null,
         role: u.role ?? "employee",
         avatarUrl: u.avatarUrl ?? u.image ?? null,
         lastMessage,
@@ -102,9 +104,12 @@ export const getContacts = query({
         lastMessage = last.content;
         lastMessageTime = last.createdAt;
       }
+      const selfLabel =
+        selfUser.name ?? selfUser.email?.split("@")[0] ?? "You";
       contacts.push({
         _id: authId,
-        name: "Saved messages",
+        name: `${selfLabel} (You)`,
+        email: selfUser.email ?? null,
         role: selfUser.role ?? "employee",
         avatarUrl: selfUser.avatarUrl ?? selfUser.image ?? null,
         lastMessage,
@@ -113,10 +118,10 @@ export const getContacts = query({
       });
     }
 
-    // Sort: Saved messages first, then unread first, then by last message time (most recent first)
+    // Sort: yourself first, then unread first, then by last message time (most recent first)
     contacts.sort((a, b) => {
-      const aSelf = a.name === "Saved messages" ? 1 : 0;
-      const bSelf = b.name === "Saved messages" ? 1 : 0;
+      const aSelf = a._id === authId ? 1 : 0;
+      const bSelf = b._id === authId ? 1 : 0;
       if (aSelf !== bSelf) return bSelf - aSelf;
       if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
       if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
