@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -311,10 +311,6 @@ export default function ContentCalendarPage() {
               {isEditable && <option value="__create__">+ Create new brand</option>}
             </select>
           </div>
-        </div>
-
-        {/* Month Nav + break days (same brief as list view) */}
-        <div className="flex items-center gap-3">
           {isEditable && calendarBriefId && (
             <button
               type="button"
@@ -328,6 +324,10 @@ export default function ContentCalendarPage() {
               {showBreakDayPicker ? "Done" : "Break days"}
             </button>
           )}
+        </div>
+
+        {/* Month Nav */}
+        <div className="flex items-center gap-3">
           <button
             onClick={prevMonth}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
@@ -390,10 +390,18 @@ export default function ContentCalendarPage() {
               </p>
             )}
             {showBreakDayPicker && calendarBriefId && (
-              <div className="mb-3 px-3 py-3 rounded-lg border border-red-200 bg-red-50/50">
-                <p className="text-[11px] text-red-800 mb-2">
-                  Click a day to toggle a break. This is the same brand calendar as Briefs → Content Calendar.
-                </p>
+              <div className="mb-3 px-3 py-3 rounded-lg border border-amber-200 bg-amber-50 flex flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[12px] font-semibold text-amber-900">
+                      Break days — {MONTHS[month]} {year}
+                    </p>
+                    <p className="text-[11px] text-amber-800 mt-0.5">
+                      Tap dates below to mark or clear breaks (same as the brand&apos;s Content Calendar brief). Red cells in the grid are full-day breaks.
+                    </p>
+                  </div>
+                </div>
                 {(() => {
                   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
                   const cells: (number | null)[] = [];
@@ -403,7 +411,7 @@ export default function ContentCalendarPage() {
                   return (
                     <div className="grid grid-cols-7 gap-1 max-w-[420px]">
                       {weekdays.map((wd) => (
-                        <div key={wd} className="text-center text-[10px] font-semibold text-[var(--text-muted)] py-0.5">
+                        <div key={wd} className="text-center text-[10px] font-semibold text-amber-900/70 py-0.5">
                           {wd}
                         </div>
                       ))}
@@ -431,7 +439,7 @@ export default function ContentCalendarPage() {
                             className={`rounded-md text-[12px] font-medium py-1.5 transition-colors ${
                               isBreak
                                 ? "bg-red-500 text-white hover:bg-red-600"
-                                : "bg-white text-[var(--text-primary)] hover:bg-red-100 border border-[var(--border-subtle)]"
+                                : "bg-white text-[var(--text-primary)] hover:bg-amber-100 border border-amber-200"
                             }`}
                           >
                             {day}
@@ -441,33 +449,6 @@ export default function ContentCalendarPage() {
                     </div>
                   );
                 })()}
-              </div>
-            )}
-            {calendarBriefId && (
-              <div className="mb-3 px-2 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                <p className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5">
-                  {MONTHS[month]} {year} — break days (red)
-                </p>
-                <div className="flex flex-wrap gap-1 max-w-full">
-                  {Array.from({ length: daysInMonth }, (_, i) => {
-                    const d = i + 1;
-                    const dateStr = `${monthStr}-${String(d).padStart(2, "0")}`;
-                    const isBreak = breakDaySet.has(dateStr);
-                    return (
-                      <div
-                        key={dateStr}
-                        title={dateStr}
-                        className={`w-7 h-7 flex items-center justify-center rounded text-[10px] font-medium shrink-0 ${
-                          isBreak
-                            ? "bg-red-500 text-white"
-                            : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
-                        }`}
-                      >
-                        {d}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
             {/* Weekday Headers */}
@@ -777,19 +758,27 @@ function DroppableDayCell({
   return (
     <div
       ref={setNodeRef}
-      className={`bg-white min-h-[120px] p-2 flex flex-col transition-colors group relative ${
-        isWeekend ? "bg-[#fafafa]" : ""
-      } ${isBreakDay ? "ring-2 ring-inset ring-red-400/80 bg-red-50/40" : ""} ${
-        isToday ? "ring-2 ring-inset ring-[var(--accent-admin)]" : ""
+      className={`min-h-[120px] p-2 flex flex-col transition-colors group relative ${
+        isBreakDay
+          ? "!bg-red-500 text-white"
+          : `bg-white ${isWeekend ? "bg-[#fafafa]" : ""}`
+      } ${
+        isToday && !isBreakDay
+          ? "ring-2 ring-inset ring-[var(--accent-admin)]"
+          : ""
+      } ${
+        isToday && isBreakDay
+          ? "ring-2 ring-inset ring-white/90"
+          : ""
       } ${isOver ? "!bg-[var(--accent-admin-dim)] ring-2 ring-inset ring-[var(--accent-admin)]" : ""}`}
     >
       <div className="flex items-center justify-between mb-1">
         <span
           className={`text-[12px] font-medium ${
-            isToday
-              ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
-              : isBreakDay
-                ? "bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center"
+            isBreakDay
+              ? "bg-white/20 text-white w-6 h-6 rounded-full flex items-center justify-center"
+              : isToday
+                ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
                 : "text-[var(--text-secondary)]"
           }`}
         >
@@ -798,7 +787,11 @@ function DroppableDayCell({
         {isEditable && (
           <button
             onClick={onAddClick}
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-all"
+            className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all ${
+              isBreakDay
+                ? "text-white/70 hover:text-white hover:bg-white/15"
+                : "text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)]"
+            }`}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>

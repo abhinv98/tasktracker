@@ -63,7 +63,8 @@ interface BriefFlowCanvasProps {
   teams: TeamSection[];
   connections: { _id: string; sourceTaskId: string; targetTaskId: string }[];
   isAdmin: boolean;
-  onCreateTask: (teamId: string) => void;
+  /** Optional: canvas no longer shows + nodes; kept for callers that may add tasks elsewhere. */
+  onCreateTask?: (teamId: string) => void;
   onEditTask: (taskId: string) => void;
   onOpenTaskDetail: (taskId: string) => void;
   onDragToCreate?: (sourceTaskId: string, teamId: string, position: { x: number; y: number }) => void;
@@ -97,6 +98,7 @@ function TaskNode({ data }: { data: TaskData }) {
     <div className="group relative">
       {/* Input handle (top) */}
       <Handle
+        id="top"
         type="target"
         position={Position.Top}
         className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-top-1.5"
@@ -107,14 +109,23 @@ function TaskNode({ data }: { data: TaskData }) {
         className="bg-white rounded-xl shadow-md border-2 border-[var(--border)] hover:shadow-lg hover:border-[var(--accent-admin)] transition-all cursor-pointer min-w-[180px] max-w-[220px]"
         onClick={() => data.onOpenDetail(data._id)}
       >
-        {/* Color top bar */}
+        {/* Color top bar + team name (inside the block) */}
         <div
           className="h-1.5 rounded-t-[10px]"
           style={{ backgroundColor: data.teamColor }}
         />
+        <div className="px-3 pt-2 pb-0 flex items-center gap-1.5">
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: data.teamColor }}
+          />
+          <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide truncate">
+            {data.teamName}
+          </span>
+        </div>
 
         {/* Content */}
-        <div className="px-3 py-2.5">
+        <div className="px-3 py-2 pt-1">
           <div className="flex items-start justify-between gap-1.5">
             <p className="text-[12px] font-semibold text-[var(--text-primary)] leading-tight line-clamp-2">
               {data.title}
@@ -166,26 +177,19 @@ function TaskNode({ data }: { data: TaskData }) {
         </div>
       </div>
 
-      {/* Output handle (bottom) */}
+      {/* Output handles: bottom + right (drag from either to connect) */}
       <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
         className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-bottom-1.5"
       />
-    </div>
-  );
-}
-
-/* ─── Add Task Node (placeholder) ────────────────── */
-
-function AddTaskNode({ data }: { data: { teamId: string; teamColor: string; onAdd: (teamId: string) => void } }) {
-  return (
-    <div
-      onClick={() => data.onAdd(data.teamId)}
-      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] cursor-pointer transition-all min-w-[160px] justify-center"
-    >
-      <Plus className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-      <span className="text-[11px] font-medium text-[var(--text-secondary)]">Add Task</span>
+      <Handle
+        id="right"
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-right-1.5"
+      />
     </div>
   );
 }
@@ -211,24 +215,10 @@ function DraftTaskNode({
   );
 }
 
-/* ─── Team Label Node ────────────────────────────── */
-
-function TeamLabelNode({ data }: { data: { teamName: string; teamColor: string; taskCount: number } }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm border border-[var(--border)] shadow-sm pointer-events-none select-none">
-      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.teamColor }} />
-      <span className="text-[12px] font-semibold text-[var(--text-primary)]">{data.teamName}</span>
-      <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{data.taskCount}</span>
-    </div>
-  );
-}
-
 /* ─── Node type registry ─────────────────────────── */
 
 const nodeTypes: NodeTypes = {
   taskNode: TaskNode as any,
-  addTaskNode: AddTaskNode as any,
-  teamLabel: TeamLabelNode as any,
   draftTaskNode: DraftTaskNode as any,
 };
 
@@ -247,7 +237,6 @@ function BriefFlowCanvasInner({
   teams,
   connections,
   isAdmin,
-  onCreateTask,
   onEditTask,
   onOpenTaskDetail,
   onDragToCreate,
@@ -270,29 +259,13 @@ function BriefFlowCanvasInner({
 
     const TEAM_GAP_Y = 200;
     const TASK_GAP_X = 240;
-    const TEAM_LABEL_X = 40;
     const TASK_START_X = 60;
-    const TASK_START_Y_OFFSET = 50;
+    const TASK_START_Y_OFFSET = 32;
 
     teams.forEach((team, teamIdx) => {
       const teamBaseY = teamIdx * TEAM_GAP_Y + 40;
 
-      // Team label node (non-draggable, non-connectable)
-      nodes.push({
-        id: `team-${team.teamId}`,
-        type: "teamLabel",
-        position: { x: TEAM_LABEL_X, y: teamBaseY },
-        data: {
-          teamName: team.teamName,
-          teamColor: team.teamColor,
-          taskCount: team.tasks.length,
-        },
-        draggable: false,
-        connectable: false,
-        selectable: false,
-      });
-
-      // Task nodes
+      // Task nodes only (team name is shown inside each card; no separate label / no + hash block)
       team.tasks.forEach((task, taskIdx) => {
         const defaultX = TASK_START_X + taskIdx * TASK_GAP_X;
         const defaultY = teamBaseY + TASK_START_Y_OFFSET;
@@ -318,26 +291,6 @@ function BriefFlowCanvasInner({
           } satisfies TaskData,
         });
       });
-
-      // "Add Task" button node
-      if (isAdmin) {
-        nodes.push({
-          id: `add-${team.teamId}`,
-          type: "addTaskNode",
-          position: {
-            x: TASK_START_X + team.tasks.length * TASK_GAP_X,
-            y: teamBaseY + TASK_START_Y_OFFSET,
-          },
-          data: {
-            teamId: team.teamId,
-            teamColor: team.teamColor,
-            onAdd: onCreateTask,
-          },
-          draggable: false,
-          connectable: false,
-          selectable: false,
-        });
-      }
     });
 
     // Build edges from connections
@@ -375,7 +328,7 @@ function BriefFlowCanvasInner({
     }
 
     return { initialNodes: nodes, initialEdges: edges };
-  }, [teams, connections, isAdmin, onEditTask, onOpenTaskDetail, onCreateTask, pendingDraft]);
+  }, [teams, connections, isAdmin, onEditTask, onOpenTaskDetail, pendingDraft]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -399,8 +352,6 @@ function BriefFlowCanvasInner({
         if (
           change.type === "position" &&
           change.position &&
-          !change.id.startsWith("team-") &&
-          !change.id.startsWith("add-") &&
           change.id !== "__pending-draft__"
         ) {
           pendingPositions.current.set(change.id, change.position);
@@ -432,9 +383,6 @@ function BriefFlowCanvasInner({
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
-      // Don't allow connecting non-task nodes
-      if (connection.source.startsWith("team-") || connection.source.startsWith("add-")) return;
-      if (connection.target.startsWith("team-") || connection.target.startsWith("add-")) return;
 
       addConnection({
         briefId,
@@ -551,8 +499,6 @@ function BriefFlowCanvasInner({
         />
         <MiniMap
           nodeColor={(node) => {
-            if (node.type === "teamLabel") return "transparent";
-            if (node.type === "addTaskNode") return "transparent";
             if (node.type === "draftTaskNode") return "var(--accent-admin)";
             const taskData = node.data as unknown as TaskData;
             return (STATUS_CONFIG[taskData?.status]?.color) ?? "#94a3b8";
