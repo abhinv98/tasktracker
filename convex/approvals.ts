@@ -1562,9 +1562,21 @@ export const handoffDeliverable = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
-    // Only approved deliverables can be handed off
-    if (deliverable.status !== "approved" && deliverable.clientStatus !== "client_approved") {
-      throw new Error("Deliverable must be approved before handoff");
+    if (deliverable.status === "rejected") {
+      throw new Error("Cannot hand off a rejected deliverable");
+    }
+
+    // Fully approved, client-approved, OR team-lead approved and received by brand manager
+    // (Brand Deliverables UI offers handoff after “Receive for review” before final Approve.)
+    const canHandoff =
+      deliverable.status === "approved" ||
+      deliverable.clientStatus === "client_approved" ||
+      (deliverable.teamLeadStatus === "approved" &&
+        deliverable.passedToManagerAt != null);
+    if (!canHandoff) {
+      throw new Error(
+        "Deliverable must be approved by the team lead and received for review, or fully approved, before handoff"
+      );
     }
 
     const sourceTask = await ctx.db.get(deliverable.taskId);
