@@ -233,7 +233,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const showReassignBanner =
     canReassignTask &&
     ((!assignee && isAdmin) || (assignee && showReassign));
-  const showCreativeSlots = brief ? briefUsesCreativeSlots(brief) : false;
+  // Handoff tasks should NOT show creative slots — they reference the original deliverables
+  const isHandoffTask = !!task.handoffSourceTaskId;
+  const showCreativeSlots = !isHandoffTask && brief ? briefUsesCreativeSlots(brief) : false;
   const creativesRequired = brief ? creativesSlotTarget(brief) : 1;
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;

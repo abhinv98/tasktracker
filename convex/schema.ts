@@ -90,9 +90,23 @@ export default defineSchema({
   briefTeams: defineTable({
     briefId: v.id("briefs"),
     teamId: v.id("teams"),
+    /** Order of this team in the sequential flowchart (0-based) */
+    order: v.optional(v.number()),
   })
     .index("by_brief", ["briefId"])
     .index("by_team", ["teamId"]),
+
+  // ─── TASK CONNECTIONS (sequential flow between tasks) ──
+  taskConnections: defineTable({
+    briefId: v.id("briefs"),
+    sourceTaskId: v.id("tasks"),
+    targetTaskId: v.id("tasks"),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_brief", ["briefId"])
+    .index("by_source", ["sourceTaskId"])
+    .index("by_target", ["targetTaskId"]),
 
   // ─── TASKS ────────────────────────────────────
   tasks: defineTable({

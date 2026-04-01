@@ -209,6 +209,13 @@ export const listTeamLeadPendingApprovals = query({
           ? users.find((u) => u._id === d.mainAssigneeReviewedBy)
           : null;
 
+        // Task-level grouping info for creative-slot briefs
+        const taskSiblings = allDeliverables.filter((s) => s.taskId === d.taskId);
+        const taskDeliverableCount = taskSiblings.length;
+        const taskApprovedByTLCount = taskSiblings.filter(
+          (s) => s.teamLeadStatus === "approved"
+        ).length;
+
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -226,6 +233,8 @@ export const listTeamLeadPendingApprovals = query({
           mainAssigneeName,
           mainAssigneeApproved: d.mainAssigneeStatus === "approved",
           mainAssigneeReviewerName: mainAssigneeReviewer?.name ?? mainAssigneeReviewer?.email ?? null,
+          taskDeliverableCount,
+          taskApprovedByTLCount,
         };
       })
     );
@@ -253,10 +262,28 @@ export const listManagerDeliverables = query({
     const brands = await ctx.db.query("brands").collect();
     const allTeams = await ctx.db.query("teams").collect();
 
-    // TL-approved deliverables for this brand: include both "awaiting pass to manager" and "with manager"
+    // Pre-fetch all handoff records for checking handed-off status in filters
+    const allHandoffs = await ctx.db.query("deliverableHandoffs").collect();
+    const handedOffDeliverableIds = new Set(allHandoffs.map((h: any) => h.sourceDeliverableId as string));
+
+    // TL-approved deliverables for this brand:
+    // - "awaiting pass to manager" (not yet approved)
+    // - "with manager" (pending or approved)
+    // - Approved but not yet handed off (when task has handoffTargetTeamId) — Bug 8 fix
     const passed = allDeliverables.filter((d) => {
       if (d.teamLeadStatus !== "approved") return false;
-      if (d.status === "approved" || d.status === "rejected") return false;
+      if (d.status === "rejected") return false;
+      // Keep approved deliverables visible if they still need handoff
+      if (d.status === "approved") {
+        if (handedOffDeliverableIds.has(d._id as string)) return false; // already handed off
+        const task = tasks.find((t) => t._id === d.taskId);
+        // Keep visible if task has a handoff target OR has other un-handed-off siblings
+        if (!task?.handoffTargetTeamId) {
+          // Also keep if any sibling deliverable on same task is not yet handed off and task has handoffs
+          const taskHandoffs = allHandoffs.filter((h: any) => h.sourceTaskId === d.taskId);
+          if (taskHandoffs.length === 0) return false; // no handoff target, no active handoffs — hide
+        }
+      }
       const task = tasks.find((t) => t._id === d.taskId);
       const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
       return !!(brief?.brandId && myBrandIds.has(brief.brandId));
@@ -329,6 +356,14 @@ export const listManagerDeliverables = query({
           }
         }
 
+        // Compute task-level grouping info for creative-slot briefs
+        const taskSiblings = allDeliverables.filter((s) => s.taskId === d.taskId);
+        const taskDeliverableCount = taskSiblings.length;
+        const taskApprovedCount = taskSiblings.filter((s) => s.status === "approved").length;
+        const allTaskDeliverablesHandedOff = taskSiblings.every((s) =>
+          handedOffDeliverableIds.has(s._id as string)
+        );
+
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -348,6 +383,9 @@ export const listManagerDeliverables = query({
           handoffTargetTeamName,
           taskHasHandoffTarget,
           hasIncompleteChainTasks,
+          taskDeliverableCount,
+          taskApprovedCount,
+          allTaskDeliverablesHandedOff,
         };
       })
     );

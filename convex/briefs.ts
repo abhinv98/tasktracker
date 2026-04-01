@@ -371,11 +371,15 @@ export const assignTeamsToBrief = mutation({
       .query("briefTeams")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
+    // Build a map of current orders to preserve them
+    const existingOrderMap = new Map(existing.map((e) => [e.teamId as string, e.order]));
     for (const e of existing) {
       await ctx.db.delete(e._id);
     }
+    let nextOrder = Math.max(0, ...existing.map((e) => (e.order ?? -1) + 1));
     for (const teamId of teamIds) {
-      await ctx.db.insert("briefTeams", { briefId, teamId });
+      const order = existingOrderMap.get(teamId as string) ?? nextOrder++;
+      await ctx.db.insert("briefTeams", { briefId, teamId, order });
     }
 
     const teams = await ctx.db.query("teams").collect();
@@ -490,6 +494,15 @@ export const deleteBrief = mutation({
       await ctx.db.delete(bt._id);
     }
 
+    // Delete task connections
+    const connections = await ctx.db
+      .query("taskConnections")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    for (const c of connections) {
+      await ctx.db.delete(c._id);
+    }
+
     // Delete activity log entries
     const logs = await ctx.db
       .query("activityLog")
@@ -542,9 +555,13 @@ export const getTeamsForBrief = query({
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
     const teams = await ctx.db.query("teams").collect();
-    return briefTeams
-      .map((bt) => teams.find((t) => t._id === bt.teamId))
-      .filter(Boolean);
+    const sorted = briefTeams.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const result: (typeof teams[number] & { order: number })[] = [];
+    for (const bt of sorted) {
+      const team = teams.find((t) => t._id === bt.teamId);
+      if (team) result.push({ ...team, order: bt.order ?? 0 } as any);
+    }
+    return result;
   },
 });
 
@@ -568,12 +585,13 @@ export const getBriefGraphData = query({
     const result = {
       brief,
       teams: [] as {
-        team: (typeof teams)[0];
+        team: (typeof teams)[0] & { order?: number };
         members: { user: (typeof users)[0]; taskCount: number; totalHours: number }[];
       }[],
     };
 
-    for (const bt of briefTeams) {
+    const sortedBriefTeams = [...briefTeams].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    for (const bt of sortedBriefTeams) {
       const team = teams.find((t) => t._id === bt.teamId);
       if (!team) continue;
       const memberIds = userTeams
@@ -589,7 +607,7 @@ export const getBriefGraphData = query({
           totalHours: totalMinutes / 60,
         };
       });
-      result.teams.push({ team, members });
+      result.teams.push({ team: { ...team, order: bt.order ?? 0 }, members });
     }
 
     return result;
@@ -611,6 +629,94 @@ export const listBriefsForEmployee = query({
     return briefs
       .filter((b): b is NonNullable<typeof b> => !!b && b.status !== "archived")
       .map((b) => ({ _id: b._id, title: b.title }));
+  },
+});
+
+// ─── TEAM ORDERING ──────────────────────────────────
+export const updateTeamOrder = mutation({
+  args: {
+    briefId: v.id("briefs"),
+    teamOrders: v.array(v.object({ teamId: v.id("teams"), order: v.number() })),
+  },
+  handler: async (ctx, { briefId, teamOrders }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    const brief = await ctx.db.get(briefId);
+    if (!brief) throw new Error("Brief not found");
+    if (!user || (user.role !== "admin" && brief.assignedManagerId !== userId)) {
+      throw new Error("Not authorized");
+    }
+    const briefTeams = await ctx.db
+      .query("briefTeams")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    for (const { teamId, order } of teamOrders) {
+      const bt = briefTeams.find((bt) => bt.teamId === teamId);
+      if (bt) await ctx.db.patch(bt._id, { order });
+    }
+  },
+});
+
+// ─── TASK CONNECTIONS (sequential flow) ─────────────
+export const listTaskConnections = query({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
+    return await ctx.db
+      .query("taskConnections")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+  },
+});
+
+export const addTaskConnection = mutation({
+  args: {
+    briefId: v.id("briefs"),
+    sourceTaskId: v.id("tasks"),
+    targetTaskId: v.id("tasks"),
+  },
+  handler: async (ctx, { briefId, sourceTaskId, targetTaskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    const brief = await ctx.db.get(briefId);
+    if (!brief) throw new Error("Brief not found");
+    if (!user || (user.role !== "admin" && brief.assignedManagerId !== userId)) {
+      throw new Error("Not authorized");
+    }
+    // Prevent duplicate connections
+    const existing = await ctx.db
+      .query("taskConnections")
+      .withIndex("by_source", (q) => q.eq("sourceTaskId", sourceTaskId))
+      .collect();
+    if (existing.some((c) => c.targetTaskId === targetTaskId)) {
+      return; // already connected
+    }
+    // Prevent self-connections
+    if (sourceTaskId === targetTaskId) throw new Error("Cannot connect a task to itself");
+    await ctx.db.insert("taskConnections", {
+      briefId,
+      sourceTaskId,
+      targetTaskId,
+      createdBy: userId,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const removeTaskConnection = mutation({
+  args: { connectionId: v.id("taskConnections") },
+  handler: async (ctx, { connectionId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const connection = await ctx.db.get(connectionId);
+    if (!connection) throw new Error("Connection not found");
+    const user = await ctx.db.get(userId);
+    const brief = await ctx.db.get(connection.briefId);
+    if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
+      throw new Error("Not authorized");
+    }
+    await ctx.db.delete(connectionId);
   },
 });
 
