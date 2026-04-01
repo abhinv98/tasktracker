@@ -1031,6 +1031,7 @@ export function ContentCalendarEntrySidebar({
     assignTaskTeam ? { teamId: assignTaskTeam as Id<"teams"> } : "skip"
   );
   const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [deletingLinkedId, setDeletingLinkedId] = useState<string | null>(null);
 
   // Reference links
   const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
@@ -1512,10 +1513,49 @@ export function ContentCalendarEntrySidebar({
                 {linkedTasks
                   .filter((lt: any) => lt._id !== task._id)
                   .map((lt: any) => (
-                  <p key={lt._id} className="text-[11px] text-[var(--text-secondary)] truncate">
-                    · {lt.title}
-                  </p>
-                ))}
+                    <div
+                      key={lt._id}
+                      className="flex items-center gap-1.5 min-w-0 group/row"
+                    >
+                      <p className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
+                        · {lt.title}
+                      </p>
+                      <button
+                        type="button"
+                        disabled={deletingLinkedId === lt._id}
+                        title="Remove linked task"
+                        onClick={async () => {
+                          if (
+                            !confirm(
+                              `Remove linked task "${lt.title}"? This cannot be undone.`
+                            )
+                          )
+                            return;
+                          setDeletingLinkedId(lt._id);
+                          try {
+                            await deleteTask({ taskId: lt._id });
+                            toast("success", "Linked task removed");
+                          } catch (err) {
+                            toast(
+                              "error",
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to remove task"
+                            );
+                          } finally {
+                            setDeletingLinkedId(null);
+                          }
+                        }}
+                        className="p-1 rounded-md shrink-0 text-[var(--text-muted)] opacity-70 hover:opacity-100 hover:text-[var(--danger)] hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        {deletingLinkedId === lt._id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
               </div>
             )}
             {showAssignTask && (
