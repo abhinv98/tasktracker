@@ -86,13 +86,16 @@ export default function MessagesPage() {
     );
   }, [contacts, searchQuery]);
 
-  const selectedContact = contacts?.find((c) => c._id === selectedContactId);
+  const selectedContact = contacts?.find(
+    (c) => String(c._id) === String(selectedContactId)
+  );
 
   async function handleSend() {
     if (!messageText.trim() || !selectedContactId) return;
     try {
       await sendMessage({ recipientId: selectedContactId, content: messageText });
       setMessageText("");
+      await markRead({ otherUserId: selectedContactId });
       inputRef.current?.focus();
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to send");
@@ -123,9 +126,18 @@ export default function MessagesPage() {
       <div className="w-80 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
         {/* Header */}
         <div className="px-4 py-3 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="h-4 w-4 text-[var(--accent-admin)]" />
-            <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Messages</h1>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-[var(--accent-admin)]" />
+              <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Messages</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedContactId(user._id)}
+              className="shrink-0 px-2 py-1 rounded-md text-[10px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-90 transition-opacity"
+            >
+              Saved messages
+            </button>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
@@ -145,7 +157,7 @@ export default function MessagesPage() {
             <p className="px-4 py-8 text-[11px] text-[var(--text-disabled)] text-center">No contacts found</p>
           ) : (
             filteredContacts.map((contact) => {
-              const isActive = selectedContactId === contact._id;
+              const isActive = String(selectedContactId) === String(contact._id);
               const hasUnread = contact.unreadCount > 0;
               return (
                 <button
@@ -317,6 +329,13 @@ export default function MessagesPage() {
             <p className="text-[12px] text-[var(--text-muted)] max-w-[280px]">
               Select a contact from the left to start a conversation. Messages are private between you and the recipient.
             </p>
+            <button
+              type="button"
+              onClick={() => setSelectedContactId(user._id)}
+              className="mt-4 px-4 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+            >
+              Open saved messages (notes to self)
+            </button>
           </div>
         )}
       </div>

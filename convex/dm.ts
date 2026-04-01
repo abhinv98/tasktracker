@@ -83,14 +83,15 @@ export const getContacts = query({
       });
     }
 
-    const selfUser = allUsers.find((u) => u._id === authId);
+    // Notes to self: prefer ctx.db.get(authId) so we always have a row even if collect() is odd
+    const selfUser = (await ctx.db.get(authId)) ?? allUsers.find((u) => u._id === authId);
     if (selfUser) {
-      const selfThread = await ctx.db
+      // Use by_recipient then filter — reliable when senderId === recipientId (some index paths are finicky)
+      const toMe = await ctx.db
         .query("directMessages")
-        .withIndex("by_sender_recipient", (q) =>
-          q.eq("senderId", authId).eq("recipientId", authId)
-        )
+        .withIndex("by_recipient", (q) => q.eq("recipientId", authId))
         .collect();
+      const selfThread = toMe.filter((m) => m.senderId === authId);
       const unreadCount = selfThread.filter((m) => !m.readAt).length;
       let lastMessage: string | null = null;
       let lastMessageTime: number | null = null;
@@ -112,8 +113,11 @@ export const getContacts = query({
       });
     }
 
-    // Sort: unread first, then by last message time (most recent first)
+    // Sort: Saved messages first, then unread first, then by last message time (most recent first)
     contacts.sort((a, b) => {
+      const aSelf = a.name === "Saved messages" ? 1 : 0;
+      const bSelf = b.name === "Saved messages" ? 1 : 0;
+      if (aSelf !== bSelf) return bSelf - aSelf;
       if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
       if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
       if (a.lastMessageTime && b.lastMessageTime) return b.lastMessageTime - a.lastMessageTime;
@@ -136,12 +140,11 @@ export const getConversation = query({
     if (!authId) return [];
 
     if (otherUserId === authId) {
-      const selfMsgs = await ctx.db
+      const toMe = await ctx.db
         .query("directMessages")
-        .withIndex("by_sender_recipient", (q) =>
-          q.eq("senderId", authId).eq("recipientId", authId)
-        )
+        .withIndex("by_recipient", (q) => q.eq("recipientId", authId))
         .collect();
+      const selfMsgs = toMe.filter((m) => m.senderId === authId);
       const allMessages = [...selfMsgs].sort((a, b) => a.createdAt - b.createdAt);
       return allMessages.map((m) => ({
         _id: m._id,
@@ -250,6 +253,22 @@ export const markConversationRead = mutation({
     const authId = await getAuthUserId(ctx);
     if (!authId) throw new Error("Not authenticated");
 
+    const now = Date.now();
+
+    if (otherUserId === authId) {
+      const toMe = await ctx.db
+        .query("directMessages")
+        .withIndex("by_recipient", (q) => q.eq("recipientId", authId))
+        .collect();
+      const selfMsgs = toMe.filter((m) => m.senderId === authId);
+      for (const msg of selfMsgs) {
+        if (!msg.readAt) {
+          await ctx.db.patch(msg._id, { readAt: now });
+        }
+      }
+      return;
+    }
+
     const unreadMessages = await ctx.db
       .query("directMessages")
       .withIndex("by_sender_recipient", (q) =>
@@ -257,7 +276,6 @@ export const markConversationRead = mutation({
       )
       .collect();
 
-    const now = Date.now();
     for (const msg of unreadMessages) {
       if (!msg.readAt) {
         await ctx.db.patch(msg._id, { readAt: now });
