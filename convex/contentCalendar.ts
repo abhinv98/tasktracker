@@ -52,6 +52,30 @@ async function getOrCreateCalendarBrief(
   });
 }
 
+/** Ensure a month sheet exists for this brief (YYYY-MM). Used by create entry mutations. */
+async function ensureSheetForMonth(
+  ctx: any,
+  briefId: any,
+  month: string,
+  userId: string
+): Promise<void> {
+  const sheets = await ctx.db
+    .query("contentCalendarSheets")
+    .withIndex("by_brief", (q: any) => q.eq("briefId", briefId))
+    .collect();
+  if (sheets.some((s: any) => s.month === month)) return;
+  const maxOrder = sheets.length
+    ? Math.max(...sheets.map((s: any) => s.sortOrder))
+    : 0;
+  await ctx.db.insert("contentCalendarSheets", {
+    briefId,
+    month,
+    sortOrder: maxOrder + 1,
+    createdBy: userId,
+    createdAt: Date.now(),
+  });
+}
+
 export const getCalendarBriefForBrand = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
@@ -141,23 +165,7 @@ export const createEntryForBrand = mutation({
     const assignee = args.assigneeId ?? assignor;
 
     const month = args.postDate.substring(0, 7);
-    const sheets = await ctx.db
-      .query("contentCalendarSheets")
-      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
-      .collect();
-    const sheetExists = sheets.some((s) => s.month === month);
-    if (!sheetExists) {
-      const maxOrder = sheets.length
-        ? Math.max(...sheets.map((s) => s.sortOrder))
-        : 0;
-      await ctx.db.insert("contentCalendarSheets", {
-        briefId,
-        month,
-        sortOrder: maxOrder + 1,
-        createdBy: userId,
-        createdAt: Date.now(),
-      });
-    }
+    await ensureSheetForMonth(ctx, briefId, month, userId);
 
     const existingTasks = await ctx.db
       .query("tasks")
@@ -429,12 +437,7 @@ export const createCalendarEntry = mutation({
     if (!brief) throw new Error("Brief not found");
 
     const month = args.postDate.substring(0, 7);
-    const sheets = await ctx.db
-      .query("contentCalendarSheets")
-      .withIndex("by_brief", (q) => q.eq("briefId", args.briefId))
-      .collect();
-    const sheetExists = sheets.some((s) => s.month === month);
-    if (!sheetExists) throw new Error(`No sheet for month ${month}. Create a sheet tab first.`);
+    await ensureSheetForMonth(ctx, args.briefId, month, userId);
 
     const assignor = args.assignedBy ?? userId;
     const assignee = args.assigneeId ?? assignor;
@@ -495,5 +498,130 @@ export const createCalendarEntry = mutation({
     });
 
     return taskId;
+  },
+});
+
+/**
+ * Create a child task linked to a content calendar entry (e.g. Copy team work).
+ * Title is prefixed with Content Calendar + brand tags; inherits post date / platform from parent when omitted.
+ */
+export const createLinkedCalendarTask = mutation({
+  args: {
+    briefId: v.id("briefs"),
+    parentTaskId: v.id("tasks"),
+    assigneeId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    deadline: v.optional(v.number()),
+    platform: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    postDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can assign linked calendar tasks");
+    }
+
+    const brief = await ctx.db.get(args.briefId);
+    if (!brief || brief.briefType !== "content_calendar") {
+      throw new Error("Brief is not a content calendar");
+    }
+
+    const parent = await ctx.db.get(args.parentTaskId);
+    if (!parent || parent.briefId !== args.briefId) {
+      throw new Error("Parent entry not found for this brief");
+    }
+
+    let brandName = "Brand";
+    if (brief.brandId) {
+      const brand = await ctx.db.get(brief.brandId);
+      if (brand?.name) brandName = brand.name;
+    }
+
+    const tagPrefix = `[Content Calendar · ${brandName}]`;
+    const fullTitle = args.title.trim().startsWith("[")
+      ? args.title.trim()
+      : `${tagPrefix} ${args.title.trim()}`;
+
+    const postDate = args.postDate ?? parent.postDate;
+    const platform = args.platform ?? parent.platform ?? "Other";
+    const contentType = args.contentType ?? parent.contentType ?? "Post";
+
+    if (postDate) {
+      const month = postDate.substring(0, 7);
+      await ensureSheetForMonth(ctx, args.briefId, month, userId);
+    }
+
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", args.briefId))
+      .collect();
+    const maxOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t) => t.sortOrder))
+      : 0;
+
+    const taskId = await ctx.db.insert("tasks", {
+      briefId: args.briefId,
+      title: fullTitle,
+      description:
+        args.description ??
+        `Linked to calendar entry: ${parent.title}\n\nTags: Content Calendar, ${brandName}`,
+      assigneeId: args.assigneeId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxOrder + 1000,
+      duration: "1d",
+      durationMinutes: 480,
+      parentTaskId: args.parentTaskId,
+      platform,
+      contentType,
+      ...(postDate ? { postDate } : {}),
+      ...(args.deadline !== undefined ? { deadline: args.deadline } : {}),
+      assignedAt: Date.now(),
+    });
+
+    await ctx.db.insert("notifications", {
+      recipientId: args.assigneeId,
+      type: "task_assigned",
+      title: "Content calendar task assigned",
+      message: `You were assigned: ${fullTitle}`,
+      briefId: args.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("activityLog", {
+      briefId: args.briefId,
+      taskId,
+      userId,
+      action: "created_task",
+      details: JSON.stringify({
+        title: fullTitle,
+        parentTaskId: args.parentTaskId,
+        linkedCalendar: true,
+      }),
+      timestamp: Date.now(),
+    });
+
+    return taskId;
+  },
+});
+
+/** Tasks created via Assign Task (linked to a calendar entry). */
+export const listLinkedTasksForEntry = query({
+  args: { parentTaskId: v.id("tasks") },
+  handler: async (ctx, { parentTaskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    return await ctx.db
+      .query("tasks")
+      .withIndex("by_parent", (q) => q.eq("parentTaskId", parentTaskId))
+      .collect();
   },
 });

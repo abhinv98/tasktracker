@@ -856,6 +856,23 @@ export default function BriefPage() {
                   setPendingConnectionSource(sourceTaskId);
                   setPendingFlowPosition(position);
                 }}
+                pendingDraft={
+                  panelMode === "create" && pendingFlowPosition && panelTeamId
+                    ? (() => {
+                        const gt = (graphData?.teams ?? []).find(
+                          (g) => g.team._id === panelTeamId
+                        )?.team;
+                        return {
+                          x: pendingFlowPosition.x,
+                          y: pendingFlowPosition.y,
+                          teamId: panelTeamId,
+                          teamName: gt?.name,
+                          teamColor: gt?.color,
+                        };
+                      })()
+                    : null
+                }
+                onRequestAddTeam={() => setShowTeamPicker(true)}
               />
             )}
           </div>

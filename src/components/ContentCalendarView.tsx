@@ -77,6 +77,16 @@ function monthLabel(month: string) {
   });
 }
 
+/** First and last calendar date strings (YYYY-MM-DD) for a YYYY-MM month. */
+function monthDateBounds(ym: string): { min: string; max: string } {
+  const [y, m] = ym.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return {
+    min: `${ym}-01`,
+    max: `${ym}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 interface ContentCalendarViewProps {
   briefId: Id<"briefs">;
   isEditable: boolean;
@@ -195,6 +205,13 @@ export function ContentCalendarView({
   async function handleAddEntry(e: React.FormEvent) {
     e.preventDefault();
     if (!currentSheetMonth) return;
+    if (newPostDate && !newPostDate.startsWith(currentSheetMonth)) {
+      toast(
+        "error",
+        `Post date must be in ${monthLabel(currentSheetMonth)} (active month tab).`
+      );
+      return;
+    }
     const assignor = newAssignor || (defaultAssignor as string) || undefined;
     try {
       await createEntry({
@@ -323,8 +340,8 @@ export function ContentCalendarView({
       {/* Break Day Picker */}
       {showBreakDayPicker && currentSheetMonth && (
         <div className="px-4 py-3 border-b border-[var(--border)] bg-red-50/40 shrink-0">
-          <p className="text-[11px] font-semibold text-red-700 mb-2">
-            Click a day to toggle it as a break day (red = break)
+          <p className="text-[11px] font-semibold text-red-700 mb-1">
+            Click a day to toggle a break. Rows in the table below show a BREAK badge when that post date matches (entries with no row still show as breaks in the month strip).
           </p>
           {(() => {
             const [y, m] = currentSheetMonth.split("-").map(Number);
@@ -374,6 +391,38 @@ export function ContentCalendarView({
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Month strip: break days visible even when no entry exists for that date */}
+      {currentSheetMonth && (
+        <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-primary)] shrink-0">
+          <p className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5">
+            {monthLabel(currentSheetMonth)} — break days (red)
+          </p>
+          <div className="flex flex-wrap gap-1 max-w-full">
+            {Array.from(
+              { length: new Date(Number(currentSheetMonth.split("-")[0]), Number(currentSheetMonth.split("-")[1]), 0).getDate() },
+              (_, i) => {
+                const d = i + 1;
+                const dateStr = `${currentSheetMonth}-${String(d).padStart(2, "0")}`;
+                const isBreak = breakDaySet.has(dateStr);
+                return (
+                  <div
+                    key={dateStr}
+                    title={dateStr}
+                    className={`w-7 h-7 flex items-center justify-center rounded text-[10px] font-medium shrink-0 ${
+                      isBreak
+                        ? "bg-red-500 text-white"
+                        : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+                    }`}
+                  >
+                    {d}
+                  </div>
+                );
+              }
+            )}
+          </div>
         </div>
       )}
 
@@ -610,6 +659,7 @@ export function ContentCalendarView({
             teams={allTeams ?? []}
             briefId={briefId}
             brandId={brandId}
+            currentSheetMonth={currentSheetMonth}
             onClose={() => setSelectedTaskId(null)}
             updateTask={updateTask}
             updateTaskStatus={updateTaskStatus}
@@ -739,6 +789,8 @@ export function ContentCalendarView({
                 <input
                   type="date"
                   value={newPostDate}
+                  min={currentSheetMonth ? monthDateBounds(currentSheetMonth).min : undefined}
+                  max={currentSheetMonth ? monthDateBounds(currentSheetMonth).max : undefined}
                   onChange={(e) => setNewPostDate(e.target.value)}
                   required
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
@@ -909,6 +961,7 @@ function DetailSidebar({
   teams,
   briefId,
   brandId,
+  currentSheetMonth,
   onClose,
   updateTask,
   updateTaskStatus,
@@ -922,6 +975,7 @@ function DetailSidebar({
   teams: any[];
   briefId: Id<"briefs">;
   brandId?: Id<"brands">;
+  currentSheetMonth: string | null;
   onClose: () => void;
   updateTask: any;
   updateTaskStatus: any;
@@ -960,6 +1014,23 @@ function DetailSidebar({
   const deliverables = useQuery(api.approvals.listDeliverables, { taskId: task._id });
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
   const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
+  const createLinkedCalendarTask = useMutation(api.contentCalendar.createLinkedCalendarTask);
+
+  const calendarEntryTaskId = (task.parentTaskId ?? task._id) as Id<"tasks">;
+  const linkedTasks = useQuery(api.contentCalendar.listLinkedTasksForEntry, {
+    parentTaskId: calendarEntryTaskId,
+  });
+
+  const [showAssignTask, setShowAssignTask] = useState(false);
+  const [assignTaskTitle, setAssignTaskTitle] = useState("");
+  const [assignTaskTeam, setAssignTaskTeam] = useState("");
+  const [assignTaskAssignee, setAssignTaskAssignee] = useState("");
+  const [assignTaskDeadline, setAssignTaskDeadline] = useState("");
+  const assignTaskMembers = useQuery(
+    api.teams.getTeamMembers,
+    assignTaskTeam ? { teamId: assignTaskTeam as Id<"teams"> } : "skip"
+  );
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
 
   // Reference links
   const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
@@ -1323,6 +1394,8 @@ function DetailSidebar({
             <input
               type="date"
               value={editPostDate}
+              min={currentSheetMonth ? monthDateBounds(currentSheetMonth).min : undefined}
+              max={currentSheetMonth ? monthDateBounds(currentSheetMonth).max : undefined}
               onChange={(e) => setEditPostDate(e.target.value)}
               className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             />
@@ -1418,6 +1491,124 @@ function DetailSidebar({
             </div>
           )}
         </div>
+
+        {/* Assign another task (Copy / Design) linked to this calendar entry */}
+        {isEditable && (
+          <div className="pt-3 border-t border-[var(--border)]">
+            <button
+              type="button"
+              onClick={() => setShowAssignTask((v) => !v)}
+              className="flex items-center gap-2 text-[12px] font-semibold text-[var(--accent-admin)] hover:underline"
+            >
+              <Users className="h-3.5 w-3.5" />
+              {showAssignTask ? "Hide Assign Task" : "Assign Task (linked)"}
+            </button>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              Creates a child task tagged for Content Calendar and this brand; appears on the assignee dashboard.
+            </p>
+            {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[10px] font-medium text-[var(--text-muted)] uppercase">Linked tasks</p>
+                {linkedTasks
+                  .filter((lt: any) => lt._id !== task._id)
+                  .map((lt: any) => (
+                  <p key={lt._id} className="text-[11px] text-[var(--text-secondary)] truncate">
+                    · {lt.title}
+                  </p>
+                ))}
+              </div>
+            )}
+            {showAssignTask && (
+              <div className="mt-3 space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Task title</label>
+                  <input
+                    value={assignTaskTitle}
+                    onChange={(e) => setAssignTaskTitle(e.target.value)}
+                    placeholder="e.g. Copy review"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Team</label>
+                  <select
+                    value={assignTaskTeam}
+                    onChange={(e) => {
+                      setAssignTaskTeam(e.target.value);
+                      setAssignTaskAssignee("");
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
+                  >
+                    <option value="">Select team</option>
+                    {teams.map((team: any) => (
+                      <option key={team._id} value={team._id}>{team.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Assignee</label>
+                  <select
+                    value={assignTaskAssignee}
+                    onChange={(e) => setAssignTaskAssignee(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
+                  >
+                    <option value="">Select member</option>
+                    {(assignTaskTeam && assignTaskMembers
+                      ? assignTaskMembers
+                      : employees
+                    ).map((emp: any) => (
+                      <option key={emp._id} value={emp._id}>
+                        {emp.name ?? emp.email}
+                        {emp.designation ? ` — ${emp.designation}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Deadline (optional)</label>
+                  <input
+                    type="date"
+                    value={assignTaskDeadline}
+                    onChange={(e) => setAssignTaskDeadline(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={assignSubmitting || !assignTaskTitle.trim() || !assignTaskAssignee}
+                  onClick={async () => {
+                    if (!assignTaskTitle.trim() || !assignTaskAssignee) return;
+                    setAssignSubmitting(true);
+                    try {
+                      await createLinkedCalendarTask({
+                        briefId,
+                        parentTaskId: calendarEntryTaskId,
+                        assigneeId: assignTaskAssignee as Id<"users">,
+                        title: assignTaskTitle.trim(),
+                        ...(assignTaskDeadline
+                          ? { deadline: new Date(assignTaskDeadline + "T23:59:59").getTime() }
+                          : {}),
+                      });
+                      toast("success", "Linked task created");
+                      setAssignTaskTitle("");
+                      setAssignTaskTeam("");
+                      setAssignTaskAssignee("");
+                      setAssignTaskDeadline("");
+                      setShowAssignTask(false);
+                    } catch (err) {
+                      toast("error", err instanceof Error ? err.message : "Failed");
+                    } finally {
+                      setAssignSubmitting(false);
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium disabled:opacity-50"
+                >
+                  {assignSubmitting ? "Creating…" : "Create linked task"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Assigned At */}
         <div>

@@ -67,6 +67,16 @@ interface BriefFlowCanvasProps {
   onEditTask: (taskId: string) => void;
   onOpenTaskDetail: (taskId: string) => void;
   onDragToCreate?: (sourceTaskId: string, teamId: string, position: { x: number; y: number }) => void;
+  /** Shows a dashed placeholder where the user dropped a connector (complete task in the side panel). */
+  pendingDraft?: {
+    x: number;
+    y: number;
+    teamId: string;
+    teamName?: string;
+    teamColor?: string;
+  } | null;
+  /** Opens team picker (e.g. add a team not yet on this brief). */
+  onRequestAddTeam?: () => void;
 }
 
 /* ─── Status colors ──────────────────────────────── */
@@ -89,12 +99,12 @@ function TaskNode({ data }: { data: TaskData }) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-3 !h-3 !bg-slate-300 !border-2 !border-white hover:!bg-blue-500 !transition-colors !-top-1.5"
+        className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-top-1.5"
       />
 
       {/* Card */}
       <div
-        className="bg-white rounded-xl shadow-sm border-2 border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer min-w-[180px] max-w-[220px]"
+        className="bg-white rounded-xl shadow-md border-2 border-[var(--border)] hover:shadow-lg hover:border-[var(--accent-admin)] transition-all cursor-pointer min-w-[180px] max-w-[220px]"
         onClick={() => data.onOpenDetail(data._id)}
       >
         {/* Color top bar */}
@@ -106,7 +116,7 @@ function TaskNode({ data }: { data: TaskData }) {
         {/* Content */}
         <div className="px-3 py-2.5">
           <div className="flex items-start justify-between gap-1.5">
-            <p className="text-[12px] font-semibold text-slate-800 leading-tight line-clamp-2">
+            <p className="text-[12px] font-semibold text-[var(--text-primary)] leading-tight line-clamp-2">
               {data.title}
             </p>
             {data.isAdmin && (
@@ -115,7 +125,7 @@ function TaskNode({ data }: { data: TaskData }) {
                   e.stopPropagation();
                   data.onEdit(data._id);
                 }}
-                className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all shrink-0"
+                className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
               >
                 <Pencil className="h-3 w-3" />
               </button>
@@ -127,13 +137,13 @@ function TaskNode({ data }: { data: TaskData }) {
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ backgroundColor: status.color }}
             />
-            <span className="text-[10px] text-slate-500 truncate">
+            <span className="text-[10px] text-[var(--text-secondary)] truncate">
               {data.assigneeName}
             </span>
           </div>
 
           {data.deadline && (
-            <p className="text-[9px] text-slate-400 mt-1">
+            <p className="text-[9px] text-[var(--text-muted)] mt-1">
               {new Date(data.deadline).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -160,7 +170,7 @@ function TaskNode({ data }: { data: TaskData }) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-3 !h-3 !bg-slate-300 !border-2 !border-white hover:!bg-blue-500 !transition-colors !-bottom-1.5"
+        className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-bottom-1.5"
       />
     </div>
   );
@@ -172,10 +182,31 @@ function AddTaskNode({ data }: { data: { teamId: string; teamColor: string; onAd
   return (
     <div
       onClick={() => data.onAdd(data.teamId)}
-      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-all min-w-[160px] justify-center"
+      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-dashed border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] cursor-pointer transition-all min-w-[160px] justify-center"
     >
-      <Plus className="h-3.5 w-3.5 text-slate-400" />
-      <span className="text-[11px] font-medium text-slate-400">Add Task</span>
+      <Plus className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+      <span className="text-[11px] font-medium text-[var(--text-secondary)]">Add Task</span>
+    </div>
+  );
+}
+
+/** Placeholder after drag-to-canvas until the side panel saves the new task. */
+function DraftTaskNode({
+  data,
+}: {
+  data: { teamName: string; teamColor: string };
+}) {
+  return (
+    <div
+      className="rounded-xl border-2 border-dashed px-4 py-3 min-w-[168px] max-w-[200px] shadow-sm"
+      style={{
+        borderColor: data.teamColor,
+        background: `color-mix(in srgb, ${data.teamColor} 12%, white)`,
+      }}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">New task</p>
+      <p className="text-[11px] font-medium text-[var(--text-primary)] mt-1 line-clamp-2">{data.teamName}</p>
+      <p className="text-[10px] text-[var(--text-secondary)] mt-1.5">Finish in the panel on the right →</p>
     </div>
   );
 }
@@ -184,10 +215,10 @@ function AddTaskNode({ data }: { data: { teamId: string; teamColor: string; onAd
 
 function TeamLabelNode({ data }: { data: { teamName: string; teamColor: string; taskCount: number } }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 backdrop-blur-sm border border-slate-200 shadow-sm pointer-events-none select-none">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm border border-[var(--border)] shadow-sm pointer-events-none select-none">
       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.teamColor }} />
-      <span className="text-[12px] font-semibold text-slate-700">{data.teamName}</span>
-      <span className="text-[10px] text-slate-400 tabular-nums">{data.taskCount}</span>
+      <span className="text-[12px] font-semibold text-[var(--text-primary)]">{data.teamName}</span>
+      <span className="text-[10px] text-[var(--text-muted)] tabular-nums">{data.taskCount}</span>
     </div>
   );
 }
@@ -198,6 +229,7 @@ const nodeTypes: NodeTypes = {
   taskNode: TaskNode as any,
   addTaskNode: AddTaskNode as any,
   teamLabel: TeamLabelNode as any,
+  draftTaskNode: DraftTaskNode as any,
 };
 
 /* ─── Main Component ─────────────────────────────── */
@@ -219,6 +251,8 @@ function BriefFlowCanvasInner({
   onEditTask,
   onOpenTaskDetail,
   onDragToCreate,
+  pendingDraft,
+  onRequestAddTeam,
 }: BriefFlowCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const updatePositions = useMutation(api.tasks.updateTaskFlowPositions);
@@ -324,8 +358,24 @@ function BriefFlowCanvasInner({
       });
     });
 
+    if (pendingDraft) {
+      const t = teams.find((x) => x.teamId === pendingDraft.teamId);
+      nodes.push({
+        id: "__pending-draft__",
+        type: "draftTaskNode",
+        position: { x: pendingDraft.x, y: pendingDraft.y },
+        data: {
+          teamName: pendingDraft.teamName ?? t?.teamName ?? "Selected team",
+          teamColor: pendingDraft.teamColor ?? t?.teamColor ?? "var(--accent-admin)",
+        },
+        draggable: false,
+        connectable: false,
+        selectable: false,
+      });
+    }
+
     return { initialNodes: nodes, initialEdges: edges };
-  }, [teams, connections, isAdmin, onEditTask, onOpenTaskDetail, onCreateTask]);
+  }, [teams, connections, isAdmin, onEditTask, onOpenTaskDetail, onCreateTask, pendingDraft]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -346,7 +396,13 @@ function BriefFlowCanvasInner({
 
       // Collect position changes for task nodes
       for (const change of changes) {
-        if (change.type === "position" && change.position && !change.id.startsWith("team-") && !change.id.startsWith("add-")) {
+        if (
+          change.type === "position" &&
+          change.position &&
+          !change.id.startsWith("team-") &&
+          !change.id.startsWith("add-") &&
+          change.id !== "__pending-draft__"
+        ) {
           pendingPositions.current.set(change.id, change.position);
         }
       }
@@ -445,8 +501,20 @@ function BriefFlowCanvasInner({
     [onDragToCreate, screenToFlowPosition, teams]
   );
 
+  const accentStroke = "var(--accent-admin, #c4684d)";
+
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative rounded-xl overflow-hidden border border-[var(--border)] bg-[linear-gradient(160deg,color-mix(in_srgb,var(--bg-primary)_92%,var(--accent-admin-dim))_0%,var(--bg-primary)_45%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+      {isAdmin && onRequestAddTeam && (
+        <button
+          type="button"
+          onClick={onRequestAddTeam}
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-white/95 border border-[var(--border)] text-[var(--text-primary)] shadow-sm hover:bg-[var(--accent-admin-dim)] hover:border-[var(--accent-admin)] transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+          Add team to brief
+        </button>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -459,14 +527,14 @@ function BriefFlowCanvasInner({
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.3 }}
-        connectionLineStyle={{ stroke: "#6366f1", strokeWidth: 2 }}
+        connectionLineStyle={{ stroke: accentStroke, strokeWidth: 2 }}
         defaultEdgeOptions={{
           type: "smoothstep",
           animated: true,
-          style: { stroke: "#6366f1", strokeWidth: 2 },
+          style: { stroke: accentStroke, strokeWidth: 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: "#6366f1",
+            color: accentStroke,
           },
         }}
         proOptions={{ hideAttribution: true }}
@@ -476,20 +544,21 @@ function BriefFlowCanvasInner({
         maxZoom={2}
         deleteKeyCode={["Backspace", "Delete"]}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#e2e8f0" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="color-mix(in srgb, var(--accent-admin) 12%, transparent)" />
         <Controls
           showInteractive={false}
-          className="!bg-white !border-slate-200 !shadow-md !rounded-xl"
+          className="!bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
         />
         <MiniMap
           nodeColor={(node) => {
             if (node.type === "teamLabel") return "transparent";
             if (node.type === "addTaskNode") return "transparent";
+            if (node.type === "draftTaskNode") return "var(--accent-admin)";
             const taskData = node.data as unknown as TaskData;
             return (STATUS_CONFIG[taskData?.status]?.color) ?? "#94a3b8";
           }}
           maskColor="rgba(241, 245, 249, 0.7)"
-          className="!bg-white !border-slate-200 !shadow-md !rounded-xl"
+          className="!bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
           pannable
           zoomable
         />
