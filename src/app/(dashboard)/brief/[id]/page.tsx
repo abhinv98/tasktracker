@@ -8,10 +8,11 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Columns3, List, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, ChevronRight, ChevronUp, ChevronDown, ArrowRight, GripVertical, Link2 } from "lucide-react";
+import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
+import { BriefFlowCanvas } from "@/components/BriefFlowCanvas";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -437,11 +438,8 @@ export default function BriefPage() {
   const removeTeamFromBrief = useMutation(api.briefs.removeTeamFromBrief);
   const allTeams = useQuery(api.teams.listTeams, {});
 
-  // Task connections & team ordering
+  // Task connections
   const taskConnections = useQuery(api.briefs.listTaskConnections, { briefId });
-  const addTaskConnection = useMutation(api.briefs.addTaskConnection);
-  const removeTaskConnection = useMutation(api.briefs.removeTaskConnection);
-  const updateTeamOrder = useMutation(api.briefs.updateTeamOrder);
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -451,7 +449,6 @@ export default function BriefPage() {
   const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
   const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [taskHandoffTeam, setTaskHandoffTeam] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [autoEditTask, setAutoEditTask] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -460,8 +457,6 @@ export default function BriefPage() {
   // Flowchart panel state
   const [panelMode, setPanelMode] = useState<"hidden" | "create" | "edit">("hidden");
   const [panelTeamId, setPanelTeamId] = useState<string>("");
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const [showTeamPicker, setShowTeamPicker] = useState(false);
 
   const { toast } = useToast();
@@ -471,12 +466,6 @@ export default function BriefPage() {
   const employeesInBriefTeams =
     briefTeamsList.flatMap((t) => t.members.map((m) => m.user)) ?? [];
   const uniqueEmployees = [...new Map(employeesInBriefTeams.map((e) => [e._id, e])).values()];
-
-  const filteredEmployees = taskTeamFilter
-    ? briefTeamsList
-        .find((t) => t.team._id === taskTeamFilter)
-        ?.members.map((m) => m.user) ?? []
-    : uniqueEmployees;
 
   const allTasks = tasksData?.tasks ?? [];
   const tasksByStatus = {
@@ -488,40 +477,6 @@ export default function BriefPage() {
   const totalTasks = allTasks.length;
   const doneTasks = tasksByStatus.done.length;
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
-
-  async function handleCreateTask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!taskAssignee) return;
-    let finalDeadline = taskDeadline;
-    if (taskDeadline !== undefined && taskDeadlineTime) {
-      const [hh, mm] = taskDeadlineTime.split(":").map(Number);
-      const d = new Date(taskDeadline);
-      d.setHours(hh, mm, 0, 0);
-      finalDeadline = d.getTime();
-    }
-    try {
-      await createTask({
-        briefId,
-        title: taskTitle,
-        description: taskDesc || undefined,
-        assigneeId: taskAssignee as Id<"users">,
-        ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
-        ...(taskClientFacing ? { clientFacing: true } : {}),
-        ...(taskHandoffTeam ? { handoffTargetTeamId: taskHandoffTeam as Id<"teams"> } : {}),
-      });
-      setTaskTitle("");
-      setTaskDesc("");
-      setTaskTeamFilter("");
-      setTaskAssignee("");
-      setTaskDeadline(undefined);
-      setTaskDeadlineTime("");
-      setTaskClientFacing(false);
-      setTaskHandoffTeam("");
-      toast("success", "Task created");
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed to create task");
-    }
-  }
 
   async function handleArchive() {
     try {
@@ -749,102 +704,35 @@ export default function BriefPage() {
         />
       ) : (
       <div className="flex-1 flex overflow-hidden relative">
-        {/* ── LEFT: Flowchart Canvas ───────────────────────── */}
-        <div className={`flex-1 overflow-auto bg-[var(--bg-primary)] transition-all duration-300 ${panelMode !== "hidden" ? "mr-[420px]" : ""}`}>
-          <div className="p-6">
-            {/* Brief description (editable) */}
-            <div className="mb-5">
-              {isAdmin && brief.status !== "archived" ? (
-                <textarea
-                  className="w-full text-[13px] text-[var(--text-secondary)] leading-relaxed bg-transparent border border-transparent hover:border-[var(--border)] focus:border-[var(--accent-admin)] focus:outline-none rounded-lg px-2 py-1 -ml-2 resize-none"
-                  defaultValue={brief.description}
-                  rows={2}
-                  onBlur={(e) => {
-                    const val = e.target.value.trim();
-                    if (val !== brief.description) updateBrief({ briefId, description: val });
-                  }}
-                />
-              ) : brief.description ? (
-                <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed">{brief.description}</p>
-              ) : null}
-            </div>
-
-            {/* Progress summary row */}
-            <div className="flex items-center gap-4 mb-6 p-3 rounded-lg bg-white border border-[var(--border-subtle)]">
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[12px] font-medium text-[var(--text-secondary)]">Progress</span>
-                  <span className="text-[12px] font-semibold text-[var(--accent-admin)]">{progressPct}%</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                  <div className="h-full rounded-full bg-[var(--accent-employee)] transition-all duration-300" style={{ width: `${progressPct}%` }} />
-                </div>
+        {/* ── FLOW CANVAS (React Flow) ─────────────────────── */}
+        <div className={`flex-1 overflow-hidden transition-all duration-300 ${panelMode !== "hidden" ? "mr-[420px]" : ""}`}>
+          {/* Top toolbar */}
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-white z-10 relative">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-[11px] font-medium text-[var(--text-secondary)]">Progress</span>
+              <div className="w-24 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+                <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${progressPct}%` }} />
               </div>
-              {(Object.entries(STATUS_LABELS) as [string, { label: string; color: string }][]).map(([status, { label, color }]) => (
-                <div key={status} className="text-center min-w-[48px]">
-                  <p className="font-bold text-[16px] tabular-nums" style={{ color }}>
-                    {tasksByStatus[status as keyof typeof tasksByStatus]?.length ?? 0}
-                  </p>
-                  <p className="text-[9px] font-medium text-[var(--text-muted)]">{label}</p>
-                </div>
-              ))}
+              <span className="text-[11px] font-semibold text-[var(--accent-admin)] tabular-nums">{progressPct}%</span>
+              <span className="text-[10px] text-[var(--text-muted)]">({doneTasks}/{totalTasks})</span>
             </div>
 
-            {/* Team picker */}
+            {/* Team pills */}
             {isAdmin && brief.status !== "archived" && (
-              <div className="mb-6 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-medium text-[var(--text-secondary)]">Teams:</span>
-                {(teamsForBrief ?? []).filter((t): t is NonNullable<typeof t> => !!t).map((team, idx) => (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(teamsForBrief ?? []).filter(Boolean).map((team: any, idx: number) => (
                   <span
                     key={team._id}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-[var(--border)]"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-white border border-[var(--border)]"
                     style={{ borderLeftWidth: 3, borderLeftColor: team.color }}
                   >
-                    <span className="text-[9px] text-[var(--text-muted)] mr-0.5">{idx + 1}.</span>
                     {team.name}
-                    {/* Move up/down */}
-                    {idx > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const teams = (teamsForBrief ?? []).filter(Boolean) as any[];
-                          const orders = teams.map((t: any, i: number) => ({ teamId: t._id as Id<"teams">, order: i }));
-                          // Swap this and previous
-                          const prev = orders[idx - 1];
-                          orders[idx - 1] = { ...orders[idx - 1], order: idx - 1, teamId: orders[idx].teamId };
-                          orders[idx] = { ...orders[idx], order: idx, teamId: prev.teamId };
-                          updateTeamOrder({ briefId, teamOrders: orders });
-                        }}
-                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        title="Move up"
-                      >
-                        <ChevronUp className="h-3 w-3" />
-                      </button>
-                    )}
-                    {idx < (teamsForBrief?.length ?? 0) - 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const teams = (teamsForBrief ?? []).filter(Boolean) as any[];
-                          const orders = teams.map((t: any, i: number) => ({ teamId: t._id as Id<"teams">, order: i }));
-                          const next = orders[idx + 1];
-                          orders[idx + 1] = { ...orders[idx + 1], order: idx + 1, teamId: orders[idx].teamId };
-                          orders[idx] = { ...orders[idx], order: idx, teamId: next.teamId };
-                          updateTeamOrder({ briefId, teamOrders: orders });
-                        }}
-                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        title="Move down"
-                      >
-                        <ChevronDown className="h-3 w-3" />
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => removeTeamFromBrief({ briefId, teamId: team._id })}
                       className="text-[var(--text-muted)] hover:text-[var(--danger)] ml-0.5"
-                      title="Remove team"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-2.5 w-2.5" />
                     </button>
                   </span>
                 ))}
@@ -852,14 +740,14 @@ export default function BriefPage() {
                   <button
                     type="button"
                     onClick={() => setShowTeamPicker(!showTeamPicker)}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin)] hover:text-white transition-colors"
+                    className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin)] hover:text-white transition-colors"
                   >
-                    <Plus className="h-3 w-3" /> Add Team
+                    <Plus className="h-2.5 w-2.5" /> Team
                   </button>
                   {showTeamPicker && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setShowTeamPicker(false)} />
-                      <div className="absolute left-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[160px]">
+                      <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[140px]">
                         {(allTeams ?? [])
                           .filter((t) => !teamsForBrief?.some((tb) => tb?._id === t._id))
                           .map((team) => (
@@ -875,14 +763,14 @@ export default function BriefPage() {
                                 });
                                 setShowTeamPicker(false);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                              className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
                             >
                               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
                               {team.name}
                             </button>
                           ))}
                         {(allTeams ?? []).filter((t) => !teamsForBrief?.some((tb) => tb?._id === t._id)).length === 0 && (
-                          <p className="px-3 py-1.5 text-[11px] text-[var(--text-muted)]">All teams assigned</p>
+                          <p className="px-3 py-1.5 text-[10px] text-[var(--text-muted)]">All teams added</p>
                         )}
                       </div>
                     </>
@@ -890,245 +778,65 @@ export default function BriefPage() {
                 </div>
               </div>
             )}
+          </div>
 
-            {/* ── Sequential Flowchart ─────────────────────── */}
+          {/* React Flow canvas */}
+          <div className="flex-1" style={{ height: "calc(100% - 42px)" }}>
             {(teamsForBrief?.length ?? 0) === 0 ? (
-              <div className="flex items-center justify-center h-[300px] text-center">
+              <div className="flex items-center justify-center h-full text-center">
                 <div>
                   <ClipboardList className="h-10 w-10 text-[var(--text-disabled)] mx-auto mb-3" />
                   <p className="text-[14px] font-medium text-[var(--text-secondary)]">No teams assigned</p>
-                  <p className="text-[12px] text-[var(--text-muted)] mt-1">Add teams above to start building the task flow.</p>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">Add teams above to build the task flow.</p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-0">
-                {(teamsForBrief ?? []).filter(Boolean).map((team: any, teamIdx: number) => {
-                  const teamTasks = allTasks.filter((t) => {
-                    // Find which team the assignee belongs to
-                    const memberTeam = briefTeamsList.find((bt) =>
-                      bt.members.some((m) => m.user._id === t.assigneeId)
-                    );
-                    return memberTeam?.team._id === team._id;
-                  });
-
-                  return (
-                    <div key={team._id} className="relative">
-                      {/* Team connector arrow (between team sections) */}
-                      {teamIdx > 0 && (
-                        <div className="flex justify-center py-2">
-                          <div className="w-px h-6 bg-[var(--border)]" />
-                        </div>
-                      )}
-
-                      {/* Team section */}
-                      <div
-                        className="rounded-xl border-2 bg-white overflow-hidden"
-                        style={{ borderColor: `color-mix(in srgb, ${team.color} 40%, transparent)` }}
-                      >
-                        {/* Team header */}
-                        <div
-                          className="px-4 py-2.5 flex items-center justify-between"
-                          style={{ backgroundColor: `color-mix(in srgb, ${team.color} 8%, transparent)` }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: team.color }}
-                            />
-                            <h3 className="font-semibold text-[13px] text-[var(--text-primary)]">
-                              {team.name}
-                            </h3>
-                            <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
-                              {teamTasks.length} task{teamTasks.length !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          {isAdmin && brief.status !== "archived" && (
-                            <button
-                              onClick={() => {
-                                setPanelMode("create");
-                                setPanelTeamId(team._id);
-                                setTaskTeamFilter(team._id);
-                                setTaskTitle("");
-                                setTaskDesc("");
-                                setTaskAssignee("");
-                                setTaskDeadline(undefined);
-                                setTaskDeadlineTime("");
-                                setTaskClientFacing(false);
-                                setTaskHandoffTeam("");
-                              }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md text-[var(--accent-admin)] hover:bg-white transition-colors"
-                            >
-                              <Plus className="h-3 w-3" /> Add Task
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Task chips */}
-                        <div className="p-3">
-                          {teamTasks.length === 0 ? (
-                            <p className="text-[11px] text-[var(--text-muted)] text-center py-4">
-                              No tasks yet. Click &ldquo;Add Task&rdquo; to create one.
-                            </p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              {teamTasks.map((task) => {
-                                const statusInfo = STATUS_LABELS[task.status] ?? { label: task.status, color: "#6b7280" };
-                                const assignee = tasksData?.byTeam
-                                  ? Object.values(tasksData.byTeam).flat().find((t) => t.task._id === task._id)?.assignee
-                                  : null;
-                                const outgoing = (taskConnections ?? []).filter((c) => c.sourceTaskId === task._id);
-                                const incoming = (taskConnections ?? []).filter((c) => c.targetTaskId === task._id);
-                                const isConnecting = connectingFrom === task._id;
-
-                                return (
-                                  <div key={task._id} className="relative group">
-                                    <div
-                                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                                        isConnecting
-                                          ? "border-[var(--accent-admin)] ring-2 ring-[var(--accent-admin)] ring-opacity-30 bg-[var(--accent-admin-dim)]"
-                                          : connectingFrom && connectingFrom !== task._id
-                                            ? "border-blue-300 bg-blue-50 hover:border-blue-500"
-                                            : "border-[var(--border)] bg-white hover:border-[var(--text-muted)]"
-                                      }`}
-                                      onClick={() => {
-                                        if (connectingFrom && connectingFrom !== task._id) {
-                                          // Complete the connection
-                                          addTaskConnection({
-                                            briefId,
-                                            sourceTaskId: connectingFrom as Id<"tasks">,
-                                            targetTaskId: task._id,
-                                          });
-                                          setConnectingFrom(null);
-                                        } else if (connectingFrom === task._id) {
-                                          setConnectingFrom(null);
-                                        } else {
-                                          // Open task detail
-                                          setSelectedTaskId(task._id);
-                                        }
-                                      }}
-                                    >
-                                      {/* Status dot */}
-                                      <span
-                                        className="w-2 h-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: statusInfo.color }}
-                                      />
-                                      {/* Task info */}
-                                      <div className="min-w-0">
-                                        <p className="text-[12px] font-medium text-[var(--text-primary)] leading-tight truncate max-w-[160px]">
-                                          {task.title}
-                                        </p>
-                                        <p className="text-[10px] text-[var(--text-muted)] truncate">
-                                          {assignee ? (assignee.name ?? assignee.email) : "Unassigned"}
-                                          {task.deadline ? ` · ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
-                                        </p>
-                                      </div>
-                                      {/* Connection indicators */}
-                                      {(outgoing.length > 0 || incoming.length > 0) && (
-                                        <span className="text-[8px] font-semibold text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] px-1 py-0.5 rounded">
-                                          {incoming.length > 0 && `${incoming.length}→`}{outgoing.length > 0 && `→${outgoing.length}`}
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Hover actions */}
-                                    {isAdmin && brief.status !== "archived" && !connectingFrom && (
-                                      <div className="absolute -top-1 -right-1 hidden group-hover:flex gap-0.5">
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setConnectingFrom(task._id);
-                                          }}
-                                          className="p-1 rounded-full bg-[var(--accent-admin)] text-white shadow-sm hover:bg-[var(--accent-admin-hover)] transition-colors"
-                                          title="Connect to another task"
-                                        >
-                                          <Link2 className="h-2.5 w-2.5" />
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setAutoEditTask(true);
-                                            setSelectedTaskId(task._id);
-                                          }}
-                                          className="p-1 rounded-full bg-white border border-[var(--border)] text-[var(--text-muted)] shadow-sm hover:text-[var(--text-primary)] transition-colors"
-                                          title="Edit task"
-                                        >
-                                          <Pencil className="h-2.5 w-2.5" />
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <BriefFlowCanvas
+                briefId={briefId}
+                teams={(graphData?.teams ?? []).map(({ team, members }) => ({
+                  teamId: team._id,
+                  teamName: team.name,
+                  teamColor: team.color,
+                  tasks: allTasks
+                    .filter((t) => members.some((m) => m.user._id === t.assigneeId))
+                    .map((t) => {
+                      const assignee = members.find((m) => m.user._id === t.assigneeId)?.user;
+                      return {
+                        _id: t._id,
+                        title: t.title,
+                        status: t.status,
+                        assigneeName: (assignee?.name ?? assignee?.email ?? "Unassigned") as string,
+                        flowX: t.flowX,
+                        flowY: t.flowY,
+                        deadline: t.deadline,
+                      };
+                    }),
+                }))}
+                connections={(taskConnections ?? []).map((c) => ({
+                  _id: c._id,
+                  sourceTaskId: c.sourceTaskId,
+                  targetTaskId: c.targetTaskId,
+                }))}
+                isAdmin={!!isAdmin}
+                onCreateTask={(teamId) => {
+                  setPanelMode("create");
+                  setPanelTeamId(teamId);
+                  setTaskTeamFilter(teamId);
+                  setTaskTitle("");
+                  setTaskDesc("");
+                  setTaskAssignee("");
+                  setTaskDeadline(undefined);
+                  setTaskDeadlineTime("");
+                  setTaskClientFacing(false);
+                  setTaskHandoffTeam("");
+                }}
+                onEditTask={(taskId) => {
+                  setAutoEditTask(true);
+                  setSelectedTaskId(taskId);
+                }}
+                onOpenTaskDetail={(taskId) => setSelectedTaskId(taskId)}
+              />
             )}
-
-            {/* Connection mode banner */}
-            {connectingFrom && (
-              <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white shadow-lg flex items-center gap-3 text-[12px] font-medium">
-                <Link2 className="h-4 w-4" />
-                <span>Click a target task to create a connection</span>
-                <button
-                  onClick={() => setConnectingFrom(null)}
-                  className="px-2 py-0.5 rounded-md bg-white/20 hover:bg-white/30 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-
-            {/* Connections list */}
-            {(taskConnections ?? []).length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-[12px] font-semibold text-[var(--text-secondary)] mb-2 flex items-center gap-1.5">
-                  <Link2 className="h-3.5 w-3.5" /> Task Connections
-                </h3>
-                <div className="space-y-1.5">
-                  {(taskConnections ?? []).map((conn) => {
-                    const srcTask = allTasks.find((t) => t._id === conn.sourceTaskId);
-                    const tgtTask = allTasks.find((t) => t._id === conn.targetTaskId);
-                    if (!srcTask || !tgtTask) return null;
-                    return (
-                      <div
-                        key={conn._id}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-[var(--border-subtle)] text-[11px]"
-                      >
-                        <span className="font-medium text-[var(--text-primary)] truncate max-w-[200px]">{srcTask.title}</span>
-                        <ArrowRight className="h-3 w-3 text-[var(--accent-admin)] shrink-0" />
-                        <span className="font-medium text-[var(--text-primary)] truncate max-w-[200px]">{tgtTask.title}</span>
-                        {isAdmin && (
-                          <button
-                            onClick={() => removeTaskConnection({ connectionId: conn._id })}
-                            className="ml-auto text-[var(--text-muted)] hover:text-[var(--danger)] shrink-0"
-                            title="Remove connection"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Attachments & discussions */}
-            <div className="mt-6 space-y-6">
-              <AttachmentList parentType="brief" parentId={briefId} />
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
-                <MessageCircle className="h-4 w-4 text-[var(--accent-admin)]" />
-                <span className="text-[12px] text-[var(--text-secondary)]">Discussions have moved!</span>
-                <a href="/discussions" className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline ml-auto">
-                  Open Discussions &rarr;
-                </a>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1138,23 +846,18 @@ export default function BriefPage() {
             panelMode !== "hidden" ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          {/* Panel header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
             <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
               {panelMode === "create" ? "Create Task" : "Edit Task"}
             </h3>
             <button
-              onClick={() => {
-                setPanelMode("hidden");
-                setEditingTaskId(null);
-              }}
+              onClick={() => { setPanelMode("hidden"); }}
               className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Panel body - create form */}
           <div className="flex-1 overflow-auto p-4">
             {panelMode === "create" && isAdmin && (
               <form
@@ -1186,14 +889,12 @@ export default function BriefPage() {
                     setTaskClientFacing(false);
                     setTaskHandoffTeam("");
                     toast("success", "Task created");
-                    // Keep panel open for adding more tasks to same team
                   } catch (err) {
                     toast("error", err instanceof Error ? err.message : "Failed to create task");
                   }
                 }}
                 className="flex flex-col gap-3"
               >
-                {/* Team indicator */}
                 {panelTeamId && (() => {
                   const team = (teamsForBrief ?? []).find((t) => t?._id === panelTeamId);
                   return team ? (
@@ -1267,19 +968,12 @@ export default function BriefPage() {
                       <option key={t._id} value={t._id}>{t.name}</option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                    On approval, deliverable will be handed off to this team
-                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">On approval, deliverable handed off to this team</p>
                 </div>
                 <Button type="submit" variant="primary" className="mt-2">
                   Create Task
                 </Button>
               </form>
-            )}
-            {panelMode !== "create" && panelMode !== "hidden" && editingTaskId && (
-              <div className="text-[13px] text-[var(--text-secondary)]">
-                <p>Use the task detail modal to edit task details.</p>
-              </div>
             )}
           </div>
         </div>

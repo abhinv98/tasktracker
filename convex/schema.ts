@@ -151,6 +151,10 @@ export default defineSchema({
     sourceDeliverableId: v.optional(v.id("deliverables")),
     /** If this task was created via handoff, the source task it was handed off from */
     handoffSourceTaskId: v.optional(v.id("tasks")),
+    /** Flow canvas position (X coordinate) */
+    flowX: v.optional(v.number()),
+    /** Flow canvas position (Y coordinate) */
+    flowY: v.optional(v.number()),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])

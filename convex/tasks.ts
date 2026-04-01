@@ -255,6 +255,36 @@ export const updateTask = mutation({
   },
 });
 
+export const updateTaskFlowPosition = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    flowX: v.number(),
+    flowY: v.number(),
+  },
+  handler: async (ctx, { taskId, flowX, flowY }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(taskId, { flowX, flowY });
+  },
+});
+
+export const updateTaskFlowPositions = mutation({
+  args: {
+    positions: v.array(v.object({
+      taskId: v.id("tasks"),
+      flowX: v.number(),
+      flowY: v.number(),
+    })),
+  },
+  handler: async (ctx, { positions }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    for (const { taskId, flowX, flowY } of positions) {
+      await ctx.db.patch(taskId, { flowX, flowY });
+    }
+  },
+});
+
 export const updateTaskStatus = mutation({
   args: {
     taskId: v.id("tasks"),
