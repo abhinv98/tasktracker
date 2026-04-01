@@ -31,6 +31,107 @@ function formatDateSeparator(ts: number) {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
+type ContactRow = {
+  _id: string;
+  name: string;
+  email: string | null;
+  role: string;
+  avatarUrl: string | null;
+  lastMessage: string | null;
+  lastMessageTime: number | null;
+  unreadCount: number;
+};
+
+/** True when the search string matches the signed-in profile (name, email, designation tokens). */
+function profileMatchesSearch(
+  qRaw: string,
+  me: {
+    name?: string | null;
+    email?: string | null;
+    designation?: string | null;
+  }
+): boolean {
+  const q = qRaw.toLowerCase().trim();
+  if (!q) return true;
+  const n = (me.name ?? "").toLowerCase();
+  const em = (me.email ?? "").toLowerCase();
+  const emLocal = em.split("@")[0] ?? "";
+  const des = (me.designation ?? "").toLowerCase();
+  if (n.includes(q) || em.includes(q) || emLocal.includes(q) || des.includes(q)) return true;
+  for (const part of [...n.split(/\s+/), ...des.split(/\s+/)]) {
+    if (part && (part.includes(q) || q.includes(part))) return true;
+  }
+  return false;
+}
+
+/** Same display + search data as the rest of the app (getCurrentUser), not only server getContacts */
+function mergeContactsWithSelf(
+  raw: ContactRow[] | undefined,
+  me: {
+    _id: string;
+    name?: string | null;
+    email?: string | null;
+    designation?: string | null;
+    role?: string | null;
+    avatarUrl?: string | null;
+    image?: string | null;
+  }
+): ContactRow[] {
+  const label =
+    me.name?.trim() ||
+    me.designation?.trim() ||
+    me.email?.split("@")[0] ||
+    "You";
+  const displayName = `${label} (You)`;
+  const list = raw ?? [];
+  const selfRow: ContactRow = {
+    _id: me._id,
+    name: displayName,
+    email: me.email ?? null,
+    role: me.role ?? "employee",
+    avatarUrl: me.avatarUrl ?? me.image ?? null,
+    lastMessage: null,
+    lastMessageTime: null,
+    unreadCount: 0,
+  };
+
+  const idx = list.findIndex((c) => String(c._id) === String(me._id));
+  if (idx === -1) {
+    return [selfRow, ...list];
+  }
+  const existing = list[idx];
+  const merged: ContactRow = {
+    ...existing,
+    name: displayName,
+    email: me.email ?? existing.email ?? null,
+    avatarUrl: me.avatarUrl ?? me.image ?? existing.avatarUrl ?? null,
+  };
+  return [...list.slice(0, idx), merged, ...list.slice(idx + 1)];
+}
+
+function contactMatchesQuery(
+  c: ContactRow,
+  qRaw: string,
+  me: {
+    _id: string;
+    name?: string | null;
+    email?: string | null;
+    designation?: string | null;
+  }
+): boolean {
+  const q = qRaw.toLowerCase().trim();
+  if (!q) return true;
+  const email = (c.email ?? "").toLowerCase();
+  const local = email.split("@")[0] ?? "";
+  const base = `${c.name} ${c.role} ${email} ${local}`.toLowerCase();
+  if (base.includes(q)) return true;
+  const looksLikeSelfRow = /\(\s*you\s*\)\s*$/i.test(c.name.trim());
+  if (String(c._id) === String(me._id) || looksLikeSelfRow) {
+    return profileMatchesSearch(qRaw, me);
+  }
+  return false;
+}
+
 export default function MessagesPage() {
   const user = useQuery(api.users.getCurrentUser);
   const contacts = useQuery(api.dm.getContacts);
@@ -75,44 +176,37 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
 
-  // Filter: name, role, email (API includes email so searching your first name finds you)
-  const filteredContacts = useMemo(() => {
-    if (!contacts) return [];
-    if (!searchQuery.trim()) return contacts;
-    const q = searchQuery.toLowerCase().trim();
-    return contacts.filter((c) => {
-      const email = ((c as { email?: string | null }).email ?? "").toLowerCase();
-      const localPart = email.split("@")[0] ?? "";
-      return (
-        c.name.toLowerCase().includes(q) ||
-        c.role.toLowerCase().includes(q) ||
-        (email && email.includes(q)) ||
-        (localPart && localPart.includes(q))
-      );
-    });
-  }, [contacts, searchQuery]);
+  /** Always include yourself using getCurrentUser (fixes DB name mismatch + search "abhinav") */
+  const contactsWithSelf = useMemo(
+    () => (user ? mergeContactsWithSelf(contacts as ContactRow[] | undefined, user) : []),
+    [contacts, user]
+  );
 
-  /** Self-thread works while contacts load (same display name as API: "Your name (You)") */
+  const filteredContacts = useMemo(() => {
+    if (!user) return [];
+    if (!searchQuery.trim()) return contactsWithSelf;
+    const filtered = contactsWithSelf.filter((c) =>
+      contactMatchesQuery(c, searchQuery, user)
+    );
+    const selfRow = contactsWithSelf.find(
+      (c) => String(c._id) === String(user._id)
+    );
+    if (
+      selfRow &&
+      profileMatchesSearch(searchQuery, user) &&
+      !filtered.some((c) => String(c._id) === String(user._id))
+    ) {
+      return [selfRow, ...filtered];
+    }
+    return filtered;
+  }, [contactsWithSelf, searchQuery, user]);
+
   const selectedContact = useMemo(() => {
     if (!selectedContactId || !user) return null;
-    const fromList = contacts?.find((c) => String(c._id) === String(selectedContactId));
-    if (fromList) return fromList;
-    if (String(selectedContactId) === String(user._id)) {
-      const selfLabel =
-        user.name ?? user.email?.split("@")[0] ?? "You";
-      return {
-        _id: user._id,
-        name: `${selfLabel} (You)`,
-        email: user.email ?? null,
-        role: user.role ?? "employee",
-        avatarUrl: user.avatarUrl ?? user.image ?? null,
-        lastMessage: null as string | null,
-        lastMessageTime: null as number | null,
-        unreadCount: 0,
-      };
-    }
-    return null;
-  }, [contacts, selectedContactId, user]);
+    return (
+      contactsWithSelf.find((c) => String(c._id) === String(selectedContactId)) ?? null
+    );
+  }, [contactsWithSelf, selectedContactId, user]);
 
   async function handleSend() {
     if (!messageText.trim() || !selectedContactId) return;
