@@ -12,7 +12,6 @@ import {
   Send,
   Check,
   CheckCheck,
-  User,
 } from "lucide-react";
 
 function formatTime(ts: number) {
@@ -76,19 +75,48 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
 
-  // Filter contacts
+  // Filter contacts (Saved messages is searchable by your name, email, "saved", "notes", "self")
   const filteredContacts = useMemo(() => {
     if (!contacts) return [];
     if (!searchQuery.trim()) return contacts;
-    const q = searchQuery.toLowerCase();
-    return contacts.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)
-    );
-  }, [contacts, searchQuery]);
+    const q = searchQuery.toLowerCase().trim();
+    return contacts.filter((c) => {
+      if (c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)) {
+        return true;
+      }
+      const isSelfRow = user && String(c._id) === String(user._id);
+      if (!isSelfRow) return false;
+      if ("saved messages".includes(q) || q.includes("saved") || q.includes("note") || q.includes("self")) {
+        return true;
+      }
+      const name = (user.name ?? "").toLowerCase();
+      const email = (user.email ?? "").toLowerCase();
+      const localPart = email.split("@")[0] ?? "";
+      if (name && name.includes(q)) return true;
+      if (email && email.includes(q)) return true;
+      if (localPart && localPart.includes(q)) return true;
+      return false;
+    });
+  }, [contacts, searchQuery, user]);
 
-  const selectedContact = contacts?.find(
-    (c) => String(c._id) === String(selectedContactId)
-  );
+  /** Self-thread must work even while contacts load or if the API row is missing */
+  const selectedContact = useMemo(() => {
+    if (!selectedContactId || !user) return null;
+    const fromList = contacts?.find((c) => String(c._id) === String(selectedContactId));
+    if (fromList) return fromList;
+    if (String(selectedContactId) === String(user._id)) {
+      return {
+        _id: user._id,
+        name: "Saved messages",
+        role: user.role ?? "employee",
+        avatarUrl: user.avatarUrl ?? user.image ?? null,
+        lastMessage: null as string | null,
+        lastMessageTime: null as number | null,
+        unreadCount: 0,
+      };
+    }
+    return null;
+  }, [contacts, selectedContactId, user]);
 
   async function handleSend() {
     if (!messageText.trim() || !selectedContactId) return;
