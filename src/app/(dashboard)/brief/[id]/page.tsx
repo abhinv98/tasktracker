@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
@@ -459,6 +459,23 @@ export default function BriefPage() {
   const [panelMode, setPanelMode] = useState<"hidden" | "create" | "edit">("hidden");
   const [panelTeamId, setPanelTeamId] = useState<string>("");
   const [showTeamPicker, setShowTeamPicker] = useState(false);
+  const [showAddTaskTeamPicker, setShowAddTaskTeamPicker] = useState(false);
+
+  const openCreateTaskPanel = useCallback((teamId: string) => {
+    setPanelMode("create");
+    setPanelTeamId(teamId);
+    setTaskTeamFilter(teamId);
+    setTaskTitle("");
+    setTaskDesc("");
+    setTaskAssignee("");
+    setTaskDeadline(undefined);
+    setTaskDeadlineTime("");
+    setTaskClientFacing(false);
+    setTaskHandoffTeam("");
+    setPendingConnectionSource(null);
+    setPendingFlowPosition(null);
+    setShowAddTaskTeamPicker(false);
+  }, []);
 
   // Drag-to-create: store pending connection source + position for new node
   const [pendingConnectionSource, setPendingConnectionSource] = useState<string | null>(null);
@@ -744,7 +761,10 @@ export default function BriefPage() {
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowTeamPicker(!showTeamPicker)}
+                    onClick={() => {
+                      setShowTeamPicker(!showTeamPicker);
+                      setShowAddTaskTeamPicker(false);
+                    }}
                     className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin)] hover:text-white transition-colors"
                   >
                     <Plus className="h-2.5 w-2.5" /> Team
@@ -777,6 +797,45 @@ export default function BriefPage() {
                         {(allTeams ?? []).filter((t) => !teamsForBrief?.some((tb) => tb?._id === t._id)).length === 0 && (
                           <p className="px-3 py-1.5 text-[10px] text-[var(--text-muted)]">All teams added</p>
                         )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddTaskTeamPicker(!showAddTaskTeamPicker);
+                      setShowTeamPicker(false);
+                    }}
+                    disabled={(teamsForBrief ?? []).filter(Boolean).length === 0}
+                    title={
+                      (teamsForBrief ?? []).filter(Boolean).length === 0
+                        ? "Add a team first, then add tasks"
+                        : "Add a task"
+                    }
+                    className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded-full bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] hover:bg-[var(--accent-employee)] hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <Plus className="h-2.5 w-2.5" /> Task
+                  </button>
+                  {showAddTaskTeamPicker && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setShowAddTaskTeamPicker(false)} />
+                      <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[180px]">
+                        <p className="px-3 py-1 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                          Add task for
+                        </p>
+                        {(teamsForBrief ?? []).filter(Boolean).map((team: { _id: Id<"teams">; name?: string; color?: string }) => (
+                          <button
+                            key={team._id}
+                            type="button"
+                            onClick={() => openCreateTaskPanel(team._id)}
+                            className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                            {team.name}
+                          </button>
+                        ))}
                       </div>
                     </>
                   )}
@@ -823,20 +882,7 @@ export default function BriefPage() {
                   targetTaskId: c.targetTaskId,
                 }))}
                 isAdmin={!!isAdmin}
-                onCreateTask={(teamId) => {
-                  setPanelMode("create");
-                  setPanelTeamId(teamId);
-                  setTaskTeamFilter(teamId);
-                  setTaskTitle("");
-                  setTaskDesc("");
-                  setTaskAssignee("");
-                  setTaskDeadline(undefined);
-                  setTaskDeadlineTime("");
-                  setTaskClientFacing(false);
-                  setTaskHandoffTeam("");
-                  setPendingConnectionSource(null);
-                  setPendingFlowPosition(null);
-                }}
+                onCreateTask={openCreateTaskPanel}
                 onEditTask={(taskId) => {
                   setAutoEditTask(true);
                   setSelectedTaskId(taskId);

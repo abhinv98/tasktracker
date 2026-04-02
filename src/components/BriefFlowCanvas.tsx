@@ -237,6 +237,7 @@ function BriefFlowCanvasInner({
   teams,
   connections,
   isAdmin,
+  onCreateTask,
   onEditTask,
   onOpenTaskDetail,
   onDragToCreate,
@@ -253,6 +254,11 @@ function BriefFlowCanvasInner({
   const connectingNodeId = useRef<string | null>(null);
 
   // Build nodes from teams data
+  const totalCanvasTasks = useMemo(
+    () => teams.reduce((n, t) => n + t.tasks.length, 0),
+    [teams]
+  );
+
   const { initialNodes, initialEdges } = useMemo(() => {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
@@ -463,6 +469,32 @@ function BriefFlowCanvasInner({
           Add team to brief
         </button>
       )}
+      {isAdmin &&
+        onCreateTask &&
+        teams.length > 0 &&
+        totalCanvasTasks === 0 && (
+          <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none p-4 pt-14">
+            <div className="pointer-events-auto rounded-xl border border-[var(--border)] bg-white/95 shadow-lg px-5 py-4 max-w-sm w-full text-center">
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">No tasks on the flow yet</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1 mb-3">
+                Add a task for a team. Nodes appear here; drag from a handle to connect or branch.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {teams.map((team) => (
+                  <button
+                    key={team.teamId}
+                    type="button"
+                    onClick={() => onCreateTask(team.teamId)}
+                    className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--border)] hover:bg-[var(--accent-admin)] hover:text-white hover:border-[var(--accent-admin)] transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    Add task — {team.teamName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       <ReactFlow
         nodes={nodes}
         edges={edges}
