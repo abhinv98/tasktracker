@@ -1022,37 +1022,6 @@ export default function DeliverablesPage() {
                       </>
                     )}
 
-                {d.teamLeadStatus === "approved" && !d.passedToManagerAt && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--accent-employee)] font-medium">TL Approved</span>
-                    {d.isAlsoBrandManager ? (
-                      <button
-                        onClick={() => handleManagerApproveFromTeamLead(d._id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                      >
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Approve as Brand Manager
-                      </button>
-                    ) : (
-                      <>
-                        {(d.brandManagers ?? []).map((mgr: any) => (
-                          <button
-                            key={mgr._id}
-                            onClick={() => handlePassToManager(d._id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
-                          >
-                            <ArrowRight className="h-3.5 w-3.5" />
-                            Pass to {mgr.name}
-                          </button>
-                        ))}
-                        {(d.brandManagers ?? []).length === 0 && (
-                          <span className="text-[11px] text-[var(--text-muted)]">No brand manager assigned</span>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-
                     {del.teamLeadStatus === "approved" && !del.passedToManagerAt && (
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-[var(--accent-employee)] font-medium">TL Approved</span>

@@ -28,6 +28,7 @@ import type * as dm from "../dm.js";
 import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
+import type * as lib_taskFlowResources from "../lib/taskFlowResources.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
 import type * as migrations_backfillReviewAt from "../migrations/backfillReviewAt.js";
 import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlineValues.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   jsr: typeof jsr;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
+  "lib/taskFlowResources": typeof lib_taskFlowResources;
   meetingMinutes: typeof meetingMinutes;
   "migrations/backfillReviewAt": typeof migrations_backfillReviewAt;
   "migrations/checkDeadlineValues": typeof migrations_checkDeadlineValues;

@@ -2,6 +2,33 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
+import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
+import type { Id } from "./_generated/dataModel";
+
+/**
+ * After a task's deliverables are all approved and the task is marked done,
+ * propagate its deliverable resources to all downstream connected tasks.
+ * This ensures the master brief route passes each task's deliverables
+ * sequentially as resources to the next task in line.
+ */
+async function propagateResourcesToDownstreamTasks(
+  ctx: any,
+  taskId: Id<"tasks">,
+  briefId: Id<"briefs">
+) {
+  const downstreamConnections = await ctx.db
+    .query("taskConnections")
+    .withIndex("by_brief", (q: any) => q.eq("briefId", briefId))
+    .collect();
+
+  const targets = downstreamConnections.filter(
+    (c: any) => c.sourceTaskId === taskId
+  );
+
+  for (const conn of targets) {
+    await mergeUpstreamResourcesIntoTask(ctx, conn.targetTaskId, taskId);
+  }
+}
 
 // ─── Helper: find team lead for a user ─────────────
 async function findTeamLeadForUser(ctx: any, userId: string) {
@@ -1049,6 +1076,8 @@ export const teamLeadAndManagerApprove = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
         }
+        // Propagate deliverable resources to downstream connected tasks in master brief
+        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
     }
 
@@ -1143,6 +1172,8 @@ export const managerApproveFromTeamLead = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
         }
+        // Propagate deliverable resources to downstream connected tasks in master brief
+        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
     }
 
@@ -1561,6 +1592,8 @@ export const approveDeliverable = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
         }
+        // Propagate deliverable resources to downstream connected tasks in master brief
+        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
     }
 

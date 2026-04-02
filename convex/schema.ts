@@ -121,7 +121,8 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("in-progress"),
       v.literal("review"),
-      v.literal("done")
+      v.literal("done"),
+      v.literal("on-hold")
     ),
     sortOrder: v.number(),
     duration: v.optional(v.string()),

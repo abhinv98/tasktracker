@@ -106,12 +106,18 @@ function TaskNode({ data }: { data: TaskData }) {
 
   return (
     <div className="group relative">
-      {/* Input handle (top) */}
+      {/* Target handles — top & left (receive incoming connections) */}
       <Handle
         id="top"
         type="target"
         position={Position.Top}
         className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-top-1.5"
+      />
+      <Handle
+        id="left"
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-left-1.5"
       />
 
       {/* Card */}
@@ -340,12 +346,15 @@ function BriefFlowCanvasInner({
 
     // Build edges from connections (persisted source handle so right vs bottom is stable)
     connections.forEach((conn) => {
+      const sh = conn.sourceHandle ?? "bottom";
+      // Route right→left horizontally, bottom→top vertically
+      const th = sh === "right" ? "left" : "top";
       edges.push({
         id: conn._id,
         source: conn.sourceTaskId,
         target: conn.targetTaskId,
-        sourceHandle: conn.sourceHandle ?? "bottom",
-        targetHandle: "top",
+        sourceHandle: sh,
+        targetHandle: th,
         type: "smoothstep",
         animated: true,
         style: { stroke: "#6366f1", strokeWidth: 2 },
@@ -463,11 +472,16 @@ function BriefFlowCanvasInner({
       const sourceHandle =
         sh === "right" || sh === "bottom" ? sh : undefined;
 
+      // Determine direction: if target handle is "left", prefer "right" source routing
+      const th = connection.targetHandle;
+      const effectiveSourceHandle =
+        sourceHandle ?? (th === "left" ? "right" : undefined);
+
       addConnection({
         briefId,
         sourceTaskId: connection.source as Id<"tasks">,
         targetTaskId: connection.target as Id<"tasks">,
-        ...(sourceHandle ? { sourceHandle } : {}),
+        ...(effectiveSourceHandle ? { sourceHandle: effectiveSourceHandle } : {}),
       });
     },
     [briefId, addConnection]
@@ -500,12 +514,13 @@ function BriefFlowCanvasInner({
         return;
       }
 
-      // Check if dropped on the pane (not on a node handle)
+      // Check if dropped on the pane (not on a node or handle)
       const target = event.target as HTMLElement;
-      const isPane = target.classList.contains("react-flow__pane") ||
-        target.closest(".react-flow__pane");
+      const isOnNodeOrHandle =
+        target.closest(".react-flow__node") ||
+        target.closest(".react-flow__handle");
 
-      if (isPane) {
+      if (!isOnNodeOrHandle) {
         const clientX = "clientX" in event ? event.clientX : event.touches[0].clientX;
         const clientY = "clientY" in event ? event.clientY : event.touches[0].clientY;
         const position = screenToFlowPosition({ x: clientX, y: clientY });

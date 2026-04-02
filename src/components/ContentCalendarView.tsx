@@ -47,6 +47,7 @@ const CONTENT_TYPES = [
 const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: "pending", label: "Planned", color: "#6b7280" },
   { value: "in-progress", label: "In Progress", color: "#f59e0b" },
+  { value: "on-hold", label: "On Hold", color: "#ef4444" },
   { value: "review", label: "Review", color: "#8b5cf6" },
   { value: "done", label: "Published", color: "#10b981" },
 ];

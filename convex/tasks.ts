@@ -294,7 +294,8 @@ export const updateTaskStatus = mutation({
       v.literal("pending"),
       v.literal("in-progress"),
       v.literal("review"),
-      v.literal("done")
+      v.literal("done"),
+      v.literal("on-hold")
     ),
   },
   handler: async (ctx, { taskId, newStatus }) => {
@@ -485,7 +486,8 @@ export const bulkUpdateStatus = mutation({
       v.literal("pending"),
       v.literal("in-progress"),
       v.literal("review"),
-      v.literal("done")
+      v.literal("done"),
+      v.literal("on-hold")
     ),
   },
   handler: async (ctx, { taskIds, newStatus }) => {
