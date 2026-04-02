@@ -101,6 +101,8 @@ export default defineSchema({
     briefId: v.id("briefs"),
     sourceTaskId: v.id("tasks"),
     targetTaskId: v.id("tasks"),
+    /** Which handle on the source node this edge leaves from (React Flow). */
+    sourceHandle: v.optional(v.union(v.literal("bottom"), v.literal("right"))),
     createdBy: v.id("users"),
     createdAt: v.number(),
   })

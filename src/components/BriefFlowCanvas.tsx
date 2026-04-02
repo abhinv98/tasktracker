@@ -61,7 +61,12 @@ interface TeamSection {
 interface BriefFlowCanvasProps {
   briefId: Id<"briefs">;
   teams: TeamSection[];
-  connections: { _id: string; sourceTaskId: string; targetTaskId: string }[];
+  connections: {
+    _id: string;
+    sourceTaskId: string;
+    targetTaskId: string;
+    sourceHandle?: "bottom" | "right";
+  }[];
   isAdmin: boolean;
   /** Optional: canvas no longer shows + nodes; kept for callers that may add tasks elsewhere. */
   onCreateTask?: (teamId: string) => void;
@@ -333,12 +338,14 @@ function BriefFlowCanvasInner({
       });
     });
 
-    // Build edges from connections
+    // Build edges from connections (persisted source handle so right vs bottom is stable)
     connections.forEach((conn) => {
       edges.push({
         id: conn._id,
         source: conn.sourceTaskId,
         target: conn.targetTaskId,
+        sourceHandle: conn.sourceHandle ?? "bottom",
+        targetHandle: "top",
         type: "smoothstep",
         animated: true,
         style: { stroke: "#6366f1", strokeWidth: 2 },
@@ -452,10 +459,15 @@ function BriefFlowCanvasInner({
       if (!connection.source || !connection.target) return;
       if (connection.source === "__pending-draft__" || connection.target === "__pending-draft__") return;
 
+      const sh = connection.sourceHandle;
+      const sourceHandle =
+        sh === "right" || sh === "bottom" ? sh : undefined;
+
       addConnection({
         briefId,
         sourceTaskId: connection.source as Id<"tasks">,
         targetTaskId: connection.target as Id<"tasks">,
+        ...(sourceHandle ? { sourceHandle } : {}),
       });
     },
     [briefId, addConnection]

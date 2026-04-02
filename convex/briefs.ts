@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -674,8 +675,9 @@ export const addTaskConnection = mutation({
     briefId: v.id("briefs"),
     sourceTaskId: v.id("tasks"),
     targetTaskId: v.id("tasks"),
+    sourceHandle: v.optional(v.union(v.literal("bottom"), v.literal("right"))),
   },
-  handler: async (ctx, { briefId, sourceTaskId, targetTaskId }) => {
+  handler: async (ctx, { briefId, sourceTaskId, targetTaskId, sourceHandle }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
@@ -684,23 +686,31 @@ export const addTaskConnection = mutation({
     if (!user || (user.role !== "admin" && brief.assignedManagerId !== userId)) {
       throw new Error("Not authorized");
     }
-    // Prevent duplicate connections
+    // Prevent self-connections
+    if (sourceTaskId === targetTaskId) throw new Error("Cannot connect a task to itself");
+
     const existing = await ctx.db
       .query("taskConnections")
       .withIndex("by_source", (q) => q.eq("sourceTaskId", sourceTaskId))
       .collect();
-    if (existing.some((c) => c.targetTaskId === targetTaskId)) {
-      return; // already connected
+    const dup = existing.find((c) => c.targetTaskId === targetTaskId);
+    if (dup) {
+      if (sourceHandle !== undefined && dup.sourceHandle !== sourceHandle) {
+        await ctx.db.patch(dup._id, { sourceHandle });
+      }
+      await mergeUpstreamResourcesIntoTask(ctx, targetTaskId, sourceTaskId);
+      return;
     }
-    // Prevent self-connections
-    if (sourceTaskId === targetTaskId) throw new Error("Cannot connect a task to itself");
+
     await ctx.db.insert("taskConnections", {
       briefId,
       sourceTaskId,
       targetTaskId,
+      ...(sourceHandle !== undefined ? { sourceHandle } : {}),
       createdBy: userId,
       createdAt: Date.now(),
     });
+    await mergeUpstreamResourcesIntoTask(ctx, targetTaskId, sourceTaskId);
   },
 });
 

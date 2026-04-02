@@ -25,6 +25,28 @@ function parseDuration(str: string): number {
   return 0;
 }
 
+/** Next default position on the flow canvas for a team row (matches BriefFlowCanvas TEAM_GAP / TASK_GAP). */
+function computeSequentialFlowSlot(
+  graphData: { teams: { team: { _id: string }; members: { user: { _id: string } }[] }[] } | null | undefined,
+  allTasks: { assigneeId: string; flowX?: number; flowY?: number }[],
+  teamId: string
+): { x: number; y: number } | null {
+  if (!graphData?.teams?.length) return null;
+  const teamIdx = graphData.teams.findIndex((g) => g.team._id === teamId);
+  if (teamIdx < 0) return null;
+  const memberIds = new Set(graphData.teams[teamIdx].members.map((m) => m.user._id));
+  const teamTasks = allTasks.filter((t) => memberIds.has(t.assigneeId));
+  const TEAM_GAP_Y = 200;
+  const TASK_GAP_X = 240;
+  const TASK_START_X = 60;
+  const TASK_START_Y_OFFSET = 32;
+  const teamBaseY = teamIdx * TEAM_GAP_Y + 40;
+  const taskIdx = teamTasks.length;
+  const nextX = TASK_START_X + taskIdx * TASK_GAP_X;
+  const nextY = teamBaseY + TASK_START_Y_OFFSET;
+  return { x: nextX, y: nextY };
+}
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "#6b7280" },
   todo: { label: "To Do", color: "#6b7280" },
@@ -884,6 +906,7 @@ export default function BriefPage() {
                   _id: c._id,
                   sourceTaskId: c.sourceTaskId,
                   targetTaskId: c.targetTaskId,
+                  sourceHandle: c.sourceHandle,
                 }))}
                 isAdmin={!!isAdmin}
                 onCreateTask={openCreateTaskPanel}
@@ -960,6 +983,10 @@ export default function BriefPage() {
                     finalDeadline = d.getTime();
                   }
                   try {
+                    const flowSlot =
+                      pendingFlowPosition ??
+                      (panelTeamId ? computeSequentialFlowSlot(graphData, allTasks, panelTeamId) : null);
+
                     const newTaskId = await createTask({
                       briefId,
                       title: taskTitle,
@@ -968,16 +995,18 @@ export default function BriefPage() {
                       ...(finalDeadline !== undefined ? { deadline: finalDeadline } : {}),
                       ...(taskClientFacing ? { clientFacing: true } : {}),
                       ...(taskHandoffTeam ? { handoffTargetTeamId: taskHandoffTeam as Id<"teams"> } : {}),
-                      ...(pendingFlowPosition ? { flowX: pendingFlowPosition.x, flowY: pendingFlowPosition.y } : {}),
+                      ...(flowSlot ? { flowX: flowSlot.x, flowY: flowSlot.y } : {}),
                     });
 
                     // Auto-connect if created via drag-to-create
                     if (pendingConnectionSource && newTaskId) {
                       try {
+                        const sh = pendingSourceHandle;
                         await addTaskConnection({
                           briefId,
                           sourceTaskId: pendingConnectionSource as Id<"tasks">,
                           targetTaskId: newTaskId,
+                          ...(sh === "right" || sh === "bottom" ? { sourceHandle: sh } : {}),
                         });
                       } catch {
                         // Connection failed silently — task was still created
