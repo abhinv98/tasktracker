@@ -53,6 +53,10 @@ export default function DeliverablesPage() {
   const [handoffAssignee, setHandoffAssignee] = useState<Record<string, string>>({});
   const [handoffDeadline, setHandoffDeadline] = useState<Record<string, string>>({});
   const [handoffNote, setHandoffNote] = useState<Record<string, string>>({});
+  /** "__new__" or an existing task id (master briefs only) */
+  const [handoffTargetChoice, setHandoffTargetChoice] = useState<Record<string, string>>({});
+  const [handoffNewTitle, setHandoffNewTitle] = useState<Record<string, string>>({});
+  const [handoffNewDesc, setHandoffNewDesc] = useState<Record<string, string>>({});
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
 
@@ -140,6 +144,40 @@ export default function DeliverablesPage() {
     if (role === "employee") return d.submittedBy === user?._id;
     return true;
   }) ?? [];
+
+  const deliverableHandoffContext = useMemo(() => {
+    if (!handoffDeliverableId) return null;
+    const pool = [...filteredDeliverables, ...((managerDeliverables ?? []) as any[])];
+    const row = pool.find((x: any) => x._id === handoffDeliverableId);
+    if (!row?.briefId) return null;
+    if (row.briefType === "single_task") return null;
+    const tid = handoffTeam[handoffDeliverableId];
+    const aid = handoffAssignee[handoffDeliverableId];
+    if (!tid || !aid) return null;
+    return { briefId: row.briefId as Id<"briefs">, assigneeId: aid as Id<"users"> };
+  }, [handoffDeliverableId, handoffTeam, handoffAssignee, filteredDeliverables, managerDeliverables]);
+
+  const deliverableHandoffCandidates = useQuery(
+    api.approvals.listHandoffCandidateTasks,
+    deliverableHandoffContext ?? "skip"
+  );
+
+  const taskHandoffContext = useMemo(() => {
+    if (!handoffTaskId) return null;
+    const g = managerGroupedByTask.find((x) => x.taskId === handoffTaskId);
+    const row = g?.first;
+    if (!row?.briefId) return null;
+    if (row.briefType === "single_task") return null;
+    const tid = handoffTeam[handoffTaskId];
+    const aid = handoffAssignee[handoffTaskId];
+    if (!tid || !aid) return null;
+    return { briefId: row.briefId as Id<"briefs">, assigneeId: aid as Id<"users"> };
+  }, [handoffTaskId, handoffTeam, handoffAssignee, managerGroupedByTask]);
+
+  const taskHandoffCandidates = useQuery(
+    api.approvals.listHandoffCandidateTasks,
+    taskHandoffContext ?? "skip"
+  );
 
   async function handleApprove(deliverableId: string) {
     await approveDeliverable({ deliverableId: deliverableId as any });
@@ -560,7 +598,16 @@ export default function DeliverablesPage() {
                           value={handoffTeam[d._id] ?? ""}
                           onChange={(e) => {
                             setHandoffTeam((prev) => ({ ...prev, [d._id]: e.target.value }));
-                            setHandoffAssignee((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
+                            setHandoffAssignee((prev) => {
+                              const n = { ...prev };
+                              delete n[d._id];
+                              return n;
+                            });
+                            setHandoffTargetChoice((prev) => {
+                              const n = { ...prev };
+                              delete n[d._id];
+                              return n;
+                            });
                           }}
                           className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         >
@@ -572,7 +619,14 @@ export default function DeliverablesPage() {
                         {handoffTeam[d._id] && (
                           <select
                             value={handoffAssignee[d._id] ?? ""}
-                            onChange={(e) => setHandoffAssignee((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                            onChange={(e) => {
+                              setHandoffAssignee((prev) => ({ ...prev, [d._id]: e.target.value }));
+                              setHandoffTargetChoice((prev) => {
+                                const n = { ...prev };
+                                delete n[d._id];
+                                return n;
+                              });
+                            }}
                             className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
                             <option value="">Select assignee from team...</option>
@@ -584,52 +638,167 @@ export default function DeliverablesPage() {
                             }
                           </select>
                         )}
-                        <input
-                          type="date"
-                          value={handoffDeadline[d._id] ?? ""}
-                          onChange={(e) => setHandoffDeadline((prev) => ({ ...prev, [d._id]: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <textarea
-                          value={handoffNote[d._id] ?? ""}
-                          onChange={(e) => setHandoffNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
-                          placeholder="Instructions for the receiving team member..."
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[60px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            disabled={!handoffTeam[d._id] || !handoffAssignee[d._id]}
-                            onClick={async () => {
-                              const teamId = handoffTeam[d._id];
-                              const assigneeId = handoffAssignee[d._id];
-                              if (!teamId || !assigneeId) return;
-                              try {
-                                await handoffDeliverableMut({
-                                  deliverableId: d._id as Id<"deliverables">,
-                                  targetTeamId: teamId as Id<"teams">,
-                                  targetAssigneeId: assigneeId as Id<"users">,
-                                  ...(handoffDeadline[d._id] ? { deadline: new Date(handoffDeadline[d._id] + "T23:59:59").getTime() } : {}),
-                                  ...(handoffNote[d._id]?.trim() ? { note: handoffNote[d._id].trim() } : {}),
-                                });
-                                setHandoffDeliverableId(null);
-                                setHandoffTeam((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
-                                setHandoffAssignee((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
-                                setHandoffDeadline((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
-                                setHandoffNote((prev) => { const n = { ...prev }; delete n[d._id]; return n; });
-                              } catch {}
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                          >
-                            <GitBranch className="h-3.5 w-3.5" />
-                            Hand Off
-                          </button>
-                          <button
-                            onClick={() => setHandoffDeliverableId(null)}
-                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+                        {handoffTeam[d._id] && handoffAssignee[d._id] && (() => {
+                          const isSingle = (d as any).briefType === "single_task";
+                          const opts = deliverableHandoffCandidates ?? [];
+                          const needPick = !isSingle && opts.length > 0;
+                          const choice = handoffTargetChoice[d._id] ?? "";
+                          const showNewFields = isSingle || opts.length === 0 || choice === "__new__";
+                          const canSubmit =
+                            handoffTeam[d._id] &&
+                            handoffAssignee[d._id] &&
+                            (!needPick || choice);
+                          return (
+                            <>
+                              {needPick && (
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Attach deliverable to</label>
+                                  <select
+                                    value={choice}
+                                    onChange={(e) =>
+                                      setHandoffTargetChoice((prev) => ({ ...prev, [d._id]: e.target.value }))
+                                    }
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  >
+                                    <option value="">Choose one...</option>
+                                    <option value="__new__">Create a new task</option>
+                                    {opts.map((t) => (
+                                      <option key={t._id} value={t._id}>
+                                        {t.title} ({t.status})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {!isSingle && opts.length === 0 && (
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person on this brief — a new handoff task will be created.</p>
+                              )}
+                              {showNewFields && (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={handoffNewTitle[d._id] ?? ""}
+                                    onChange={(e) =>
+                                      setHandoffNewTitle((prev) => ({ ...prev, [d._id]: e.target.value }))
+                                    }
+                                    placeholder={`New task title (optional — defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <textarea
+                                    value={handoffNewDesc[d._id] ?? ""}
+                                    onChange={(e) =>
+                                      setHandoffNewDesc((prev) => ({ ...prev, [d._id]: e.target.value }))
+                                    }
+                                    placeholder="Description for the new task (optional)"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <div>
+                                    <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <input
+                                      type="date"
+                                      value={handoffDeadline[d._id] ?? ""}
+                                      onChange={(e) =>
+                                        setHandoffDeadline((prev) => ({ ...prev, [d._id]: e.target.value }))
+                                      }
+                                      className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                              <textarea
+                                value={handoffNote[d._id] ?? ""}
+                                onChange={(e) => setHandoffNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
+                                placeholder="Extra instructions (optional) — appended to the handoff"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  disabled={!canSubmit}
+                                  onClick={async () => {
+                                    const teamId = handoffTeam[d._id];
+                                    const assigneeId = handoffAssignee[d._id];
+                                    if (!teamId || !assigneeId) return;
+                                    const isS = (d as any).briefType === "single_task";
+                                    const o = deliverableHandoffCandidates ?? [];
+                                    const ch = handoffTargetChoice[d._id] ?? "";
+                                    const isNew = isS || o.length === 0 || ch === "__new__";
+                                    try {
+                                      const payload: Record<string, unknown> = {
+                                        deliverableId: d._id as Id<"deliverables">,
+                                        targetTeamId: teamId as Id<"teams">,
+                                        targetAssigneeId: assigneeId as Id<"users">,
+                                        ...(handoffDeadline[d._id] && isNew
+                                          ? { deadline: new Date(handoffDeadline[d._id] + "T23:59:59").getTime() }
+                                          : {}),
+                                        ...(handoffNote[d._id]?.trim() ? { note: handoffNote[d._id].trim() } : {}),
+                                      };
+                                      if (!isNew && ch && ch !== "__new__") {
+                                        payload.targetExistingTaskId = ch as Id<"tasks">;
+                                      } else {
+                                        if (handoffNewTitle[d._id]?.trim()) {
+                                          payload.newTaskTitle = handoffNewTitle[d._id].trim();
+                                        }
+                                        if (handoffNewDesc[d._id]?.trim()) {
+                                          payload.newTaskDescription = handoffNewDesc[d._id].trim();
+                                        }
+                                        payload.forceNewHandoffTask = true;
+                                      }
+                                      await handoffDeliverableMut(payload as any);
+                                      setHandoffDeliverableId(null);
+                                      setHandoffTeam((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffAssignee((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffDeadline((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffNote((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffTargetChoice((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffNewTitle((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                      setHandoffNewDesc((prev) => {
+                                        const n = { ...prev };
+                                        delete n[d._id];
+                                        return n;
+                                      });
+                                    } catch {
+                                      /* toast optional */
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                                >
+                                  <GitBranch className="h-3.5 w-3.5" />
+                                  Hand Off
+                                </button>
+                                <button
+                                  onClick={() => setHandoffDeliverableId(null)}
+                                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1178,7 +1347,16 @@ export default function DeliverablesPage() {
                           value={handoffTeam[group.taskId] ?? ""}
                           onChange={(e) => {
                             setHandoffTeam((prev) => ({ ...prev, [group.taskId]: e.target.value }));
-                            setHandoffAssignee((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
+                            setHandoffAssignee((prev) => {
+                              const n = { ...prev };
+                              delete n[group.taskId];
+                              return n;
+                            });
+                            setHandoffTargetChoice((prev) => {
+                              const n = { ...prev };
+                              delete n[group.taskId];
+                              return n;
+                            });
                           }}
                           className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         >
@@ -1190,7 +1368,14 @@ export default function DeliverablesPage() {
                         {handoffTeam[group.taskId] && (
                           <select
                             value={handoffAssignee[group.taskId] ?? ""}
-                            onChange={(e) => setHandoffAssignee((prev) => ({ ...prev, [group.taskId]: e.target.value }))}
+                            onChange={(e) => {
+                              setHandoffAssignee((prev) => ({ ...prev, [group.taskId]: e.target.value }));
+                              setHandoffTargetChoice((prev) => {
+                                const n = { ...prev };
+                                delete n[group.taskId];
+                                return n;
+                              });
+                            }}
                             className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
                             <option value="">Select assignee from team...</option>
@@ -1202,58 +1387,171 @@ export default function DeliverablesPage() {
                             }
                           </select>
                         )}
-                        <input
-                          type="date"
-                          value={handoffDeadline[group.taskId] ?? ""}
-                          onChange={(e) => setHandoffDeadline((prev) => ({ ...prev, [group.taskId]: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <textarea
-                          value={handoffNote[group.taskId] ?? ""}
-                          onChange={(e) => setHandoffNote((prev) => ({ ...prev, [group.taskId]: e.target.value }))}
-                          placeholder="Instructions for the receiving team member..."
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[60px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            disabled={!handoffTeam[group.taskId] || !handoffAssignee[group.taskId]}
-                            onClick={async () => {
-                              const teamId = handoffTeam[group.taskId];
-                              const assigneeId = handoffAssignee[group.taskId];
-                              if (!teamId || !assigneeId) return;
-                              try {
-                                // Hand off ALL un-handed-off deliverables for this task (Bug 9 fix)
-                                const toHandoff = deliverables.filter((x: any) =>
-                                  (x.status === "approved" || x.teamLeadStatus === "approved") && !x.isHandedOff
-                                );
-                                for (const del of toHandoff) {
-                                  await handoffDeliverableMut({
-                                    deliverableId: del._id as Id<"deliverables">,
-                                    targetTeamId: teamId as Id<"teams">,
-                                    targetAssigneeId: assigneeId as Id<"users">,
-                                    ...(handoffDeadline[group.taskId] ? { deadline: new Date(handoffDeadline[group.taskId] + "T23:59:59").getTime() } : {}),
-                                    ...(handoffNote[group.taskId]?.trim() ? { note: handoffNote[group.taskId].trim() } : {}),
-                                  });
-                                }
-                                setHandoffTaskId(null);
-                                setHandoffTeam((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
-                                setHandoffAssignee((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
-                                setHandoffDeadline((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
-                                setHandoffNote((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
-                              } catch {}
-                            }}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                          >
-                            <GitBranch className="h-3.5 w-3.5" />
-                            Hand Off{isMultiCreative ? " All" : ""}
-                          </button>
-                          <button
-                            onClick={() => setHandoffTaskId(null)}
-                            className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
+                        {handoffTeam[group.taskId] && handoffAssignee[group.taskId] && (() => {
+                          const tk = group.taskId;
+                          const isSingle = (d as any).briefType === "single_task";
+                          const opts = taskHandoffCandidates ?? [];
+                          const needPick = !isSingle && opts.length > 0;
+                          const choice = handoffTargetChoice[tk] ?? "";
+                          const showNewFields = isSingle || opts.length === 0 || choice === "__new__";
+                          const canSubmit = handoffTeam[tk] && handoffAssignee[tk] && (!needPick || choice);
+                          return (
+                            <>
+                              {needPick && (
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Attach deliverables to</label>
+                                  <select
+                                    value={choice}
+                                    onChange={(e) =>
+                                      setHandoffTargetChoice((prev) => ({ ...prev, [tk]: e.target.value }))
+                                    }
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  >
+                                    <option value="">Choose one...</option>
+                                    <option value="__new__">Create a new task</option>
+                                    {opts.map((t) => (
+                                      <option key={t._id} value={t._id}>
+                                        {t.title} ({t.status})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {!isSingle && opts.length === 0 && (
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person on this brief — a new handoff task will be created.</p>
+                              )}
+                              {showNewFields && (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={handoffNewTitle[tk] ?? ""}
+                                    onChange={(e) =>
+                                      setHandoffNewTitle((prev) => ({ ...prev, [tk]: e.target.value }))
+                                    }
+                                    placeholder={`New task title (optional — defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <textarea
+                                    value={handoffNewDesc[tk] ?? ""}
+                                    onChange={(e) =>
+                                      setHandoffNewDesc((prev) => ({ ...prev, [tk]: e.target.value }))
+                                    }
+                                    placeholder="Description for the new task (optional)"
+                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <div>
+                                    <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <input
+                                      type="date"
+                                      value={handoffDeadline[tk] ?? ""}
+                                      onChange={(e) =>
+                                        setHandoffDeadline((prev) => ({ ...prev, [tk]: e.target.value }))
+                                      }
+                                      className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                              <textarea
+                                value={handoffNote[tk] ?? ""}
+                                onChange={(e) => setHandoffNote((prev) => ({ ...prev, [tk]: e.target.value }))}
+                                placeholder="Extra instructions (optional) — appended to the handoff"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  disabled={!canSubmit}
+                                  onClick={async () => {
+                                    const teamId = handoffTeam[tk];
+                                    const assigneeId = handoffAssignee[tk];
+                                    if (!teamId || !assigneeId) return;
+                                    const isS = (d as any).briefType === "single_task";
+                                    const o = taskHandoffCandidates ?? [];
+                                    const ch = handoffTargetChoice[tk] ?? "";
+                                    const isNew = isS || o.length === 0 || ch === "__new__";
+                                    try {
+                                      const toHandoff = deliverables.filter((x: any) =>
+                                        (x.status === "approved" || x.teamLeadStatus === "approved") && !x.isHandedOff
+                                      );
+                                      for (let i = 0; i < toHandoff.length; i++) {
+                                        const del = toHandoff[i];
+                                        const payload: Record<string, unknown> = {
+                                          deliverableId: del._id as Id<"deliverables">,
+                                          targetTeamId: teamId as Id<"teams">,
+                                          targetAssigneeId: assigneeId as Id<"users">,
+                                          ...(handoffDeadline[tk] && isNew
+                                            ? { deadline: new Date(handoffDeadline[tk] + "T23:59:59").getTime() }
+                                            : {}),
+                                          ...(handoffNote[tk]?.trim() ? { note: handoffNote[tk].trim() } : {}),
+                                        };
+                                        if (!isNew && ch && ch !== "__new__") {
+                                          payload.targetExistingTaskId = ch as Id<"tasks">;
+                                        } else {
+                                          if (handoffNewTitle[tk]?.trim()) {
+                                            payload.newTaskTitle = handoffNewTitle[tk].trim();
+                                          }
+                                          if (handoffNewDesc[tk]?.trim()) {
+                                            payload.newTaskDescription = handoffNewDesc[tk].trim();
+                                          }
+                                          if (i === 0) payload.forceNewHandoffTask = true;
+                                        }
+                                        await handoffDeliverableMut(payload as any);
+                                      }
+                                      setHandoffTaskId(null);
+                                      setHandoffTeam((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffAssignee((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffDeadline((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffNote((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffTargetChoice((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffNewTitle((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                      setHandoffNewDesc((prev) => {
+                                        const n = { ...prev };
+                                        delete n[tk];
+                                        return n;
+                                      });
+                                    } catch {
+                                      /* */
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                                >
+                                  <GitBranch className="h-3.5 w-3.5" />
+                                  Hand Off{isMultiCreative ? " All" : ""}
+                                </button>
+                                <button
+                                  onClick={() => setHandoffTaskId(null)}
+                                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

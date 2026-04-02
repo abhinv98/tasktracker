@@ -114,6 +114,7 @@ export const listDeliverables = query({
           taskDuration: task?.duration ?? "—",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
+          briefType: brief?.briefType ?? null,
           brandId: brief?.brandId,
           files,
           teamLeadReviewerName: teamLeadName,
@@ -371,6 +372,7 @@ export const listManagerDeliverables = query({
           taskDuration: task?.duration ?? "—",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
+          briefType: brief?.briefType ?? null,
           brandName: brand?.name ?? "No Brand",
           brandId: brief?.brandId,
           teamLeadReviewerName: teamLeadReviewer?.name ?? teamLeadReviewer?.email ?? null,
@@ -1841,6 +1843,43 @@ export const deleteDeliverable = mutation({
 
 // ─── DELIVERABLE HANDOFF (cross-team pipeline) ──────────
 
+/** Open tasks for an assignee on a brief — pick when handing off to an existing task (master briefs). */
+export const listHandoffCandidateTasks = query({
+  args: {
+    briefId: v.id("briefs"),
+    assigneeId: v.id("users"),
+  },
+  handler: async (ctx, { briefId, assigneeId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const brief = await ctx.db.get(briefId);
+    if (!brief) return [];
+
+    const user = await ctx.db.get(userId);
+    let authorized = user?.role === "admin";
+    if (!authorized && brief.brandId) {
+      authorized = await isBrandManager(ctx, userId, brief.brandId);
+    }
+    if (!authorized) return [];
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief_assignee", (q) => q.eq("briefId", briefId).eq("assigneeId", assigneeId))
+      .collect();
+
+    return tasks
+      .filter((t) => t.status !== "done")
+      .map((t) => ({
+        _id: t._id,
+        title: t.title,
+        status: t.status,
+        deadline: t.deadline,
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  },
+});
+
 export const handoffDeliverable = mutation({
   args: {
     deliverableId: v.id("deliverables"),
@@ -1848,8 +1887,25 @@ export const handoffDeliverable = mutation({
     targetAssigneeId: v.id("users"),
     deadline: v.optional(v.number()),
     note: v.optional(v.string()),
+    /** Attach deliverable refs to this task instead of creating or reusing a handoff task (master briefs). */
+    targetExistingTaskId: v.optional(v.id("tasks")),
+    /** When true, always create a new handoff task even if one exists for this source task + team. */
+    forceNewHandoffTask: v.optional(v.boolean()),
+    newTaskTitle: v.optional(v.string()),
+    newTaskDescription: v.optional(v.string()),
   },
-  handler: async (ctx, { deliverableId, targetTeamId, targetAssigneeId, deadline, note }) => {
+  handler: async (ctx, args) => {
+    const {
+      deliverableId,
+      targetTeamId,
+      targetAssigneeId,
+      deadline,
+      note,
+      targetExistingTaskId,
+      forceNewHandoffTask,
+      newTaskTitle,
+      newTaskDescription,
+    } = args;
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -1878,6 +1934,12 @@ export const handoffDeliverable = mutation({
     const sourceBrief = await ctx.db.get(sourceTask.briefId);
     if (!sourceBrief) throw new Error("Source brief not found");
 
+    if (targetExistingTaskId && sourceBrief.briefType === "single_task") {
+      throw new Error(
+        "Cannot attach to an existing task when handing off from a single-task brief. Use create new task instead."
+      );
+    }
+
     // Authorization: admin or brand manager
     const user = await ctx.db.get(userId);
     let authorized = user?.role === "admin";
@@ -1888,6 +1950,16 @@ export const handoffDeliverable = mutation({
 
     const targetTeam = await ctx.db.get(targetTeamId);
     if (!targetTeam) throw new Error("Target team not found");
+
+    const assigneeOnTeam = await ctx.db
+      .query("userTeams")
+      .withIndex("by_user_team", (q: any) =>
+        q.eq("userId", targetAssigneeId).eq("teamId", targetTeamId)
+      )
+      .first();
+    if (!assigneeOnTeam) {
+      throw new Error("Selected user is not on the target team");
+    }
 
     // Determine whether to create task in same brief or new brief
     const isSingleTask = sourceBrief.briefType === "single_task";
@@ -1952,16 +2024,39 @@ export const handoffDeliverable = mutation({
     const existingHandoffForTeam = existingHandoffs.find(
       (h: any) => h.targetTeamId === targetTeamId && h.targetBriefId === targetBriefId
     );
-    let targetTaskId: any;
-    let reusingExistingTask = false;
 
-    if (existingHandoffForTeam) {
-      // Reuse the existing handoff task — just append reference links
+    let targetTaskId: any;
+    /** Auto-merge into the handoff task created for this source + team */
+    let reusedHandoffTask = false;
+    /** User chose an arbitrary existing task on the brief */
+    let attachedToChosenTask = false;
+
+    if (targetExistingTaskId) {
+      const chosen = await ctx.db.get(targetExistingTaskId);
+      if (!chosen) throw new Error("Target task not found");
+      if (chosen.assigneeId !== targetAssigneeId) {
+        throw new Error("That task is not assigned to the selected team member");
+      }
+      if (chosen.briefId !== targetBriefId) {
+        throw new Error("Task must belong to this brief");
+      }
+      if (chosen.status === "done") {
+        throw new Error("Cannot attach to a completed task");
+      }
+      targetTaskId = targetExistingTaskId;
+      attachedToChosenTask = true;
+      const existingLinks = chosen.referenceLinks ?? [];
+      const newLinks = referenceLinks.filter((l: string) => !existingLinks.includes(l));
+      if (newLinks.length > 0) {
+        await ctx.db.patch(targetTaskId, {
+          referenceLinks: [...existingLinks, ...newLinks],
+        });
+      }
+    } else if (existingHandoffForTeam && !forceNewHandoffTask) {
       const existingTask = await ctx.db.get(existingHandoffForTeam.targetTaskId);
       if (existingTask && existingTask.status !== "done") {
         targetTaskId = existingHandoffForTeam.targetTaskId;
-        reusingExistingTask = true;
-        // Merge new reference links into existing task
+        reusedHandoffTask = true;
         const existingLinks = existingTask.referenceLinks ?? [];
         const newLinks = referenceLinks.filter((l: string) => !existingLinks.includes(l));
         if (newLinks.length > 0) {
@@ -1972,7 +2067,7 @@ export const handoffDeliverable = mutation({
       }
     }
 
-    if (!reusingExistingTask) {
+    if (!targetTaskId) {
       // Calculate sort order for the new task
       const existingTasks = await ctx.db
         .query("tasks")
@@ -1982,11 +2077,23 @@ export const handoffDeliverable = mutation({
         ? Math.max(...existingTasks.map((t: any) => t.sortOrder))
         : 0;
 
-      // Create the handoff task
+      const defaultDescription = `Handed off from "${sourceTask.title}"${
+        sourceBrief.title !== sourceTask.title ? ` (${sourceBrief.title})` : ""
+      }.\n\n${note ?? ""}${deliverable.message ? `\n\nOriginal deliverable note: ${deliverable.message}` : ""}`.trim();
+
+      const title =
+        newTaskTitle?.trim() && newTaskTitle.trim().length > 0
+          ? newTaskTitle.trim()
+          : `[Handoff] ${sourceTask.title}`;
+      const description =
+        newTaskDescription?.trim() && newTaskDescription.trim().length > 0
+          ? `${newTaskDescription.trim()}\n\n---\n${defaultDescription}`
+          : defaultDescription;
+
       targetTaskId = await ctx.db.insert("tasks", {
         briefId: targetBriefId,
-        title: `[Handoff] ${sourceTask.title}`,
-        description: `Handed off from "${sourceTask.title}"${sourceBrief.title !== sourceTask.title ? ` (${sourceBrief.title})` : ""}.\n\n${note ?? ""}${deliverable.message ? `\n\nOriginal deliverable note: ${deliverable.message}` : ""}`.trim(),
+        title,
+        description,
         assigneeId: targetAssigneeId,
         assignedBy: userId,
         status: "pending",
@@ -1999,6 +2106,8 @@ export const handoffDeliverable = mutation({
         handoffSourceTaskId: sourceTask._id,
       });
     }
+
+    const shouldNotifyAssignee = !reusedHandoffTask;
 
     // Record the handoff
     await ctx.db.insert("deliverableHandoffs", {
@@ -2013,13 +2122,16 @@ export const handoffDeliverable = mutation({
       note,
     });
 
-    // Notify only when a new task was created (not when reusing an existing handoff task)
-    if (!reusingExistingTask) {
+    if (shouldNotifyAssignee) {
+      const taskRow = (await ctx.db.get(targetTaskId)) as { title?: string } | null;
+      const taskLabel = taskRow?.title ?? sourceTask.title;
       await ctx.db.insert("notifications", {
         recipientId: targetAssigneeId,
         type: "task_assigned",
-        title: "Handoff task assigned",
-        message: `${user?.name ?? "Someone"} handed off "${sourceTask.title}" to you for ${targetTeam.name}`,
+        title: attachedToChosenTask ? "Deliverable added to your task" : "Handoff task assigned",
+        message: attachedToChosenTask
+          ? `${user?.name ?? "Someone"} handed off a deliverable from "${sourceTask.title}" to your task "${taskLabel}"`
+          : `${user?.name ?? "Someone"} handed off "${sourceTask.title}" to you for ${targetTeam.name}`,
         briefId: targetBriefId,
         taskId: targetTaskId,
         triggeredBy: userId,
@@ -2031,8 +2143,10 @@ export const handoffDeliverable = mutation({
         await ctx.db.insert("notifications", {
           recipientId: targetTeam.leadId,
           type: "team_added",
-          title: "Handoff task added to your team",
-          message: `"${sourceTask.title}" was handed off to ${targetTeam.name}`,
+          title: attachedToChosenTask ? "Deliverable handoff" : "Handoff task added to your team",
+          message: attachedToChosenTask
+            ? `"${sourceTask.title}": deliverable handed off to ${targetTeam.name}`
+            : `"${sourceTask.title}" was handed off to ${targetTeam.name}`,
           briefId: targetBriefId,
           taskId: targetTaskId,
           triggeredBy: userId,
