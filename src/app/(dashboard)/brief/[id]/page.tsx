@@ -480,14 +480,18 @@ export default function BriefPage() {
   // Drag-to-create: store pending connection source + position for new node
   const [pendingConnectionSource, setPendingConnectionSource] = useState<string | null>(null);
   const [pendingFlowPosition, setPendingFlowPosition] = useState<{ x: number; y: number } | null>(null);
+  /** Which handle was dragged (bottom | right) for edge styling */
+  const [pendingSourceHandle, setPendingSourceHandle] = useState<string | null>(null);
+
+  const focusCreateTaskPanel = useCallback(() => {
+    const el = document.getElementById("create-task-team-select");
+    el?.focus();
+  }, []);
 
   const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
 
   const briefTeamsList = graphData?.teams ?? [];
-  const employeesInBriefTeams =
-    briefTeamsList.flatMap((t) => t.members.map((m) => m.user)) ?? [];
-  const uniqueEmployees = [...new Map(employeesInBriefTeams.map((e) => [e._id, e])).values()];
 
   const allTasks = tasksData?.tasks ?? [];
   const tasksByStatus = {
@@ -888,10 +892,10 @@ export default function BriefPage() {
                   setSelectedTaskId(taskId);
                 }}
                 onOpenTaskDetail={(taskId) => setSelectedTaskId(taskId)}
-                onDragToCreate={(sourceTaskId, teamId, position) => {
+                onDragToCreate={(sourceTaskId, position, sourceHandleId) => {
                   setPanelMode("create");
-                  setPanelTeamId(teamId);
-                  setTaskTeamFilter(teamId);
+                  setPanelTeamId("");
+                  setTaskTeamFilter("");
                   setTaskTitle("");
                   setTaskDesc("");
                   setTaskAssignee("");
@@ -901,23 +905,14 @@ export default function BriefPage() {
                   setTaskHandoffTeam("");
                   setPendingConnectionSource(sourceTaskId);
                   setPendingFlowPosition(position);
+                  setPendingSourceHandle(sourceHandleId ?? null);
                 }}
                 pendingDraft={
-                  panelMode === "create" && pendingFlowPosition && panelTeamId
-                    ? (() => {
-                        const gt = (graphData?.teams ?? []).find(
-                          (g) => g.team._id === panelTeamId
-                        )?.team;
-                        return {
-                          x: pendingFlowPosition.x,
-                          y: pendingFlowPosition.y,
-                          teamId: panelTeamId,
-                          teamName: gt?.name,
-                          teamColor: gt?.color,
-                        };
-                      })()
-                    : null
+                  panelMode === "create" && pendingFlowPosition ? { x: pendingFlowPosition.x, y: pendingFlowPosition.y } : null
                 }
+                pendingConnectionSource={pendingConnectionSource}
+                pendingConnectionSourceHandle={pendingSourceHandle}
+                onDraftNodeClick={focusCreateTaskPanel}
                 onRequestAddTeam={() => setShowTeamPicker(true)}
               />
             )}
@@ -935,7 +930,12 @@ export default function BriefPage() {
               {panelMode === "create" ? "Create Task" : "Edit Task"}
             </h3>
             <button
-              onClick={() => { setPanelMode("hidden"); setPendingConnectionSource(null); setPendingFlowPosition(null); }}
+              onClick={() => {
+                setPanelMode("hidden");
+                setPendingConnectionSource(null);
+                setPendingFlowPosition(null);
+                setPendingSourceHandle(null);
+              }}
               className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <X className="h-4 w-4" />
@@ -947,6 +947,10 @@ export default function BriefPage() {
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
+                  if (!panelTeamId) {
+                    toast("error", "Select a team");
+                    return;
+                  }
                   if (!taskAssignee) return;
                   let finalDeadline = taskDeadline;
                   if (taskDeadline !== undefined && taskDeadlineTime) {
@@ -989,6 +993,7 @@ export default function BriefPage() {
                     setTaskHandoffTeam("");
                     setPendingConnectionSource(null);
                     setPendingFlowPosition(null);
+                    setPendingSourceHandle(null);
                     toast("success", "Task created");
                   } catch (err) {
                     toast("error", err instanceof Error ? err.message : "Failed to create task");
@@ -996,15 +1001,35 @@ export default function BriefPage() {
                 }}
                 className="flex flex-col gap-3"
               >
-                {panelTeamId && (() => {
-                  const team = (teamsForBrief ?? []).find((t) => t?._id === panelTeamId);
-                  return team ? (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: team.color }} />
-                      <span className="text-[12px] font-medium text-[var(--text-primary)]">{team.name}</span>
-                    </div>
-                  ) : null;
-                })()}
+                <div>
+                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Team</label>
+                  <select
+                    id="create-task-team-select"
+                    value={panelTeamId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPanelTeamId(v);
+                      setTaskTeamFilter(v);
+                      setTaskAssignee("");
+                    }}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    required
+                  >
+                    <option value="">Select team...</option>
+                    {(teamsForBrief ?? []).filter(Boolean).map((team: { _id: Id<"teams">; color?: string; name?: string }) => (
+                      <option key={team._id} value={team._id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamPicker(true)}
+                    className="mt-1.5 text-[10px] font-medium text-[var(--accent-admin)] hover:underline"
+                  >
+                    + Add another team to this brief
+                  </button>
+                </div>
 
                 <Input
                   label="Title"
@@ -1025,10 +1050,10 @@ export default function BriefPage() {
                     onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
                     className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
-                    <option value="">Select employee</option>
+                    <option value="">{panelTeamId ? "Select employee" : "Select team first"}</option>
                     {(panelTeamId
                       ? briefTeamsList.find((t) => t.team._id === panelTeamId)?.members.map((m) => m.user) ?? []
-                      : uniqueEmployees
+                      : []
                     ).map((e) => (
                       <option key={e._id} value={e._id}>{(e.name ?? e.email ?? "Unknown") as string}</option>
                     ))}

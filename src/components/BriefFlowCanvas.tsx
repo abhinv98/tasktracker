@@ -26,7 +26,7 @@ import "@xyflow/react/dist/style.css";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, AlertCircle } from "lucide-react";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -67,15 +67,20 @@ interface BriefFlowCanvasProps {
   onCreateTask?: (teamId: string) => void;
   onEditTask: (taskId: string) => void;
   onOpenTaskDetail: (taskId: string) => void;
-  onDragToCreate?: (sourceTaskId: string, teamId: string, position: { x: number; y: number }) => void;
-  /** Shows a dashed placeholder where the user dropped a connector (complete task in the side panel). */
-  pendingDraft?: {
-    x: number;
-    y: number;
-    teamId: string;
-    teamName?: string;
-    teamColor?: string;
-  } | null;
+  /** Dropped connector on empty canvas — parent opens create panel without pre-selecting team. */
+  onDragToCreate?: (
+    sourceTaskId: string,
+    position: { x: number; y: number },
+    sourceHandleId?: string | null
+  ) => void;
+  /** Placeholder node position until the new task is saved (solid empty node, not a separate hashed box). */
+  pendingDraft?: { x: number; y: number } | null;
+  /** Source task id for the temporary edge into the placeholder. */
+  pendingConnectionSource?: string | null;
+  /** Which handle the user dragged from (bottom | right) for edge routing. */
+  pendingConnectionSourceHandle?: string | null;
+  /** Click empty placeholder — focus the create form (e.g. team field). */
+  onDraftNodeClick?: () => void;
   /** Opens team picker (e.g. add a team not yet on this brief). */
   onRequestAddTeam?: () => void;
 }
@@ -194,23 +199,48 @@ function TaskNode({ data }: { data: TaskData }) {
   );
 }
 
-/** Placeholder after drag-to-canvas until the side panel saves the new task. */
-function DraftTaskNode({
+/** Placeholder node after drag-to-canvas — matches task card shell; alert prompts sidebar completion. */
+function EmptyDraftNode({
   data,
 }: {
-  data: { teamName: string; teamColor: string };
+  data: { onClick: () => void };
 }) {
   return (
-    <div
-      className="rounded-xl border-2 border-dashed px-4 py-3 min-w-[168px] max-w-[200px] shadow-sm"
-      style={{
-        borderColor: data.teamColor,
-        background: `color-mix(in srgb, ${data.teamColor} 12%, white)`,
-      }}
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">New task</p>
-      <p className="text-[11px] font-medium text-[var(--text-primary)] mt-1 line-clamp-2">{data.teamName}</p>
-      <p className="text-[10px] text-[var(--text-secondary)] mt-1.5">Finish in the panel on the right →</p>
+    <div className="group relative">
+      <Handle
+        id="top"
+        type="target"
+        position={Position.Top}
+        className="!w-3 !h-3 !bg-[var(--bg-hover)] !border-2 !border-white hover:!bg-[var(--accent-admin)] !transition-colors !-top-1.5"
+      />
+      <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            data.onClick();
+          }
+        }}
+        className="bg-white rounded-xl shadow-md border-2 border-[var(--border)] hover:border-[var(--accent-admin)] hover:shadow-lg transition-all cursor-pointer min-w-[180px] max-w-[220px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
+        onClick={(e) => {
+          e.stopPropagation();
+          data.onClick();
+        }}
+      >
+        <div className="h-1.5 rounded-t-[10px] bg-[var(--bg-hover)]" />
+        <div className="px-3 pt-2 pb-1">
+          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">New task</p>
+        </div>
+        <div className="px-3 pb-3">
+          <div className="rounded-lg bg-amber-50 border border-amber-200/90 px-2 py-1.5 flex items-start gap-1.5 text-left">
+            <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+            <p className="text-[10px] text-amber-950 leading-snug">
+              Finish in the panel on the right — select team, assignee, title, and deadline.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -219,7 +249,7 @@ function DraftTaskNode({
 
 const nodeTypes: NodeTypes = {
   taskNode: TaskNode as any,
-  draftTaskNode: DraftTaskNode as any,
+  emptyDraftNode: EmptyDraftNode as any,
 };
 
 /* ─── Main Component ─────────────────────────────── */
@@ -242,6 +272,9 @@ function BriefFlowCanvasInner({
   onOpenTaskDetail,
   onDragToCreate,
   pendingDraft,
+  pendingConnectionSource,
+  pendingConnectionSourceHandle,
+  onDraftNodeClick,
   onRequestAddTeam,
 }: BriefFlowCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
@@ -252,6 +285,7 @@ function BriefFlowCanvasInner({
   const pendingPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectingNodeId = useRef<string | null>(null);
+  const connectingHandleId = useRef<string | null>(null);
 
   // Build nodes from teams data
   const totalCanvasTasks = useMemo(
@@ -318,23 +352,50 @@ function BriefFlowCanvasInner({
     });
 
     if (pendingDraft) {
-      const t = teams.find((x) => x.teamId === pendingDraft.teamId);
       nodes.push({
         id: "__pending-draft__",
-        type: "draftTaskNode",
+        type: "emptyDraftNode",
         position: { x: pendingDraft.x, y: pendingDraft.y },
         data: {
-          teamName: pendingDraft.teamName ?? t?.teamName ?? "Selected team",
-          teamColor: pendingDraft.teamColor ?? t?.teamColor ?? "var(--accent-admin)",
+          onClick: () => onDraftNodeClick?.(),
         },
         draggable: false,
         connectable: false,
-        selectable: false,
+        selectable: true,
+      });
+    }
+
+    if (pendingDraft && pendingConnectionSource) {
+      edges.push({
+        id: "__pending-edge__",
+        source: pendingConnectionSource,
+        target: "__pending-draft__",
+        sourceHandle: pendingConnectionSourceHandle ?? "bottom",
+        targetHandle: "top",
+        type: "smoothstep",
+        animated: true,
+        style: { stroke: "var(--accent-admin, #c4684d)", strokeWidth: 2 },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "var(--accent-admin, #c4684d)",
+          width: 16,
+          height: 16,
+        },
       });
     }
 
     return { initialNodes: nodes, initialEdges: edges };
-  }, [teams, connections, isAdmin, onEditTask, onOpenTaskDetail, pendingDraft]);
+  }, [
+    teams,
+    connections,
+    isAdmin,
+    onEditTask,
+    onOpenTaskDetail,
+    pendingDraft,
+    pendingConnectionSource,
+    pendingConnectionSourceHandle,
+    onDraftNodeClick,
+  ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -389,6 +450,7 @@ function BriefFlowCanvasInner({
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
+      if (connection.source === "__pending-draft__" || connection.target === "__pending-draft__") return;
 
       addConnection({
         briefId,
@@ -411,8 +473,9 @@ function BriefFlowCanvasInner({
 
   // Track connection drag start to know the source node
   const onConnectStart = useCallback(
-    (_: any, params: { nodeId: string | null }) => {
+    (_: any, params: { nodeId: string | null; handleId?: string | null }) => {
       connectingNodeId.current = params.nodeId;
+      connectingHandleId.current = params.handleId ?? null;
     },
     []
   );
@@ -435,22 +498,28 @@ function BriefFlowCanvasInner({
         const clientY = "clientY" in event ? event.clientY : event.touches[0].clientY;
         const position = screenToFlowPosition({ x: clientX, y: clientY });
 
-        // Find the team for the source task
         const sourceId = connectingNodeId.current;
-        let sourceTeamId = "";
-        for (const team of teams) {
-          if (team.tasks.some((t) => t._id === sourceId)) {
-            sourceTeamId = team.teamId;
-            break;
+        let sourceOk = false;
+        if (sourceId) {
+          for (const team of teams) {
+            if (team.tasks.some((t) => t._id === sourceId)) {
+              sourceOk = true;
+              break;
+            }
           }
         }
 
-        if (sourceTeamId) {
-          onDragToCreate(sourceId, sourceTeamId, { x: Math.round(position.x), y: Math.round(position.y) });
+        if (sourceOk && sourceId) {
+          onDragToCreate(
+            sourceId,
+            { x: Math.round(position.x), y: Math.round(position.y) },
+            connectingHandleId.current
+          );
         }
       }
 
       connectingNodeId.current = null;
+      connectingHandleId.current = null;
     },
     [onDragToCreate, screenToFlowPosition, teams]
   );
@@ -531,7 +600,7 @@ function BriefFlowCanvasInner({
         />
         <MiniMap
           nodeColor={(node) => {
-            if (node.type === "draftTaskNode") return "var(--accent-admin)";
+            if (node.type === "emptyDraftNode") return "#cbd5e1";
             const taskData = node.data as unknown as TaskData;
             return (STATUS_CONFIG[taskData?.status]?.color) ?? "#94a3b8";
           }}
