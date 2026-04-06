@@ -42,6 +42,7 @@ import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSing
 import type * as migrations_mergeAccounts from "../migrations/mergeAccounts.js";
 import type * as migrations_normalizeDeadlines from "../migrations/normalizeDeadlines.js";
 import type * as migrations_provisionUsers from "../migrations/provisionUsers.js";
+import type * as migrations_provisionUsersInternals from "../migrations/provisionUsersInternals.js";
 import type * as migrations_resetPassword from "../migrations/resetPassword.js";
 import type * as migrations_syncSingleTaskBriefs from "../migrations/syncSingleTaskBriefs.js";
 import type * as notifications from "../notifications.js";
@@ -100,6 +101,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/mergeAccounts": typeof migrations_mergeAccounts;
   "migrations/normalizeDeadlines": typeof migrations_normalizeDeadlines;
   "migrations/provisionUsers": typeof migrations_provisionUsers;
+  "migrations/provisionUsersInternals": typeof migrations_provisionUsersInternals;
   "migrations/resetPassword": typeof migrations_resetPassword;
   "migrations/syncSingleTaskBriefs": typeof migrations_syncSingleTaskBriefs;
   notifications: typeof notifications;

@@ -1,44 +1,25 @@
-import { internalAction, internalMutation, internalQuery } from "../_generated/server";
-import { v } from "convex/values";
+import { internalAction } from "../_generated/server";
 import { createAccount } from "@convex-dev/auth/server";
-import { internal } from "../_generated/api";
+import { makeFunctionReference } from "convex/server";
+import type { Doc, Id } from "../_generated/dataModel";
 
-export const getUserByEmail = internalQuery({
-  args: { email: v.string() },
-  handler: async (ctx, { email }) => {
-    return await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", email))
-      .first();
-  },
-});
+const getUserByEmail = makeFunctionReference<
+  "query",
+  { email: string },
+  Doc<"users"> | null
+>("migrations/provisionUsersInternals:getUserByEmail");
 
-export const linkBrandManagerToAllBrands = internalMutation({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) => {
-    const brands = await ctx.db.query("brands").collect();
-    let linked = 0;
-    for (const brand of brands) {
-      const existing = await ctx.db
-        .query("brandManagers")
-        .withIndex("by_brand", (q) => q.eq("brandId", brand._id))
-        .collect();
-      if (existing.some((e) => e.managerId === userId)) continue;
-      await ctx.db.insert("brandManagers", { brandId: brand._id, managerId: userId });
-      linked++;
-    }
-    return { linked, brandCount: brands.length };
-  },
-});
+const patchUsersToEmployee = makeFunctionReference<
+  "mutation",
+  { userIds: Id<"users">[] },
+  void
+>("migrations/provisionUsersInternals:patchUsersToEmployee");
 
-export const patchUsersToEmployee = internalMutation({
-  args: { userIds: v.array(v.id("users")) },
-  handler: async (ctx, { userIds }) => {
-    for (const id of userIds) {
-      await ctx.db.patch(id, { role: "employee" });
-    }
-  },
-});
+const linkBrandManagerToAllBrands = makeFunctionReference<
+  "mutation",
+  { userId: Id<"users"> },
+  { linked: number; brandCount: number }
+>("migrations/provisionUsersInternals:linkBrandManagerToAllBrands");
 
 function randomPassword(): string {
   const chars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@%&";
@@ -55,9 +36,8 @@ export const run = internalAction({
     const navyEmail = "navyaneel.jagada@ecultify.com";
     const rishiEmail = "akkiofficial22@gmail.com";
 
-    const mod = internal["migrations/provisionUsers"];
-    const existingNavy = await ctx.runQuery(mod.getUserByEmail, { email: navyEmail });
-    const existingRishi = await ctx.runQuery(mod.getUserByEmail, { email: rishiEmail });
+    const existingNavy = await ctx.runQuery(getUserByEmail, { email: navyEmail });
+    const existingRishi = await ctx.runQuery(getUserByEmail, { email: rishiEmail });
     if (existingNavy || existingRishi) {
       throw new Error(
         `User already exists: ${[existingNavy && navyEmail, existingRishi && rishiEmail].filter(Boolean).join(", ")}`
@@ -88,11 +68,11 @@ export const run = internalAction({
       },
     });
 
-    await ctx.runMutation(mod.patchUsersToEmployee, {
+    await ctx.runMutation(patchUsersToEmployee, {
       userIds: [navy.user._id, rishi.user._id],
     });
 
-    const bm = await ctx.runMutation(mod.linkBrandManagerToAllBrands, {
+    const bm = await ctx.runMutation(linkBrandManagerToAllBrands, {
       userId: rishi.user._id,
     });
 
