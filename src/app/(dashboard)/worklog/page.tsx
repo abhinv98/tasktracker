@@ -448,26 +448,10 @@ export default function WorkLogPage() {
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
-                        <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                      </div>
-                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
-                        {emp.totalTaskHours ?? 0}h
-                      </p>
-                      <p className="text-[10px] text-[var(--text-muted)]">Time Spent</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
                         <Briefcase className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       </div>
                       <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{emp.briefCount}</p>
                       <p className="text-[10px] text-[var(--text-muted)]">Briefs</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                      </div>
-                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{emp.avgCompletionHours}h</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">Avg Completion</p>
                     </div>
                   </div>
 
@@ -485,8 +469,6 @@ export default function WorkLogPage() {
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Submitted</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Deadline</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Approved</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Emp. Time</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Appr. Time</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Changes</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Remarks</th>
                             </tr>
@@ -542,16 +524,6 @@ export default function WorkLogPage() {
                                         {new Date(task.completedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                       </span>
                                     ) : "—"}
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <span className="text-[11px] text-[var(--text-muted)]">
-                                      {task.employeeTimeHours != null ? `${task.employeeTimeHours}h` : "—"}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2">
-                                    <span className={`text-[11px] ${task.approvalTimeHours != null && task.approvalTimeHours > 48 ? "text-[var(--danger)] font-medium" : "text-[var(--text-muted)]"}`}>
-                                      {task.approvalTimeHours != null ? `${task.approvalTimeHours}h` : "—"}
-                                    </span>
                                   </td>
                                   <td className="px-3 py-2 text-center">
                                     {(task as any).changesCount > 0 ? (

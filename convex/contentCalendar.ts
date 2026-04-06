@@ -79,6 +79,8 @@ async function ensureSheetForMonth(
 /**
  * Returns count of content calendar tasks that are pending (not done/review)
  * for the current month — used for the sidebar notification badge.
+ * Scoped per brand manager: only counts tasks from brands they manage.
+ * Super admins see counts from all brands.
  */
 export const getPendingCalendarTaskCount = query({
   args: {},
@@ -86,9 +88,35 @@ export const getPendingCalendarTaskCount = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return 0;
 
+    const user = await ctx.db.get(userId);
+    if (!user) return 0;
+
+    const isSuperAdmin = (user as any).isSuperAdmin === true;
+
+    // Get brand IDs this user manages
+    let managedBrandIds: Set<string>;
+    if (isSuperAdmin) {
+      // Super admins see all brands
+      managedBrandIds = new Set(
+        (await ctx.db.query("brands").collect()).map((b) => b._id)
+      );
+    } else {
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_manager", (q) => q.eq("managerId", userId))
+        .collect();
+      managedBrandIds = new Set(bms.map((bm) => bm.brandId));
+    }
+
+    if (managedBrandIds.size === 0) return 0;
+
     const allBriefs = await ctx.db.query("briefs").collect();
     const ccBriefs = allBriefs.filter(
-      (b: any) => b.briefType === "content_calendar" && b.status !== "archived"
+      (b: any) =>
+        b.briefType === "content_calendar" &&
+        b.status !== "archived" &&
+        b.brandId &&
+        managedBrandIds.has(b.brandId)
     );
     if (ccBriefs.length === 0) return 0;
 

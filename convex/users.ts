@@ -1,6 +1,59 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+
+/** Shared user teardown (teams, notifications, auth sessions, user row). Used by deleteUser and internal migrations. */
+async function removeUserAndCleanup(
+  ctx: MutationCtx,
+  targetUserId: Id<"users">
+): Promise<void> {
+  const targetUser = await ctx.db.get(targetUserId);
+  if (!targetUser) return;
+
+  const userTeams = await ctx.db
+    .query("userTeams")
+    .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+    .collect();
+  for (const ut of userTeams) {
+    await ctx.db.delete(ut._id);
+  }
+
+  const notifs = await ctx.db
+    .query("notifications")
+    .withIndex("by_recipient", (q) => q.eq("recipientId", targetUserId))
+    .collect();
+  for (const n of notifs) {
+    await ctx.db.delete(n._id);
+  }
+
+  const authAccounts = await ctx.db.query("authAccounts").collect();
+  const userAuthAccounts = authAccounts.filter((a: any) => a.userId === targetUserId);
+  for (const account of userAuthAccounts) {
+    await ctx.db.delete(account._id);
+  }
+  const authSessions = await ctx.db.query("authSessions").collect();
+  const userSessions = authSessions.filter((s: any) => s.userId === targetUserId);
+  for (const session of userSessions) {
+    const refreshTokens = await ctx.db.query("authRefreshTokens").collect();
+    const sessionTokens = refreshTokens.filter((t: any) => t.sessionId === session._id);
+    for (const token of sessionTokens) {
+      await ctx.db.delete(token._id);
+    }
+    await ctx.db.delete(session._id);
+  }
+
+  if (targetUser.email) {
+    const allInvites = await ctx.db.query("invites").collect();
+    const invite = allInvites.find((inv: any) => inv.email === targetUser.email && inv.used);
+    if (invite) {
+      await ctx.db.patch(invite._id, { used: false } as any);
+    }
+  }
+
+  await ctx.db.delete(targetUserId);
+}
 
 export const getCurrentUser = query({
   args: {},
@@ -174,46 +227,43 @@ export const deleteUser = mutation({
       if (admins.length <= 1) throw new Error("Cannot delete the last admin");
     }
 
-    // Remove from all teams
-    const userTeams = await ctx.db.query("userTeams").withIndex("by_user", (q) => q.eq("userId", targetUserId)).collect();
-    for (const ut of userTeams) {
-      await ctx.db.delete(ut._id);
-    }
+    await removeUserAndCleanup(ctx, targetUserId);
+  },
+});
 
-    // Delete notifications
-    const notifs = await ctx.db.query("notifications").withIndex("by_recipient", (q) => q.eq("recipientId", targetUserId)).collect();
-    for (const n of notifs) {
-      await ctx.db.delete(n._id);
-    }
+/** One-off / maintenance: remove users whose name or email contains any substring (case-insensitive). Default: harshita, samhit. Run: `npx convex run users:removeUsersByNameSubstrings` */
+export const removeUsersByNameSubstrings = internalMutation({
+  args: {
+    substrings: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { substrings }) => {
+    const patterns = (substrings ?? ["harshita", "samhit"]).map((p) => p.toLowerCase());
+    const allUsers = await ctx.db.query("users").collect();
+    const toRemove = allUsers.filter((u) => {
+      const name = (u.name ?? "").toLowerCase();
+      const email = (u.email ?? "").toLowerCase();
+      return patterns.some((p) => name.includes(p) || email.includes(p));
+    });
 
-    // Clean up Convex Auth records so the email can be reused
-    const authAccounts = await ctx.db.query("authAccounts").collect();
-    const userAuthAccounts = authAccounts.filter((a: any) => a.userId === targetUserId);
-    for (const account of userAuthAccounts) {
-      await ctx.db.delete(account._id);
-    }
-    const authSessions = await ctx.db.query("authSessions").collect();
-    const userSessions = authSessions.filter((s: any) => s.userId === targetUserId);
-    for (const session of userSessions) {
-      // Delete refresh tokens for this session
-      const refreshTokens = await ctx.db.query("authRefreshTokens").collect();
-      const sessionTokens = refreshTokens.filter((t: any) => t.sessionId === session._id);
-      for (const token of sessionTokens) {
-        await ctx.db.delete(token._id);
+    const removed: string[] = [];
+    const skipped: { name: string; reason: string }[] = [];
+
+    for (const u of toRemove) {
+      if (u.role === "admin") {
+        const admins = await ctx.db
+          .query("users")
+          .withIndex("by_role", (q) => q.eq("role", "admin"))
+          .collect();
+        if (admins.length <= 1) {
+          skipped.push({ name: u.name ?? String(u._id), reason: "last admin" });
+          continue;
+        }
       }
-      await ctx.db.delete(session._id);
+      await removeUserAndCleanup(ctx, u._id);
+      removed.push(u.name ?? u.email ?? String(u._id));
     }
 
-    // Reset the invite so it can be used again
-    if (targetUser?.email) {
-      const allInvites = await ctx.db.query("invites").collect();
-      const invite = allInvites.find((inv: any) => inv.email === targetUser.email && inv.used);
-      if (invite) {
-        await ctx.db.patch(invite._id, { used: false } as any);
-      }
-    }
-
-    await ctx.db.delete(targetUserId);
+    return { removedCount: removed.length, removed, skipped };
   },
 });
 
