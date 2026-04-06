@@ -148,6 +148,12 @@ export const createBrief = mutation({
     taskClientFacing: v.optional(v.boolean()),
     teamIds: v.optional(v.array(v.id("teams"))),
     creativesRequired: v.optional(v.number()),
+    // Content calendar fields
+    ccMonth: v.optional(v.string()),
+    ccCopyTeamId: v.optional(v.id("teams")),
+    ccDesignTeamId: v.optional(v.id("teams")),
+    ccCopyAssigneeId: v.optional(v.id("users")),
+    ccDesignAssigneeId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -178,6 +184,11 @@ export const createBrief = mutation({
       taskClientFacing,
       teamIds,
       creativesRequired: creativesRequiredArg,
+      ccMonth,
+      ccCopyTeamId,
+      ccDesignTeamId,
+      ccCopyAssigneeId,
+      ccDesignAssigneeId,
       ...briefArgs
     } = args;
 
@@ -220,6 +231,126 @@ export const createBrief = mutation({
             title: "Team added to brief",
             message: `Your team ${team.name} was added to a brief "${args.title}"`,
             briefId,
+            triggeredBy: userId,
+            read: false,
+            createdAt: Date.now(),
+          });
+        }
+      }
+    }
+
+    // ── Content Calendar: create entry + sequential team tasks ──
+    if (args.briefType === "content_calendar" && args.brandId && ccMonth) {
+      // Activate the brief since we have an entry
+      await ctx.db.patch(briefId, { status: "active" as const });
+
+      // Ensure month sheet exists
+      const sheets = await ctx.db
+        .query("contentCalendarSheets")
+        .withIndex("by_brief", (q: any) => q.eq("briefId", briefId))
+        .collect();
+      if (!sheets.some((s: any) => s.month === ccMonth)) {
+        const maxSheetOrder = sheets.length
+          ? Math.max(...sheets.map((s: any) => s.sortOrder))
+          : 0;
+        await ctx.db.insert("contentCalendarSheets", {
+          briefId,
+          month: ccMonth,
+          sortOrder: maxSheetOrder + 1,
+          createdBy: userId,
+          createdAt: Date.now(),
+        });
+      }
+
+      // Create parent entry task (the calendar card)
+      const postDate = `${ccMonth}-01`;
+      const parentTaskId = await ctx.db.insert("tasks", {
+        briefId,
+        title: args.title,
+        description: args.description || undefined,
+        assigneeId: userId, // admin owns the parent entry
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: 1000,
+        duration: "1d",
+        durationMinutes: 480,
+        platform: "Other",
+        contentType: "Post",
+        postDate,
+        assignedAt: Date.now(),
+        ...(ccDesignTeamId ? { handoffTargetTeamId: ccDesignTeamId } : {}),
+      });
+
+      // Create Copy team linked task (step 1)
+      if (ccCopyTeamId) {
+        const copyAssignee = ccCopyAssigneeId ?? userId;
+        const copyTaskId = await ctx.db.insert("tasks", {
+          briefId,
+          title: `[Copy] ${args.title}`,
+          description: args.description || undefined,
+          assigneeId: copyAssignee,
+          assignedBy: userId,
+          status: "pending",
+          sortOrder: 1001,
+          duration: "1d",
+          durationMinutes: 480,
+          platform: "Other",
+          contentType: "Post",
+          postDate,
+          parentTaskId,
+          assignedAt: Date.now(),
+          ...(ccDesignTeamId ? { handoffTargetTeamId: ccDesignTeamId } : {}),
+        });
+
+        // Link copy team to brief
+        await ctx.db.insert("briefTeams", { briefId, teamId: ccCopyTeamId, order: 0 });
+
+        if (ccCopyAssigneeId && ccCopyAssigneeId !== userId) {
+          await ctx.db.insert("notifications", {
+            recipientId: ccCopyAssigneeId,
+            type: "task_assigned",
+            title: "Content calendar task assigned",
+            message: `You were assigned copy: "${args.title}"`,
+            briefId,
+            taskId: copyTaskId,
+            triggeredBy: userId,
+            read: false,
+            createdAt: Date.now(),
+          });
+        }
+      }
+
+      // Create Design team linked task (step 2)
+      if (ccDesignTeamId) {
+        const designAssignee = ccDesignAssigneeId ?? userId;
+        const designTaskId = await ctx.db.insert("tasks", {
+          briefId,
+          title: `[Design] ${args.title}`,
+          description: args.description || undefined,
+          assigneeId: designAssignee,
+          assignedBy: userId,
+          status: "pending",
+          sortOrder: 1002,
+          duration: "1d",
+          durationMinutes: 480,
+          platform: "Other",
+          contentType: "Post",
+          postDate,
+          parentTaskId,
+          assignedAt: Date.now(),
+        });
+
+        // Link design team to brief
+        await ctx.db.insert("briefTeams", { briefId, teamId: ccDesignTeamId, order: 1 });
+
+        if (ccDesignAssigneeId && ccDesignAssigneeId !== userId) {
+          await ctx.db.insert("notifications", {
+            recipientId: ccDesignAssigneeId,
+            type: "task_assigned",
+            title: "Content calendar task assigned",
+            message: `You were assigned design: "${args.title}"`,
+            briefId,
+            taskId: designTaskId,
             triggeredBy: userId,
             read: false,
             createdAt: Date.now(),

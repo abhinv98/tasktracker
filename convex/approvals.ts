@@ -2276,3 +2276,54 @@ export const getHandoffHistory = query({
     });
   },
 });
+
+/**
+ * Counts deliverables pending manager review.
+ * Scoped per brand manager (only their brands), super admins see all.
+ * Counts deliverables where teamLeadStatus === "approved" and status is still "pending".
+ */
+export const getPendingDeliverableCount = query({
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return 0;
+
+    const isSuperAdmin = (user as any).isSuperAdmin === true;
+
+    let managedBrandIds: Set<string>;
+    if (isSuperAdmin) {
+      managedBrandIds = new Set(
+        (await ctx.db.query("brands").collect()).map((b) => b._id)
+      );
+    } else {
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_manager", (q) => q.eq("managerId", userId))
+        .collect();
+      managedBrandIds = new Set(bms.map((bm) => bm.brandId));
+    }
+
+    if (managedBrandIds.size === 0) return 0;
+
+    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+    const briefs = await ctx.db.query("briefs").collect();
+
+    let count = 0;
+    for (const d of allDeliverables) {
+      // Deliverables that team lead approved but manager hasn't acted on yet
+      if (d.teamLeadStatus !== "approved") continue;
+      if (d.status === "approved" || d.status === "rejected") continue;
+
+      const task = tasks.find((t) => t._id === d.taskId);
+      if (!task) continue;
+      const brief = briefs.find((b) => b._id === task.briefId);
+      if (!brief?.brandId || !managedBrandIds.has(brief.brandId)) continue;
+
+      count++;
+    }
+
+    return count;
+  },
+});

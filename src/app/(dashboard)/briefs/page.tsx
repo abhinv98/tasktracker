@@ -80,6 +80,21 @@ export default function BriefsPage() {
     stTeamId ? { teamId: stTeamId as Id<"teams"> } : "skip"
   );
 
+  // Content calendar brief fields
+  const [ccMonth, setCcMonth] = useState<string>("");
+  const [ccCopyTeamId, setCcCopyTeamId] = useState<string>("");
+  const [ccDesignTeamId, setCcDesignTeamId] = useState<string>("");
+  const ccCopyMembers = useQuery(
+    api.teams.getTeamMembers,
+    ccCopyTeamId ? { teamId: ccCopyTeamId as Id<"teams"> } : "skip"
+  );
+  const ccDesignMembers = useQuery(
+    api.teams.getTeamMembers,
+    ccDesignTeamId ? { teamId: ccDesignTeamId as Id<"teams"> } : "skip"
+  );
+  const [ccCopyAssignee, setCcCopyAssignee] = useState<string>("");
+  const [ccDesignAssignee, setCcDesignAssignee] = useState<string>("");
+
   const [deletingBriefId, setDeletingBriefId] = useState<Id<"briefs"> | null>(null);
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
@@ -336,6 +351,16 @@ export default function BriefsPage() {
           ? Math.floor(crNum)
           : undefined;
 
+      // Build content calendar specific fields
+      const ccFields: Record<string, any> = {};
+      if (isContentCal) {
+        if (ccMonth) ccFields.ccMonth = ccMonth;
+        if (ccCopyTeamId) ccFields.ccCopyTeamId = ccCopyTeamId as Id<"teams">;
+        if (ccDesignTeamId) ccFields.ccDesignTeamId = ccDesignTeamId as Id<"teams">;
+        if (ccCopyAssignee) ccFields.ccCopyAssigneeId = ccCopyAssignee as Id<"users">;
+        if (ccDesignAssignee) ccFields.ccDesignAssigneeId = ccDesignAssignee as Id<"users">;
+      }
+
       await createBrief({
         title,
         description,
@@ -351,6 +376,7 @@ export default function BriefsPage() {
           taskClientFacing: clientFacing || undefined,
         } : {}),
         ...(isSingle && stTeamId ? { teamIds: [stTeamId as Id<"teams">] } : {}),
+        ...ccFields,
       });
       try {
         sessionStorage.removeItem(STORAGE_BRIEF_DRAFT);
@@ -370,7 +396,12 @@ export default function BriefsPage() {
       setStTeamId("");
       setStDeadlineTime("");
       setCreativesRequired(1);
-      toast("success", isSingle ? "Single task brief created" : "Brief created");
+      setCcMonth("");
+      setCcCopyTeamId("");
+      setCcDesignTeamId("");
+      setCcCopyAssignee("");
+      setCcDesignAssignee("");
+      toast("success", isSingle ? "Single task brief created" : isContentCal ? "Content calendar created" : "Brief created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
     }
@@ -932,6 +963,113 @@ export default function BriefsPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                </>
+              )}
+
+              {briefMode === "content_calendar" && (
+                <>
+                  <div>
+                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Month (optional)</label>
+                    <input
+                      type="month"
+                      value={ccMonth}
+                      onChange={(e) => setCcMonth(e.target.value)}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    />
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">If set, a calendar sheet entry is created for this month.</p>
+                  </div>
+                  {/* Sequential team assignment */}
+                  <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-hover)]/40">
+                    <p className="text-[11px] font-semibold text-[var(--text-secondary)] mb-2">Team Assignment (optional)</p>
+                    <p className="text-[10px] text-[var(--text-muted)] mb-3">Assign <strong>Copy team</strong> first, then <strong>Design team</strong>. Leave blank to assign later.</p>
+                    <div className="flex items-center gap-2 mb-3 text-[10px] font-semibold">
+                      <span className={`px-1.5 py-0.5 rounded ${ccCopyTeamId ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                        1. Copy Team {ccCopyTeamId ? "✓" : "← first"}
+                      </span>
+                      <span className="text-[var(--text-muted)]">→</span>
+                      <span className={`px-1.5 py-0.5 rounded ${ccCopyTeamId ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                        2. Design Team {ccCopyTeamId ? "← next" : ""}
+                      </span>
+                    </div>
+                    {/* Copy team */}
+                    <div className="mb-2">
+                      <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Copy Team</label>
+                      <select
+                        value={ccCopyTeamId}
+                        onChange={(e) => { setCcCopyTeamId(e.target.value); setCcCopyAssignee(""); }}
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      >
+                        <option value="">Select copy team...</option>
+                        {(() => {
+                          const isCopyTeam = (name: string) => /copy|content|writing/i.test(name);
+                          const sorted = [...(allTeams ?? [])].sort((a: any, b: any) => {
+                            const ac = isCopyTeam(a.name) ? 0 : 1;
+                            const bc = isCopyTeam(b.name) ? 0 : 1;
+                            return ac - bc;
+                          });
+                          return sorted.map((t: any) => (
+                            <option key={t._id} value={t._id}>{t.name}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+                    {ccCopyTeamId && (
+                      <div className="mb-3">
+                        <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Copy Assignee (optional)</label>
+                        <select
+                          value={ccCopyAssignee}
+                          onChange={(e) => setCcCopyAssignee(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        >
+                          <option value="">Assign later</option>
+                          {(ccCopyMembers ?? []).map((m: any) => (
+                            <option key={m._id} value={m._id}>
+                              {m.name ?? m.email}{m.designation ? ` — ${m.designation}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {/* Design team */}
+                    <div className="mb-2">
+                      <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Design Team</label>
+                      <select
+                        value={ccDesignTeamId}
+                        onChange={(e) => { setCcDesignTeamId(e.target.value); setCcDesignAssignee(""); }}
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      >
+                        <option value="">Select design team...</option>
+                        {(() => {
+                          const isDesignTeam = (name: string) => /design|creative|graphic/i.test(name);
+                          const sorted = [...(allTeams ?? [])].sort((a: any, b: any) => {
+                            const ac = isDesignTeam(a.name) ? 0 : 1;
+                            const bc = isDesignTeam(b.name) ? 0 : 1;
+                            return ac - bc;
+                          });
+                          return sorted.map((t: any) => (
+                            <option key={t._id} value={t._id}>{t.name}</option>
+                          ));
+                        })()}
+                      </select>
+                    </div>
+                    {ccDesignTeamId && (
+                      <div>
+                        <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Design Assignee (optional)</label>
+                        <select
+                          value={ccDesignAssignee}
+                          onChange={(e) => setCcDesignAssignee(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        >
+                          <option value="">Assign later</option>
+                          {(ccDesignMembers ?? []).map((m: any) => (
+                            <option key={m._id} value={m._id}>
+                              {m.name ?? m.email}{m.designation ? ` — ${m.designation}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

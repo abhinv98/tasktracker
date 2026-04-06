@@ -180,6 +180,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const role = user.role ?? "employee";
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
   const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
+  const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
 
   const nav =
     role === "admin"
@@ -299,6 +300,13 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                               isActive ? "bg-white/30 text-white" : "bg-amber-500 text-white"
                             }`}>
                               {pendingCalendarCount}
+                            </span>
+                          )}
+                          {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
+                            <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
+                              isActive ? "bg-white/30 text-white" : "bg-purple-500 text-white"
+                            }`}>
+                              {pendingDeliverableCount}
                             </span>
                           )}
                         </Link>

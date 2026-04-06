@@ -70,6 +70,19 @@ export default function WorkLogPage() {
   const brands = useQuery(api.brands.listBrands);
   const teams = useQuery(api.teams.listTeams);
 
+  // Filter employee dropdown by selected team
+  const reportTeamMembers = useQuery(
+    api.teams.getTeamMembers,
+    reportTeamId ? { teamId: reportTeamId as Id<"teams"> } : "skip"
+  );
+  const filteredEmployees = (() => {
+    if (reportTeamId && reportTeamMembers) {
+      const memberIds = new Set(reportTeamMembers.map((m: any) => m._id));
+      return employees.filter((e) => memberIds.has(e._id));
+    }
+    return employees;
+  })();
+
   const report = useQuery(api.reports.getEmployeeReport, {
     ...(selectedEmployee ? { employeeId: selectedEmployee as Id<"users"> } : {}),
     startDate: reportStartDate,
@@ -379,8 +392,8 @@ export default function WorkLogPage() {
                 onChange={(e) => setSelectedEmployee(e.target.value)}
                 className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
               >
-                <option value="">All Team Members</option>
-                {employees.map((emp) => (
+                <option value="">{reportTeamId ? "All Team Members" : "All Employees"}</option>
+                {filteredEmployees.map((emp: any) => (
                   <option key={emp._id} value={emp._id}>
                     {emp.name ?? emp.email}{emp.role === "admin" ? " (Admin)" : (emp as any).isSuperAdmin ? " (Super Admin)" : ""}
                   </option>
@@ -410,7 +423,7 @@ export default function WorkLogPage() {
               </label>
               <select
                 value={reportTeamId}
-                onChange={(e) => setReportTeamId(e.target.value)}
+                onChange={(e) => { setReportTeamId(e.target.value); setSelectedEmployee(""); }}
                 className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[160px]"
               >
                 <option value="">All Teams</option>
@@ -759,7 +772,7 @@ export default function WorkLogPage() {
           />
           <div
             ref={panelRef}
-            className={`fixed right-0 top-0 h-full w-full sm:w-[820px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
+            className={`fixed right-0 top-0 h-full w-full sm:w-[960px] z-50 bg-white border-l border-[var(--border)] shadow-xl flex flex-col transition-transform duration-200 ease-out ${
               panelOpen ? "translate-x-0" : "translate-x-full"
             }`}
           >
@@ -808,46 +821,51 @@ export default function WorkLogPage() {
                   {memberTasks.tasks.length === 0 ? (
                     <p className="text-[13px] text-[var(--text-muted)]">No active tasks</p>
                   ) : (
-                    <div className="rounded-lg border border-[var(--border)] overflow-hidden">
-                      <table className="w-full text-left">
+                    <div className="rounded-lg border border-[var(--border)] overflow-x-auto">
+                      <table className="w-full text-left min-w-[880px]">
                         <thead>
                           <tr className="bg-[var(--bg-hover)]">
                             <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
                             <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brief</th>
                             <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Duration</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned By</th>
+                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned</th>
+                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
+                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Sent for Review</th>
+                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Approved</th>
                           </tr>
                         </thead>
                         <tbody>
                           {memberTasks.tasks
-                            .sort((a, b) => (MEMBER_STATUS_CONFIG[a.status]?.order ?? 99) - (MEMBER_STATUS_CONFIG[b.status]?.order ?? 99))
-                            .map((task, idx) => {
+                            .sort((a: any, b: any) => (MEMBER_STATUS_CONFIG[a.status]?.order ?? 99) - (MEMBER_STATUS_CONFIG[b.status]?.order ?? 99))
+                            .map((task: any, idx: number) => {
                               const config = MEMBER_STATUS_CONFIG[task.status] ?? { color: "var(--text-muted)", label: task.status, order: 99 };
+                              const fmtDate = (ts: number | null | undefined) => {
+                                if (!ts) return "—";
+                                return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                              };
+                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done";
                               return (
                                 <tr
                                   key={task._id}
-                                  className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"} hover:bg-[var(--bg-hover)] transition-colors`}
+                                  className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer`}
+                                  onClick={() => router.push(`/brief/${task.briefId}`)}
                                 >
                                   <td className="px-3 py-2.5">
                                     <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
                                       {task.title}
                                     </span>
-                                  </td>
-                                  <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)] truncate block max-w-[120px]">
-                                      {(task as any).brandName ?? "—"}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)] block max-w-[180px] leading-snug line-clamp-2">
+                                    <span className="text-[10px] text-[var(--text-muted)] block truncate max-w-[200px]">
                                       {task.briefTitle}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
+                                    <span className="text-[11px] text-[var(--text-secondary)] truncate block max-w-[100px]">
+                                      {task.brandName ?? "—"}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5">
                                     <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap"
                                       style={{ color: config.color, backgroundColor: config.color + "18" }}
                                     >
                                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
@@ -855,10 +873,36 @@ export default function WorkLogPage() {
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--accent-admin)] font-medium">{task.duration}</span>
+                                    <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
+                                      {fmtDate(task.assignedAt)}
+                                    </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-muted)]">{task.assignedByName}</span>
+                                    {task.deadline ? (
+                                      <span className={`text-[11px] whitespace-nowrap ${isOverdue ? "text-[var(--danger)] font-semibold" : "text-[var(--text-secondary)]"}`}>
+                                        {fmtDate(task.deadline)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    {task.submittedForReviewAt ? (
+                                      <span className="text-[11px] text-blue-600 whitespace-nowrap">
+                                        {fmtDate(task.submittedForReviewAt)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    {task.completedAt ? (
+                                      <span className="text-[11px] text-emerald-600 whitespace-nowrap">
+                                        {fmtDate(task.completedAt)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                    )}
                                   </td>
                                 </tr>
                               );

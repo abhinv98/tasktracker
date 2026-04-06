@@ -200,7 +200,9 @@ export const getTeamMemberTasks = query({
     );
     const activeBriefIds = new Set(activeBriefs.map((b) => b._id));
 
-    const activeTasks = allTasks.filter((t) => activeBriefIds.has(t.briefId));
+    const activeTasks = allTasks.filter(
+      (t) => activeBriefIds.has(t.briefId) && t.status !== "done"
+    );
 
     return {
       user: {
@@ -224,6 +226,9 @@ export const getTeamMemberTasks = query({
           brandName: brand?.name ?? "—",
           assignedByName: assignedByUser?.name ?? assignedByUser?.email ?? "Unknown",
           deadline: t.deadline,
+          assignedAt: t.assignedAt ?? (t as any)._creationTime ?? null,
+          submittedForReviewAt: t.submittedForReviewAt ?? null,
+          completedAt: t.completedAt ?? null,
         };
       }),
     };
