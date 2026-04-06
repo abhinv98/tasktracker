@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -440,10 +440,25 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   );
 }
 
+function safeReturnPath(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) return decoded;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export default function BriefPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const briefId = params.id as Id<"briefs">;
+  const returnTo = safeReturnPath(searchParams.get("returnTo"));
+  const backHref = returnTo ?? "/briefs";
+  const backLabel = returnTo?.includes("/brands/") ? "Brand" : "Briefs";
 
   const brief = useQuery(api.briefs.getBrief, { briefId });
   const tasksData = useQuery(api.tasks.listTasksForBrief, { briefId });
@@ -530,7 +545,7 @@ export default function BriefPage() {
     try {
       await archiveBrief({ briefId });
       toast("success", "Brief archived");
-      router.push("/briefs");
+      router.push(backHref);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to archive");
     }
@@ -540,7 +555,7 @@ export default function BriefPage() {
     try {
       await deleteBrief({ briefId });
       toast("success", "Brief deleted");
-      router.push("/briefs");
+      router.push(backHref);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to delete brief");
     }
@@ -562,10 +577,11 @@ export default function BriefPage() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)] bg-white">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
-            onClick={() => router.push("/briefs")}
+            type="button"
+            onClick={() => router.push(backHref)}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin)] hover:text-white transition-all shrink-0"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Briefs
+            <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
           </button>
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" aria-hidden />
           {isAdmin && brief.status !== "archived" ? (

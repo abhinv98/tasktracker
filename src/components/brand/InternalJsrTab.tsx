@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useState, useMemo } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Filter, Inbox } from "lucide-react";
@@ -35,9 +36,19 @@ function fmtDateShort(ts: number | undefined): string {
 }
 
 export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const overview = useQuery(api.brands.getBrandTeamOverview, { brandId });
   const [filterStatus, setFilterStatus] = useState("");
   const [filterMember, setFilterMember] = useState("");
+
+  const goToBrief = useCallback(
+    (briefId: Id<"briefs">) => {
+      const returnTo = encodeURIComponent(`${pathname}?tab=internal-jsr`);
+      router.push(`/brief/${briefId}?returnTo=${returnTo}`);
+    },
+    [router, pathname]
+  );
 
   const members = useMemo(() => {
     if (!overview) return [];
@@ -187,7 +198,17 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                   return (
                     <tr
                       key={task._id}
-                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors"
+                      role="link"
+                      tabIndex={0}
+                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                      onClick={() => goToBrief(task.briefId)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          goToBrief(task.briefId);
+                        }
+                      }}
+                      aria-label={`Open brief: ${task.taskTitle}`}
                     >
                       <td className="px-3 py-2.5 align-top max-w-[240px]">
                         <p className="text-[12px] font-medium text-[var(--text-primary)] leading-snug">

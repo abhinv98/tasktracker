@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -16,7 +16,23 @@ type BrandTab = "overview" | "client-jsr" | "internal-jsr" | "mom";
 export default function BrandDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const brandId = params.id as Id<"brands">;
+
+  const tabParam = searchParams.get("tab");
+  const activeTab: BrandTab =
+    tabParam === "client-jsr" || tabParam === "internal-jsr" || tabParam === "mom"
+      ? tabParam
+      : "overview";
+
+  function navigateToTab(tab: BrandTab) {
+    if (tab === "overview") {
+      router.replace(pathname);
+    } else {
+      router.replace(`${pathname}?tab=${encodeURIComponent(tab)}`);
+    }
+  }
 
   const brand = useQuery(api.brands.getBrand, { brandId });
   const user = useQuery(api.users.getCurrentUser);
@@ -104,9 +120,6 @@ export default function BrandDetailPage() {
   const sendToClientMut = useMutation(api.jsr.sendToClient);
   const [clientInputTaskId, setClientInputTaskId] = useState<string | null>(null);
   const [clientInputMsg, setClientInputMsg] = useState("");
-
-  // Tabs
-  const [activeTab, setActiveTab] = useState<BrandTab>("overview");
 
   // Drag & drop file upload
   const [dragOver, setDragOver] = useState(false);
@@ -427,7 +440,8 @@ export default function BrandDetailPage() {
         ]).map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            type="button"
+            onClick={() => navigateToTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
                 ? "border-[var(--accent-admin)] text-[var(--accent-admin)]"
