@@ -2278,50 +2278,78 @@ export const getHandoffHistory = query({
 });
 
 /**
- * Counts deliverables pending manager review.
- * Scoped per brand manager (only their brands), super admins see all.
- * Counts deliverables where teamLeadStatus === "approved" and status is still "pending".
+ * Counts deliverables pending the current user's review.
+ *
+ * - Super admins: all deliverables awaiting manager review (TL approved, not yet manager-acted).
+ * - Brand managers (admins): same, scoped to their managed brands.
+ * - Team leads (employees who lead a team): deliverables with teamLeadStatus === "pending"
+ *   submitted by their team members.
  */
 export const getPendingDeliverableCount = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return 0;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return 0;
+    if (!user) return 0;
 
+    const isAdmin = user.role === "admin";
     const isSuperAdmin = (user as any).isSuperAdmin === true;
 
-    let managedBrandIds: Set<string>;
-    if (isSuperAdmin) {
-      managedBrandIds = new Set(
-        (await ctx.db.query("brands").collect()).map((b) => b._id)
-      );
-    } else {
-      const bms = await ctx.db
-        .query("brandManagers")
-        .withIndex("by_manager", (q) => q.eq("managerId", userId))
-        .collect();
-      managedBrandIds = new Set(bms.map((bm) => bm.brandId));
-    }
+    // Check if user leads any teams
+    const ledTeams = await ctx.db
+      .query("teams")
+      .withIndex("by_lead", (q) => q.eq("leadId", userId))
+      .collect();
+    const isTeamLead = ledTeams.length > 0;
 
-    if (managedBrandIds.size === 0) return 0;
+    if (!isAdmin && !isTeamLead) return 0;
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
-    const tasks = await ctx.db.query("tasks").collect();
-    const briefs = await ctx.db.query("briefs").collect();
-
     let count = 0;
-    for (const d of allDeliverables) {
-      // Deliverables that team lead approved but manager hasn't acted on yet
-      if (d.teamLeadStatus !== "approved") continue;
-      if (d.status === "approved" || d.status === "rejected") continue;
 
-      const task = tasks.find((t) => t._id === d.taskId);
-      if (!task) continue;
-      const brief = briefs.find((b) => b._id === task.briefId);
-      if (!brief?.brandId || !managedBrandIds.has(brief.brandId)) continue;
+    // ── Team lead count: deliverables pending TL review from their team members ──
+    if (isTeamLead) {
+      const allUserTeams = await ctx.db.query("userTeams").collect();
+      const ledTeamIds = new Set(ledTeams.map((t) => t._id));
+      const teamMemberIds = new Set(
+        allUserTeams.filter((ut) => ledTeamIds.has(ut.teamId)).map((ut) => ut.userId)
+      );
+      count += allDeliverables.filter(
+        (d) => d.teamLeadStatus === "pending" && teamMemberIds.has(d.submittedBy)
+      ).length;
+    }
 
-      count++;
+    // ── Brand manager / super admin count: deliverables pending manager review ──
+    if (isAdmin) {
+      let managedBrandIds: Set<string>;
+      if (isSuperAdmin) {
+        managedBrandIds = new Set(
+          (await ctx.db.query("brands").collect()).map((b) => b._id)
+        );
+      } else {
+        const bms = await ctx.db
+          .query("brandManagers")
+          .withIndex("by_manager", (q) => q.eq("managerId", userId))
+          .collect();
+        managedBrandIds = new Set(bms.map((bm) => bm.brandId));
+      }
+
+      if (managedBrandIds.size > 0) {
+        const tasks = await ctx.db.query("tasks").collect();
+        const briefs = await ctx.db.query("briefs").collect();
+
+        for (const d of allDeliverables) {
+          if (d.teamLeadStatus !== "approved") continue;
+          if (d.status === "approved" || d.status === "rejected") continue;
+
+          const task = tasks.find((t) => t._id === d.taskId);
+          if (!task) continue;
+          const brief = briefs.find((b) => b._id === task.briefId);
+          if (!brief?.brandId || !managedBrandIds.has(brief.brandId)) continue;
+
+          count++;
+        }
+      }
     }
 
     return count;
