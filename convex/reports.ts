@@ -7,21 +7,77 @@ export const getEmployeeReport = query({
     employeeId: v.optional(v.id("users")),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    brandId: v.optional(v.id("brands")),
+    teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return null;
+    if (!user) return null;
+
+    const isAdmin = user.role === "admin";
+
+    // Check if user is a team lead
+    const allTeams = await ctx.db.query("teams").collect();
+    const ledTeams = allTeams.filter((t) => t.leadId === userId);
+    const isTeamLead = ledTeams.length > 0;
+
+    // Must be admin or team lead to access reports
+    if (!isAdmin && !isTeamLead) return null;
 
     const allUsers = await ctx.db.query("users").collect();
-    // Include ALL users (employees, admins, super admins)
-    const employees = allUsers.filter((u) => u.name || u.email);
+    const allUserTeams = await ctx.db.query("userTeams").collect();
+
+    // Determine which employees are visible to this user
+    let visibleEmployeeIds: Set<any>;
+
+    if (isAdmin) {
+      // Admins see everyone
+      visibleEmployeeIds = new Set(
+        allUsers.filter((u) => u.name || u.email).map((u) => u._id)
+      );
+    } else {
+      // Team leads see only members of the teams they lead
+      const ledTeamIds = new Set(ledTeams.map((t) => t._id));
+      const teamMemberIds = allUserTeams
+        .filter((ut) => ledTeamIds.has(ut.teamId))
+        .map((ut) => ut.userId);
+      visibleEmployeeIds = new Set(teamMemberIds);
+      // Also include themselves
+      visibleEmployeeIds.add(userId);
+    }
+
+    // If team filter is applied, narrow down to that team's members
+    if (args.teamId) {
+      const teamMembers = allUserTeams
+        .filter((ut) => ut.teamId === args.teamId)
+        .map((ut) => ut.userId);
+      const teamMemberSet = new Set(teamMembers);
+      // Intersect with visible employees
+      visibleEmployeeIds = new Set(
+        [...visibleEmployeeIds].filter((id) => teamMemberSet.has(id))
+      );
+    }
+
+    const employees = allUsers.filter(
+      (u) => (u.name || u.email) && visibleEmployeeIds.has(u._id)
+    );
 
     const allTasks = await ctx.db.query("tasks").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
     const allDeliverables = await ctx.db.query("deliverables").collect();
+
+    // Brand filter: get brief IDs for the selected brand
+    let brandBriefIds: Set<string> | null = null;
+    if (args.brandId) {
+      brandBriefIds = new Set(
+        allBriefs
+          .filter((b: any) => b.brandId === args.brandId)
+          .map((b) => b._id)
+      );
+    }
 
     const startMs = args.startDate ? new Date(args.startDate + "T00:00:00").getTime() : 0;
     const endMs = args.endDate ? new Date(args.endDate + "T23:59:59.999").getTime() : Date.now();
@@ -30,7 +86,12 @@ export const getEmployeeReport = query({
       const emp = allUsers.find((u) => u._id === empId);
       if (!emp) return null;
 
-      const empTasks = allTasks.filter((t) => t.assigneeId === empId);
+      let empTasks = allTasks.filter((t) => t.assigneeId === empId);
+
+      // Apply brand filter at task level
+      if (brandBriefIds) {
+        empTasks = empTasks.filter((t) => brandBriefIds!.has(t.briefId));
+      }
 
       const tasksInRange = empTasks.filter((t) => {
         const assignedAt = t.assignedAt ?? (t as any)._creationTime;
@@ -124,6 +185,10 @@ export const getEmployeeReport = query({
     }
 
     if (args.employeeId) {
+      // Ensure the requested employee is within visible set
+      if (!visibleEmployeeIds.has(args.employeeId)) {
+        return { employees: [], dateRange: { startDate: args.startDate, endDate: args.endDate } };
+      }
       const report = buildEmployeeReport(args.employeeId);
       return { employees: report ? [report] : [], dateRange: { startDate: args.startDate, endDate: args.endDate } };
     }

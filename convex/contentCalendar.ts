@@ -133,7 +133,8 @@ export const getPendingCalendarTaskCount = query({
         (t) =>
           t.postDate &&
           t.postDate.startsWith(currentMonth) &&
-          t.status === "pending"
+          t.status === "pending" &&
+          !t.parentTaskId
       ).length;
     }
 
@@ -182,7 +183,7 @@ export const listTasksByBrandMonth = query({
       .collect();
 
     const monthTasks = tasks.filter(
-      (t) => t.postDate && t.postDate.startsWith(month)
+      (t) => t.postDate && t.postDate.startsWith(month) && !t.parentTaskId
     );
 
     const users = await ctx.db.query("users").collect();
@@ -424,7 +425,7 @@ export const listTasksForSheet = query({
       .collect();
 
     const monthTasks = tasks.filter(
-      (t) => t.postDate && t.postDate.startsWith(month)
+      (t) => t.postDate && t.postDate.startsWith(month) && !t.parentTaskId
     );
 
     const users = await ctx.db.query("users").collect();

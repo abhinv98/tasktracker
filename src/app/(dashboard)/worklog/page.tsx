@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle, Eye } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
 const STATUS_COLORS = TASK_STATUS_CONFIG;
@@ -64,10 +64,18 @@ export default function WorkLogPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [reportStartDate, setReportStartDate] = useState(getMonthAgoStr());
   const [reportEndDate, setReportEndDate] = useState(getTodayStr());
+  const [reportBrandId, setReportBrandId] = useState<string>("");
+  const [reportTeamId, setReportTeamId] = useState<string>("");
+
+  const brands = useQuery(api.brands.listBrands);
+  const teams = useQuery(api.teams.listTeams);
+
   const report = useQuery(api.reports.getEmployeeReport, {
     ...(selectedEmployee ? { employeeId: selectedEmployee as Id<"users"> } : {}),
     startDate: reportStartDate,
     endDate: reportEndDate,
+    ...(reportBrandId ? { brandId: reportBrandId as Id<"brands"> } : {}),
+    ...(reportTeamId ? { teamId: reportTeamId as Id<"teams"> } : {}),
   });
 
   const [selectedMemberId, setSelectedMemberId] = useState<Id<"users"> | null>(null);
@@ -102,10 +110,13 @@ export default function WorkLogPage() {
   const worklog = useQuery(api.worklog.getEmployeeWorkLog, { date: selectedDate });
   const teamLoad = useQuery(api.worklog.getTeamLoadView);
 
-  if (!user || user.role !== "admin") {
+  const isAdmin = user?.role === "admin";
+  const isTeamLead = (teams ?? []).some((t: any) => t.leadId === user?._id);
+
+  if (!user || (!isAdmin && !isTeamLead)) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Access denied. Admin only.</p>
+        <p className="text-[14px] text-[var(--text-secondary)]">Access denied. Admin or Team Lead only.</p>
       </div>
     );
   }
@@ -377,6 +388,40 @@ export default function WorkLogPage() {
               </select>
             </div>
             <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">
+                <span className="flex items-center gap-1"><Building2 className="h-3 w-3" /> Brand</span>
+              </label>
+              <select
+                value={reportBrandId}
+                onChange={(e) => setReportBrandId(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[160px]"
+              >
+                <option value="">All Brands</option>
+                {(brands ?? []).map((brand: any) => (
+                  <option key={brand._id} value={brand._id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">
+                <span className="flex items-center gap-1"><UsersRound className="h-3 w-3" /> Team</span>
+              </label>
+              <select
+                value={reportTeamId}
+                onChange={(e) => setReportTeamId(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[160px]"
+              >
+                <option value="">All Teams</option>
+                {(teams ?? []).map((team: any) => (
+                  <option key={team._id} value={team._id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Start Date</label>
               <input
                 type="date"
@@ -394,6 +439,16 @@ export default function WorkLogPage() {
                 className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               />
             </div>
+            {(reportBrandId || reportTeamId) && (
+              <div className="flex items-center self-end pb-0.5">
+                <button
+                  onClick={() => { setReportBrandId(""); setReportTeamId(""); }}
+                  className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Report Cards */}
@@ -424,7 +479,7 @@ export default function WorkLogPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-5">
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
                         <FileText className="h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -438,6 +493,13 @@ export default function WorkLogPage() {
                       </div>
                       <p className="font-bold text-[24px] tabular-nums" style={{ color: "#10b981" }}>{emp.completedTasks}</p>
                       <p className="text-[10px] text-[var(--text-muted)]">Completed</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Clock className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
+                      </div>
+                      <p className="font-bold text-[24px] tabular-nums" style={{ color: "#6b7280" }}>{emp.tasks.filter((t: any) => t.status === "pending").length}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">Pending</p>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
