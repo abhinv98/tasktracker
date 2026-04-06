@@ -204,14 +204,23 @@ export const getBrandOverview = query({
   },
 });
 
-// Internal JSR: team member task breakdown for a brand
+// Internal JSR: flat task list for a brand (admins + brand managers)
 export const getBrandTeamOverview = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") return [];
+    if (!user) return [];
+
+    const isAdmin = user.role === "admin";
+    if (!isAdmin) {
+      const bm = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+        .collect();
+      if (!bm.some((x) => x.managerId === userId)) return [];
+    }
 
     const briefs = await ctx.db.query("briefs").collect();
     const brandBriefs = briefs.filter((b) => b.brandId === brandId && b.status !== "archived");
@@ -223,6 +232,7 @@ export const getBrandTeamOverview = query({
     const users = await ctx.db.query("users").collect();
     const teams = await ctx.db.query("teams").collect();
     const userTeams = await ctx.db.query("userTeams").collect();
+    const deliverables = await ctx.db.query("deliverables").collect();
 
     return brandTasks.map((task) => {
       const brief = brandBriefs.find((b) => b._id === task.briefId);
@@ -239,11 +249,29 @@ export const getBrandTeamOverview = query({
         ? users.find((u) => u._id === assigneeTeams[0]!.leadId)
         : null;
 
+      const taskDeliverables = deliverables.filter((d) => d.taskId === task._id);
+      let latestSubmittedAt: number | undefined;
+      let latestApprovedAt: number | undefined;
+      if (taskDeliverables.length > 0) {
+        latestSubmittedAt = Math.max(...taskDeliverables.map((d) => d.submittedAt));
+        const approvedWithReview = taskDeliverables.filter(
+          (d) => d.status === "approved" && d.reviewedAt !== undefined
+        );
+        if (approvedWithReview.length > 0) {
+          latestApprovedAt = Math.max(
+            ...approvedWithReview.map((d) => d.reviewedAt as number)
+          );
+        }
+      }
+
       return {
         _id: task._id,
         taskTitle: task.title,
         taskStatus: task.status,
         deadline: task.deadline,
+        assignedAt: task.assignedAt,
+        latestSubmittedAt,
+        latestApprovedAt,
         briefTitle: brief?.title ?? "Unknown",
         briefId: task.briefId,
         assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
