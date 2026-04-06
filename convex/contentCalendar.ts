@@ -76,6 +76,43 @@ async function ensureSheetForMonth(
   });
 }
 
+/**
+ * Returns count of content calendar tasks that are pending (not done/review)
+ * for the current month — used for the sidebar notification badge.
+ */
+export const getPendingCalendarTaskCount = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+
+    const allBriefs = await ctx.db.query("briefs").collect();
+    const ccBriefs = allBriefs.filter(
+      (b: any) => b.briefType === "content_calendar" && b.status !== "archived"
+    );
+    if (ccBriefs.length === 0) return 0;
+
+    let count = 0;
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    for (const brief of ccBriefs) {
+      const tasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+      count += tasks.filter(
+        (t) =>
+          t.postDate &&
+          t.postDate.startsWith(currentMonth) &&
+          t.status === "pending"
+      ).length;
+    }
+
+    return count;
+  },
+});
+
 export const getCalendarBriefForBrand = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {

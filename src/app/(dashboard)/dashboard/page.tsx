@@ -859,7 +859,9 @@ export default function DashboardPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const overdueStatus = useQuery(api.tasks.getOverdueHaltStatus);
   const contactManager = useMutation(api.tasks.contactManagerForOverdue);
+  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const [justContactedTasks, setJustContactedTasks] = useState<Set<string>>(new Set());
+  const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -971,12 +973,35 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description || (task as any).briefDescription}</p>
                   )}
                 </div>
-                <span
-                  className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium"
-                  style={{ color: sc.color, backgroundColor: sc.bg }}
-                >
-                  {task.status}
-                </span>
+                {task.status === "pending" ? (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setStartingTaskId(task._id);
+                      try {
+                        await updateTaskStatus({ taskId: task._id as Id<"tasks">, newStatus: "in-progress" });
+                      } finally {
+                        setStartingTaskId(null);
+                      }
+                    }}
+                    disabled={startingTaskId === task._id}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                  >
+                    {startingTaskId === task._id ? (
+                      <Clock className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                    Start
+                  </button>
+                ) : (
+                  <span
+                    className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium"
+                    style={{ color: sc.color, backgroundColor: sc.bg }}
+                  >
+                    {task.status}
+                  </span>
+                )}
               </div>
             </Card>
           );

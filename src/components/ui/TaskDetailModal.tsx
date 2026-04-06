@@ -28,6 +28,7 @@ import {
   Trash2,
   AlertTriangle,
   UserPlus,
+  Play,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
@@ -548,7 +549,34 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   ⏸ Brief On Hold
                 </span>
               )}
-              {canUpdateStatus && nextStatus && status !== "done" && (
+              {/* Employees: only show a "Start" button when task is pending */}
+              {canUpdateStatus && isAssignee && !isAdmin && status === "pending" && (
+                <button
+                  onClick={async () => {
+                    if (isUpdatingStatus) return;
+                    setIsUpdatingStatus(true);
+                    try {
+                      await updateTaskStatus({
+                        taskId: taskId as Id<"tasks">,
+                        newStatus: "in-progress",
+                      });
+                    } finally {
+                      setIsUpdatingStatus(false);
+                    }
+                  }}
+                  disabled={isUpdatingStatus}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                >
+                  {isUpdatingStatus ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Play className="h-3 w-3" />
+                  )}
+                  Start Task
+                </button>
+              )}
+              {/* Admins: keep full status flow control */}
+              {canUpdateStatus && isAdmin && nextStatus && status !== "done" && (
                 <button
                   onClick={handleStatusUpdate}
                   disabled={isUpdatingStatus}
@@ -561,6 +589,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   )}
                   Move to {STATUS_CONFIG[nextStatus]?.label}
                 </button>
+              )}
+              {isAssignee && !isAdmin && status === "in-progress" && (
+                <span className="text-[11px] text-[var(--text-muted)] italic">
+                  Submit a deliverable when ready
+                </span>
               )}
               {isAssignee && !isAdmin && status === "review" && (
                 <span className="text-[11px] text-[var(--text-muted)] italic">

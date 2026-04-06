@@ -331,6 +331,11 @@ export default function WorkLogPage() {
                               {Math.round(task.timeSpentMinutes)}m
                             </span>
                           )}
+                          {(task as any).changesCount > 0 && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 text-amber-700 bg-amber-50">
+                              {(task as any).changesCount} {(task as any).changesCount === 1 ? "change" : "changes"}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
@@ -482,6 +487,7 @@ export default function WorkLogPage() {
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Approved</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Emp. Time</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Appr. Time</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2 whitespace-nowrap">Changes</th>
                               <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase px-3 py-2">Remarks</th>
                             </tr>
                           </thead>
@@ -546,6 +552,15 @@ export default function WorkLogPage() {
                                     <span className={`text-[11px] ${task.approvalTimeHours != null && task.approvalTimeHours > 48 ? "text-[var(--danger)] font-medium" : "text-[var(--text-muted)]"}`}>
                                       {task.approvalTimeHours != null ? `${task.approvalTimeHours}h` : "—"}
                                     </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    {(task as any).changesCount > 0 ? (
+                                      <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                                        {(task as any).changesCount}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[11px] text-[var(--text-muted)]">0</span>
+                                    )}
                                   </td>
                                   <td className="px-3 py-2">
                                     <div className="flex flex-wrap gap-1">

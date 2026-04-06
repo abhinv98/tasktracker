@@ -1494,7 +1494,7 @@ export function ContentCalendarEntrySidebar({
           )}
         </div>
 
-        {/* Assign another task (Copy / Design) linked to this calendar entry */}
+        {/* Assign another task (Copy → Design) linked to this calendar entry */}
         {isEditable && (
           <div className="pt-3 border-t border-[var(--border)]">
             <button
@@ -1503,10 +1503,10 @@ export function ContentCalendarEntrySidebar({
               className="flex items-center gap-2 text-[12px] font-semibold text-[var(--accent-admin)] hover:underline"
             >
               <Users className="h-3.5 w-3.5" />
-              {showAssignTask ? "Hide" : "Assign task to another team"}
+              {showAssignTask ? "Hide" : "Assign task"}
             </button>
             <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              e.g. Copy or Design — creates a linked task with Content Calendar + brand context; assignee submits copy from their dashboard.
+              Assign to the <strong>Copy team</strong> first, then to the <strong>Design team</strong>. Copy team delivers the copy; Design team takes it forward.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
@@ -1559,14 +1559,44 @@ export function ContentCalendarEntrySidebar({
                   ))}
               </div>
             )}
-            {showAssignTask && (
+            {showAssignTask && (() => {
+              // Sort teams: copy-related teams first, then design-related, then others
+              const sortedTeams = [...teams].sort((a: any, b: any) => {
+                const aName = (a.name || "").toLowerCase();
+                const bName = (b.name || "").toLowerCase();
+                const aIsCopy = aName.includes("copy") || aName.includes("content") || aName.includes("writing");
+                const bIsCopy = bName.includes("copy") || bName.includes("content") || bName.includes("writing");
+                const aIsDesign = aName.includes("design") || aName.includes("creative") || aName.includes("graphic");
+                const bIsDesign = bName.includes("design") || bName.includes("creative") || bName.includes("graphic");
+                if (aIsCopy && !bIsCopy) return -1;
+                if (!aIsCopy && bIsCopy) return 1;
+                if (aIsDesign && !bIsDesign) return -1;
+                if (!aIsDesign && bIsDesign) return 1;
+                return 0;
+              });
+              // Check if a copy task already exists in linked tasks
+              const hasCopyTask = linkedTasks?.some((lt: any) => {
+                const title = (lt.title || "").toLowerCase();
+                return title.includes("copy") || title.includes("content") || title.includes("writing");
+              });
+              return (
               <div className="mt-3 space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                {/* Workflow hint */}
+                <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pb-2 border-b border-[var(--border-subtle)]">
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${!hasCopyTask ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
+                    1. Copy Team {hasCopyTask ? "✓" : "← next"}
+                  </span>
+                  <span className="text-[var(--text-muted)]">→</span>
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasCopyTask ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
+                    2. Design Team {hasCopyTask ? "← next" : ""}
+                  </span>
+                </div>
                 <div>
                   <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Task title</label>
                   <input
                     value={assignTaskTitle}
                     onChange={(e) => setAssignTaskTitle(e.target.value)}
-                    placeholder="e.g. Copy review"
+                    placeholder={hasCopyTask ? "e.g. Design creative" : "e.g. Write copy"}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   />
                 </div>
@@ -1581,9 +1611,15 @@ export function ContentCalendarEntrySidebar({
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   >
                     <option value="">Select team</option>
-                    {teams.map((team: any) => (
-                      <option key={team._id} value={team._id}>{team.name}</option>
-                    ))}
+                    {sortedTeams.map((team: any) => {
+                      const tName = (team.name || "").toLowerCase();
+                      const isCopy = tName.includes("copy") || tName.includes("content") || tName.includes("writing");
+                      const isDesign = tName.includes("design") || tName.includes("creative") || tName.includes("graphic");
+                      const tag = isCopy ? " (Copy)" : isDesign ? " (Design)" : "";
+                      return (
+                        <option key={team._id} value={team._id}>{team.name}{tag}</option>
+                      );
+                    })}
                   </select>
                 </div>
                 <div>
@@ -1647,7 +1683,8 @@ export function ContentCalendarEntrySidebar({
                   {assignSubmitting ? "Creating…" : "Create linked task"}
                 </button>
               </div>
-            )}
+              );
+            })()}
           </div>
         )}
 

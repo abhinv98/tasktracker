@@ -97,6 +97,7 @@ export const getEmployeeReport = query({
           approvalTimeHours,
           deadlineExtended: t.deadlineExtended ?? false,
           originalDeadline: t.originalDeadline,
+          changesCount: t.changesCount ?? 0,
         };
       });
 

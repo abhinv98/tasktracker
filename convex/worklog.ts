@@ -74,6 +74,7 @@ export const getEmployeeWorkLog = query({
             briefId: task.briefId,
             timeSpentMinutes: timeSpent,
             deadline: task.deadline,
+            changesCount: task.changesCount ?? 0,
           };
         })
         .filter(Boolean);

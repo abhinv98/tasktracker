@@ -861,8 +861,14 @@ export const teamLeadReject = mutation({
     });
 
     const task = await ctx.db.get(deliverable.taskId);
-    if (task && task.status === "review") {
-      await ctx.db.patch(deliverable.taskId, { status: "in-progress" });
+    if (task) {
+      const updates: Record<string, any> = {
+        changesCount: (task.changesCount ?? 0) + 1,
+      };
+      if (task.status === "review") {
+        updates.status = "in-progress";
+      }
+      await ctx.db.patch(deliverable.taskId, updates);
     }
 
     const user = await ctx.db.get(userId);
@@ -1475,8 +1481,14 @@ export const mainAssigneeReject = mutation({
       mainAssigneeReviewedAt: Date.now(),
     });
 
-    if (subTask.status === "review") {
-      await ctx.db.patch(deliverable.taskId, { status: "in-progress" });
+    {
+      const updates: Record<string, any> = {
+        changesCount: (subTask.changesCount ?? 0) + 1,
+      };
+      if (subTask.status === "review") {
+        updates.status = "in-progress";
+      }
+      await ctx.db.patch(deliverable.taskId, updates);
     }
 
     const user = await ctx.db.get(userId);
@@ -1662,8 +1674,14 @@ export const rejectDeliverable = mutation({
       passedToManagerAt: undefined,
     });
 
-    if (task && task.status === "review") {
-      await ctx.db.patch(deliverable.taskId, { status: "in-progress" });
+    if (task) {
+      const updates: Record<string, any> = {
+        changesCount: (task.changesCount ?? 0) + 1,
+      };
+      if (task.status === "review") {
+        updates.status = "in-progress";
+      }
+      await ctx.db.patch(deliverable.taskId, updates);
     }
 
     await ctx.db.insert("notifications", {

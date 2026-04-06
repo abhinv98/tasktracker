@@ -179,6 +179,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const role = user.role ?? "employee";
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
+  const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
 
   const nav =
     role === "admin"
@@ -291,6 +292,13 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           {item.href === "/messages" && unreadDmCount > 0 && (
                             <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
                               {unreadDmCount}
+                            </span>
+                          )}
+                          {item.href === "/content-calendar" && pendingCalendarCount > 0 && (
+                            <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
+                              isActive ? "bg-white/30 text-white" : "bg-amber-500 text-white"
+                            }`}>
+                              {pendingCalendarCount}
                             </span>
                           )}
                         </Link>
