@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle, Eye } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
 const STATUS_COLORS = TASK_STATUS_CONFIG;
@@ -445,6 +445,13 @@ export default function WorkLogPage() {
                       </div>
                       <p className="font-bold text-[24px] text-[var(--danger)] tabular-nums">{emp.overdueTasks}</p>
                       <p className="text-[10px] text-[var(--text-muted)]">Overdue</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Eye className="h-3.5 w-3.5" style={{ color: "#8b5cf6" }} />
+                      </div>
+                      <p className="font-bold text-[24px] tabular-nums" style={{ color: "#8b5cf6" }}>{emp.tasks.filter((t: any) => t.status === "review").length}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">In Review</p>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
