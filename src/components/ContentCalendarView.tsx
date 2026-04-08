@@ -434,7 +434,7 @@ export function ContentCalendarView({
           className={`flex-1 overflow-auto bg-[var(--bg-primary)] ${selectedTask ? "border-r border-[var(--border)]" : ""}`}
         >
           {(() => {
-            const incomplete = (tasks ?? []).filter((t: any) => !t.assigneeId || !t.deadline);
+            const incomplete = (tasks ?? []).filter((t: any) => !t.assignedAt || !t.deadline);
             const noAssignee = incomplete.filter((t: any) => !t.assigneeId).length;
             const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
             if (incomplete.length === 0) return null;
@@ -499,7 +499,7 @@ export function ContentCalendarView({
                         ? "bg-[var(--accent-admin-dim)]"
                         : isBreakDay
                           ? "bg-red-100 hover:bg-red-200"
-                          : (!task.assigneeId || !task.deadline)
+                          : (!task.assignedAt || !task.deadline)
                             ? "bg-amber-50/50 hover:bg-amber-50"
                             : "hover:bg-[var(--bg-hover)]"
                     }`}
@@ -559,7 +559,7 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {task.assigneeId ? (
+                      {task.assignedAt ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
                             {task.assigneeName}

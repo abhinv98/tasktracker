@@ -100,6 +100,19 @@ export default function BriefsPage() {
   );
   const createCalendarEntryWithCopyTask = useMutation(api.contentCalendar.createCalendarEntryWithCopyTask);
 
+  // Auto-select design & copy teams when switching to "For Calendar"
+  useEffect(() => {
+    if (stTaskPurpose !== "calendar" || !allTeams?.length) return;
+    if (!stCalDesignTeamId) {
+      const designTeam = allTeams.find((t: any) => /design|creative|graphic/i.test(t.name));
+      if (designTeam) setStCalDesignTeamId(designTeam._id);
+    }
+    if (!stCalCopyTeamId) {
+      const copyTeam = allTeams.find((t: any) => /copy|content|writing/i.test(t.name));
+      if (copyTeam) setStCalCopyTeamId(copyTeam._id);
+    }
+  }, [stTaskPurpose, allTeams, stCalDesignTeamId, stCalCopyTeamId]);
+
   // Content calendar brief fields
   const [ccMonth, setCcMonth] = useState<string>("");
   const [ccCopyTeamId, setCcCopyTeamId] = useState<string>("");
@@ -350,16 +363,18 @@ export default function BriefsPage() {
 
       // ── Handle "Single Task → For Calendar" mode ──
       if (isCalendarEntry) {
-        if (!brandId || !stCalMonth || !stCalGoLiveDate || !stCalDesignAssignee) {
-          toast("error", "Brand, month, go-live date, and design assignee are required");
+        if (!brandId || !stCalMonth || !stCalDesignAssignee) {
+          toast("error", "Brand, month, and design assignee are required");
           return;
         }
+        // Default go-live date to 1st of selected month if not set
+        const goLiveDate = stCalGoLiveDate || `${stCalMonth}-01`;
         await createCalendarEntryWithCopyTask({
           brandId: brandId as Id<"brands">,
           title,
           description: description || undefined,
           month: stCalMonth,
-          goLiveDate: stCalGoLiveDate,
+          goLiveDate,
           designAssigneeId: stCalDesignAssignee as Id<"users">,
           ...(stCalDesignDeadline ? { designDeadline: stCalDesignDeadline } : {}),
           ...(stCalCopyAssignee ? { copyAssigneeId: stCalCopyAssignee as Id<"users"> } : {}),
@@ -1084,12 +1099,11 @@ export default function BriefsPage() {
                             />
                           </div>
                           <div>
-                            <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Go Live Date *</label>
+                            <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Go Live Date <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
                             <input
                               type="date"
                               value={stCalGoLiveDate}
                               onChange={(e) => setStCalGoLiveDate(e.target.value)}
-                              required
                               className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                             />
                           </div>
