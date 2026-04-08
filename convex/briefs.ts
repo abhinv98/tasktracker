@@ -11,7 +11,7 @@ function normalizeDeadlineToEndOfDay(deadline: number): number {
     d.setUTCHours(23, 59, 59, 999);
     return d.getTime();
   }
-  // Midnight IST (UTC+5:30) = 18:30:00 UTC previous day
+  // Midnight IST (UTC+5:30) = 18:30:00 UTC previous days
   if (uh === 18 && um === 30 && us === 0) {
     // Move to 23:59:59 IST same day = 18:29:59 UTC next day
     d.setUTCDate(d.getUTCDate() + 1);
