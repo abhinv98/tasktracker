@@ -70,6 +70,18 @@ function formatPostDate(dateStr: string) {
   return { display: `${month} ${day}`, weekday };
 }
 
+/** Explicit deadline, or end-of-day go-live (postDate) when no deadline is set. */
+function effectiveDeadlineMs(task: {
+  deadline?: number | null;
+  postDate?: string | null;
+}): number | null {
+  if (task.deadline != null && task.deadline !== undefined) return task.deadline;
+  if (task.postDate) {
+    return new Date(task.postDate + "T23:59:59").getTime();
+  }
+  return null;
+}
+
 function monthLabel(month: string) {
   const [y, m] = month.split("-").map(Number);
   return new Date(y, m - 1).toLocaleDateString("en-US", {
@@ -434,9 +446,12 @@ export function ContentCalendarView({
           className={`flex-1 overflow-auto bg-[var(--bg-primary)] ${selectedTask ? "border-r border-[var(--border)]" : ""}`}
         >
           {(() => {
-            const incomplete = (tasks ?? []).filter((t: any) => !t.assignedAt || !t.deadline);
-            const noAssignee = incomplete.filter((t: any) => !t.assigneeId).length;
-            const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
+            const hasRealAssignee = (t: any) => t.assigneeId && t.assigneeId !== t.assignedBy;
+            const incomplete = (tasks ?? []).filter(
+              (t: any) => !hasRealAssignee(t) || !effectiveDeadlineMs(t)
+            );
+            const noAssignee = incomplete.filter((t: any) => !hasRealAssignee(t)).length;
+            const noDeadline = incomplete.filter((t: any) => !effectiveDeadlineMs(t)).length;
             if (incomplete.length === 0) return null;
             return (
               <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
@@ -499,7 +514,8 @@ export function ContentCalendarView({
                         ? "bg-[var(--accent-admin-dim)]"
                         : isBreakDay
                           ? "bg-red-100 hover:bg-red-200"
-                          : (!task.assignedAt || !task.deadline)
+                          : ((!task.assigneeId || task.assigneeId === task.assignedBy) ||
+                              !effectiveDeadlineMs(task))
                             ? "bg-amber-50/50 hover:bg-amber-50"
                             : "hover:bg-[var(--bg-hover)]"
                     }`}
@@ -559,7 +575,7 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {task.assignedAt ? (
+                      {task.assigneeId && task.assigneeId !== task.assignedBy ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
                             {task.assigneeName}
@@ -593,25 +609,27 @@ export function ContentCalendarView({
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      {task.deadline ? (
-                        <span
-                          className={`text-[11px] font-medium ${
-                            task.status !== "done" &&
-                            task.deadline < Date.now()
-                              ? "text-[var(--danger)]"
-                              : "text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          {new Date(task.deadline).toLocaleDateString(
-                            "en-US",
-                            { month: "short", day: "numeric" }
-                          )}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
-                          No Deadline
-                        </span>
-                      )}
+                      {(() => {
+                        const dl = effectiveDeadlineMs(task);
+                        return dl != null ? (
+                          <span
+                            className={`text-[11px] font-medium ${
+                              task.status !== "done" && dl < Date.now()
+                                ? "text-[var(--danger)]"
+                                : "text-[var(--text-secondary)]"
+                            }`}
+                          >
+                            {new Date(dl).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
+                            No Deadline
+                          </span>
+                        );
+                      })()}
                     </td>
                     {isEditable && (
                       <td
@@ -1723,13 +1741,16 @@ export function ContentCalendarEntrySidebar({
             />
           ) : (
             <p className="text-[13px] text-[var(--text-primary)]">
-              {task.deadline
-                ? new Date(task.deadline).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "No deadline"}
+              {(() => {
+                const dl = effectiveDeadlineMs(task);
+                return dl != null
+                  ? new Date(dl).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "No deadline";
+              })()}
             </p>
           )}
         </div>
