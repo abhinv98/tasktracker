@@ -188,6 +188,9 @@ export const listTasksByBrandMonth = query({
 
     const users = await ctx.db.query("users").collect();
 
+    // Fetch all child/linked tasks for these entries in one pass
+    const allChildTasks = tasks.filter((t) => t.parentTaskId);
+
     return monthTasks
       .sort((a, b) => {
         if (a.postDate && b.postDate) return a.postDate.localeCompare(b.postDate);
@@ -196,11 +199,17 @@ export const listTasksByBrandMonth = query({
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
         const assignor = users.find((u) => u._id === task.assignedBy);
+        // Find copy assignee from linked child tasks
+        const childTasks = allChildTasks.filter((ct) => ct.parentTaskId === task._id);
+        const copyChild = childTasks.length > 0 ? childTasks[0] : null;
+        const copyAssignee = copyChild ? users.find((u) => u._id === copyChild.assigneeId) : null;
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           assignorName: assignor?.name ?? assignor?.email ?? "—",
+          copyAssigneeName: copyAssignee ? (copyAssignee.name ?? copyAssignee.email ?? "Unknown") : "",
+          copyAssigneeDesignation: copyAssignee?.designation ?? "",
         };
       });
   },
@@ -274,6 +283,147 @@ export const createEntryForBrand = mutation({
     }
 
     return taskId;
+  },
+});
+
+/**
+ * Creates a content calendar entry (design assignee as main owner)
+ * plus an optional linked copy task — all in one mutation.
+ * Used by the "Single Task → For Calendar" form.
+ */
+export const createCalendarEntryWithCopyTask = mutation({
+  args: {
+    brandId: v.id("brands"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    month: v.string(), // "YYYY-MM"
+    goLiveDate: v.string(), // "YYYY-MM-DD" – the postDate
+    platform: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    // Design (main entry assignee)
+    designAssigneeId: v.id("users"),
+    designDeadline: v.optional(v.number()),
+    // Copy (linked task)
+    copyAssigneeId: v.optional(v.id("users")),
+    copyDeadline: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can create calendar entries");
+
+    const briefId = await getOrCreateCalendarBrief(ctx, args.brandId, userId);
+    await ensureSheetForMonth(ctx, briefId, args.month, userId);
+
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    const maxOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t) => t.sortOrder))
+      : 0;
+
+    const platform = args.platform ?? "Other";
+    const contentType = args.contentType ?? "Post";
+
+    // 1. Create parent entry (design assignee is the main owner)
+    const parentTaskId = await ctx.db.insert("tasks", {
+      briefId,
+      title: args.title,
+      description: args.description,
+      assigneeId: args.designAssigneeId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxOrder + 1000,
+      duration: "1d",
+      durationMinutes: 480,
+      platform,
+      contentType,
+      postDate: args.goLiveDate,
+      assignedAt: Date.now(),
+      ...(args.designDeadline ? { deadline: args.designDeadline } : {}),
+    });
+
+    if (args.designAssigneeId !== userId) {
+      await ctx.db.insert("notifications", {
+        recipientId: args.designAssigneeId,
+        type: "task_assigned",
+        title: "Content calendar task assigned",
+        message: `You were assigned: ${args.title}`,
+        briefId,
+        taskId: parentTaskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    // 2. Create linked copy task if copy assignee is provided
+    if (args.copyAssigneeId) {
+      let brandName = "Brand";
+      const brand = await ctx.db.get(args.brandId);
+      if (brand?.name) brandName = brand.name;
+
+      const copyTitle = `[Content Calendar · ${brandName}] Copy: ${args.title}`;
+      const copyTaskId = await ctx.db.insert("tasks", {
+        briefId,
+        title: copyTitle,
+        description: `Linked to calendar entry: ${args.title}`,
+        assigneeId: args.copyAssigneeId,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: maxOrder + 1001,
+        duration: "1d",
+        durationMinutes: 480,
+        platform,
+        contentType,
+        postDate: args.goLiveDate,
+        parentTaskId,
+        assignedAt: Date.now(),
+        ...(args.copyDeadline ? { deadline: args.copyDeadline } : {}),
+      });
+
+      await ctx.db.insert("notifications", {
+        recipientId: args.copyAssigneeId,
+        type: "task_assigned",
+        title: "Content calendar task assigned",
+        message: `You were assigned copy: ${args.title}`,
+        briefId,
+        taskId: copyTaskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+
+      await ctx.db.insert("activityLog", {
+        briefId,
+        taskId: copyTaskId,
+        userId,
+        action: "created_task",
+        details: JSON.stringify({
+          title: copyTitle,
+          parentTaskId,
+          linkedCalendar: true,
+        }),
+        timestamp: Date.now(),
+      });
+    }
+
+    await ctx.db.insert("activityLog", {
+      briefId,
+      taskId: parentTaskId,
+      userId,
+      action: "created_task",
+      details: JSON.stringify({
+        title: args.title,
+        calendarEntryFromSingleTask: true,
+      }),
+      timestamp: Date.now(),
+    });
+
+    return parentTaskId;
   },
 });
 
@@ -441,6 +591,9 @@ export const listTasksForSheet = query({
       attachmentCounts[task._id] = atts.length;
     }
 
+    // Fetch all child/linked tasks for these entries in one pass
+    const allBriefTasks = tasks.filter((t) => t.parentTaskId);
+
     return monthTasks
       .sort((a, b) => {
         if (a.postDate && b.postDate) return a.postDate.localeCompare(b.postDate);
@@ -448,11 +601,17 @@ export const listTasksForSheet = query({
       })
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
+        // Find copy assignee from linked child tasks
+        const childTasks = allBriefTasks.filter((ct) => ct.parentTaskId === task._id);
+        const copyChild = childTasks.length > 0 ? childTasks[0] : null;
+        const copyAssignee = copyChild ? users.find((u) => u._id === copyChild.assigneeId) : null;
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           attachmentCount: attachmentCounts[task._id] ?? 0,
+          copyAssigneeName: copyAssignee ? (copyAssignee.name ?? copyAssignee.email ?? "Unknown") : "",
+          copyAssigneeDesignation: copyAssignee?.designation ?? "",
         };
       });
   },
@@ -685,9 +844,20 @@ export const listLinkedTasksForEntry = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    return await ctx.db
+    const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_parent", (q) => q.eq("parentTaskId", parentTaskId))
       .collect();
+
+    const users = await ctx.db.query("users").collect();
+
+    return tasks.map((task) => {
+      const assignee = users.find((u) => u._id === task.assigneeId);
+      return {
+        ...task,
+        assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+        assigneeDesignation: assignee?.designation ?? "",
+      };
+    });
   },
 });

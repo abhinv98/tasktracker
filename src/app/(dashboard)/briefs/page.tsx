@@ -80,6 +80,26 @@ export default function BriefsPage() {
     stTeamId ? { teamId: stTeamId as Id<"teams"> } : "skip"
   );
 
+  // Single task "For Calendar" mode
+  const [stTaskPurpose, setStTaskPurpose] = useState<"individual" | "calendar">("individual");
+  const [stCalDesignTeamId, setStCalDesignTeamId] = useState("");
+  const [stCalDesignAssignee, setStCalDesignAssignee] = useState("");
+  const [stCalDesignDeadline, setStCalDesignDeadline] = useState<number | undefined>(undefined);
+  const [stCalCopyTeamId, setStCalCopyTeamId] = useState("");
+  const [stCalCopyAssignee, setStCalCopyAssignee] = useState("");
+  const [stCalCopyDeadline, setStCalCopyDeadline] = useState<number | undefined>(undefined);
+  const [stCalMonth, setStCalMonth] = useState("");
+  const [stCalGoLiveDate, setStCalGoLiveDate] = useState("");
+  const stCalDesignMembers = useQuery(
+    api.teams.getTeamMembers,
+    stCalDesignTeamId ? { teamId: stCalDesignTeamId as Id<"teams"> } : "skip"
+  );
+  const stCalCopyMembers = useQuery(
+    api.teams.getTeamMembers,
+    stCalCopyTeamId ? { teamId: stCalCopyTeamId as Id<"teams"> } : "skip"
+  );
+  const createCalendarEntryWithCopyTask = useMutation(api.contentCalendar.createCalendarEntryWithCopyTask);
+
   // Content calendar brief fields
   const [ccMonth, setCcMonth] = useState<string>("");
   const [ccCopyTeamId, setCcCopyTeamId] = useState<string>("");
@@ -325,7 +345,40 @@ export default function BriefsPage() {
     e.preventDefault();
     try {
       const isSingle = briefMode === "single";
+      const isCalendarEntry = isSingle && stTaskPurpose === "calendar";
       const isContentCal = briefMode === "content_calendar";
+
+      // ── Handle "Single Task → For Calendar" mode ──
+      if (isCalendarEntry) {
+        if (!brandId || !stCalMonth || !stCalGoLiveDate || !stCalDesignAssignee) {
+          toast("error", "Brand, month, go-live date, and design assignee are required");
+          return;
+        }
+        await createCalendarEntryWithCopyTask({
+          brandId: brandId as Id<"brands">,
+          title,
+          description: description || undefined,
+          month: stCalMonth,
+          goLiveDate: stCalGoLiveDate,
+          designAssigneeId: stCalDesignAssignee as Id<"users">,
+          ...(stCalDesignDeadline ? { designDeadline: stCalDesignDeadline } : {}),
+          ...(stCalCopyAssignee ? { copyAssigneeId: stCalCopyAssignee as Id<"users"> } : {}),
+          ...(stCalCopyDeadline ? { copyDeadline: stCalCopyDeadline } : {}),
+        });
+        try { sessionStorage.removeItem(STORAGE_BRIEF_DRAFT); } catch { /* ignore */ }
+        setShowModal(false);
+        setTitle(""); setDescription(""); setBrandId(""); setManagerId("");
+        setDeadline(undefined); setBriefType(""); setBriefMode("master");
+        setClientFacing(false); setStAssignee(""); setStTeamId(""); setStDeadlineTime("");
+        setCreativesRequired(1); setStTaskPurpose("individual");
+        setStCalDesignTeamId(""); setStCalDesignAssignee(""); setStCalDesignDeadline(undefined);
+        setStCalCopyTeamId(""); setStCalCopyAssignee(""); setStCalCopyDeadline(undefined);
+        setStCalMonth(""); setStCalGoLiveDate("");
+        setCcMonth(""); setCcCopyTeamId(""); setCcDesignTeamId("");
+        setCcCopyAssignee(""); setCcDesignAssignee("");
+        toast("success", "Calendar entry created with linked tasks");
+        return;
+      }
 
       type BriefType = "developmental" | "designing" | "video_editing" | "content_calendar" | "copywriting" | "single_task";
 
@@ -396,6 +449,10 @@ export default function BriefsPage() {
       setStTeamId("");
       setStDeadlineTime("");
       setCreativesRequired(1);
+      setStTaskPurpose("individual");
+      setStCalDesignTeamId(""); setStCalDesignAssignee(""); setStCalDesignDeadline(undefined);
+      setStCalCopyTeamId(""); setStCalCopyAssignee(""); setStCalCopyDeadline(undefined);
+      setStCalMonth(""); setStCalGoLiveDate("");
       setCcMonth("");
       setCcCopyTeamId("");
       setCcDesignTeamId("");
@@ -919,51 +976,218 @@ export default function BriefsPage() {
 
               {briefMode === "single" && (
                 <>
+                  {/* Purpose toggle: Individual Task vs For Calendar */}
                   <div>
-                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Task Type</label>
-                    <select
-                      value={briefType}
-                      onChange={(e) => setBriefType(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="">Select type...</option>
-                      <option value="developmental">Developmental</option>
-                      <option value="designing">Designing</option>
-                      <option value="video_editing">Video Editing</option>
-                      <option value="copywriting">Copywriting</option>
-                    </select>
+                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Task Purpose</label>
+                    <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-hover)]">
+                      <button
+                        type="button"
+                        onClick={() => setStTaskPurpose("individual")}
+                        className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                          stTaskPurpose === "individual" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
+                        }`}
+                      >
+                        Individual Task
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStTaskPurpose("calendar")}
+                        className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                          stTaskPurpose === "calendar" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
+                        }`}
+                      >
+                        For Calendar
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Team</label>
-                    <select
-                      value={stTeamId}
-                      onChange={(e) => { setStTeamId(e.target.value); setStAssignee(""); }}
-                      required
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    >
-                      <option value="">Select team...</option>
-                      {(allTeams ?? []).map((t: any) => (
-                        <option key={t._id} value={t._id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Assignee</label>
-                    <select
-                      value={stAssignee}
-                      onChange={(e) => setStAssignee(e.target.value)}
-                      required
-                      disabled={!stTeamId}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
-                    >
-                      <option value="">{stTeamId ? "Select team member..." : "Select a team first"}</option>
-                      {(stTeamMembers ?? []).map((m: any) => (
-                        <option key={m._id} value={m._id}>
-                          {m.name ?? m.email}{m.role === "admin" ? " (Admin)" : m.designation ? ` — ${m.designation}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+
+                  {stTaskPurpose === "individual" ? (
+                    <>
+                      <div>
+                        <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Task Type</label>
+                        <select
+                          value={briefType}
+                          onChange={(e) => setBriefType(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        >
+                          <option value="">Select type...</option>
+                          <option value="developmental">Developmental</option>
+                          <option value="designing">Designing</option>
+                          <option value="video_editing">Video Editing</option>
+                          <option value="copywriting">Copywriting</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Team</label>
+                        <select
+                          value={stTeamId}
+                          onChange={(e) => { setStTeamId(e.target.value); setStAssignee(""); }}
+                          required
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        >
+                          <option value="">Select team...</option>
+                          {(allTeams ?? []).map((t: any) => (
+                            <option key={t._id} value={t._id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Assignee</label>
+                        <select
+                          value={stAssignee}
+                          onChange={(e) => setStAssignee(e.target.value)}
+                          required
+                          disabled={!stTeamId}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                        >
+                          <option value="">{stTeamId ? "Select team member..." : "Select a team first"}</option>
+                          {(stTeamMembers ?? []).map((m: any) => (
+                            <option key={m._id} value={m._id}>
+                              {m.name ?? m.email}{m.role === "admin" ? " (Admin)" : m.designation ? ` — ${m.designation}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* ── For Calendar mode ── */}
+                      <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-hover)]/40 space-y-3">
+                        <p className="text-[11px] font-semibold text-[var(--text-secondary)]">Calendar Entry Details</p>
+
+                        {/* Brand (required for calendar) */}
+                        <div>
+                          <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Brand *</label>
+                          <select
+                            value={brandId}
+                            onChange={(e) => { setBrandId(e.target.value); setManagerId(""); }}
+                            required
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          >
+                            <option value="">Select brand...</option>
+                            {(brands ?? []).map((b: any) => (
+                              <option key={b._id} value={b._id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Month + Go Live Date */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Month *</label>
+                            <input
+                              type="month"
+                              value={stCalMonth}
+                              onChange={(e) => setStCalMonth(e.target.value)}
+                              required
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Go Live Date *</label>
+                            <input
+                              type="date"
+                              value={stCalGoLiveDate}
+                              onChange={(e) => setStCalGoLiveDate(e.target.value)}
+                              required
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Design Team (main entry assignee) */}
+                      <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-hover)]/40 space-y-2">
+                        <p className="text-[11px] font-semibold text-[var(--text-secondary)]">Design Team <span className="text-[10px] font-normal text-[var(--text-muted)]">(main assignee)</span></p>
+                        <div>
+                          <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Team *</label>
+                          <select
+                            value={stCalDesignTeamId}
+                            onChange={(e) => { setStCalDesignTeamId(e.target.value); setStCalDesignAssignee(""); }}
+                            required
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          >
+                            <option value="">Select design team...</option>
+                            {(allTeams ?? []).filter((t: any) => /design|creative|graphic/i.test(t.name)).map((t: any) => (
+                              <option key={t._id} value={t._id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Assignee *</label>
+                          <select
+                            value={stCalDesignAssignee}
+                            onChange={(e) => setStCalDesignAssignee(e.target.value)}
+                            required
+                            disabled={!stCalDesignTeamId}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                          >
+                            <option value="">{stCalDesignTeamId ? "Select member..." : "Select team first"}</option>
+                            {(stCalDesignMembers ?? []).map((m: any) => (
+                              <option key={m._id} value={m._id}>
+                                {m.name ?? m.email}{m.designation ? ` — ${m.designation}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Design Deadline <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
+                          <input
+                            type="date"
+                            value={stCalDesignDeadline ? new Date(stCalDesignDeadline).toISOString().split("T")[0] : ""}
+                            onChange={(e) => setStCalDesignDeadline(e.target.value ? new Date(e.target.value + "T23:59:59").getTime() : undefined)}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Copy Team (linked task) */}
+                      <div className="rounded-lg border border-[var(--border)] p-3 bg-[var(--bg-hover)]/40 space-y-2">
+                        <p className="text-[11px] font-semibold text-[var(--text-secondary)]">Copy Team <span className="text-[10px] font-normal text-[var(--text-muted)]">(linked task)</span></p>
+                        <div>
+                          <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Team</label>
+                          <select
+                            value={stCalCopyTeamId}
+                            onChange={(e) => { setStCalCopyTeamId(e.target.value); setStCalCopyAssignee(""); }}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          >
+                            <option value="">Select copy team...</option>
+                            {(allTeams ?? []).filter((t: any) => /copy|content|writing/i.test(t.name)).map((t: any) => (
+                              <option key={t._id} value={t._id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {stCalCopyTeamId && (
+                          <>
+                            <div>
+                              <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Copy Assignee</label>
+                              <select
+                                value={stCalCopyAssignee}
+                                onChange={(e) => setStCalCopyAssignee(e.target.value)}
+                                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                              >
+                                <option value="">Assign later</option>
+                                {(stCalCopyMembers ?? []).map((m: any) => (
+                                  <option key={m._id} value={m._id}>
+                                    {m.name ?? m.email}{m.designation ? ` — ${m.designation}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="font-medium text-[11px] text-[var(--text-secondary)] block mb-1">Copy Deadline <span className="font-normal text-[var(--text-muted)]">(optional)</span></label>
+                              <input
+                                type="date"
+                                value={stCalCopyDeadline ? new Date(stCalCopyDeadline).toISOString().split("T")[0] : ""}
+                                onChange={(e) => setStCalCopyDeadline(e.target.value ? new Date(e.target.value + "T23:59:59").getTime() : undefined)}
+                                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
@@ -1074,59 +1298,64 @@ export default function BriefsPage() {
                 </>
               )}
 
-              <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                  {briefMode === "single" ? "Deadline" : "Deadline (optional)"}
-                </label>
-                <div className="flex gap-1.5">
-                  <div className="flex-1">
-                    <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
+              {/* Hide deadline/brand/manager when in "Single Task → For Calendar" mode (already in the calendar form) */}
+              {!(briefMode === "single" && stTaskPurpose === "calendar") && (
+                <>
+                  <div>
+                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                      {briefMode === "single" ? "Deadline" : "Deadline (optional)"}
+                    </label>
+                    <div className="flex gap-1.5">
+                      <div className="flex-1">
+                        <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
+                      </div>
+                      {briefMode === "single" && (
+                        <input
+                          type="time"
+                          value={stDeadlineTime}
+                          onChange={(e) => setStDeadlineTime(e.target.value)}
+                          className="w-28 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          placeholder="HH:MM"
+                        />
+                      )}
+                    </div>
                   </div>
-                  {briefMode === "single" && (
-                    <input
-                      type="time"
-                      value={stDeadlineTime}
-                      onChange={(e) => setStDeadlineTime(e.target.value)}
-                      className="w-28 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                      placeholder="HH:MM"
-                    />
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Brand</label>
-                <select
-                  value={brandId}
-                  onChange={(e) => { setBrandId(e.target.value); setManagerId(""); }}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                >
-                  <option value="">No brand</option>
-                  {(brands ?? []).map((b: any) => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-              {isAdmin && (
-                <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                    {briefMode === "single" ? "Assignor / Manager" : "Assign Manager (optional)"}
-                  </label>
-                  <select
-                    value={managerId}
-                    onChange={(e) => setManagerId(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                  >
-                    <option value="">No manager</option>
-                    {(managers ?? [])
-                      .filter((m: any) => !brandId || !brandManagerIds || brandManagerIds.includes(m._id))
-                      .map((m: any) => (
-                        <option key={m._id} value={m._id}>{m.name ?? m.email}</option>
+                  <div>
+                    <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Brand</label>
+                    <select
+                      value={brandId}
+                      onChange={(e) => { setBrandId(e.target.value); setManagerId(""); }}
+                      className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    >
+                      <option value="">No brand</option>
+                      {(brands ?? []).map((b: any) => (
+                        <option key={b._id} value={b._id}>{b.name}</option>
                       ))}
-                  </select>
-                  {brandId && brandManagerIds && brandManagerIds.length === 0 && (
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1">No managers assigned to this brand yet.</p>
+                    </select>
+                  </div>
+                  {isAdmin && (
+                    <div>
+                      <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                        {briefMode === "single" ? "Assignor / Manager" : "Assign Manager (optional)"}
+                      </label>
+                      <select
+                        value={managerId}
+                        onChange={(e) => setManagerId(e.target.value)}
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      >
+                        <option value="">No manager</option>
+                        {(managers ?? [])
+                          .filter((m: any) => !brandId || !brandManagerIds || brandManagerIds.includes(m._id))
+                          .map((m: any) => (
+                            <option key={m._id} value={m._id}>{m.name ?? m.email}</option>
+                          ))}
+                      </select>
+                      {brandId && brandManagerIds && brandManagerIds.length === 0 && (
+                        <p className="text-[11px] text-[var(--text-muted)] mt-1">No managers assigned to this brand yet.</p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
               <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                 <input

@@ -452,7 +452,7 @@ export function ContentCalendarView({
               </div>
             );
           })()}
-          <table className="w-full min-w-[900px]">
+          <table className="w-full min-w-[1050px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-[var(--bg-primary)] border-b border-[var(--border)]">
                 <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[120px]">
@@ -470,8 +470,11 @@ export function ContentCalendarView({
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
                   Status
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[150px]">
-                  Assignee
+                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
+                  Design Assignee
+                </th>
+                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
+                  Copy Assignee
                 </th>
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
                   Deadline
@@ -574,6 +577,22 @@ export function ContentCalendarView({
                       )}
                     </td>
                     <td className="px-3 py-2.5">
+                      {task.copyAssigneeName ? (
+                        <div>
+                          <span className="text-[12px] text-[var(--text-primary)]">
+                            {task.copyAssigneeName}
+                          </span>
+                          {task.copyAssigneeDesignation && (
+                            <p className="text-[10px] text-[var(--text-muted)]">
+                              {task.copyAssigneeDesignation}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
                       {task.deadline ? (
                         <span
                           className={`text-[11px] font-medium ${
@@ -628,7 +647,7 @@ export function ContentCalendarView({
               {tasks?.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isEditable ? 8 : 7}
+                    colSpan={isEditable ? 9 : 8}
                     className="px-4 py-12 text-center"
                   >
                     <p className="text-[13px] text-[var(--text-muted)]">
@@ -1506,7 +1525,7 @@ export function ContentCalendarEntrySidebar({
               {showAssignTask ? "Hide" : "Assign task"}
             </button>
             <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              Assign to the <strong>Copy team</strong> first, then to the <strong>Design team</strong>. Copy team delivers the copy; Design team takes it forward.
+              Assign a linked task to the <strong>Copy team</strong>. The main entry assignee handles design.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
@@ -1518,9 +1537,17 @@ export function ContentCalendarEntrySidebar({
                       key={lt._id}
                       className="flex items-center gap-1.5 min-w-0 group/row"
                     >
-                      <p className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
-                        · {lt.title}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                          · {lt.title}
+                        </p>
+                        {lt.assigneeName && (
+                          <p className="text-[10px] text-[var(--text-muted)] ml-2.5">
+                            Assigned to: <span className="font-medium text-[var(--text-secondary)]">{lt.assigneeName}</span>
+                            {lt.assigneeDesignation ? ` — ${lt.assigneeDesignation}` : ""}
+                          </p>
+                        )}
+                      </div>
                       <button
                         type="button"
                         disabled={deletingLinkedId === lt._id}
@@ -1560,35 +1587,19 @@ export function ContentCalendarEntrySidebar({
               </div>
             )}
             {showAssignTask && (() => {
-              // Sort teams: copy-related teams first, then design-related, then others
-              const sortedTeams = [...teams].sort((a: any, b: any) => {
-                const aName = (a.name || "").toLowerCase();
-                const bName = (b.name || "").toLowerCase();
-                const aIsCopy = aName.includes("copy") || aName.includes("content") || aName.includes("writing");
-                const bIsCopy = bName.includes("copy") || bName.includes("content") || bName.includes("writing");
-                const aIsDesign = aName.includes("design") || aName.includes("creative") || aName.includes("graphic");
-                const bIsDesign = bName.includes("design") || bName.includes("creative") || bName.includes("graphic");
-                if (aIsCopy && !bIsCopy) return -1;
-                if (!aIsCopy && bIsCopy) return 1;
-                if (aIsDesign && !bIsDesign) return -1;
-                if (!aIsDesign && bIsDesign) return 1;
-                return 0;
+              // Only show copy-related teams — linked tasks are exclusively for the Copy team
+              const copyTeams = teams.filter((t: any) => {
+                const tName = (t.name || "").toLowerCase();
+                return tName.includes("copy") || tName.includes("content") || tName.includes("writing");
               });
               // Check if a copy task already exists in linked tasks
-              const hasCopyTask = linkedTasks?.some((lt: any) => {
-                const title = (lt.title || "").toLowerCase();
-                return title.includes("copy") || title.includes("content") || title.includes("writing");
-              });
+              const hasCopyTask = linkedTasks?.some((lt: any) => lt._id !== task._id);
               return (
               <div className="mt-3 space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                 {/* Workflow hint */}
                 <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pb-2 border-b border-[var(--border-subtle)]">
-                  <span className={`px-1.5 py-0.5 rounded font-semibold ${!hasCopyTask ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"}`}>
-                    1. Copy Team {hasCopyTask ? "✓" : "← next"}
-                  </span>
-                  <span className="text-[var(--text-muted)]">→</span>
-                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasCopyTask ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
-                    2. Design Team {hasCopyTask ? "← next" : ""}
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasCopyTask ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                    Copy Team {hasCopyTask ? "✓ Assigned" : "← Assign now"}
                   </span>
                 </div>
                 <div>
@@ -1596,7 +1607,7 @@ export function ContentCalendarEntrySidebar({
                   <input
                     value={assignTaskTitle}
                     onChange={(e) => setAssignTaskTitle(e.target.value)}
-                    placeholder={hasCopyTask ? "e.g. Design creative" : "e.g. Write copy"}
+                    placeholder="e.g. Write copy for post"
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   />
                 </div>
@@ -1610,16 +1621,10 @@ export function ContentCalendarEntrySidebar({
                     }}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   >
-                    <option value="">Select team</option>
-                    {sortedTeams.map((team: any) => {
-                      const tName = (team.name || "").toLowerCase();
-                      const isCopy = tName.includes("copy") || tName.includes("content") || tName.includes("writing");
-                      const isDesign = tName.includes("design") || tName.includes("creative") || tName.includes("graphic");
-                      const tag = isCopy ? " (Copy)" : isDesign ? " (Design)" : "";
-                      return (
-                        <option key={team._id} value={team._id}>{team.name}{tag}</option>
-                      );
-                    })}
+                    <option value="">Select copy team</option>
+                    {copyTeams.map((team: any) => (
+                      <option key={team._id} value={team._id}>{team.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
