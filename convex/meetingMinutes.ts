@@ -41,6 +41,8 @@ export const create = mutation({
     brandId: v.id("brands"),
     title: v.string(),
     meetingDate: v.number(),
+    startTime: v.optional(v.string()),
+    endTime: v.optional(v.string()),
     attendees: v.optional(v.array(v.string())),
     content: v.string(),
     transcriptFileId: v.optional(v.id("_storage")),
@@ -69,6 +71,8 @@ export const update = mutation({
     content: v.optional(v.string()),
     attendees: v.optional(v.array(v.string())),
     meetingDate: v.optional(v.number()),
+    startTime: v.optional(v.string()),
+    endTime: v.optional(v.string()),
   },
   handler: async (ctx, { momId, ...fields }) => {
     const userId = await getAuthUserId(ctx);
@@ -82,6 +86,8 @@ export const update = mutation({
     if (fields.content !== undefined) updates.content = fields.content;
     if (fields.attendees !== undefined) updates.attendees = fields.attendees;
     if (fields.meetingDate !== undefined) updates.meetingDate = fields.meetingDate;
+    if (fields.startTime !== undefined) updates.startTime = fields.startTime;
+    if (fields.endTime !== undefined) updates.endTime = fields.endTime;
 
     await ctx.db.patch(momId, updates);
   },

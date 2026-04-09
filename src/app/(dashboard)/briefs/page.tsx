@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
-import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X } from "lucide-react";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
 /** Designing / copywriting only (not content calendar). */
@@ -134,7 +134,10 @@ export default function BriefsPage() {
 
   const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
-  const [briefsTab, setBriefsTab] = useState<"active" | "completed">("active");
+  const [briefsTab, setBriefsTab] = useState<"active" | "completed" | "review">("active");
+  const [filterBriefType, setFilterBriefType] = useState<string>("");
+  const [filterDateStart, setFilterDateStart] = useState<string>("");
+  const [filterDateEnd, setFilterDateEnd] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -145,11 +148,17 @@ export default function BriefsPage() {
         filterManagerId?: string;
         viewMode?: string;
         expandedBrandIds?: string[];
+        filterBriefType?: string;
+        filterDateStart?: string;
+        filterDateEnd?: string;
       };
-      if (o.briefsTab === "active" || o.briefsTab === "completed") setBriefsTab(o.briefsTab);
+      if (o.briefsTab === "active" || o.briefsTab === "completed" || o.briefsTab === "review") setBriefsTab(o.briefsTab);
       if (typeof o.filterManagerId === "string") setFilterManagerId(o.filterManagerId);
       if (o.viewMode === "folders" || o.viewMode === "all") setViewMode(o.viewMode);
       if (Array.isArray(o.expandedBrandIds)) setExpandedBrands(new Set(o.expandedBrandIds));
+      if (typeof o.filterBriefType === "string") setFilterBriefType(o.filterBriefType);
+      if (typeof o.filterDateStart === "string") setFilterDateStart(o.filterDateStart);
+      if (typeof o.filterDateEnd === "string") setFilterDateEnd(o.filterDateEnd);
     } catch {
       /* ignore */
     }
@@ -164,12 +173,15 @@ export default function BriefsPage() {
           filterManagerId,
           viewMode,
           expandedBrandIds: [...expandedBrands],
+          filterBriefType,
+          filterDateStart,
+          filterDateEnd,
         })
       );
     } catch {
       /* ignore */
     }
-  }, [briefsTab, filterManagerId, viewMode, expandedBrands]);
+  }, [briefsTab, filterManagerId, viewMode, expandedBrands, filterBriefType, filterDateStart, filterDateEnd]);
 
   const persistBriefDraft = useCallback(() => {
     try {
@@ -272,12 +284,31 @@ export default function BriefsPage() {
     return folders;
   }
 
-  const activeBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status !== "completed"), [briefs]);
-  const completedBriefs = useMemo(() => (briefs ?? []).filter((b) => b.status === "completed"), [briefs]);
+  // Apply type + date range filters first, then split by tab
+  const filteredBriefs = useMemo(() => {
+    let list = briefs ?? [];
+    if (filterBriefType) {
+      list = list.filter((b) => (b as any).briefType === filterBriefType);
+    }
+    if (filterDateStart) {
+      const startTs = new Date(filterDateStart).getTime();
+      list = list.filter((b) => b.deadline && b.deadline >= startTs);
+    }
+    if (filterDateEnd) {
+      const endTs = new Date(filterDateEnd + "T23:59:59").getTime();
+      list = list.filter((b) => b.deadline && b.deadline <= endTs);
+    }
+    return list;
+  }, [briefs, filterBriefType, filterDateStart, filterDateEnd]);
+
+  const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
+  const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
+  const reviewBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "review"), [filteredBriefs]);
   const activeFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands]);
   const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands]);
-  const brandFolders = briefsTab === "active" ? activeFolders : completedFolders;
-  const displayedBriefs = briefsTab === "active" ? activeBriefs : completedBriefs;
+  const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands]);
+  const brandFolders = briefsTab === "active" ? activeFolders : briefsTab === "review" ? reviewFolders : completedFolders;
+  const displayedBriefs = briefsTab === "active" ? activeBriefs : briefsTab === "review" ? reviewBriefs : completedBriefs;
 
 
   function parseDuration(str: string): number {
@@ -527,16 +558,28 @@ export default function BriefsPage() {
           Completed
           <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
         </button>
+        <button
+          onClick={() => setBriefsTab("review")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            briefsTab === "review"
+              ? "bg-white shadow-sm text-[var(--text-primary)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Review
+          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{reviewBriefs.length}</span>
+        </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
           <select
             value={filterManagerId}
             onChange={(e) => setFilterManagerId(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
           >
             <option value="">All Managers</option>
             {(managers ?? []).map((m: any) => (
@@ -545,15 +588,47 @@ export default function BriefsPage() {
               </option>
             ))}
           </select>
-          {filterManagerId && (
-            <button
-              onClick={() => setFilterManagerId("")}
-              className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
-            >
-              Clear
-            </button>
-          )}
         </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterBriefType}
+            onChange={(e) => setFilterBriefType(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
+          >
+            <option value="">All Types</option>
+            <option value="developmental">Developmental</option>
+            <option value="designing">Designing</option>
+            <option value="video_editing">Video Editing</option>
+            <option value="copywriting">Copywriting</option>
+            <option value="content_calendar">Content Calendar</option>
+            <option value="single_task">Single Task</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-[var(--text-muted)]">From</span>
+          <input
+            type="date"
+            value={filterDateStart}
+            onChange={(e) => setFilterDateStart(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          />
+          <span className="text-[11px] text-[var(--text-muted)]">To</span>
+          <input
+            type="date"
+            value={filterDateEnd}
+            onChange={(e) => setFilterDateEnd(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          />
+        </div>
+        {(filterManagerId || filterBriefType || filterDateStart || filterDateEnd) && (
+          <button
+            onClick={() => { setFilterManagerId(""); setFilterBriefType(""); setFilterDateStart(""); setFilterDateEnd(""); }}
+            className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+          >
+            <X className="h-3 w-3" />
+            Clear filters
+          </button>
+        )}
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-auto">
           <button
             onClick={() => setViewMode("folders")}

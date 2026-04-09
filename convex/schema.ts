@@ -509,6 +509,8 @@ export default defineSchema({
     brandId: v.id("brands"),
     title: v.string(),
     meetingDate: v.number(),
+    startTime: v.optional(v.string()),   // e.g. "10:00"
+    endTime: v.optional(v.string()),     // e.g. "11:30"
     attendees: v.optional(v.array(v.string())),
     content: v.string(),
     transcriptFileId: v.optional(v.id("_storage")),

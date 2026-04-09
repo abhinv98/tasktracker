@@ -17,6 +17,7 @@ import {
   Calendar,
   Users,
   X,
+  Clock,
 } from "lucide-react";
 
 interface MomTabProps {
@@ -51,6 +52,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
     return d.toISOString().split("T")[0];
   });
   const [content, setContent] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [attendeesStr, setAttendeesStr] = useState("");
   const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +67,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
   const [editContent, setEditContent] = useState("");
   const [editAttendees, setEditAttendees] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleCreate(e: React.FormEvent) {
@@ -95,6 +100,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
         brandId,
         title: title.trim(),
         meetingDate: new Date(meetingDate + "T00:00:00").getTime(),
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
         content: content.trim(),
         attendees: attendees.length > 0 ? attendees : undefined,
         transcriptFileId,
@@ -103,6 +110,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
 
       setTitle("");
       setContent("");
+      setStartTime("");
+      setEndTime("");
       setAttendeesStr("");
       setTranscriptFile(null);
       setShowAdd(false);
@@ -120,6 +129,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
     setEditContent(mom.content);
     setEditAttendees((mom.attendees ?? []).join(", "));
     setEditDate(new Date(mom.meetingDate).toISOString().split("T")[0]);
+    setEditStartTime(mom.startTime ?? "");
+    setEditEndTime(mom.endTime ?? "");
   }
 
   async function handleSaveEdit() {
@@ -137,6 +148,8 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
         content: editContent.trim() || undefined,
         attendees: attendees.length > 0 ? attendees : undefined,
         meetingDate: editDate ? new Date(editDate + "T00:00:00").getTime() : undefined,
+        startTime: editStartTime || undefined,
+        endTime: editEndTime || undefined,
       });
       setEditingId(null);
       toast("success", "Meeting minutes updated");
@@ -188,6 +201,26 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                 value={meetingDate}
                 onChange={(e) => setMeetingDate(e.target.value)}
                 required
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Start Time</label>
+              <input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">End Time</label>
+              <input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               />
             </div>
@@ -248,7 +281,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
             <Button type="submit" disabled={submitting}>
               {submitting ? "Saving..." : "Save MOM"}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); setTitle(""); setContent(""); setAttendeesStr(""); setTranscriptFile(null); }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); setTitle(""); setContent(""); setStartTime(""); setEndTime(""); setAttendeesStr(""); setTranscriptFile(null); }}>
               Cancel
             </Button>
           </div>
@@ -286,6 +319,12 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                       <Calendar className="h-3 w-3" />
                       {formatDate(mom.meetingDate)}
                     </span>
+                    {(mom.startTime || mom.endTime) && (
+                      <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                        <Clock className="h-3 w-3" />
+                        {mom.startTime ?? "?"} – {mom.endTime ?? "?"}
+                      </span>
+                    )}
                     {mom.attendees && mom.attendees.length > 0 && (
                       <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
                         <Users className="h-3 w-3" />
@@ -320,6 +359,26 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                         onChange={(e) => setEditDate(e.target.value)}
                         className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                       />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">Start Time</label>
+                          <input
+                            type="time"
+                            value={editStartTime}
+                            onChange={(e) => setEditStartTime(e.target.value)}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">End Time</label>
+                          <input
+                            type="time"
+                            value={editEndTime}
+                            onChange={(e) => setEditEndTime(e.target.value)}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          />
+                        </div>
+                      </div>
                       <input
                         value={editAttendees}
                         onChange={(e) => setEditAttendees(e.target.value)}
