@@ -25,3 +25,32 @@ export async function syncSingleTaskBriefStatus(
     await ctx.db.patch(briefId, { status: mappedStatus as any });
   }
 }
+
+/**
+ * For multi-task (master) briefs: checks if ALL tasks in the brief are
+ * now "done". If so, marks the brief as "completed".
+ * Called after approval flow marks a task as done.
+ */
+export async function syncMultiTaskBriefStatus(
+  ctx: MutationCtx,
+  briefId: Id<"briefs">,
+  justCompletedTaskId: Id<"tasks">
+) {
+  const brief = await ctx.db.get(briefId);
+  if (!brief) return;
+  if (brief.status === "completed" || brief.status === "archived") return;
+  // Single-task briefs are handled by syncSingleTaskBriefStatus
+  if (brief.briefType === "single_task") return;
+
+  const allTasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+    .collect();
+
+  if (allTasks.length === 0) return;
+
+  const allDone = allTasks.every((t) => t.status === "done");
+  if (allDone) {
+    await ctx.db.patch(briefId, { status: "completed" as any });
+  }
+}

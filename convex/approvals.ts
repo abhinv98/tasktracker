@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus } from "./lib/syncBriefStatus";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import type { Id } from "./_generated/dataModel";
 
@@ -1097,6 +1097,7 @@ export const teamLeadAndManagerApprove = mutation({
             completedAt: now,
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
@@ -1193,6 +1194,7 @@ export const managerApproveFromTeamLead = mutation({
             completedAt: now,
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
@@ -1619,6 +1621,7 @@ export const approveDeliverable = mutation({
             completedAt: Date.now(),
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);

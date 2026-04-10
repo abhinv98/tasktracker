@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus } from "./lib/syncBriefStatus";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -931,6 +931,7 @@ export const clientApproveDeliverable = mutation({
     if (task) {
       await ctx.db.patch(task._id, { status: "done", completedAt: Date.now() });
       await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
+      await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
 
       const brief = await ctx.db.get(task.briefId);
       const brand = await ctx.db.get(jsrLink.brandId);
