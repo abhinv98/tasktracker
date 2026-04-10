@@ -21,6 +21,7 @@ function normalizeDeadlineToEndOfDay(deadline: number): number {
   return deadline;
 }
 
+
 export const listBriefs = query({
   args: {
     status: v.optional(v.string()),

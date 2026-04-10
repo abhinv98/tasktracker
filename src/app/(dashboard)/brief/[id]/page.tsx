@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X } from "lucide-react";
+import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
@@ -498,6 +498,10 @@ export default function BriefPage() {
   const [showTeamPicker, setShowTeamPicker] = useState(false);
   const [showAddTaskTeamPicker, setShowAddTaskTeamPicker] = useState(false);
 
+  // Team-wise filter for task visibility
+  const [viewTeamFilter, setViewTeamFilter] = useState<string>("");
+  const [showViewTeamFilter, setShowViewTeamFilter] = useState(false);
+
   const openCreateTaskPanel = useCallback((teamId: string) => {
     setPanelMode("create");
     setPanelTeamId(teamId);
@@ -531,13 +535,25 @@ export default function BriefPage() {
   const briefTeamsList = graphData?.teams ?? [];
 
   const allTasks = tasksData?.tasks ?? [];
+
+  // Apply team-wise filter: find which user IDs belong to the selected team
+  const filteredTasks = useMemo(() => {
+    if (!viewTeamFilter) return allTasks;
+    const teamMembers = graphData?.teams?.find(
+      (t) => t.team._id === viewTeamFilter
+    )?.members;
+    if (!teamMembers) return allTasks;
+    const memberIds = new Set(teamMembers.map((m) => m.user._id));
+    return allTasks.filter((t) => memberIds.has(t.assigneeId));
+  }, [allTasks, viewTeamFilter, graphData?.teams]);
+
   const tasksByStatus = {
-    todo: allTasks.filter((t) => t.status === "pending"),
-    "in-progress": allTasks.filter((t) => t.status === "in-progress"),
-    review: allTasks.filter((t) => t.status === "review"),
-    done: allTasks.filter((t) => t.status === "done"),
+    todo: filteredTasks.filter((t) => t.status === "pending"),
+    "in-progress": filteredTasks.filter((t) => t.status === "in-progress"),
+    review: filteredTasks.filter((t) => t.status === "review"),
+    done: filteredTasks.filter((t) => t.status === "done"),
   };
-  const totalTasks = allTasks.length;
+  const totalTasks = filteredTasks.length;
   const doneTasks = tasksByStatus.done.length;
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
@@ -781,6 +797,57 @@ export default function BriefPage() {
               <span className="text-[10px] text-[var(--text-muted)]">({doneTasks}/{totalTasks})</span>
             </div>
 
+            {/* Team filter dropdown */}
+            {(teamsForBrief ?? []).filter(Boolean).length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowViewTeamFilter(!showViewTeamFilter);
+                    setShowTeamPicker(false);
+                    setShowAddTaskTeamPicker(false);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+                    viewTeamFilter
+                      ? "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                      : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  }`}
+                >
+                  <Filter className="h-3 w-3" />
+                  {viewTeamFilter
+                    ? (teamsForBrief ?? []).find((t) => t?._id === viewTeamFilter)?.name ?? "Team"
+                    : "All Teams"}
+                </button>
+                {showViewTeamFilter && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowViewTeamFilter(false)} />
+                    <div className="absolute left-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[160px]">
+                      <button
+                        onClick={() => { setViewTeamFilter(""); setShowViewTeamFilter(false); }}
+                        className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] flex items-center gap-2 ${
+                          !viewTeamFilter ? "text-[var(--accent-employee)] font-semibold" : "text-[var(--text-primary)]"
+                        }`}
+                      >
+                        All Teams
+                      </button>
+                      {(teamsForBrief ?? []).filter(Boolean).map((team: { _id: Id<"teams">; name?: string; color?: string }) => (
+                        <button
+                          key={team._id}
+                          onClick={() => { setViewTeamFilter(team._id); setShowViewTeamFilter(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] flex items-center gap-2 ${
+                            viewTeamFilter === team._id ? "text-[var(--accent-employee)] font-semibold" : "text-[var(--text-primary)]"
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                          {team.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Team pills */}
             {isAdmin && brief.status !== "archived" && (
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -903,7 +970,7 @@ export default function BriefPage() {
                   teamId: team._id,
                   teamName: team.name,
                   teamColor: team.color,
-                  tasks: allTasks
+                  tasks: filteredTasks
                     .filter((t) => members.some((m) => m.user._id === t.assigneeId))
                     .map((t) => {
                       const assignee = members.find((m) => m.user._id === t.assigneeId)?.user;

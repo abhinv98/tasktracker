@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Activity,
 } from "lucide-react";
 import {
   DndContext,
@@ -44,7 +45,7 @@ interface ClientJsrTabProps {
   canManageLinks: boolean;
 }
 
-type BlockId = "briefs" | "taskStatus" | "analytics" | "clientTasks" | "messages";
+type BlockId = "briefs" | "taskStatus" | "analytics" | "clientTasks" | "messages" | "recentActivity";
 
 interface BlockConfig {
   id: BlockId;
@@ -58,6 +59,7 @@ const DEFAULT_BLOCKS: BlockConfig[] = [
   { id: "analytics", label: "Analytics", visible: true },
   { id: "clientTasks", label: "Client Tasks", visible: true },
   { id: "messages", label: "Client Messages", visible: true },
+  { id: "recentActivity", label: "Recent Activity", visible: true },
 ];
 
 function getStorageKey(brandId: string) {
@@ -132,6 +134,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
   const jsrMessages = useQuery(api.jsr.listJsrMessages, { brandId });
   const sendManagerMessage = useMutation(api.jsr.sendManagerMessage);
   const brandClientTasks = useQuery(api.jsr.listBrandTasksForClient, { brandId });
+  const updateJsrHiddenSections = useMutation(api.jsr.updateJsrHiddenSections);
 
   const [deactivatingJsrId, setDeactivatingJsrId] = useState<Id<"jsrLinks"> | null>(null);
   const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
@@ -169,17 +172,34 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
     });
   }
 
+  function syncHiddenSections(updatedBlocks: BlockConfig[]) {
+    const hidden = updatedBlocks.filter((b) => !b.visible).map((b) => b.id);
+    updateJsrHiddenSections({ brandId, hiddenSections: hidden }).catch(() => {});
+  }
+
   function toggleBlock(id: BlockId) {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b)));
+    setBlocks((prev) => {
+      const updated = prev.map((b) => (b.id === id ? { ...b, visible: !b.visible } : b));
+      syncHiddenSections(updated);
+      return updated;
+    });
   }
 
   function addBlock(id: BlockId) {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, visible: true } : b)));
+    setBlocks((prev) => {
+      const updated = prev.map((b) => (b.id === id ? { ...b, visible: true } : b));
+      syncHiddenSections(updated);
+      return updated;
+    });
     setShowAddBlock(false);
   }
 
   function removeBlock(id: BlockId) {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, visible: false } : b)));
+    setBlocks((prev) => {
+      const updated = prev.map((b) => (b.id === id ? { ...b, visible: false } : b));
+      syncHiddenSections(updated);
+      return updated;
+    });
   }
 
   async function handleGenerateJsr() {
@@ -298,6 +318,15 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
           </div>
         );
       }
+      case "recentActivity":
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+              <Activity className="h-3.5 w-3.5" />
+              <span>Shows recent task activity to the client (status changes, task updates, etc.)</span>
+            </div>
+          </div>
+        );
       case "messages": {
         const msgs = jsrMessages ?? [];
         const recent = msgs.slice(-5);

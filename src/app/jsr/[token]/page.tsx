@@ -517,7 +517,7 @@ export default function JsrPublicPage() {
         )}
 
         {/* ═══ RECENT ACTIVITY ═══ */}
-        {recentActivity.length > 0 && (
+        {recentActivity.length > 0 && !(jsr.hiddenSections ?? []).includes("recentActivity") && (
           <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
             <button
               onClick={() => setActivityExpanded(!activityExpanded)}

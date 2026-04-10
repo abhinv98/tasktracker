@@ -530,6 +530,8 @@ export default defineSchema({
     createdAt: v.number(),
     isActive: v.boolean(),
     label: v.optional(v.string()),
+    /** Sections hidden from the client-facing JSR page */
+    hiddenSections: v.optional(v.array(v.string())),
   })
     .index("by_token", ["token"])
     .index("by_brand", ["brandId"]),

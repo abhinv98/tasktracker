@@ -51,6 +51,29 @@ export const listJsrLinks = query({
   },
 });
 
+export const updateJsrHiddenSections = mutation({
+  args: {
+    brandId: v.id("brands"),
+    hiddenSections: v.array(v.string()),
+  },
+  handler: async (ctx, { brandId, hiddenSections }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const activeLinks = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    for (const link of activeLinks) {
+      await ctx.db.patch(link._id, { hiddenSections });
+    }
+  },
+});
+
 export const deactivateJsrLink = mutation({
   args: {
     jsrLinkId: v.id("jsrLinks"),
@@ -352,6 +375,7 @@ export const getJsrByToken = query({
       messages: sortedMessages,
       ecultifyRequests,
       readyForReview,
+      hiddenSections: jsrLink.hiddenSections ?? [],
     };
   },
 });
