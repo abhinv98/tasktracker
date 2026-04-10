@@ -24,7 +24,7 @@ export async function mergeUpstreamResourcesIntoTask(
     .collect();
 
   for (const d of deliverables) {
-    if (d.status === "rejected") continue;
+    if (d.status !== "approved") continue;
     if (d.link) urls.push(d.link);
     if (d.fileIds?.length) {
       for (const fid of d.fileIds) {

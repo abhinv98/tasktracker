@@ -922,6 +922,49 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             </div>
           )}
 
+          {/* Upstream resources from connected tasks */}
+          {task.referenceLinks && task.referenceLinks.length > 0 && (
+            <>
+              <div className="border-t border-[var(--border)]" />
+              <div className="p-5 space-y-3">
+                <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+                  Resources from upstream tasks
+                </h4>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                  {task.referenceLinks.length} resource{task.referenceLinks.length !== 1 ? "s" : ""} passed from connected tasks
+                </p>
+                <div className="space-y-2 mt-2">
+                  {task.referenceLinks.map((url: string, i: number) => {
+                    const isFile = url.includes("/storage/") || url.includes("convex.cloud");
+                    const label = isFile
+                      ? `File ${i + 1}`
+                      : (() => {
+                          try { return new URL(url).hostname; } catch { return url; }
+                        })();
+                    return (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-secondary)] transition-colors group"
+                      >
+                        {isFile ? (
+                          <FileText className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+                        ) : (
+                          <ExternalLink className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+                        )}
+                        <span className="text-[12px] text-[var(--accent)] group-hover:underline truncate">
+                          {label}
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="border-t border-[var(--border)]" />
 
           {/* Deliverables section */}
