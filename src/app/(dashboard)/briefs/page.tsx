@@ -138,6 +138,7 @@ export default function BriefsPage() {
   const [filterBriefType, setFilterBriefType] = useState<string>("");
   const [filterDateStart, setFilterDateStart] = useState<string>("");
   const [filterDateEnd, setFilterDateEnd] = useState<string>("");
+  const [filterTeamId, setFilterTeamId] = useState<string>("");
 
   useEffect(() => {
     try {
@@ -151,6 +152,7 @@ export default function BriefsPage() {
         filterBriefType?: string;
         filterDateStart?: string;
         filterDateEnd?: string;
+        filterTeamId?: string;
       };
       if (o.briefsTab === "active" || o.briefsTab === "completed" || o.briefsTab === "review") setBriefsTab(o.briefsTab);
       if (typeof o.filterManagerId === "string") setFilterManagerId(o.filterManagerId);
@@ -159,6 +161,7 @@ export default function BriefsPage() {
       if (typeof o.filterBriefType === "string") setFilterBriefType(o.filterBriefType);
       if (typeof o.filterDateStart === "string") setFilterDateStart(o.filterDateStart);
       if (typeof o.filterDateEnd === "string") setFilterDateEnd(o.filterDateEnd);
+      if (typeof o.filterTeamId === "string") setFilterTeamId(o.filterTeamId);
     } catch {
       /* ignore */
     }
@@ -176,12 +179,13 @@ export default function BriefsPage() {
           filterBriefType,
           filterDateStart,
           filterDateEnd,
+          filterTeamId,
         })
       );
     } catch {
       /* ignore */
     }
-  }, [briefsTab, filterManagerId, viewMode, expandedBrands, filterBriefType, filterDateStart, filterDateEnd]);
+  }, [briefsTab, filterManagerId, viewMode, expandedBrands, filterBriefType, filterDateStart, filterDateEnd, filterTeamId]);
 
   const persistBriefDraft = useCallback(() => {
     try {
@@ -284,11 +288,14 @@ export default function BriefsPage() {
     return folders;
   }
 
-  // Apply type + date range filters first, then split by tab
+  // Apply type + date range + team filters first, then split by tab
   const filteredBriefs = useMemo(() => {
     let list = briefs ?? [];
     if (filterBriefType) {
       list = list.filter((b) => (b as any).briefType === filterBriefType);
+    }
+    if (filterTeamId) {
+      list = list.filter((b) => (b as any).teamIds?.includes(filterTeamId));
     }
     if (filterDateStart) {
       const startTs = new Date(filterDateStart).getTime();
@@ -299,7 +306,7 @@ export default function BriefsPage() {
       list = list.filter((b) => b.deadline && b.deadline <= endTs);
     }
     return list;
-  }, [briefs, filterBriefType, filterDateStart, filterDateEnd]);
+  }, [briefs, filterBriefType, filterTeamId, filterDateStart, filterDateEnd]);
 
   const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
   const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
@@ -604,6 +611,20 @@ export default function BriefsPage() {
             <option value="single_task">Single Task</option>
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterTeamId}
+            onChange={(e) => setFilterTeamId(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
+          >
+            <option value="">All Teams</option>
+            {(allTeams ?? []).map((t: any) => (
+              <option key={t._id} value={t._id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-[var(--text-muted)]">From</span>
           <input
@@ -620,9 +641,9 @@ export default function BriefsPage() {
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           />
         </div>
-        {(filterManagerId || filterBriefType || filterDateStart || filterDateEnd) && (
+        {(filterManagerId || filterBriefType || filterTeamId || filterDateStart || filterDateEnd) && (
           <button
-            onClick={() => { setFilterManagerId(""); setFilterBriefType(""); setFilterDateStart(""); setFilterDateEnd(""); }}
+            onClick={() => { setFilterManagerId(""); setFilterBriefType(""); setFilterTeamId(""); setFilterDateStart(""); setFilterDateEnd(""); }}
             className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
           >
             <X className="h-3 w-3" />

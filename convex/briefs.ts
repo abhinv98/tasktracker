@@ -59,6 +59,7 @@ export const listBriefs = query({
     return briefs.map((b) => {
       const manager = managers.find((m) => m._id === b.assignedManagerId);
       const bt = briefTeams.filter((x) => x.briefId === b._id);
+      const teamIds = bt.map((x) => x.teamId);
       const teamNames = bt
         .map((x) => teams.find((t) => t._id === x.teamId)?.name)
         .filter(Boolean); 
@@ -78,6 +79,7 @@ export const listBriefs = query({
         ...b,
         deadline: effectiveDeadline,
         managerName: manager?.name ?? manager?.email,
+        teamIds,
         teamNames,
         taskCount: tasksInBrief.length,
         doneCount,
