@@ -22,6 +22,7 @@ import {
   Clock,
   AlertCircle,
   Activity,
+  CalendarDays,
 } from "lucide-react";
 import {
   DndContext,
@@ -135,6 +136,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
   const sendManagerMessage = useMutation(api.jsr.sendManagerMessage);
   const brandClientTasks = useQuery(api.jsr.listBrandTasksForClient, { brandId });
   const updateJsrHiddenSections = useMutation(api.jsr.updateJsrHiddenSections);
+  const updateJsrCalendarMonth = useMutation(api.jsr.updateJsrCalendarMonth);
 
   const [deactivatingJsrId, setDeactivatingJsrId] = useState<Id<"jsrLinks"> | null>(null);
   const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
@@ -458,6 +460,43 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                 Clients can view and approve deliverables marked as client-facing. They can also submit task requests and communicate via the chat.
               </p>
             </div>
+            {/* Content Calendar month control */}
+            {brand.briefs?.some((b: any) => b.briefType === "content_calendar") && (
+              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Content Calendar Month</p>
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] mb-2">
+                  Choose which month the client sees on the JSR. Leave on "All Months" to show everything.
+                </p>
+                <select
+                  value={(() => {
+                    const active = (jsrLinks ?? []).find((l) => l.isActive);
+                    return (active as any)?.calendarMonth ?? "";
+                  })()}
+                  onChange={(e) => {
+                    updateJsrCalendarMonth({ brandId, calendarMonth: e.target.value }).catch(() => {});
+                  }}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                >
+                  <option value="">All Months</option>
+                  {(() => {
+                    const months: { value: string; label: string }[] = [];
+                    const now = new Date();
+                    for (let i = -3; i < 12; i++) {
+                      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+                      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                      const label = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+                      months.push({ value: val, label });
+                    }
+                    return months;
+                  })().map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       </div>

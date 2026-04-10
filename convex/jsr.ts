@@ -74,6 +74,29 @@ export const updateJsrHiddenSections = mutation({
   },
 });
 
+export const updateJsrCalendarMonth = mutation({
+  args: {
+    brandId: v.id("brands"),
+    calendarMonth: v.string(),
+  },
+  handler: async (ctx, { brandId, calendarMonth }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const activeLinks = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    for (const link of activeLinks) {
+      await ctx.db.patch(link._id, { calendarMonth: calendarMonth || undefined });
+    }
+  },
+});
+
 export const deactivateJsrLink = mutation({
   args: {
     jsrLinkId: v.id("jsrLinks"),
@@ -204,6 +227,13 @@ export const getJsrByToken = query({
                 })
               )
             ).filter((f) => f.url);
+          }
+          if (d.r2FileKeys && d.r2FileKeys.length > 0) {
+            const r2Files = d.r2FileKeys.map((key, idx) => ({
+              name: d.r2FileNames?.[idx] ?? "file",
+              url: `/api/r2-file?key=${encodeURIComponent(key)}`,
+            }));
+            files = [...files, ...r2Files];
           }
           const remarks = allRemarks
             .filter((r) => r.deliverableId === d._id)
@@ -344,6 +374,13 @@ export const getJsrByToken = query({
               })
             )).filter((f) => f.url);
           }
+          if (d.r2FileKeys && d.r2FileKeys.length > 0) {
+            const r2Files = d.r2FileKeys.map((key, idx) => ({
+              name: d.r2FileNames?.[idx] ?? "file",
+              url: `/api/r2-file?key=${encodeURIComponent(key)}`,
+            }));
+            files = [...files, ...r2Files];
+          }
           return {
             deliverableId: d._id,
             taskId: task?._id ?? "",
@@ -376,6 +413,7 @@ export const getJsrByToken = query({
       ecultifyRequests,
       readyForReview,
       hiddenSections: jsrLink.hiddenSections ?? [],
+      calendarMonth: jsrLink.calendarMonth ?? "",
     };
   },
 });

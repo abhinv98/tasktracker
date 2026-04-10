@@ -114,7 +114,15 @@ export default function JsrPublicPage() {
   const [reviewAction, setReviewAction] = useState<"approve" | "changes" | "deny" | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
-  const calendarList = jsr?.calendarList ?? [];
+  const rawCalendarList = jsr?.calendarList ?? [];
+  // If admin set a specific month, only show that month's entries to the client
+  const jsrCalendarMonth = jsr?.calendarMonth ?? "";
+  const calendarList = jsrCalendarMonth
+    ? rawCalendarList.filter((e) => {
+        const m = e.postDate ? e.postDate.substring(0, 7) : "unscheduled";
+        return m === jsrCalendarMonth;
+      })
+    : rawCalendarList;
 
   const calendarByMonth: Record<string, typeof calendarList> = {};
   for (const entry of calendarList) {

@@ -90,7 +90,7 @@ export const listDeliverables = query({
 
         let files: { name: string; url: string }[] = [];
         if (d.fileIds && d.fileIds.length > 0) {
-          files = await Promise.all(
+          const convexFiles = await Promise.all(
             d.fileIds.map(async (fileId, idx) => {
               const url = await ctx.storage.getUrl(fileId);
               return {
@@ -99,7 +99,15 @@ export const listDeliverables = query({
               };
             })
           );
-          files = files.filter((f) => f.url);
+          files = convexFiles.filter((f) => f.url);
+        }
+        // Also include R2-stored files
+        if (d.r2FileKeys && d.r2FileKeys.length > 0) {
+          const r2Files = d.r2FileKeys.map((key, idx) => ({
+            name: d.r2FileNames?.[idx] ?? "file",
+            url: `/api/r2-file?key=${encodeURIComponent(key)}`,
+          }));
+          files = [...files, ...r2Files];
         }
 
         // Find submitter's team and lead
@@ -697,8 +705,10 @@ export const submitDeliverable = mutation({
     link: v.optional(v.string()),
     fileIds: v.optional(v.array(v.id("_storage"))),
     fileNames: v.optional(v.array(v.string())),
+    r2FileKeys: v.optional(v.array(v.string())),
+    r2FileNames: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { taskId, message, link, fileIds, fileNames }) => {
+  handler: async (ctx, { taskId, message, link, fileIds, fileNames, r2FileKeys, r2FileNames }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -723,6 +733,8 @@ export const submitDeliverable = mutation({
         : { teamLeadStatus: "pending" as const }),
       ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
       ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
+      ...(r2FileKeys && r2FileKeys.length > 0 ? { r2FileKeys } : {}),
+      ...(r2FileNames && r2FileNames.length > 0 ? { r2FileNames } : {}),
     });
 
     if (task.status !== "done" && task.status !== "review") {
@@ -955,8 +967,10 @@ export const submitDeliverableDirectToManager = mutation({
     link: v.optional(v.string()),
     fileIds: v.optional(v.array(v.id("_storage"))),
     fileNames: v.optional(v.array(v.string())),
+    r2FileKeys: v.optional(v.array(v.string())),
+    r2FileNames: v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { taskId, message, link, fileIds, fileNames }) => {
+  handler: async (ctx, { taskId, message, link, fileIds, fileNames, r2FileKeys, r2FileNames }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -982,6 +996,8 @@ export const submitDeliverableDirectToManager = mutation({
       passedToManagerAt: Date.now(),
       ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
       ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
+      ...(r2FileKeys && r2FileKeys.length > 0 ? { r2FileKeys } : {}),
+      ...(r2FileNames && r2FileNames.length > 0 ? { r2FileNames } : {}),
     });
 
     // Move task to review

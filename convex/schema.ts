@@ -186,6 +186,9 @@ export default defineSchema({
     reviewedAt: v.optional(v.number()),
     fileIds: v.optional(v.array(v.id("_storage"))),
     fileNames: v.optional(v.array(v.string())),
+    /** R2 object keys for files stored in Cloudflare R2 (new uploads use this instead of fileIds) */
+    r2FileKeys: v.optional(v.array(v.string())),
+    r2FileNames: v.optional(v.array(v.string())),
     teamLeadStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("changes_requested"), v.literal("rejected"))),
     teamLeadReviewedBy: v.optional(v.id("users")),
     teamLeadReviewNote: v.optional(v.string()),
@@ -532,6 +535,8 @@ export default defineSchema({
     label: v.optional(v.string()),
     /** Sections hidden from the client-facing JSR page */
     hiddenSections: v.optional(v.array(v.string())),
+    /** Which month to show on the client calendar (YYYY-MM format). Empty/unset = all months. */
+    calendarMonth: v.optional(v.string()),
   })
     .index("by_token", ["token"])
     .index("by_brand", ["brandId"]),

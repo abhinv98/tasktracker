@@ -271,16 +271,26 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     if (!deliverableMessage.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      let fileIds: Id<"_storage">[] = [];
-      let fileNames: string[] = [];
+      let r2FileKeys: string[] = [];
+      let r2FileNames: string[] = [];
 
       if (deliverableFiles.length > 0) {
         for (const file of deliverableFiles) {
-          const url = await generateUploadUrl();
-          const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
-          const { storageId } = await res.json();
-          fileIds.push(storageId);
-          fileNames.push(file.name);
+          // Get presigned upload URL from our R2 API
+          const presignRes = await fetch("/api/r2-upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileName: file.name, contentType: file.type }),
+          });
+          const { uploadUrl, fileKey } = await presignRes.json();
+          // PUT file directly to R2
+          await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type },
+            body: file,
+          });
+          r2FileKeys.push(fileKey);
+          r2FileNames.push(file.name);
         }
       }
 
@@ -288,7 +298,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         taskId: taskId as Id<"tasks">,
         message: deliverableMessage.trim(),
         link: deliverableLink.trim() || undefined,
-        ...(fileIds.length > 0 ? { fileIds, fileNames } : {}),
+        ...(r2FileKeys.length > 0 ? { r2FileKeys, r2FileNames } : {}),
       });
       setDeliverableMessage("");
       setDeliverableLink("");

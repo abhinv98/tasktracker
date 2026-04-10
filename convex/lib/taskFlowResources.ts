@@ -32,6 +32,12 @@ export async function mergeUpstreamResourcesIntoTask(
         if (url) urls.push(url);
       }
     }
+    // Include R2-stored files as API URLs
+    if (d.r2FileKeys?.length) {
+      for (const key of d.r2FileKeys) {
+        urls.push(`/api/r2-file?key=${encodeURIComponent(key)}`);
+      }
+    }
   }
 
   const uniq = [...new Set(urls.filter(Boolean))];
