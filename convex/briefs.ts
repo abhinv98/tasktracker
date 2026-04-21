@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -113,8 +114,21 @@ export const getBrief = query({
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
     const doneCount = tasks.filter((t) => t.status === "done").length;
+
+    // For single_task briefs, mirror listBriefs: the task's deadline is the
+    // source of truth. Keeps brief detail view consistent with the list view
+    // when a task deadline is edited from the task modal.
+    let effectiveDeadline = brief.deadline;
+    if (brief.briefType === "single_task" && tasks.length > 0) {
+      const taskDeadline = tasks[0].deadline;
+      if (taskDeadline !== undefined) {
+        effectiveDeadline = taskDeadline;
+      }
+    }
+
     return {
       ...brief,
+      deadline: effectiveDeadline,
       manager,
       assignedTeams,
       tasks,
@@ -396,6 +410,360 @@ export const createBrief = mutation({
   },
 });
 
+/**
+ * Unified Individual Task creation. Replaces the old "Single Task" + "For Calendar"
+ * split. Creates either:
+ *   (a) A single_task brief with ONE task        — 1 team, no CC opt-in
+ *   (b) A single_task brief with SEQUENTIAL tasks chained via handoffTargetTeamId
+ *        — 2+ teams, no CC opt-in. brief.deadline = overallDeadline.
+ *   (c) A calendar entry (parent task + Copy/Design children) under the brand's
+ *        auto-found / auto-created content_calendar brief — CC opt-in.
+ *        Teams are inserted as Copy → Design via handoffTargetTeamId.
+ */
+export const createIndividualTaskBrief = mutation({
+  args: {
+    title: v.string(),
+    description: v.optional(v.string()),
+    brandId: v.optional(v.id("brands")),
+    assignedManagerId: v.optional(v.id("users")),
+    overallDeadline: v.optional(v.number()),
+    clientFacing: v.optional(v.boolean()),
+    briefType: v.optional(
+      v.union(
+        v.literal("developmental"),
+        v.literal("designing"),
+        v.literal("video_editing"),
+        v.literal("copywriting")
+      )
+    ),
+    creativesRequired: v.optional(v.number()),
+    teams: v.array(
+      v.object({
+        teamId: v.id("teams"),
+        assigneeId: v.id("users"),
+        deadline: v.optional(v.number()),
+      })
+    ),
+    contentCalendar: v.optional(
+      v.object({
+        month: v.optional(v.string()),
+        goLiveDate: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can create briefs");
+    }
+
+    if (args.teams.length === 0) {
+      throw new Error("At least one team assignment is required");
+    }
+
+    const now = Date.now();
+    const useCalendar = !!args.contentCalendar && !!args.brandId;
+
+    // Normalize deadlines
+    const normalizedOverall = args.overallDeadline
+      ? normalizeDeadlineToEndOfDay(args.overallDeadline)
+      : undefined;
+    const normalizedTeams = args.teams.map((t) => ({
+      ...t,
+      deadline: t.deadline ? normalizeDeadlineToEndOfDay(t.deadline) : undefined,
+    }));
+
+    const creativesRequired =
+      args.creativesRequired !== undefined && args.creativesRequired >= 1
+        ? Math.min(99, Math.floor(args.creativesRequired))
+        : undefined;
+
+    // ─── Branch A/B: single_task brief (no CC) ───
+    if (!useCalendar) {
+      let assignedManagerId = args.assignedManagerId;
+      if (!assignedManagerId && args.brandId) {
+        const brandMgrs = await ctx.db
+          .query("brandManagers")
+          .withIndex("by_brand", (q) => q.eq("brandId", args.brandId!))
+          .collect();
+        if (brandMgrs.length > 0) assignedManagerId = brandMgrs[0].managerId;
+      }
+
+      const count = await ctx.db.query("briefs").collect();
+      const globalPriority = count.length + 1;
+
+      const briefId = await ctx.db.insert("briefs", {
+        title: args.title,
+        description: args.description ?? "",
+        status: "active",
+        briefType: args.briefType ?? "single_task",
+        createdBy: userId,
+        globalPriority,
+        ...(args.brandId ? { brandId: args.brandId } : {}),
+        ...(assignedManagerId ? { assignedManagerId } : {}),
+        ...(normalizedOverall !== undefined ? { deadline: normalizedOverall } : {}),
+        ...(creativesRequired !== undefined ? { creativesRequired } : {}),
+      });
+
+      await ctx.db.insert("activityLog", {
+        briefId,
+        userId,
+        action: "created_brief",
+        details: JSON.stringify({ title: args.title }),
+        timestamp: now,
+      });
+
+      // Insert briefTeams
+      for (let i = 0; i < normalizedTeams.length; i++) {
+        await ctx.db.insert("briefTeams", {
+          briefId,
+          teamId: normalizedTeams[i].teamId,
+          order: i,
+        });
+      }
+
+      // Notify team leads
+      const teamsData = await Promise.all(
+        normalizedTeams.map((t) => ctx.db.get(t.teamId))
+      );
+      for (const team of teamsData) {
+        if (team?.leadId && team.leadId !== userId) {
+          await ctx.db.insert("notifications", {
+            recipientId: team.leadId,
+            type: "team_added",
+            title: "Team added to brief",
+            message: `Your team ${team.name} was added to a brief "${args.title}"`,
+            briefId,
+            triggeredBy: userId,
+            read: false,
+            createdAt: now,
+          });
+        }
+      }
+
+      // Create sequential tasks chained via handoffTargetTeamId
+      for (let i = 0; i < normalizedTeams.length; i++) {
+        const t = normalizedTeams[i];
+        const nextTeamId = i < normalizedTeams.length - 1 ? normalizedTeams[i + 1].teamId : undefined;
+        // Task deadline priority: per-member > overall (fallback)
+        const taskDeadline = t.deadline ?? normalizedOverall;
+
+        const taskId = await ctx.db.insert("tasks", {
+          briefId,
+          title:
+            normalizedTeams.length > 1
+              ? `${args.title} — Step ${i + 1}`
+              : args.title,
+          description: args.description,
+          assigneeId: t.assigneeId,
+          assignedBy: userId,
+          status: "pending",
+          sortOrder: 1000 + i,
+          ...(taskDeadline !== undefined ? { deadline: taskDeadline } : {}),
+          ...(args.clientFacing ? { clientFacing: true } : {}),
+          ...(nextTeamId ? { handoffTargetTeamId: nextTeamId } : {}),
+          assignedAt: now,
+        });
+
+        if (t.assigneeId !== userId) {
+          await ctx.db.insert("notifications", {
+            recipientId: t.assigneeId,
+            type: "task_assigned",
+            title: "Task assigned",
+            message: `You were assigned "${args.title}"`,
+            briefId,
+            taskId,
+            triggeredBy: userId,
+            read: false,
+            createdAt: now,
+          });
+        }
+      }
+
+      return briefId;
+    }
+
+    // ─── Branch C: Content Calendar entry under brand's CC brief ───
+    if (!args.brandId) {
+      throw new Error("Brand is required for content calendar entries");
+    }
+    const brand = await ctx.db.get(args.brandId);
+    if (!brand) throw new Error("Brand not found");
+
+    // Find or create the content calendar brief for this brand
+    const allBriefs = await ctx.db.query("briefs").collect();
+    let ccBrief = allBriefs.find(
+      (b) =>
+        b.brandId === args.brandId &&
+        b.briefType === "content_calendar" &&
+        b.status !== "archived"
+    );
+    let ccBriefId: Id<"briefs">;
+    if (ccBrief) {
+      ccBriefId = ccBrief._id;
+    } else {
+      const brandMgrs = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", args.brandId!))
+        .collect();
+      const ccManagerId =
+        args.assignedManagerId ??
+        (brandMgrs.length > 0 ? brandMgrs[0].managerId : undefined);
+      const maxPriority =
+        allBriefs.length > 0
+          ? Math.max(...allBriefs.map((b) => b.globalPriority))
+          : 0;
+      ccBriefId = await ctx.db.insert("briefs", {
+        title: `${brand.name} — Content Calendar`,
+        description: `Content calendar for ${brand.name}`,
+        status: "active",
+        briefType: "content_calendar",
+        createdBy: userId,
+        ...(ccManagerId ? { assignedManagerId: ccManagerId } : {}),
+        globalPriority: maxPriority + 1,
+        brandId: args.brandId,
+      });
+      await ctx.db.insert("activityLog", {
+        briefId: ccBriefId,
+        userId,
+        action: "created_brief",
+        details: JSON.stringify({ title: `${brand.name} — Content Calendar`, auto: true }),
+        timestamp: now,
+      });
+    }
+
+    // Ensure sheet for month
+    const month = args.contentCalendar?.month;
+    if (month) {
+      const sheets = await ctx.db
+        .query("contentCalendarSheets")
+        .withIndex("by_brief", (q) => q.eq("briefId", ccBriefId))
+        .collect();
+      if (!sheets.some((s) => s.month === month)) {
+        const maxSheetOrder = sheets.length
+          ? Math.max(...sheets.map((s) => s.sortOrder))
+          : 0;
+        await ctx.db.insert("contentCalendarSheets", {
+          briefId: ccBriefId,
+          month,
+          sortOrder: maxSheetOrder + 1,
+          createdBy: userId,
+          createdAt: now,
+        });
+      }
+    }
+
+    const postDate =
+      args.contentCalendar?.goLiveDate ??
+      (month ? `${month}-01` : undefined);
+
+    // Link all teams to the CC brief (deduped, preserving order)
+    const existingBriefTeams = await ctx.db
+      .query("briefTeams")
+      .withIndex("by_brief", (q) => q.eq("briefId", ccBriefId))
+      .collect();
+    const existingTeamIds = new Set(existingBriefTeams.map((bt) => bt.teamId));
+    let nextOrder = existingBriefTeams.length
+      ? Math.max(...existingBriefTeams.map((bt) => bt.order ?? 0)) + 1
+      : 0;
+    for (const t of normalizedTeams) {
+      if (!existingTeamIds.has(t.teamId)) {
+        await ctx.db.insert("briefTeams", {
+          briefId: ccBriefId,
+          teamId: t.teamId,
+          order: nextOrder++,
+        });
+      }
+    }
+
+    // Parent entry task (admin owns it)
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", ccBriefId))
+      .collect();
+    const maxTaskOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t) => t.sortOrder))
+      : 0;
+
+    const firstHandoff =
+      normalizedTeams.length > 1 ? normalizedTeams[1].teamId : undefined;
+    const parentTaskId = await ctx.db.insert("tasks", {
+      briefId: ccBriefId,
+      title: args.title,
+      description: args.description,
+      assigneeId: userId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxTaskOrder + 1000,
+      duration: "1d",
+      durationMinutes: 480,
+      platform: "Other",
+      contentType: "Post",
+      ...(postDate ? { postDate } : {}),
+      ...(normalizedOverall !== undefined ? { deadline: normalizedOverall } : {}),
+      ...(firstHandoff ? { handoffTargetTeamId: firstHandoff } : {}),
+      assignedAt: now,
+    });
+
+    // Child tasks per team, chained Copy → Design via handoffTargetTeamId
+    for (let i = 0; i < normalizedTeams.length; i++) {
+      const t = normalizedTeams[i];
+      const nextTeamId =
+        i < normalizedTeams.length - 1 ? normalizedTeams[i + 1].teamId : undefined;
+      const taskDeadline = t.deadline ?? normalizedOverall;
+      const teamRecord = await ctx.db.get(t.teamId);
+      const teamLabel = teamRecord?.name ?? `Team ${i + 1}`;
+
+      const childId = await ctx.db.insert("tasks", {
+        briefId: ccBriefId,
+        title: `[${teamLabel}] ${args.title}`,
+        description: args.description,
+        assigneeId: t.assigneeId,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: maxTaskOrder + 1001 + i,
+        duration: "1d",
+        durationMinutes: 480,
+        platform: "Other",
+        contentType: "Post",
+        parentTaskId,
+        ...(postDate ? { postDate } : {}),
+        ...(taskDeadline !== undefined ? { deadline: taskDeadline } : {}),
+        ...(nextTeamId ? { handoffTargetTeamId: nextTeamId } : {}),
+        ...(args.clientFacing ? { clientFacing: true } : {}),
+        assignedAt: now,
+      });
+
+      if (t.assigneeId !== userId) {
+        await ctx.db.insert("notifications", {
+          recipientId: t.assigneeId,
+          type: "task_assigned",
+          title: "Content calendar task assigned",
+          message: `You were assigned "${args.title}"`,
+          briefId: ccBriefId,
+          taskId: childId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: now,
+        });
+      }
+    }
+
+    await ctx.db.insert("activityLog", {
+      briefId: ccBriefId,
+      taskId: parentTaskId,
+      userId,
+      action: "created_task",
+      details: JSON.stringify({ title: args.title, linkedCalendar: true }),
+      timestamp: now,
+    });
+
+    return ccBriefId;
+  },
+});
+
 export const updateBrief = mutation({
   args: {
     briefId: v.id("briefs"),
@@ -443,6 +811,28 @@ export const updateBrief = mutation({
 
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(briefId, updates);
+
+      // Symmetric sync for single_task briefs: if the brief's deadline was
+      // edited directly, mirror it onto the lone task so task-level views
+      // (task modal, task cards) don't go stale.
+      if (
+        "deadline" in updates &&
+        brief.briefType === "single_task"
+      ) {
+        const tasksInBrief = await ctx.db
+          .query("tasks")
+          .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+          .collect();
+        if (tasksInBrief.length > 0) {
+          const newDeadline = updates.deadline as number | undefined;
+          for (const t of tasksInBrief) {
+            if (t.deadline !== newDeadline) {
+              await ctx.db.patch(t._id, { deadline: newDeadline });
+            }
+          }
+        }
+      }
+
       await ctx.db.insert("activityLog", {
         briefId,
         userId,

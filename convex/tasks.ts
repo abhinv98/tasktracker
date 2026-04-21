@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
+import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -245,6 +246,19 @@ export const updateTask = mutation({
 
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(taskId, updates);
+
+      // For single_task briefs, the brief deadline IS the task deadline.
+      // Keep the two in sync on the DB so every query (listBriefs, getBrief,
+      // and any downstream consumer reading brief.deadline directly) sees
+      // the freshest value without relying on read-time overrides.
+      const deadlineChanged = "deadline" in updates;
+      if (deadlineChanged && brief && brief.briefType === "single_task") {
+        const newDeadline = updates.deadline as number | undefined;
+        if (newDeadline !== brief.deadline) {
+          await ctx.db.patch(task.briefId, { deadline: newDeadline });
+        }
+      }
+
       await ctx.db.insert("activityLog", {
         briefId: task.briefId,
         taskId,
@@ -320,6 +334,13 @@ export const updateTaskStatus = mutation({
       ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
     });
 
+    // If parent task is marked done, cascade to all descendant child tasks
+    // (e.g. Content Calendar parent entry → [Copy] + [Design] children).
+    // Helper is idempotent and recurses through already-done middle layers.
+    if (newStatus === "done") {
+      await cascadeDoneToChildren(ctx, taskId, userId);
+    }
+
     if (task.assignedBy !== userId) {
       await ctx.db.insert("notifications", {
         recipientId: task.assignedBy,
@@ -341,11 +362,13 @@ export const updateTaskStatus = mutation({
     }
 
     if (brief?.briefType !== "single_task") {
+      // Re-query after cascade: children may have been flipped to "done" above,
+      // so the stale in-memory snapshot would miss them.
       const allTasks = await ctx.db
         .query("tasks")
         .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
         .collect();
-      const allDone = allTasks.every((t) => t._id === taskId ? newStatus === "done" : t.status === "done");
+      const allDone = allTasks.length > 0 && allTasks.every((t) => t.status === "done");
       if (allDone && brief && user?.role === "admin") {
         await ctx.db.patch(task.briefId, { status: "completed" as any });
       } else if (allDone && brief) {
@@ -511,6 +534,11 @@ export const bulkUpdateStatus = mutation({
         status: newStatus,
         ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
       });
+
+      // Mirror updateTaskStatus: propagate "done" down to all descendants.
+      if (newStatus === "done") {
+        await cascadeDoneToChildren(ctx, taskId, userId);
+      }
     }
   },
 });

@@ -49,7 +49,7 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: "in-progress", label: "In Progress", color: "#f59e0b" },
   { value: "on-hold", label: "On Hold", color: "#ef4444" },
   { value: "review", label: "Review", color: "#8b5cf6" },
-  { value: "done", label: "Published", color: "#10b981" },
+  { value: "done", label: "Completed", color: "#10b981" },
 ];
 
 function statusInfo(status: string) {
@@ -486,10 +486,10 @@ export function ContentCalendarView({
                   Status
                 </th>
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
-                  Design Assignee
+                  Copy Assignee
                 </th>
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
-                  Copy Assignee
+                  Design Assignee
                 </th>
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
                   Deadline
@@ -575,6 +575,22 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
+                      {task.copyAssigneeName ? (
+                        <div>
+                          <span className="text-[12px] text-[var(--text-primary)]">
+                            {task.copyAssigneeName}
+                          </span>
+                          {task.copyAssigneeDesignation && (
+                            <p className="text-[10px] text-[var(--text-muted)]">
+                              {task.copyAssigneeDesignation}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
                       {task.assigneeId && task.assigneeId !== task.assignedBy ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
@@ -590,22 +606,6 @@ export function ContentCalendarView({
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
                           Unassigned
                         </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {task.copyAssigneeName ? (
-                        <div>
-                          <span className="text-[12px] text-[var(--text-primary)]">
-                            {task.copyAssigneeName}
-                          </span>
-                          {task.copyAssigneeDesignation && (
-                            <p className="text-[10px] text-[var(--text-muted)]">
-                              {task.copyAssigneeDesignation}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
@@ -1059,6 +1059,13 @@ export function ContentCalendarEntrySidebar({
     parentTaskId: calendarEntryTaskId,
   });
 
+  // When the user opens a linked (Copy) task, we don't have the parent entry's
+  // assignee/status baked in. Fetch it so the Workflow summary can render Design.
+  const parentEntryDetail = useQuery(
+    api.tasks.getTaskDetail,
+    task.parentTaskId ? { taskId: calendarEntryTaskId } : "skip"
+  );
+
   const [showAssignTask, setShowAssignTask] = useState(false);
   const [assignTaskTitle, setAssignTaskTitle] = useState("");
   const [assignTaskTeam, setAssignTaskTeam] = useState("");
@@ -1227,6 +1234,88 @@ export function ContentCalendarEntrySidebar({
 
       {/* Sidebar Content */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Task Workflow — Copy first, Design below */}
+        {(() => {
+          // Determine Copy task (linked) and Design task (parent entry)
+          const isViewingParent = !task.parentTaskId;
+          const copyTask = linkedTasks && linkedTasks.length > 0
+            ? (linkedTasks.find((lt: any) => lt._id !== task._id) ?? (isViewingParent ? null : task))
+            : (isViewingParent ? null : task);
+          const designTask = isViewingParent
+            ? task
+            : (parentEntryDetail?.task
+                ? {
+                    ...parentEntryDetail.task,
+                    assigneeName:
+                      parentEntryDetail.assignee?.name ??
+                      parentEntryDetail.assignee?.email ??
+                      "Unknown",
+                    assigneeDesignation: parentEntryDetail.assignee?.designation ?? "",
+                  }
+                : null);
+
+          const renderRow = (label: string, t: any | null, accent: string) => {
+            if (!t) {
+              return (
+                <div className="flex items-center justify-between py-2 px-2.5 rounded-md border border-dashed border-[var(--border)]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                      {label}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)]">Not assigned</span>
+                </div>
+              );
+            }
+            const ti = statusInfo(t.status);
+            const isCurrent = t._id === task._id;
+            return (
+              <div
+                className={`py-2 px-2.5 rounded-md border ${
+                  isCurrent
+                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-primary)]"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+                    <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                      {label}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-[9px] font-medium text-[var(--accent-admin)]">
+                        Viewing
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium"
+                    style={{ color: ti.color, backgroundColor: `${ti.color}15` }}
+                  >
+                    {ti.label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                  {t.assigneeName || "Unassigned"}
+                  {t.assigneeDesignation ? ` · ${t.assigneeDesignation}` : ""}
+                </p>
+              </div>
+            );
+          };
+
+          return (
+            <div className="space-y-1.5">
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Task Workflow
+              </label>
+              {renderRow("Copy", copyTask, "#3b82f6")}
+              {renderRow("Design", designTask, "#8b5cf6")}
+            </div>
+          );
+        })()}
+
         {/* Title */}
         <div>
           <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">

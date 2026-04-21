@@ -595,6 +595,29 @@ export default defineSchema({
     .index("by_target_task", ["targetTaskId"])
     .index("by_source_task", ["sourceTaskId"]),
 
+  // ─── SUGGESTIONS (Suggestion Box on Profile) ──
+  suggestions: defineTable({
+    userId: v.id("users"),
+    title: v.optional(v.string()),
+    content: v.string(),
+    status: v.union(
+      v.literal("new"),
+      v.literal("reviewing"),
+      v.literal("planned"),
+      v.literal("done"),
+      v.literal("declined")
+    ),
+    adminNote: v.optional(v.string()),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_createdAt", ["createdAt"])
+    .index("by_status", ["status"]),
+
   // ─── JSR REMARKS (client comments on deliverables) ──
   jsrRemarks: defineTable({
     deliverableId: v.id("deliverables"),
