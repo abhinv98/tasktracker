@@ -1,7 +1,15 @@
-import { internalAction, internalQuery } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { internalAction } from "../_generated/server";
+import { makeFunctionReference } from "convex/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { modifyAccountCredentials } from "@convex-dev/auth/server";
+
+/** String ref avoids `internal.*` in this file — prevents TS7022 circular inference on Vercel/strict builds. */
+const findUserByNameContainsRef = makeFunctionReference<
+  "query",
+  { needle: string },
+  { userId: Id<"users">; email: string | null; name: string | null } | null
+>("migrations/resetPasswordLookup:findUserByNameContains");
 
 export const run = internalAction({
   args: {
@@ -17,26 +25,6 @@ export const run = internalAction({
   },
 });
 
-/** Internal lookup for password helpers (name/email substring, case-insensitive). */
-export const findUserByNameContains = internalQuery({
-  args: { needle: v.string() },
-  handler: async (ctx, { needle }) => {
-    const lower = needle.toLowerCase();
-    const users = await ctx.db.query("users").collect();
-    const match = users.find(
-      (u) =>
-        u.name?.toLowerCase().includes(lower) ||
-        u.email?.toLowerCase().includes(lower)
-    );
-    if (!match) return null;
-    return {
-      userId: match._id,
-      email: match.email ?? null,
-      name: match.name ?? null,
-    };
-  },
-});
-
 /**
  * One-off: find user with "kaushal" in name/email and set password.
  * Run: npx convex run migrations/resetPassword:runKaushal
@@ -44,10 +32,9 @@ export const findUserByNameContains = internalQuery({
 export const runKaushal = internalAction({
   args: {},
   handler: async (ctx) => {
-    const user = await ctx.runQuery(
-      internal.migrations.resetPassword.findUserByNameContains,
-      { needle: "kaushal" }
-    );
+    const user = await ctx.runQuery(findUserByNameContainsRef, {
+      needle: "kaushal",
+    });
     if (!user) {
       throw new Error('No user found with name or email containing "kaushal"');
     }
