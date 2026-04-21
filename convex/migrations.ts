@@ -113,7 +113,8 @@ export const backfillParentDoneCascade = internalMutation({
         // (e.g. all tasks are done but brief still at "in-progress").
         const everyTaskDone =
           allTasks.length > 0 && allTasks.every((t) => t.status === "done");
-        if (everyTaskDone && brief.status !== "completed") {
+        // Outer branch already excludes brief.status === "completed"
+        if (everyTaskDone) {
           if (!dryRun) {
             if (brief.briefType === "single_task" && allTasks[0]) {
               await syncSingleTaskBriefStatus(ctx, brief._id, "done");
