@@ -1276,19 +1276,22 @@ export default function DeliverablesPage() {
                         </span>
                       )}
 
-                      {deliverables.some((x: any) => x.status !== "approved" && !x.isHandedOff) && !d.hasIncompleteChainTasks && (
-                        showRejectForm === group.taskId ? (
-                          renderRejectForm(deliverables.find((x: any) => x.status !== "approved")?._id ?? d._id, handleReject)
+                      {deliverables.some((x: any) => x.status !== "approved" && !x.isHandedOff) && !d.hasIncompleteChainTasks && (() => {
+                        // Use the deliverable ID consistently across the button, state, and form
+                        // so the guard inside renderRejectForm (showRejectForm === id) matches.
+                        const rejectTargetId = (deliverables.find((x: any) => x.status !== "approved" && !x.isHandedOff)?._id ?? d._id) as string;
+                        return showRejectForm === rejectTargetId ? (
+                          renderRejectForm(rejectTargetId, handleReject)
                         ) : (
                           <button
-                            onClick={() => setShowRejectForm(group.taskId)}
+                            onClick={() => setShowRejectForm(rejectTargetId)}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <X className="h-3.5 w-3.5" />
                             Request Changes
                           </button>
-                        )
-                      )}
+                        );
+                      })()}
 
                       {/* Task-level Hand Off button (hands off ALL approved deliverables) */}
                       {(allApproved || d.taskHasHandoffTarget) && !allHandedOff && (

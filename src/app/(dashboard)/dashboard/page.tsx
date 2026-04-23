@@ -2,11 +2,11 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, TaskDetailModal, DatePicker } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar } from "lucide-react";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -47,6 +47,336 @@ const STATUS_CONFIG: Record<string, { color: string; label: string; order: numbe
   review: { color: "#8b5cf6", label: "Review", order: 3 },
   done: { color: "#10b981", label: "Done", order: 4 },
 };
+
+// ═══════════════════════════════════════════
+// EMPLOYEE TASK VIEWS (Kanban + Tabbed List)
+// ═══════════════════════════════════════════
+type EmployeeTask = {
+  _id: string;
+  title: string;
+  briefName?: string;
+  description?: string;
+  status: string;
+  deadline?: number;
+};
+
+const EMPLOYEE_STATUSES: Array<{ key: string; label: string; color: string; bg: string; dot: string }> = [
+  { key: "pending", label: "Pending", color: "var(--text-muted)", bg: "var(--bg-hover)", dot: "#9CA3AF" },
+  { key: "in-progress", label: "In Progress", color: "#3B82F6", bg: "#EFF6FF", dot: "#3B82F6" },
+  { key: "review", label: "Review", color: "#F59E0B", bg: "#FFFBEB", dot: "#F59E0B" },
+  { key: "done", label: "Done", color: "var(--accent-employee)", bg: "var(--accent-employee-dim)", dot: "#10B981" },
+];
+
+const VIEW_STORAGE_KEY = "employeeQueueView";
+const TAB_STORAGE_KEY = "employeeQueueTab";
+
+function EmployeeTaskCard({
+  task,
+  onSelect,
+  onStart,
+  isStarting,
+  statusColors,
+  compact = false,
+}: {
+  task: EmployeeTask;
+  onSelect: (id: string) => void;
+  onStart: (id: string) => void;
+  isStarting: boolean;
+  statusColors: Record<string, { color: string; bg: string }>;
+  compact?: boolean;
+}) {
+  const sc = statusColors[task.status] ?? statusColors.pending;
+  const t = task as EmployeeTask & {
+    parentTaskId?: string;
+    deadlineExtended?: boolean;
+    briefStatus?: string;
+    briefDescription?: string;
+  };
+
+  return (
+    <Card
+      className={task.status === "done" ? "opacity-60" : ""}
+      accent={task.status === "done" ? "employee" : undefined}
+      onClick={() => onSelect(task._id)}
+    >
+      <div className={compact ? "flex flex-col gap-2" : "flex justify-between items-start gap-2"}>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {!!t.parentTaskId && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
+                HELPER
+              </span>
+            )}
+            {t.deadlineExtended && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
+                EXTENDED
+              </span>
+            )}
+            {t.briefStatus === "on_hold" && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                ⏸ ON HOLD
+              </span>
+            )}
+            <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
+              {task.title}
+            </h3>
+          </div>
+          <p className="text-[12px] text-[var(--text-secondary)] mt-1">
+            {task.briefName}
+            {task.deadline
+              ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}`
+              : ""}
+          </p>
+          {(task.description || t.briefDescription) && (
+            <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
+              {task.description || t.briefDescription}
+            </p>
+          )}
+        </div>
+        {task.status === "pending" ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStart(task._id);
+            }}
+            disabled={isStarting}
+            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60`}
+          >
+            {isStarting ? <Clock className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            Start
+          </button>
+        ) : (
+          <span
+            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium`}
+            style={{ color: sc.color, backgroundColor: sc.bg }}
+          >
+            {task.status}
+          </span>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function EmployeeTaskViews({
+  tasks,
+  onSelectTask,
+  onStartTask,
+  startingTaskId,
+  statusColors,
+}: {
+  tasks: EmployeeTask[];
+  onSelectTask: (id: string) => void;
+  onStartTask: (id: string) => void;
+  startingTaskId: string | null;
+  statusColors: Record<string, { color: string; bg: string }>;
+}) {
+  type ViewState = {
+    viewMode: "kanban" | "list";
+    activeTab: string;
+    hydrated: boolean;
+  };
+  const [state, setState] = useState<ViewState>({
+    viewMode: "kanban",
+    activeTab: "in-progress",
+    hydrated: false,
+  });
+  const { viewMode, activeTab, hydrated } = state;
+
+  // Hydrate preferences from localStorage on mount (single state update, SSR-safe)
+  useEffect(() => {
+    let nextView: ViewState["viewMode"] = "kanban";
+    let nextTab = "in-progress";
+    try {
+      const savedView = localStorage.getItem(VIEW_STORAGE_KEY);
+      if (savedView === "kanban" || savedView === "list") nextView = savedView;
+      const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+      if (savedTab && EMPLOYEE_STATUSES.some((s) => s.key === savedTab)) nextTab = savedTab;
+    } catch {
+      // localStorage may be unavailable (private mode). Ignore.
+    }
+    setState({ viewMode: nextView, activeTab: nextTab, hydrated: true });
+  }, []);
+
+  const setViewMode = (next: ViewState["viewMode"]) => {
+    setState((prev) => ({ ...prev, viewMode: next }));
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {}
+  };
+  const setActiveTab = (next: string) => {
+    setState((prev) => ({ ...prev, activeTab: next }));
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {}
+  };
+  void hydrated; // hydrated is reserved for future SSR flicker suppression if needed
+
+  // Group tasks by status
+  const grouped: Record<string, EmployeeTask[]> = {
+    pending: [],
+    "in-progress": [],
+    review: [],
+    done: [],
+  };
+  for (const task of tasks) {
+    if (grouped[task.status]) grouped[task.status].push(task);
+    else grouped.pending.push(task);
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <Card>
+        <p className="text-[13px] text-[var(--text-muted)] text-center py-4">
+          No tasks assigned to you yet.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* View Toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[12px] text-[var(--text-muted)] tabular-nums">
+          {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+        </div>
+        <div className="inline-flex items-center rounded-lg border border-[var(--border)] bg-white p-0.5 shadow-sm">
+          <button
+            onClick={() => setViewMode("kanban")}
+            aria-pressed={viewMode === "kanban"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+              viewMode === "kanban"
+                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Kanban
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            aria-pressed={viewMode === "list"}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+              viewMode === "list"
+                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            <ListIcon className="h-3.5 w-3.5" />
+            List
+          </button>
+        </div>
+      </div>
+
+      {viewMode === "kanban" ? (
+        <div className="flex gap-3 overflow-x-auto pb-2 snap-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
+          {EMPLOYEE_STATUSES.map((col) => {
+            const colTasks = grouped[col.key] ?? [];
+            return (
+              <div
+                key={col.key}
+                className="flex flex-col min-w-[280px] sm:min-w-0 snap-start rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]"
+              >
+                <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-hover)] rounded-t-xl">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: col.dot }}
+                    />
+                    <span className="font-semibold text-[12px] text-[var(--text-primary)] uppercase tracking-wide">
+                      {col.label}
+                    </span>
+                  </div>
+                  <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-white border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] tabular-nums">
+                    {colTasks.length}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2 p-2 min-h-[80px] max-h-[70vh] overflow-y-auto">
+                  {colTasks.length === 0 ? (
+                    <p className="text-[11px] text-[var(--text-muted)] text-center py-6 italic">
+                      No tasks
+                    </p>
+                  ) : (
+                    colTasks.map((task) => (
+                      <EmployeeTaskCard
+                        key={task._id}
+                        task={task}
+                        onSelect={onSelectTask}
+                        onStart={onStartTask}
+                        isStarting={startingTaskId === task._id}
+                        statusColors={statusColors}
+                        compact
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {/* Tabs */}
+          <div className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto">
+            {EMPLOYEE_STATUSES.map((tab) => {
+              const count = (grouped[tab.key] ?? []).length;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    isActive
+                      ? "border-[var(--accent-employee)] text-[var(--text-primary)]"
+                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: tab.dot }}
+                  />
+                  {tab.label}
+                  <span
+                    className={`inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full text-[10px] font-semibold tabular-nums ${
+                      isActive
+                        ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tab Panel */}
+          <div className="flex flex-col gap-3">
+            {(grouped[activeTab] ?? []).length === 0 ? (
+              <Card>
+                <p className="text-[13px] text-[var(--text-muted)] text-center py-4">
+                  No {EMPLOYEE_STATUSES.find((s) => s.key === activeTab)?.label.toLowerCase()} tasks.
+                </p>
+              </Card>
+            ) : (
+              (grouped[activeTab] ?? []).map((task) => (
+                <EmployeeTaskCard
+                  key={task._id}
+                  task={task}
+                  onSelect={onSelectTask}
+                  onStart={onStartTask}
+                  isStarting={startingTaskId === task._id}
+                  statusColors={statusColors}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -934,86 +1264,20 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        {(tasks ?? []).map((task) => {
-          const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
-          return (
-            <Card
-              key={task._id}
-              className={task.status === "done" ? "opacity-60" : ""}
-              accent={task.status === "done" ? "employee" : undefined}
-              onClick={() => setSelectedTaskId(task._id)}
-            >
-              <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    {!!(task as any).parentTaskId && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                        HELPER
-                      </span>
-                    )}
-                    {(task as any).deadlineExtended && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
-                        EXTENDED
-                      </span>
-                    )}
-                    {(task as any).briefStatus === "on_hold" && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                        ⏸ ON HOLD
-                      </span>
-                    )}
-                    <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
-                      {task.title}
-                    </h3>
-                  </div>
-                  <p className="text-[12px] text-[var(--text-secondary)] mt-1">
-                    {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
-                  </p>
-                  {(task.description || (task as any).briefDescription) && (
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description || (task as any).briefDescription}</p>
-                  )}
-                </div>
-                {task.status === "pending" ? (
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      setStartingTaskId(task._id);
-                      try {
-                        await updateTaskStatus({ taskId: task._id as Id<"tasks">, newStatus: "in-progress" });
-                      } finally {
-                        setStartingTaskId(null);
-                      }
-                    }}
-                    disabled={startingTaskId === task._id}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                  >
-                    {startingTaskId === task._id ? (
-                      <Clock className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Play className="h-3 w-3" />
-                    )}
-                    Start
-                  </button>
-                ) : (
-                  <span
-                    className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium"
-                    style={{ color: sc.color, backgroundColor: sc.bg }}
-                  >
-                    {task.status}
-                  </span>
-                )}
-              </div>
-            </Card>
-          );
-        })}
-        {(tasks ?? []).length === 0 && (
-          <Card>
-            <p className="text-[13px] text-[var(--text-muted)] text-center py-4">
-              No tasks assigned to you yet.
-            </p>
-          </Card>
-        )}
-      </div>
+      <EmployeeTaskViews
+        tasks={tasks ?? []}
+        onSelectTask={setSelectedTaskId}
+        onStartTask={async (taskId) => {
+          setStartingTaskId(taskId);
+          try {
+            await updateTaskStatus({ taskId: taskId as Id<"tasks">, newStatus: "in-progress" });
+          } finally {
+            setStartingTaskId(null);
+          }
+        }}
+        startingTaskId={startingTaskId}
+        statusColors={STATUS_COLORS}
+      />
 
       {/* Task Detail Modal */}
       {selectedTaskId && (
