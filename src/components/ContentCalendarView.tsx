@@ -254,6 +254,25 @@ export function ContentCalendarView({
     }
   }
 
+  // NOTE: hooks must run on every render in the same order. The
+  // `externalTaskDetail` query stays ABOVE the conditional early returns
+  // below so React always sees the same hook sequence (otherwise we hit
+  // the Rules of Hooks violation, React error #310).
+  const selectedFromLocal =
+    selectedTaskId && tasks
+      ? tasks.find((t: any) => t._id === selectedTaskId)
+      : null;
+
+  // Linked Copy tasks are filtered out of the spreadsheet (they only appear
+  // in the parent entry's sidebar). When the user clicks one, fall back to
+  // a server fetch so the sidebar can render with full edit capability.
+  const externalTaskDetail = useQuery(
+    api.tasks.getTaskDetail,
+    selectedTaskId && !selectedFromLocal
+      ? { taskId: selectedTaskId as Id<"tasks"> }
+      : "skip"
+  );
+
   if (sheets === undefined) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -306,21 +325,6 @@ export function ContentCalendarView({
       </div>
     );
   }
-
-  const selectedFromLocal =
-    selectedTaskId && tasks
-      ? tasks.find((t: any) => t._id === selectedTaskId)
-      : null;
-
-  // Linked Copy tasks are filtered out of the spreadsheet (they only appear
-  // in the parent entry's sidebar). When the user clicks one, fall back to
-  // a server fetch so the sidebar can render with full edit capability.
-  const externalTaskDetail = useQuery(
-    api.tasks.getTaskDetail,
-    selectedTaskId && !selectedFromLocal
-      ? { taskId: selectedTaskId as Id<"tasks"> }
-      : "skip"
-  );
 
   const selectedTask =
     selectedFromLocal ??
