@@ -46,6 +46,7 @@ import type * as migrations_findUser from "../migrations/findUser.js";
 import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
 import type * as migrations_fixDeadlines from "../migrations/fixDeadlines.js";
 import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
+import type * as migrations_inspectAdAdapt1 from "../migrations/inspectAdAdapt1.js";
 import type * as migrations_mergeAccounts from "../migrations/mergeAccounts.js";
 import type * as migrations_normalizeDeadlines from "../migrations/normalizeDeadlines.js";
 import type * as migrations_provisionUsers from "../migrations/provisionUsers.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
   "migrations/fixDeadlines": typeof migrations_fixDeadlines;
   "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;
+  "migrations/inspectAdAdapt1": typeof migrations_inspectAdAdapt1;
   "migrations/mergeAccounts": typeof migrations_mergeAccounts;
   "migrations/normalizeDeadlines": typeof migrations_normalizeDeadlines;
   "migrations/provisionUsers": typeof migrations_provisionUsers;

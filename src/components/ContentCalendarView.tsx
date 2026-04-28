@@ -718,26 +718,36 @@ export function ContentCalendarView({
           </table>
         </div>
 
-        {/* Detail Sidebar */}
-        {selectedTask && (
-          <ContentCalendarEntrySidebar
-            key={selectedTask._id}
-            task={selectedTask}
-            isEditable={isEditable}
-            employees={employees}
-            admins={admins}
-            teams={allTeams ?? []}
-            briefId={briefId}
-            brandId={brandId}
-            currentSheetMonth={currentSheetMonth}
-            onClose={() => setSelectedTaskId(null)}
-            onSelectTask={(id) => setSelectedTaskId(id)}
-            updateTask={updateTask}
-            updateTaskStatus={updateTaskStatus}
-            deleteTask={deleteTask}
-            toast={toast}
-          />
-        )}
+        {/* Detail Sidebar.
+            We keep the slot mounted while a linked-task fetch is in flight
+            so clicking a workflow card (Copy ↔ Design) does not collapse
+            the sidebar and re-open it. The spinner shell occupies the
+            same width so the grid layout does not jump either. */}
+        {selectedTaskId ? (
+          selectedTask ? (
+            <ContentCalendarEntrySidebar
+              key={selectedTask._id}
+              task={selectedTask}
+              isEditable={isEditable}
+              employees={employees}
+              admins={admins}
+              teams={allTeams ?? []}
+              briefId={briefId}
+              brandId={brandId}
+              currentSheetMonth={currentSheetMonth}
+              onClose={() => setSelectedTaskId(null)}
+              onSelectTask={(id) => setSelectedTaskId(id)}
+              updateTask={updateTask}
+              updateTaskStatus={updateTaskStatus}
+              deleteTask={deleteTask}
+              toast={toast}
+            />
+          ) : (
+            <div className="w-[360px] shrink-0 bg-white flex items-center justify-center border-l border-[var(--border)]">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+            </div>
+          )
+        ) : null}
       </div>
 
       {/* Sheet Tabs Bar (Excel-style) */}

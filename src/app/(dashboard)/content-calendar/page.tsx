@@ -16,6 +16,7 @@ import {
   Link2,
   ExternalLink,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import {
   DndContext,
@@ -581,26 +582,35 @@ export default function ContentCalendarPage() {
             </div>
           </div>
 
-          {/* Detail Sidebar */}
-          {selectedTask && (
-            <ContentCalendarEntrySidebar
-              key={selectedTask._id}
-              task={selectedTask}
-              isEditable={!!isEditable}
-              employees={employees}
-              admins={admins}
-              teams={allTeams ?? []}
-              briefId={selectedTask.briefId}
-              brandId={selectedBrandId as Id<"brands">}
-              currentSheetMonth={monthStr}
-              onClose={() => setSelectedTaskId(null)}
-              onSelectTask={(id) => setSelectedTaskId(id)}
-              updateTask={updateTask}
-              updateTaskStatus={updateTaskStatus}
-              deleteTask={deleteTask}
-              toast={toast}
-            />
-          )}
+          {/* Detail Sidebar.
+              Keep the slot mounted while a linked-task fetch is in flight
+              so clicking a workflow card does not collapse the sidebar
+              and pop it back open. */}
+          {selectedTaskId ? (
+            selectedTask ? (
+              <ContentCalendarEntrySidebar
+                key={selectedTask._id}
+                task={selectedTask}
+                isEditable={!!isEditable}
+                employees={employees}
+                admins={admins}
+                teams={allTeams ?? []}
+                briefId={selectedTask.briefId}
+                brandId={selectedBrandId as Id<"brands">}
+                currentSheetMonth={monthStr}
+                onClose={() => setSelectedTaskId(null)}
+                onSelectTask={(id) => setSelectedTaskId(id)}
+                updateTask={updateTask}
+                updateTaskStatus={updateTaskStatus}
+                deleteTask={deleteTask}
+                toast={toast}
+              />
+            ) : (
+              <div className="w-[360px] shrink-0 bg-white flex items-center justify-center border-l border-[var(--border)]">
+                <Loader2 className="h-5 w-5 animate-spin text-[var(--text-muted)]" />
+              </div>
+            )
+          ) : null}
         </div>
         <DragOverlay dropAnimation={null}>
           {activeTask ? <TaskCardOverlay task={activeTask} /> : null}

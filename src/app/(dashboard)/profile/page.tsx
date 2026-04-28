@@ -38,15 +38,18 @@ const STATUS_LABELS: Record<SuggestionStatus, string> = {
   declined: "Declined",
 };
 
-// NOTE: chips also render at 60% opacity inside the "Set status" row when
-// they represent the current state. Pick text/bg pairs strong enough to
-// stay legible after the opacity fade-out.
+// Explicit hex values via Tailwind arbitrary classes so the JIT cannot
+// drop them and a stale CSS variable cannot wash out the text. Each chip
+// pairs a saturated background with near-black text for clear contrast.
+//   Reviewing -> deep purple (chosen so it does not collide with the
+//                accent-admin orange that flooded the previous amber pill).
+//   Planned   -> deep blue.
 const STATUS_STYLES: Record<SuggestionStatus, string> = {
   new: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--accent-admin)]",
   reviewing:
-    "bg-amber-100 text-amber-900 border border-amber-400 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-600",
+    "bg-[#ede9fe] text-[#4c1d95] border border-[#7c3aed]",
   planned:
-    "bg-blue-100 text-blue-900 border border-blue-400 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-600",
+    "bg-[#dbeafe] text-[#1e3a8a] border border-[#2563eb]",
   done: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] border border-[var(--accent-employee)]",
   declined:
     "bg-[var(--bg-muted)] text-[var(--text-muted)] border border-[var(--border)]",
@@ -206,7 +209,11 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
+    // Page used to clamp at max-w-3xl which left a huge dead band on the
+    // right when Suggestion Box landed on the All Suggestions view (and
+    // truncated the tab underline). Drop the page-level cap; the Account
+    // form keeps its own max-w-xl below so it stays compact.
+    <div className="p-8">
       <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight mb-2">
         Profile
       </h1>
