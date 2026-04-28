@@ -50,6 +50,7 @@ import type * as migrations_mergeAccounts from "../migrations/mergeAccounts.js";
 import type * as migrations_normalizeDeadlines from "../migrations/normalizeDeadlines.js";
 import type * as migrations_provisionUsers from "../migrations/provisionUsers.js";
 import type * as migrations_provisionUsersInternals from "../migrations/provisionUsersInternals.js";
+import type * as migrations_repairCascadeAndOnHold from "../migrations/repairCascadeAndOnHold.js";
 import type * as migrations_resetPassword from "../migrations/resetPassword.js";
 import type * as migrations_resetPasswordLookup from "../migrations/resetPasswordLookup.js";
 import type * as migrations_syncSingleTaskBriefs from "../migrations/syncSingleTaskBriefs.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/normalizeDeadlines": typeof migrations_normalizeDeadlines;
   "migrations/provisionUsers": typeof migrations_provisionUsers;
   "migrations/provisionUsersInternals": typeof migrations_provisionUsersInternals;
+  "migrations/repairCascadeAndOnHold": typeof migrations_repairCascadeAndOnHold;
   "migrations/resetPassword": typeof migrations_resetPassword;
   "migrations/resetPasswordLookup": typeof migrations_resetPasswordLookup;
   "migrations/syncSingleTaskBriefs": typeof migrations_syncSingleTaskBriefs;

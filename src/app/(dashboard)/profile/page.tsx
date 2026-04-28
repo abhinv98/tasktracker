@@ -38,12 +38,15 @@ const STATUS_LABELS: Record<SuggestionStatus, string> = {
   declined: "Declined",
 };
 
+// NOTE: chips also render at 60% opacity inside the "Set status" row when
+// they represent the current state. Pick text/bg pairs strong enough to
+// stay legible after the opacity fade-out.
 const STATUS_STYLES: Record<SuggestionStatus, string> = {
   new: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--accent-admin)]",
   reviewing:
-    "bg-amber-50 text-amber-700 border border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700",
+    "bg-amber-100 text-amber-900 border border-amber-400 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-600",
   planned:
-    "bg-blue-50 text-blue-700 border border-blue-300 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700",
+    "bg-blue-100 text-blue-900 border border-blue-400 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-600",
   done: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] border border-[var(--accent-employee)]",
   declined:
     "bg-[var(--bg-muted)] text-[var(--text-muted)] border border-[var(--border)]",
@@ -840,9 +843,19 @@ function AllSuggestionsView() {
           </p>
         </Card>
       ) : (
-        <div className="flex flex-col gap-3">
+        // Two-column masonry layout. CSS `columns` keeps the natural
+        // newest-first order (the listAll query already sorts createdAt
+        // DESC) while letting cards of different heights tile cleanly
+        // without leaving rectangular gaps. Drops to a single column on
+        // narrow screens.
+        <div className="columns-1 md:columns-2 gap-3 [column-fill:_balance]">
           {filtered.map((s) => (
-            <AdminSuggestionItem key={s._id} suggestion={s} />
+            <div
+              key={s._id}
+              className="mb-3 break-inside-avoid"
+            >
+              <AdminSuggestionItem suggestion={s} />
+            </div>
           ))}
         </div>
       )}
@@ -998,7 +1011,8 @@ function AdminSuggestionItem({
                 onClick={() => handleQuickStatus(s)}
                 className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
                   suggestion.status === s
-                    ? STATUS_STYLES[s] + " opacity-60 cursor-default"
+                    ? STATUS_STYLES[s] +
+                      " ring-2 ring-offset-1 ring-[var(--accent-admin)] cursor-default font-semibold"
                     : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)]"
                 }`}
               >

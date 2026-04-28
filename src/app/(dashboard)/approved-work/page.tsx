@@ -14,6 +14,9 @@ import {
   Briefcase,
   Send,
   FolderOpen,
+  Search,
+  Users,
+  User,
 } from "lucide-react";
 
 function formatDate(ts: number): string {
@@ -28,8 +31,14 @@ export default function ApprovedWorkPage() {
   const deliverables = useQuery(api.approvals.listClientApprovedDeliverables);
   const stats = useQuery(api.approvals.getApprovedWorkStats);
 
+  const currentUser = useQuery(api.users.getCurrentUser);
+  const isSuperAdmin = currentUser?.isSuperAdmin === true;
+
+  const [searchQuery, setSearchQuery] = useState("");
   const [filterManager, setFilterManager] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
+  const [filterTeam, setFilterTeam] = useState("");
+  const [filterEmployee, setFilterEmployee] = useState("");
   const [showStats, setShowStats] = useState(false);
 
   const managers = useMemo(() => {
@@ -40,7 +49,9 @@ export default function ApprovedWorkPage() {
         set.set(d.managerId, d.managerName);
       }
     }
-    return [...set.entries()].map(([id, name]) => ({ id, name }));
+    return [...set.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [deliverables]);
 
   const brands = useMemo(() => {
@@ -51,17 +62,86 @@ export default function ApprovedWorkPage() {
         set.set(d.brandId, d.brandName);
       }
     }
-    return [...set.entries()].map(([id, name]) => ({ id, name }));
+    return [...set.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [deliverables]);
+
+  const employees = useMemo(() => {
+    if (!deliverables) return [];
+    const set = new Map<string, string>();
+    for (const d of deliverables) {
+      const sid = (d as any).submitterId as string | undefined;
+      if (sid && !set.has(sid)) {
+        set.set(sid, d.submitterName);
+      }
+    }
+    return [...set.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [deliverables]);
+
+  const teams = useMemo(() => {
+    if (!deliverables) return [];
+    const set = new Map<string, string>();
+    for (const d of deliverables) {
+      const t = (d as any).submitterTeams as
+        | { id: string; name: string }[]
+        | undefined;
+      for (const team of t ?? []) {
+        if (!set.has(team.id)) set.set(team.id, team.name);
+      }
+    }
+    return [...set.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [deliverables]);
 
   const filtered = useMemo(() => {
     if (!deliverables) return [];
+    const q = searchQuery.trim().toLowerCase();
     return deliverables.filter((d) => {
       if (filterManager && d.managerId !== filterManager) return false;
       if (filterBrand && d.brandId !== filterBrand) return false;
+      if (filterEmployee && (d as any).submitterId !== filterEmployee) return false;
+      if (filterTeam) {
+        const ts = ((d as any).submitterTeams ?? []) as { id: string }[];
+        if (!ts.some((t) => t.id === filterTeam)) return false;
+      }
+      if (q) {
+        const haystack = [
+          d.taskTitle,
+          d.briefTitle,
+          d.brandName,
+          d.managerName,
+          d.submitterName,
+          d.message ?? "",
+          d.clientNote ?? "",
+          ...(((d as any).submitterTeams ?? []) as { name: string }[]).map(
+            (t) => t.name
+          ),
+        ]
+          .join(" \n ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       return true;
     });
-  }, [deliverables, filterManager, filterBrand]);
+  }, [
+    deliverables,
+    searchQuery,
+    filterManager,
+    filterBrand,
+    filterTeam,
+    filterEmployee,
+  ]);
+
+  const anyFilterActive =
+    !!searchQuery ||
+    !!filterManager ||
+    !!filterBrand ||
+    !!filterTeam ||
+    !!filterEmployee;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -84,47 +164,116 @@ export default function ApprovedWorkPage() {
         </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
-        <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-        <select
-          value={filterManager}
-          onChange={(e) => setFilterManager(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
-        >
-          <option value="">All Managers</option>
-          {managers.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterBrand}
-          onChange={(e) => setFilterBrand(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
-        >
-          <option value="">All Brands</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        {(filterManager || filterBrand) && (
-          <button
-            onClick={() => {
-              setFilterManager("");
-              setFilterBrand("");
-            }}
-            className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+      {/* Search + Filter Bar */}
+      <div className="flex flex-col gap-3 mb-5">
+        {/* Search */}
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)] pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={
+              isSuperAdmin
+                ? "Search by employee, manager, brand, brief, or task..."
+                : "Search by name, brand, brief, or task..."
+            }
+            className="w-full pl-9 pr-9 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+
+          <select
+            value={filterManager}
+            onChange={(e) => setFilterManager(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[170px]"
           >
-            Clear
-          </button>
-        )}
-        <span className="text-[11px] text-[var(--text-muted)] ml-auto">
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-        </span>
+            <option value="">All Managers</option>
+            {managers.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterBrand}
+            onChange={(e) => setFilterBrand(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[170px]"
+          >
+            <option value="">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="inline-flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <select
+              value={filterTeam}
+              onChange={(e) => setFilterTeam(e.target.value)}
+              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
+            >
+              <option value="">All Teams</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <select
+              value={filterEmployee}
+              onChange={(e) => setFilterEmployee(e.target.value)}
+              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[170px]"
+            >
+              <option value="">All Employees</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {anyFilterActive && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setFilterManager("");
+                setFilterBrand("");
+                setFilterTeam("");
+                setFilterEmployee("");
+              }}
+              className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+            >
+              Clear all
+            </button>
+          )}
+          <span className="text-[11px] text-[var(--text-muted)] ml-auto">
+            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+            {isSuperAdmin && deliverables && filtered.length !== deliverables.length
+              ? ` of ${deliverables.length}`
+              : ""}
+          </span>
+        </div>
       </div>
 
       {/* Deliverables List */}
@@ -144,6 +293,23 @@ export default function ApprovedWorkPage() {
                 </div>
                 <p className="text-[12px] text-[var(--text-secondary)] mb-1.5">
                   Brief: {d.briefTitle} &middot; Manager: {d.managerName} &middot; Submitted by: {d.submitterName}
+                  {(() => {
+                    const ts = ((d as any).submitterTeams ?? []) as {
+                      id: string;
+                      name: string;
+                    }[];
+                    if (ts.length === 0) return null;
+                    return (
+                      <>
+                        {" "}
+                        &middot;{" "}
+                        <span className="inline-flex items-center gap-1 text-[var(--text-muted)]">
+                          <Users className="h-3 w-3" />
+                          {ts.map((t) => t.name).join(", ")}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </p>
                 <div className="flex items-center gap-4 text-[11px] text-[var(--text-muted)]">
                   <span className="flex items-center gap-1">
@@ -201,8 +367,8 @@ export default function ApprovedWorkPage() {
         {deliverables !== undefined && filtered.length === 0 && (
           <Card>
             <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
-              {filterManager || filterBrand
-                ? "No approved work found for the selected filters."
+              {anyFilterActive
+                ? "No approved work matches the current search and filters."
                 : "No client-approved deliverables yet."}
             </p>
           </Card>

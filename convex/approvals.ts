@@ -3,6 +3,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
+import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
+import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -587,6 +589,10 @@ export const listClientApprovedDeliverables = query({
     const briefs = await ctx.db.query("briefs").collect();
     const brands = await ctx.db.query("brands").collect();
     const users = await ctx.db.query("users").collect();
+    // Pre-fetch team membership so we can attach team info per submitter
+    // without N+1 queries inside the result loop.
+    const allUserTeams = await ctx.db.query("userTeams").collect();
+    const allTeams = await ctx.db.query("teams").collect();
 
     const results = await Promise.all(
       approved.map(async (d) => {
@@ -604,6 +610,16 @@ export const listClientApprovedDeliverables = query({
           ? users.find((u) => u._id === brief.assignedManagerId)
           : null;
         const submitter = users.find((u) => u._id === d.submittedBy);
+
+        // Resolve every team this submitter belongs to (for the filter
+        // dropdown). Pick the first as the primary teamName label.
+        const submitterTeamLinks = allUserTeams.filter(
+          (ut) => ut.userId === d.submittedBy
+        );
+        const submitterTeams = submitterTeamLinks
+          .map((ut) => allTeams.find((t) => t._id === ut.teamId))
+          .filter((t): t is NonNullable<typeof t> => !!t)
+          .map((t) => ({ id: t._id as string, name: t.name }));
 
         let files: { name: string; url: string }[] = [];
         if (d.fileIds && d.fileIds.length > 0) {
@@ -627,6 +643,8 @@ export const listClientApprovedDeliverables = query({
           managerName: manager?.name ?? manager?.email ?? "Unknown",
           managerId: brief?.assignedManagerId,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
+          submitterId: d.submittedBy,
+          submitterTeams,
           submittedAt: d.submittedAt,
           clientReviewedAt: d.clientReviewedAt,
           clientNote: d.clientNote,
@@ -1103,10 +1121,16 @@ export const teamLeadAndManagerApprove = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
           await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
+
+          // Cascade done -> linked Copy/Helper children + auto-approve any
+          // pending child deliverables so they don't sit in TL/BM queues.
+          await cascadeDoneToChildren(ctx, task._id, userId);
+          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
+      await syncBriefStatusFromTasks(ctx, task.briefId);
     }
 
     const user = await ctx.db.get(userId);
@@ -1200,10 +1224,16 @@ export const managerApproveFromTeamLead = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
           await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
+
+          // Cascade done -> linked Copy/Helper children + auto-approve any
+          // pending child deliverables so they don't sit in TL/BM queues.
+          await cascadeDoneToChildren(ctx, task._id, userId);
+          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
+      await syncBriefStatusFromTasks(ctx, task.briefId);
     }
 
     const user = await ctx.db.get(userId);
@@ -1627,6 +1657,15 @@ export const approveDeliverable = mutation({
           });
           await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
           await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
+
+          // When a content-calendar entry's design deliverable lands as
+          // approved, the linked Copy task on the same entry should also
+          // be considered done — otherwise it sits in "review" forever
+          // even though the parent shipped. Cascade done downward and
+          // auto-approve any pending child deliverables so they stop
+          // haunting Team Lead / Brand Manager queues.
+          await cascadeDoneToChildren(ctx, task._id, userId);
+          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
         }
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);

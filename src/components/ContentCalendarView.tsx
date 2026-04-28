@@ -1318,13 +1318,21 @@ export function ContentCalendarEntrySidebar({
             }
             const ti = statusInfo(t.status);
             const isCurrent = t._id === task._id;
+            // Clickable when there is a switch handler AND we are not already
+            // viewing this task. Clicking swaps the sidebar to that task's
+            // form so admins can drill into Copy / Design directly.
+            const canSwitch = !!onSelectTask && !isCurrent;
+            const Tag: any = canSwitch ? "button" : "div";
             return (
-              <div
-                className={`py-2 px-2.5 rounded-md border ${
+              <Tag
+                type={canSwitch ? "button" : undefined}
+                onClick={canSwitch ? () => onSelectTask!(t._id as string) : undefined}
+                className={`w-full text-left py-2 px-2.5 rounded-md border transition-colors ${
                   isCurrent
                     ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
                     : "border-[var(--border-subtle)] bg-[var(--bg-primary)]"
-                }`}
+                } ${canSwitch ? "hover:bg-[var(--bg-hover)] hover:border-[var(--accent-admin)] cursor-pointer" : ""}`}
+                title={canSwitch ? `Open ${label} task to edit` : undefined}
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
@@ -1349,7 +1357,7 @@ export function ContentCalendarEntrySidebar({
                   {t.assigneeName || "Unassigned"}
                   {t.assigneeDesignation ? ` · ${t.assigneeDesignation}` : ""}
                 </p>
-              </div>
+              </Tag>
             );
           };
 

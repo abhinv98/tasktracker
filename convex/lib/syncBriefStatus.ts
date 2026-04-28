@@ -64,10 +64,13 @@ export async function syncMultiTaskBriefStatus(
  * - Archived briefs are never auto-changed.
  * - Briefs with zero tasks are left alone (caller decides).
  *
- * Status rules:
+ * Status rules (no auto on_hold — that status is reserved for an explicit
+ * manager decision; otherwise a single delayed entry inside a content
+ * calendar would flag the whole brief and every assignee's dashboard would
+ * pick up the on-hold pill):
  *   total === 0                                   -> no change
- *   anyOnHold && !allDone                         -> "on_hold"
  *   done === total                                -> "completed"
+ *   currently "on_hold" and not all done          -> leave it alone
  *   anyReview && done < total                     -> "review"
  *   anyInProgress || (done > 0 && done < total)   -> "in-progress"
  *   else                                          -> "active"
@@ -92,12 +95,14 @@ export async function syncBriefStatusFromTasks(
   const done = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
   const review = tasks.filter((t) => t.status === "review").length;
-  const onHold = tasks.filter((t) => t.status === "on-hold").length;
+
+  // Respect a manually-set "on_hold" brief status until everything is
+  // actually finished. A manager flipping the brief on hold should not be
+  // overridden just because a couple of entries are still in progress.
+  if (brief.status === "on_hold" && done < total) return;
 
   let next: string;
-  if (onHold > 0 && done < total) {
-    next = "on_hold";
-  } else if (done === total) {
+  if (done === total) {
     next = "completed";
   } else if (review > 0) {
     next = "review";
