@@ -209,7 +209,12 @@ export const createBrief = mutation({
       ...briefArgs
     } = args;
 
-    if (briefArgs.deadline !== undefined) {
+    // Content calendar briefs are evergreen (rolling month sheets) and the
+    // top-level brief deadline is meaningless for them — every entry inside
+    // carries its own deadline. Strip it on create so it never sneaks in.
+    if (briefArgs.briefType === "content_calendar") {
+      briefArgs.deadline = undefined;
+    } else if (briefArgs.deadline !== undefined) {
       briefArgs.deadline = normalizeDeadlineToEndOfDay(briefArgs.deadline);
     }
 
@@ -801,7 +806,22 @@ export const updateBrief = mutation({
     if (fields.status !== undefined) updates.status = fields.status;
     if (fields.assignedManagerId !== undefined)
       updates.assignedManagerId = fields.assignedManagerId;
-    if (fields.deadline !== undefined) updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
+    // Content calendar briefs never carry a top-level deadline. If the
+    // caller is changing briefType to content_calendar, also clear any
+    // previously set deadline. If briefType is already content_calendar,
+    // ignore deadline edits silently so old call sites do not error.
+    const willBeContentCalendar =
+      fields.briefType === "content_calendar" ||
+      (fields.briefType === undefined && brief.briefType === "content_calendar");
+
+    if (willBeContentCalendar) {
+      if (fields.briefType === "content_calendar" && brief.deadline !== undefined) {
+        updates.deadline = undefined;
+      }
+      // drop any incoming deadline edit for content calendar briefs
+    } else if (fields.deadline !== undefined) {
+      updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
+    }
     if (fields.briefType !== undefined) updates.briefType = fields.briefType;
     if (fields.creativesRequired !== undefined) {
       const n = fields.creativesRequired;

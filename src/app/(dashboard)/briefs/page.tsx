@@ -461,12 +461,16 @@ export default function BriefsPage() {
       }
 
       // ─── Master Brief ───
+      // Content calendar briefs do not carry a top-level deadline (the
+      // backend strips it too — this just keeps the payload tidy).
+      const includeDeadline =
+        deadline !== undefined && briefType !== "content_calendar";
       await createBrief({
         title,
         description,
         ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
-        ...(deadline !== undefined ? { deadline } : {}),
+        ...(includeDeadline ? { deadline } : {}),
         briefType: (briefType || undefined) as any,
         ...(cr !== undefined ? { creativesRequired: cr } : {}),
       });
@@ -772,15 +776,28 @@ export default function BriefsPage() {
                                 </span>
                               </TableCell>
                               <TableCell className="hidden sm:table-cell">
-                                <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${(brief as { progress?: number }).progress ?? 0}%`,
-                                      backgroundColor: "#10b981",
-                                    }}
-                                  />
-                                </div>
+                                {(() => {
+                                  const b = brief as { progress?: number; taskCount?: number; doneCount?: number };
+                                  const total = b.taskCount ?? 0;
+                                  const done = b.doneCount ?? 0;
+                                  const pct = b.progress ?? 0;
+                                  return (
+                                    <div className="flex items-center gap-2 min-w-[120px]">
+                                      <div className="w-20 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full"
+                                          style={{
+                                            width: `${pct}%`,
+                                            backgroundColor: "#10b981",
+                                          }}
+                                        />
+                                      </div>
+                                      <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
+                                        {done}/{total}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               {isAdmin && (
                                 <TableCell>
@@ -940,12 +957,25 @@ export default function BriefsPage() {
                               </span>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
-                              <div className="w-24 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${(brief as { progress?: number }).progress ?? 0}%`, backgroundColor: "#10b981" }}
-                                />
-                              </div>
+                              {(() => {
+                                const b = brief as { progress?: number; taskCount?: number; doneCount?: number };
+                                const total = b.taskCount ?? 0;
+                                const done = b.doneCount ?? 0;
+                                const pct = b.progress ?? 0;
+                                return (
+                                  <div className="flex items-center gap-2 min-w-[120px]">
+                                    <div className="w-20 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{ width: `${pct}%`, backgroundColor: "#10b981" }}
+                                      />
+                                    </div>
+                                    <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
+                                      {done}/{total}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
                             {isAdmin && (
                               <TableCell>
@@ -1091,13 +1121,23 @@ export default function BriefsPage() {
                   setSingleTaskDeadline={setDeadline}
                 />
               )}
-              {/* Shared fields: deadline (master-only), brand, manager */}
-              {briefMode === "master" && (
+              {/* Shared fields: deadline (master-only), brand, manager.
+                  Content calendar briefs are evergreen (rolling month sheets)
+                  and do not carry a top-level deadline — every entry inside
+                  has its own. */}
+              {briefMode === "master" && briefType !== "content_calendar" && (
                 <div>
                   <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
                     Deadline (optional)
                   </label>
                   <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
+                </div>
+              )}
+              {briefMode === "master" && briefType === "content_calendar" && (
+                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)] px-3 py-2">
+                  <p className="text-[12px] text-[var(--text-secondary)]">
+                    Content Calendar briefs run month after month. Deadlines live on the individual entries inside, not on the brief itself.
+                  </p>
                 </div>
               )}
               <div>

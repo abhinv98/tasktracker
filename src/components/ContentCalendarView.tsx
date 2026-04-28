@@ -307,10 +307,38 @@ export function ContentCalendarView({
     );
   }
 
-  const selectedTask =
+  const selectedFromLocal =
     selectedTaskId && tasks
       ? tasks.find((t: any) => t._id === selectedTaskId)
       : null;
+
+  // Linked Copy tasks are filtered out of the spreadsheet (they only appear
+  // in the parent entry's sidebar). When the user clicks one, fall back to
+  // a server fetch so the sidebar can render with full edit capability.
+  const externalTaskDetail = useQuery(
+    api.tasks.getTaskDetail,
+    selectedTaskId && !selectedFromLocal
+      ? { taskId: selectedTaskId as Id<"tasks"> }
+      : "skip"
+  );
+
+  const selectedTask =
+    selectedFromLocal ??
+    (externalTaskDetail?.task
+      ? {
+          ...externalTaskDetail.task,
+          assigneeName:
+            externalTaskDetail.assignee?.name ??
+            externalTaskDetail.assignee?.email ??
+            "Unknown",
+          assigneeDesignation:
+            externalTaskDetail.assignee?.designation ?? "",
+          assignorName:
+            externalTaskDetail.assignedBy?.name ??
+            externalTaskDetail.assignedBy?.email ??
+            "—",
+        }
+      : null);
 
   return (
     <div className="flex flex-col h-full">
@@ -699,6 +727,7 @@ export function ContentCalendarView({
             brandId={brandId}
             currentSheetMonth={currentSheetMonth}
             onClose={() => setSelectedTaskId(null)}
+            onSelectTask={(id) => setSelectedTaskId(id)}
             updateTask={updateTask}
             updateTaskStatus={updateTaskStatus}
             deleteTask={deleteTask}
@@ -1001,6 +1030,7 @@ export function ContentCalendarEntrySidebar({
   brandId,
   currentSheetMonth,
   onClose,
+  onSelectTask,
   updateTask,
   updateTaskStatus,
   deleteTask,
@@ -1015,6 +1045,8 @@ export function ContentCalendarEntrySidebar({
   brandId?: Id<"brands">;
   currentSheetMonth: string | null;
   onClose: () => void;
+  /** Optional: switch the sidebar to a different task (e.g. opening a linked Copy task). */
+  onSelectTask?: (taskId: string) => void;
   updateTask: any;
   updateTaskStatus: any;
   deleteTask: any;
@@ -1203,14 +1235,26 @@ export function ContentCalendarEntrySidebar({
 
   const si = statusInfo(task.status);
 
+  const isViewingLinkedChild = !!task.parentTaskId;
+
   return (
     <div className="w-[360px] shrink-0 bg-white flex flex-col overflow-hidden">
       {/* Sidebar Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: si.color }} />
+        <div className="flex items-center gap-2 min-w-0">
+          {isViewingLinkedChild && onSelectTask && task.parentTaskId && (
+            <button
+              type="button"
+              onClick={() => onSelectTask(task.parentTaskId as string)}
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              title="Back to parent entry"
+            >
+              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+            </button>
+          )}
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: si.color }} />
           <h3 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
-            Entry Details
+            {isViewingLinkedChild ? "Linked Task" : "Entry Details"}
           </h3>
         </div>
         <div className="flex items-center gap-1">
@@ -1642,10 +1686,16 @@ export function ContentCalendarEntrySidebar({
                   .map((lt: any) => (
                     <div
                       key={lt._id}
-                      className="flex items-center gap-1.5 min-w-0 group/row"
+                      className="flex items-center gap-1.5 min-w-0 group/row rounded-md hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                      <button
+                        type="button"
+                        onClick={() => onSelectTask?.(lt._id)}
+                        className="flex-1 min-w-0 text-left p-1 rounded-md disabled:cursor-not-allowed"
+                        disabled={!onSelectTask}
+                        title={onSelectTask ? "Open this linked task to edit it" : ""}
+                      >
+                        <p className="text-[11px] text-[var(--text-secondary)] truncate hover:text-[var(--accent-admin)]">
                           · {lt.title}
                         </p>
                         {lt.assigneeName && (
@@ -1654,7 +1704,7 @@ export function ContentCalendarEntrySidebar({
                             {lt.assigneeDesignation ? ` — ${lt.assigneeDesignation}` : ""}
                           </p>
                         )}
-                      </div>
+                      </button>
                       <button
                         type="button"
                         disabled={deletingLinkedId === lt._id}

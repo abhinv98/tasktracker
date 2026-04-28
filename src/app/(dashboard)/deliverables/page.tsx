@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button, ConfirmModal } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal, useToast } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
   Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
@@ -179,56 +179,117 @@ export default function DeliverablesPage() {
     taskHandoffContext ?? "skip"
   );
 
+  const { toast } = useToast();
+
   async function handleApprove(deliverableId: string) {
-    await approveDeliverable({ deliverableId: deliverableId as any });
+    try {
+      await approveDeliverable({ deliverableId: deliverableId as any });
+      toast("success", "Deliverable approved");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Approval failed");
+    }
   }
 
   async function handleReject(deliverableId: string) {
     const note = rejectNote[deliverableId];
-    if (!note?.trim()) return;
-    await rejectDeliverable({ deliverableId: deliverableId as any, note: note.trim() });
-    setShowRejectForm(null);
-    setRejectNote({});
+    if (!note?.trim()) {
+      toast("error", "Add a reason before requesting changes");
+      return;
+    }
+    try {
+      await rejectDeliverable({ deliverableId: deliverableId as any, note: note.trim() });
+      toast("success", "Changes requested — sent back to the submitter");
+      setShowRejectForm(null);
+      setRejectNote({});
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not request changes");
+    }
   }
 
   async function handleTeamLeadApprove(deliverableId: string) {
-    await teamLeadApproveMut({ deliverableId: deliverableId as any });
+    try {
+      await teamLeadApproveMut({ deliverableId: deliverableId as any });
+      toast("success", "Approved by team lead");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Approval failed");
+    }
   }
 
   async function handleTeamLeadReject(deliverableId: string) {
     const note = rejectNote[deliverableId];
-    if (!note?.trim()) return;
-    await teamLeadRejectMut({ deliverableId: deliverableId as any, note: note.trim() });
-    setShowRejectForm(null);
-    setRejectNote({});
+    if (!note?.trim()) {
+      toast("error", "Add a reason before requesting changes");
+      return;
+    }
+    try {
+      await teamLeadRejectMut({ deliverableId: deliverableId as any, note: note.trim() });
+      toast("success", "Changes requested");
+      setShowRejectForm(null);
+      setRejectNote({});
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not request changes");
+    }
   }
 
   async function handlePassToManager(deliverableId: string) {
-    await passToManagerMut({ deliverableId: deliverableId as any });
+    try {
+      await passToManagerMut({ deliverableId: deliverableId as any });
+      toast("success", "Passed to brand manager");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Action failed");
+    }
   }
 
   async function handleTeamLeadAndManagerApprove(deliverableId: string) {
-    await teamLeadAndManagerApproveMut({ deliverableId: deliverableId as any });
+    try {
+      await teamLeadAndManagerApproveMut({ deliverableId: deliverableId as any });
+      toast("success", "Approved");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Approval failed");
+    }
   }
 
   async function handleManagerApproveFromTeamLead(deliverableId: string) {
-    await managerApproveFromTeamLeadMut({ deliverableId: deliverableId as any });
+    try {
+      await managerApproveFromTeamLeadMut({ deliverableId: deliverableId as any });
+      toast("success", "Approved");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Approval failed");
+    }
   }
 
   async function handleMainAssigneeApprove(deliverableId: string) {
-    await mainAssigneeApproveMut({ deliverableId: deliverableId as any });
+    try {
+      await mainAssigneeApproveMut({ deliverableId: deliverableId as any });
+      toast("success", "Approved");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Approval failed");
+    }
   }
 
   async function handleMainAssigneeReject(deliverableId: string) {
     const note = rejectNote[deliverableId];
-    if (!note?.trim()) return;
-    await mainAssigneeRejectMut({ deliverableId: deliverableId as any, note: note.trim() });
-    setShowRejectForm(null);
-    setRejectNote({});
+    if (!note?.trim()) {
+      toast("error", "Add a reason before requesting changes");
+      return;
+    }
+    try {
+      await mainAssigneeRejectMut({ deliverableId: deliverableId as any, note: note.trim() });
+      toast("success", "Changes requested");
+      setShowRejectForm(null);
+      setRejectNote({});
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not request changes");
+    }
   }
 
   async function handlePassSubTaskToTeamLead(deliverableId: string) {
-    await passSubTaskToTeamLeadMut({ deliverableId: deliverableId as any });
+    try {
+      await passSubTaskToTeamLeadMut({ deliverableId: deliverableId as any });
+      toast("success", "Sent to team lead");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Action failed");
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -304,18 +365,28 @@ export default function DeliverablesPage() {
 
   function renderRejectForm(id: string, onReject: (id: string) => Promise<void>) {
     if (showRejectForm !== id) return null;
+    const noteValue = rejectNote[id] ?? "";
+    const noteIsEmpty = !noteValue.trim();
     return (
       <div className="flex items-center gap-2 flex-1">
         <input
-          value={rejectNote[id] ?? ""}
+          value={noteValue}
           onChange={(e) => setRejectNote({ ...rejectNote, [id]: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !noteIsEmpty) {
+              e.preventDefault();
+              onReject(id);
+            }
+          }}
           placeholder="Reason for changes..."
           className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--danger)]"
           autoFocus
         />
         <button
           onClick={() => onReject(id)}
-          className="px-3 py-1.5 rounded-lg bg-[var(--danger)] text-white text-[12px] font-medium hover:opacity-90"
+          disabled={noteIsEmpty}
+          className="px-3 py-1.5 rounded-lg bg-[var(--danger)] text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          title={noteIsEmpty ? "Add a reason first" : "Send"}
         >
           Send
         </button>

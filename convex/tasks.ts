@@ -1,8 +1,10 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { syncSingleTaskBriefStatus } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
+import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
+import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -339,6 +341,15 @@ export const updateTaskStatus = mutation({
     // Helper is idempotent and recurses through already-done middle layers.
     if (newStatus === "done") {
       await cascadeDoneToChildren(ctx, taskId, userId);
+
+      // BM / Super Admin override: when an admin force-marks a task done
+      // (skipping the normal deliverable approval flow), auto-approve every
+      // non-rejected deliverable on this task and on every cascaded child
+      // so deliverables stop sitting in Team Lead / Brand Manager queues.
+      // Employees can never reach this branch (the throw above blocks them).
+      if (user?.role === "admin") {
+        await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
+      }
     }
 
     if (task.assignedBy !== userId) {
@@ -355,25 +366,14 @@ export const updateTaskStatus = mutation({
       });
     }
 
-    if (newStatus === "done" && user?.role === "admin") {
-      await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
-    } else if (newStatus !== "done") {
-      await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
-    }
+    // Single-task briefs: keep the brief.status mirrored to the task.
+    await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
 
+    // Multi-task / content-calendar briefs: recompute status from current
+    // counts. This handles BOTH directions (forward: all-done -> completed,
+    // reverse: a previously-completed brief whose task got reopened).
     if (brief?.briefType !== "single_task") {
-      // Re-query after cascade: children may have been flipped to "done" above,
-      // so the stale in-memory snapshot would miss them.
-      const allTasks = await ctx.db
-        .query("tasks")
-        .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
-        .collect();
-      const allDone = allTasks.length > 0 && allTasks.every((t) => t.status === "done");
-      if (allDone && brief && user?.role === "admin") {
-        await ctx.db.patch(task.briefId, { status: "completed" as any });
-      } else if (allDone && brief) {
-        await ctx.db.patch(task.briefId, { status: "review" });
-      }
+      await syncBriefStatusFromTasks(ctx, task.briefId);
     }
 
     await ctx.db.insert("activityLog", {
@@ -382,6 +382,126 @@ export const updateTaskStatus = mutation({
       userId,
       action: "changed_status",
       details: JSON.stringify({ status: newStatus }),
+      timestamp: Date.now(),
+    });
+  },
+});
+
+/**
+ * Reopen a previously-completed task. Authorised callers: super admin,
+ * brand manager of the brief's brand, or the brief's assignedManagerId.
+ *
+ * - Task: status -> "in-progress", completedAt cleared, changesCount + 1
+ * - Latest deliverable on the task (if any): status -> "rejected" with the
+ *   provided note so the deliverable goes back through the approval flow.
+ * - Brief: if currently "completed", recomputed via syncBriefStatusFromTasks
+ *   (will land on "in-progress" because at least one task is now non-done).
+ * - Notifies the original assignee and writes an activityLog entry.
+ *
+ * This intentionally does NOT cascade the redo upward to the parent task
+ * (a child being redone does not invalidate the parent's done state). It
+ * also does not cascade downward through the handoff chain by default.
+ */
+export const requestTaskRedo = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    note: v.string(),
+  },
+  handler: async (ctx, { taskId, note }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    const brief = await ctx.db.get(task.briefId);
+
+    // Authorisation: super admin, admin who manages this brand, or the
+    // assigned manager of this brief.
+    const isSuperAdmin = (user as any).isSuperAdmin === true;
+    let isBrandMgr = false;
+    if (brief?.brandId) {
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
+        .collect();
+      isBrandMgr = bms.some((bm) => bm.managerId === userId);
+    }
+    const isAssignedManager =
+      !!brief?.assignedManagerId && brief.assignedManagerId === userId;
+
+    if (!isSuperAdmin && !isBrandMgr && !isAssignedManager) {
+      throw new Error(
+        "Only super admins, brand managers, or the brief's assigned manager can request a redo"
+      );
+    }
+
+    const trimmedNote = note?.trim();
+    if (!trimmedNote) throw new Error("A reason is required for redo");
+
+    // Reopen the task itself
+    await ctx.db.patch(taskId, {
+      status: "in-progress",
+      completedAt: undefined,
+      changesCount: (task.changesCount ?? 0) + 1,
+      submittedForReviewAt: undefined,
+    });
+
+    // Reopen the latest deliverable on this task (if one exists) so the
+    // approval flow re-runs end-to-end. Earlier deliverables are left as-is
+    // for audit history.
+    const dels = await ctx.db
+      .query("deliverables")
+      .withIndex("by_task", (q) => q.eq("taskId", taskId))
+      .collect();
+    const latest = dels.sort((a, b) => b.submittedAt - a.submittedAt)[0];
+    if (latest && latest.status !== "rejected") {
+      await ctx.db.patch(latest._id, {
+        status: "rejected",
+        reviewedBy: userId,
+        reviewNote: trimmedNote,
+        reviewedAt: Date.now(),
+        teamLeadStatus: undefined,
+        teamLeadReviewedBy: undefined,
+        teamLeadReviewNote: undefined,
+        teamLeadReviewedAt: undefined,
+        passedToManagerBy: undefined,
+        passedToManagerAt: undefined,
+      });
+    }
+
+    // Refresh brief status (covers the "completed brief reopened" case).
+    await syncSingleTaskBriefStatus(ctx, task.briefId, "in-progress");
+    if (brief?.briefType !== "single_task") {
+      await syncBriefStatusFromTasks(ctx, task.briefId);
+    }
+
+    // Notify the assignee
+    if (task.assigneeId !== userId) {
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "deliverable_rejected",
+        title: "Redo requested",
+        message: `${user.name ?? user.email ?? "A manager"} reopened "${task.title}": ${trimmedNote}`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    await ctx.db.insert("activityLog", {
+      briefId: task.briefId,
+      taskId,
+      userId,
+      action: "requested_redo",
+      details: JSON.stringify({
+        note: trimmedNote,
+        previousStatus: task.status,
+        latestDeliverableId: latest?._id ?? null,
+      }),
       timestamp: Date.now(),
     });
   },
@@ -491,14 +611,31 @@ export const deleteTask = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can delete tasks");
     }
-    await ctx.db.delete(taskId);
+
+    const briefId = task.briefId;
+
+    // Cascade: descendants via parentTaskId + every artefact (deliverables,
+    // attachments, comments, time entries, schedule blocks, task connections,
+    // daily summaries, jsr remarks, handoff records) are removed so we do
+    // not leave orphans behind (root cause of the Faiz-style bug).
+    const result = await cascadeDeleteTask(ctx, taskId);
+
     await ctx.db.insert("activityLog", {
-      briefId: task.briefId,
+      briefId,
       taskId,
       userId,
       action: "deleted_task",
+      details: JSON.stringify({
+        cascadedTaskCount: result.tasks.length,
+        cascadedDeliverableCount: result.deliverables.length,
+      }),
       timestamp: Date.now(),
     });
+
+    // After deletion, refresh the parent brief's status (e.g. removing the
+    // last open task on a master brief should auto-complete it; deleting the
+    // only blocking in-progress task should let it move to "review").
+    await syncBriefStatusFromTasks(ctx, briefId);
   },
 });
 
@@ -535,9 +672,19 @@ export const bulkUpdateStatus = mutation({
         ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
       });
 
-      // Mirror updateTaskStatus: propagate "done" down to all descendants.
+      // Mirror updateTaskStatus: propagate "done" down to all descendants
+      // and auto-approve deliverables on the whole tree when an admin is
+      // doing a bulk override.
       if (newStatus === "done") {
         await cascadeDoneToChildren(ctx, taskId, userId);
+        if (user?.role === "admin") {
+          await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
+        }
+      }
+
+      await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);
+      if (brief?.briefType !== "single_task") {
+        await syncBriefStatusFromTasks(ctx, task.briefId);
       }
     }
   },

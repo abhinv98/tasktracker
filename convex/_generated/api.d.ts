@@ -28,6 +28,8 @@ import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
 import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
+import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverables.js";
+import type * as lib_cascadeDeleteTask from "../lib/cascadeDeleteTask.js";
 import type * as lib_cascadeTaskStatus from "../lib/cascadeTaskStatus.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as lib_taskFlowResources from "../lib/taskFlowResources.js";
@@ -37,7 +39,9 @@ import type * as migrations_backfillReviewAt from "../migrations/backfillReviewA
 import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlineValues.js";
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_checkTimeEntries from "../migrations/checkTimeEntries.js";
+import type * as migrations_clearContentCalendarDeadlines from "../migrations/clearContentCalendarDeadlines.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
+import type * as migrations_findFaizOrphanTasks from "../migrations/findFaizOrphanTasks.js";
 import type * as migrations_findUser from "../migrations/findUser.js";
 import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
 import type * as migrations_fixDeadlines from "../migrations/fixDeadlines.js";
@@ -92,6 +96,8 @@ declare const fullApi: ApiFromModules<{
   dm: typeof dm;
   http: typeof http;
   jsr: typeof jsr;
+  "lib/autoApproveDeliverables": typeof lib_autoApproveDeliverables;
+  "lib/cascadeDeleteTask": typeof lib_cascadeDeleteTask;
   "lib/cascadeTaskStatus": typeof lib_cascadeTaskStatus;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   "lib/taskFlowResources": typeof lib_taskFlowResources;
@@ -101,7 +107,9 @@ declare const fullApi: ApiFromModules<{
   "migrations/checkDeadlineValues": typeof migrations_checkDeadlineValues;
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/checkTimeEntries": typeof migrations_checkTimeEntries;
+  "migrations/clearContentCalendarDeadlines": typeof migrations_clearContentCalendarDeadlines;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;
+  "migrations/findFaizOrphanTasks": typeof migrations_findFaizOrphanTasks;
   "migrations/findUser": typeof migrations_findUser;
   "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
   "migrations/fixDeadlines": typeof migrations_fixDeadlines;

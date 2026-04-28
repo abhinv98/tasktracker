@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   UserPlus,
   Play,
+  RotateCcw,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
@@ -101,6 +102,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
   const subTasks = useQuery(api.tasks.getSubTasks, { parentTaskId: taskId as Id<"tasks"> });
   const createSubTask = useMutation(api.tasks.createSubTask);
+  const requestTaskRedo = useMutation(api.tasks.requestTaskRedo);
+  const [showRedoForm, setShowRedoForm] = useState(false);
+  const [redoNote, setRedoNote] = useState("");
+  const [isSubmittingRedo, setIsSubmittingRedo] = useState(false);
   const briefId = detail?.task?.briefId;
   const graphData = useQuery(
     api.briefs.getBriefGraphData,
@@ -554,6 +559,17 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   🔒 Task Done by Employee
                 </span>
               )}
+              {isDelivered && isAdmin && !showRedoForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowRedoForm(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+                  title="Send this task back for changes"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Request Redo
+                </button>
+              )}
               {isBriefOnHold && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
                   ⏸ Brief On Hold
@@ -611,6 +627,77 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 </span>
               )}
             </div>
+
+            {/* Redo prompt: visible only when admin clicked Request Redo on a done task */}
+            {showRedoForm && isDelivered && isAdmin && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
+                  <p className="text-[12px] font-semibold text-amber-800">
+                    Request a redo for this task
+                  </p>
+                </div>
+                <p className="text-[11px] text-amber-700">
+                  This reopens the task (status returns to In Progress) and pushes the latest deliverable back through the approval flow. The brief will move out of Completed automatically.
+                </p>
+                <textarea
+                  value={redoNote}
+                  onChange={(e) => setRedoNote(e.target.value)}
+                  placeholder="Why does this need to be redone? (required)"
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  autoFocus
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSubmittingRedo || !redoNote.trim()}
+                    onClick={async () => {
+                      if (!redoNote.trim()) return;
+                      setIsSubmittingRedo(true);
+                      try {
+                        await requestTaskRedo({
+                          taskId: taskId as Id<"tasks">,
+                          note: redoNote.trim(),
+                        });
+                        setShowRedoForm(false);
+                        setRedoNote("");
+                      } catch (err) {
+                        // Surface inline; toast plumbing not available in this modal.
+                        // Keeping console for visibility while we standardise on toast.
+                        // eslint-disable-next-line no-console
+                        console.error("requestTaskRedo failed", err);
+                        alert(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not request redo"
+                        );
+                      } finally {
+                        setIsSubmittingRedo(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
+                  >
+                    {isSubmittingRedo ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3" />
+                    )}
+                    Send Back for Redo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRedoForm(false);
+                      setRedoNote("");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Meta grid */}
             <div className="grid grid-cols-2 gap-3">

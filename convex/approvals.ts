@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import type { Id } from "./_generated/dataModel";
 
@@ -46,7 +46,12 @@ async function findTeamLeadForUser(ctx: any, userId: string) {
 }
 
 // ─── Helper: check if user is brand manager ────────
+// Super Admins are treated as managers of every brand so they can approve
+// or reject deliverables across the org without being explicitly listed in
+// brandManagers (matches existing behaviour in scopedBriefs / dashboards).
 async function isBrandManager(ctx: any, userId: string, brandId: string) {
+  const user = await ctx.db.get(userId);
+  if (user && (user as any).isSuperAdmin === true) return true;
   const bms = await ctx.db
     .query("brandManagers")
     .withIndex("by_brand", (q: any) => q.eq("brandId", brandId))
@@ -1626,6 +1631,9 @@ export const approveDeliverable = mutation({
         // Propagate deliverable resources to downstream connected tasks in master brief
         await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
       }
+      // Recompute multi-task brief status (forward + reverse) so progress
+      // tracks current task counts, not just the all-done case above.
+      await syncBriefStatusFromTasks(ctx, task.briefId);
     }
 
     await ctx.db.insert("notifications", {
@@ -1697,10 +1705,20 @@ export const rejectDeliverable = mutation({
       const updates: Record<string, any> = {
         changesCount: (task.changesCount ?? 0) + 1,
       };
-      if (task.status === "review") {
+      if (task.status === "review" || task.status === "done") {
         updates.status = "in-progress";
+        if (task.status === "done") updates.completedAt = undefined;
       }
       await ctx.db.patch(deliverable.taskId, updates);
+
+      // If the task was previously done (and the brief possibly completed),
+      // recompute brief status so it falls back to in-progress.
+      await syncSingleTaskBriefStatus(
+        ctx,
+        task.briefId,
+        updates.status ?? task.status
+      );
+      await syncBriefStatusFromTasks(ctx, task.briefId);
     }
 
     await ctx.db.insert("notifications", {

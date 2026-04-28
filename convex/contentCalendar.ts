@@ -1,6 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
+import { syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 
 // ─── BRAND-BASED CONTENT CALENDAR ──────────────
 
@@ -547,14 +549,25 @@ export const deleteSheet = mutation({
       .withIndex("by_brief", (q) => q.eq("briefId", sheet.briefId))
       .collect();
 
-    const monthTasks = tasks.filter(
-      (t) => t.postDate && t.postDate.startsWith(sheet.month)
+    // Only delete PARENT calendar entries (no parentTaskId) whose postDate
+    // is inside this month. The cascade helper then sweeps every linked
+    // child (Copy/Design helpers) regardless of their own postDate, so we
+    // never leave orphan rows behind even if a child's postDate was edited
+    // to a different month.
+    const monthParents = tasks.filter(
+      (t) =>
+        !t.parentTaskId &&
+        t.postDate &&
+        t.postDate.startsWith(sheet.month)
     );
-    for (const task of monthTasks) {
-      await ctx.db.delete(task._id);
+
+    for (const task of monthParents) {
+      await cascadeDeleteTask(ctx, task._id);
     }
 
     await ctx.db.delete(sheetId);
+
+    await syncBriefStatusFromTasks(ctx, sheet.briefId);
   },
 });
 

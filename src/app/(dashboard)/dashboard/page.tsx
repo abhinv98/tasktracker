@@ -224,6 +224,28 @@ function EmployeeTaskViews({
     else grouped.pending.push(task);
   }
 
+  // Sort each column newest-first. Falls back gracefully when a date field
+  // is missing so brand-new tasks (no assignedAt yet) still rank near the top.
+  const dateKey = (t: EmployeeTask) => {
+    const tt = t as EmployeeTask & {
+      completedAt?: number;
+      submittedForReviewAt?: number;
+      assignedAt?: number;
+      _creationTime?: number;
+    };
+    return (
+      tt.completedAt ??
+      tt.submittedForReviewAt ??
+      tt.assignedAt ??
+      t.deadline ??
+      tt._creationTime ??
+      0
+    );
+  };
+  for (const status of Object.keys(grouped)) {
+    grouped[status].sort((a, b) => dateKey(b) - dateKey(a));
+  }
+
   if (tasks.length === 0) {
     return (
       <Card>

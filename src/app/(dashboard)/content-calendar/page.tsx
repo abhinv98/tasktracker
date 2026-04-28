@@ -257,9 +257,37 @@ export default function ContentCalendarPage() {
     [updateTask, toast]
   );
 
-  const selectedTask = selectedTaskId && tasks
+  const selectedFromLocal = selectedTaskId && tasks
     ? tasks.find((t: any) => t._id === selectedTaskId)
     : null;
+
+  // Linked Copy tasks are filtered out of the calendar grid (only parent
+  // entries appear). When the sidebar requests one we fall back to a server
+  // fetch so users can open and edit the child.
+  const externalTaskDetail = useQuery(
+    api.tasks.getTaskDetail,
+    selectedTaskId && !selectedFromLocal
+      ? { taskId: selectedTaskId as Id<"tasks"> }
+      : "skip"
+  );
+
+  const selectedTask =
+    selectedFromLocal ??
+    (externalTaskDetail?.task
+      ? {
+          ...externalTaskDetail.task,
+          assigneeName:
+            externalTaskDetail.assignee?.name ??
+            externalTaskDetail.assignee?.email ??
+            "Unknown",
+          assigneeDesignation:
+            externalTaskDetail.assignee?.designation ?? "",
+          assignorName:
+            externalTaskDetail.assignedBy?.name ??
+            externalTaskDetail.assignedBy?.email ??
+            "—",
+        }
+      : null);
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -566,6 +594,7 @@ export default function ContentCalendarPage() {
               brandId={selectedBrandId as Id<"brands">}
               currentSheetMonth={monthStr}
               onClose={() => setSelectedTaskId(null)}
+              onSelectTask={(id) => setSelectedTaskId(id)}
               updateTask={updateTask}
               updateTaskStatus={updateTaskStatus}
               deleteTask={deleteTask}
