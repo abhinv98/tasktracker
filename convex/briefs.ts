@@ -3,6 +3,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
+import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
+import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -849,6 +851,55 @@ export const updateBrief = mutation({
             if (t.deadline !== newDeadline) {
               await ctx.db.patch(t._id, { deadline: newDeadline });
             }
+          }
+        }
+      }
+
+      // Brief manually flipped to "completed": cascade down so every task
+      // (and its descendants) lands in "done" too. Without this, the brief
+      // shows Completed in the list but Brief Details + employee Dashboard
+      // keep rendering tasks as review/in-progress (and worklog hides them
+      // because it filters by brief.status), producing the inconsistency
+      // reported when a brief is closed out from the dropdown.
+      const briefIsBeingCompleted =
+        fields.status === "completed" && brief.status !== "completed";
+      if (briefIsBeingCompleted) {
+        const tasksInBrief = await ctx.db
+          .query("tasks")
+          .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+          .collect();
+        const now = Date.now();
+        for (const t of tasksInBrief) {
+          if (t.status !== "done") {
+            await ctx.db.patch(t._id, {
+              status: "done",
+              completedAt: now,
+            });
+            if (t.assigneeId !== userId) {
+              await ctx.db.insert("notifications", {
+                recipientId: t.assigneeId,
+                type: "task_status_changed",
+                title: "Task auto-completed",
+                message: `"${t.title}" was marked done because the brief was marked completed.`,
+                briefId: t.briefId,
+                taskId: t._id,
+                triggeredBy: userId,
+                read: false,
+                createdAt: now,
+              });
+            }
+            await ctx.db.insert("activityLog", {
+              briefId: t.briefId,
+              taskId: t._id,
+              userId,
+              action: "auto_completed_via_brief",
+              details: JSON.stringify({ reason: "brief_marked_completed" }),
+              timestamp: now,
+            });
+          }
+          await cascadeDoneToChildren(ctx, t._id, userId, "brief_marked_completed");
+          if (user?.role === "admin") {
+            await autoApproveDeliverablesForTaskTree(ctx, t._id, userId);
           }
         }
       }
