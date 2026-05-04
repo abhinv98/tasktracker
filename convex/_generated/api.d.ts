@@ -44,6 +44,7 @@ import type * as migrations_findDuplicateUsers from "../migrations/findDuplicate
 import type * as migrations_findFaizOrphanTasks from "../migrations/findFaizOrphanTasks.js";
 import type * as migrations_findUser from "../migrations/findUser.js";
 import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
+import type * as migrations_fixCompletedBriefsWithOpenTasks from "../migrations/fixCompletedBriefsWithOpenTasks.js";
 import type * as migrations_fixDeadlines from "../migrations/fixDeadlines.js";
 import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
 import type * as migrations_inspectAdAdapt1 from "../migrations/inspectAdAdapt1.js";
@@ -114,6 +115,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/findFaizOrphanTasks": typeof migrations_findFaizOrphanTasks;
   "migrations/findUser": typeof migrations_findUser;
   "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
+  "migrations/fixCompletedBriefsWithOpenTasks": typeof migrations_fixCompletedBriefsWithOpenTasks;
   "migrations/fixDeadlines": typeof migrations_fixDeadlines;
   "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;
   "migrations/inspectAdAdapt1": typeof migrations_inspectAdAdapt1;

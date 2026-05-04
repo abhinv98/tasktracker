@@ -520,18 +520,6 @@ export default function BriefsPage() {
           <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{activeBriefs.length}</span>
         </button>
         <button
-          onClick={() => setBriefsTab("completed")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-            briefsTab === "completed"
-              ? "bg-white shadow-sm text-[var(--text-primary)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Completed
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
-        </button>
-        <button
           onClick={() => setBriefsTab("review")}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
             briefsTab === "review"
@@ -542,6 +530,18 @@ export default function BriefsPage() {
           <Eye className="h-3.5 w-3.5" />
           Review
           <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{reviewBriefs.length}</span>
+        </button>
+        <button
+          onClick={() => setBriefsTab("completed")}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            briefsTab === "completed"
+              ? "bg-white shadow-sm text-[var(--text-primary)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Completed
+          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
         </button>
       </div>
 
