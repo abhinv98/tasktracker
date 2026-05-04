@@ -152,7 +152,7 @@ export default function ApprovedWorkPage() {
             Approved Work
           </h1>
           <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-            Deliverables approved by clients
+            Deliverables approved by clients or finalized internally
           </p>
         </div>
         <button
@@ -290,6 +290,17 @@ export default function ApprovedWorkPage() {
                     {d.taskTitle}
                   </h3>
                   <Badge variant="neutral">{d.brandName}</Badge>
+                  <Badge
+                    variant={
+                      (d as any).approvalSource === "client"
+                        ? "success"
+                        : "neutral"
+                    }
+                  >
+                    {(d as any).approvalSource === "client"
+                      ? "Client approved"
+                      : "Internal approval"}
+                  </Badge>
                 </div>
                 <p className="text-[12px] text-[var(--text-secondary)] mb-1.5">
                   Brief: {d.briefTitle} &middot; Manager: {d.managerName} &middot; Submitted by: {d.submitterName}
@@ -316,10 +327,10 @@ export default function ApprovedWorkPage() {
                     <Send className="h-3 w-3" />
                     Submitted {formatDate(d.submittedAt)}
                   </span>
-                  {d.clientReviewedAt && (
+                  {((d as any).approvedAt ?? d.clientReviewedAt) && (
                     <span className="flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                      Approved {formatDate(d.clientReviewedAt)}
+                      Approved {formatDate(((d as any).approvedAt ?? d.clientReviewedAt) as number)}
                     </span>
                   )}
                 </div>
@@ -395,74 +406,95 @@ export default function ApprovedWorkPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
               {stats ? (
                 <>
+                  {/* Hero: Total Approved (anchor metric) */}
+                  <Card className="p-5 bg-emerald-50/60 border-emerald-100" accent="employee">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+                        Total Approved
+                      </p>
+                    </div>
+                    <p className="font-bold text-[36px] text-emerald-700 tabular-nums leading-none">
+                      {(stats as any).totalApproved ?? stats.clientApproved}
+                    </p>
+                    <p className="mt-2 text-[11px] text-emerald-700/70">
+                      Client-approved + finalized internally
+                    </p>
+                  </Card>
+
+                  {/* Secondary stats */}
                   <div className="grid grid-cols-2 gap-3">
-                    <Card className="p-4" accent="manager">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Send className="h-4 w-4 text-purple-500" />
-                        <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                    <Card className="p-3" accent="manager">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Send className="h-3.5 w-3.5 text-purple-500" />
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                           Sent to Client
                         </p>
                       </div>
-                      <p className="font-bold text-[28px] text-[var(--text-primary)] tabular-nums">
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
                         {stats.sentToClient}
                       </p>
                     </Card>
-                    <Card className="p-4" accent="employee">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                    <Card className="p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                           Client Approved
                         </p>
                       </div>
-                      <p className="font-bold text-[28px] text-emerald-600 tabular-nums">
+                      <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
                         {stats.clientApproved}
                       </p>
                     </Card>
                   </div>
 
-                  <div className="border-t border-[var(--border)] pt-4">
-                    <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] uppercase tracking-wider mb-3">
-                      Briefs Breakdown
-                    </h3>
-                    <div className="space-y-3">
-                      <Card className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Briefcase className="h-4 w-4 text-[var(--accent-admin)]" />
-                          <p className="text-[11px] font-medium text-[var(--text-secondary)]">
-                            Total Briefs
+                  {/* Briefs Overview */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-hover)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                        <Briefcase className="h-3 w-3" />
+                        Briefs Overview
+                      </span>
+                      <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
+                        {stats.totalBriefs} total
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Card className="p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <FolderOpen className="h-3.5 w-3.5 text-blue-500" />
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                            Internal
                           </p>
                         </div>
-                        <p className="font-bold text-[28px] text-[var(--text-primary)] tabular-nums">
-                          {stats.totalBriefs}
+                        <p className="font-bold text-[22px] text-[var(--text-primary)] tabular-nums">
+                          {stats.internalBriefs}
                         </p>
+                        <BriefsBar
+                          value={stats.internalBriefs}
+                          total={stats.totalBriefs}
+                          color="rgb(59 130 246)"
+                        />
                       </Card>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Card className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FolderOpen className="h-4 w-4 text-blue-500" />
-                            <p className="text-[11px] font-medium text-[var(--text-secondary)]">
-                              Internal
-                            </p>
-                          </div>
-                          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
-                            {stats.internalBriefs}
+                      <Card className="p-3">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ExternalLink className="h-3.5 w-3.5 text-amber-500" />
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                            Client-facing
                           </p>
-                        </Card>
-                        <Card className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <ExternalLink className="h-4 w-4 text-amber-500" />
-                            <p className="text-[11px] font-medium text-[var(--text-secondary)]">
-                              Client-facing
-                            </p>
-                          </div>
-                          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
-                            {stats.clientBriefs}
-                          </p>
-                        </Card>
-                      </div>
+                        </div>
+                        <p className="font-bold text-[22px] text-[var(--text-primary)] tabular-nums">
+                          {stats.clientBriefs}
+                        </p>
+                        <BriefsBar
+                          value={stats.clientBriefs}
+                          total={stats.totalBriefs}
+                          color="rgb(245 158 11)"
+                        />
+                      </Card>
                     </div>
                   </div>
                 </>
@@ -473,6 +505,26 @@ export default function ApprovedWorkPage() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function BriefsBar({
+  value,
+  total,
+  color,
+}: {
+  value: number;
+  total: number;
+  color: string;
+}) {
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  return (
+    <div className="mt-2 w-full h-1 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+      <div
+        className="h-full rounded-full transition-all duration-300"
+        style={{ width: `${pct}%`, backgroundColor: color }}
+      />
     </div>
   );
 }

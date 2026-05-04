@@ -580,12 +580,29 @@ export const listClientApprovedDeliverables = query({
     }
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
-    const approved = allDeliverables.filter(
-      (d) => d.clientStatus === "client_approved"
-    );
+    const tasks = await ctx.db.query("tasks").collect();
+    const tasksById = new Map(tasks.map((t) => [t._id, t]));
+
+    // Approved Work covers two flavours of "shipped":
+    //   1. Client-facing tasks where the client has explicitly approved
+    //      (`clientStatus === "client_approved"`).
+    //   2. Internal / non-client-facing tasks where the brand manager has
+    //      approved the deliverable (`status === "approved"`) and there is
+    //      no client review in flight. These never get a `clientStatus` so
+    //      the old query hid them entirely — super admins were missing
+    //      every brand whose work doesn't go through the JSR portal.
+    const approved = allDeliverables.filter((d) => {
+      if (d.clientStatus === "client_approved") return true;
+      if (d.status !== "approved") return false;
+      const task = tasksById.get(d.taskId);
+      if (!task) return false;
+      // Skip client-facing deliverables that have not yet earned a client
+      // approval — those belong to "in flight" not "approved work".
+      if (task.clientFacing) return false;
+      return true;
+    });
     if (approved.length === 0) return [];
 
-    const tasks = await ctx.db.query("tasks").collect();
     const briefs = await ctx.db.query("briefs").collect();
     const brands = await ctx.db.query("brands").collect();
     const users = await ctx.db.query("users").collect();
@@ -633,6 +650,13 @@ export const listClientApprovedDeliverables = query({
           ).filter((f) => f.url);
         }
 
+        // Approval source: client (JSR) vs internal (BM only). Used by the
+        // UI so internally-approved items don't claim a phantom client.
+        const approvalSource: "client" | "internal" =
+          d.clientStatus === "client_approved" ? "client" : "internal";
+        const approvedAt =
+          d.clientReviewedAt ?? d.reviewedAt ?? d.submittedAt;
+
         return {
           _id: d._id,
           taskTitle: task?.title ?? "Unknown",
@@ -648,6 +672,8 @@ export const listClientApprovedDeliverables = query({
           submittedAt: d.submittedAt,
           clientReviewedAt: d.clientReviewedAt,
           clientNote: d.clientNote,
+          approvalSource,
+          approvedAt,
           message: d.message,
           link: d.link,
           files,
@@ -657,7 +683,7 @@ export const listClientApprovedDeliverables = query({
 
     return results
       .filter((r): r is NonNullable<typeof r> => r !== null)
-      .sort((a, b) => (b.clientReviewedAt ?? 0) - (a.clientReviewedAt ?? 0));
+      .sort((a, b) => (b.approvedAt ?? 0) - (a.approvedAt ?? 0));
   },
 });
 
@@ -698,6 +724,15 @@ export const getApprovedWorkStats = query({
     const clientApproved = scopedDeliverables.filter(
       (d) => d.clientStatus === "client_approved"
     ).length;
+    // Total approved deliverables: client-approved OR BM-approved on a
+    // non-client-facing task (matches listClientApprovedDeliverables).
+    const tasksByIdForStats = new Map(scopedTasks.map((t) => [t._id, t]));
+    const totalApproved = scopedDeliverables.filter((d) => {
+      if (d.clientStatus === "client_approved") return true;
+      if (d.status !== "approved") return false;
+      const t = tasksByIdForStats.get(d.taskId);
+      return !!t && !t.clientFacing;
+    }).length;
 
     const totalBriefs = scopedBriefs.length;
 
@@ -712,6 +747,7 @@ export const getApprovedWorkStats = query({
     return {
       sentToClient,
       clientApproved,
+      totalApproved,
       totalBriefs,
       clientBriefs,
       internalBriefs,

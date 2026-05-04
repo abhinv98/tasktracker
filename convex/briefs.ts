@@ -69,13 +69,19 @@ export const listBriefs = query({
       const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
       const doneCount = tasksInBrief.filter((t) => t.status === "done").length;
 
-      // For single_task briefs, use the task's deadline (which may have been extended)
+      // Effective deadline: surface the underlying task's deadline whenever
+      // there is exactly one task and the brief isn't a content_calendar
+      // (those use postDate per entry, not a brief-level deadline). This
+      // covers single_task briefs AND multi-task briefs that happen to have
+      // only one task — users mentally treat that lone task's deadline as
+      // "the brief's date" and editing the row should mirror it everywhere.
       let effectiveDeadline = b.deadline;
-      if (b.briefType === "single_task" && tasksInBrief.length > 0) {
-        const taskDeadline = tasksInBrief[0].deadline;
-        if (taskDeadline !== undefined) {
-          effectiveDeadline = taskDeadline;
-        }
+      if (
+        b.briefType !== "content_calendar" &&
+        tasksInBrief.length === 1 &&
+        tasksInBrief[0].deadline !== undefined
+      ) {
+        effectiveDeadline = tasksInBrief[0].deadline;
       }
 
       return {
@@ -117,15 +123,16 @@ export const getBrief = query({
       .collect();
     const doneCount = tasks.filter((t) => t.status === "done").length;
 
-    // For single_task briefs, mirror listBriefs: the task's deadline is the
-    // source of truth. Keeps brief detail view consistent with the list view
-    // when a task deadline is edited from the task modal.
+    // Mirror listBriefs: when there's exactly one task and it isn't a
+    // content_calendar brief, the lone task's deadline is the source of
+    // truth. Covers both single_task briefs and 1-task multi-task briefs.
     let effectiveDeadline = brief.deadline;
-    if (brief.briefType === "single_task" && tasks.length > 0) {
-      const taskDeadline = tasks[0].deadline;
-      if (taskDeadline !== undefined) {
-        effectiveDeadline = taskDeadline;
-      }
+    if (
+      brief.briefType !== "content_calendar" &&
+      tasks.length === 1 &&
+      tasks[0].deadline !== undefined
+    ) {
+      effectiveDeadline = tasks[0].deadline;
     }
 
     return {

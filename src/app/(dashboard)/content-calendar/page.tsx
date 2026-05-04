@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -17,6 +17,9 @@ import {
   ExternalLink,
   AlertTriangle,
   Loader2,
+  Inbox,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   DndContext,
@@ -101,6 +104,29 @@ export default function ContentCalendarPage() {
   const [popoverDate, setPopoverDate] = useState<string | null>(null);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 
+  // Holding Tray (sheets-like staging area). Tasks added here are hidden
+  // from the calendar grid until either dropped on a day cell (which patches
+  // postDate) or removed manually. State is client-only / per-session — we
+  // never mutate `postDate` just to park a task in the tray.
+  const [trayTaskIds, setTrayTaskIds] = useState<string[]>([]);
+  const [trayCollapsed, setTrayCollapsed] = useState(false);
+  const [trayContextMenu, setTrayContextMenu] = useState<{
+    taskId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!trayContextMenu) return;
+    const close = () => setTrayContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [trayContextMenu]);
+
   const { toast } = useToast();
 
   const user = useQuery(api.users.getCurrentUser);
@@ -165,16 +191,49 @@ export default function ContentCalendarPage() {
     [brands, selectedBrandId]
   );
 
+  const trayTaskIdSet = useMemo(() => new Set(trayTaskIds), [trayTaskIds]);
+
   const tasksByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
     for (const t of tasks ?? []) {
-      if (t.postDate) {
+      if (t.postDate && !trayTaskIdSet.has(t._id)) {
         if (!map[t.postDate]) map[t.postDate] = [];
         map[t.postDate].push(t);
       }
     }
     return map;
-  }, [tasks]);
+  }, [tasks, trayTaskIdSet]);
+
+  // Tray view-models — preserve user-defined order. Tasks vanish from the
+  // tray automatically if their underlying record is no longer in scope
+  // (e.g. month switch loaded a different result set).
+  const trayTasks = useMemo(() => {
+    if (!tasks) return [];
+    const byId = new Map((tasks as any[]).map((t) => [t._id, t]));
+    return trayTaskIds
+      .map((id) => byId.get(id))
+      .filter((t): t is any => !!t);
+  }, [tasks, trayTaskIds]);
+
+  const handleAddToTray = useCallback(
+    (taskId: string) => {
+      setTrayTaskIds((prev) =>
+        prev.includes(taskId) ? prev : [...prev, taskId]
+      );
+      setTrayCollapsed(false);
+      setTrayContextMenu(null);
+      toast("info", "Moved to holding tray");
+    },
+    [toast]
+  );
+
+  const handleRemoveFromTray = useCallback((taskId: string) => {
+    setTrayTaskIds((prev) => prev.filter((id) => id !== taskId));
+  }, []);
+
+  const handleClearTray = useCallback(() => {
+    setTrayTaskIds([]);
+  }, []);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
@@ -250,6 +309,9 @@ export default function ContentCalendarPage() {
       if (!task || targetDate === task.postDate) return;
       try {
         await updateTask({ taskId: task._id as Id<"tasks">, postDate: targetDate });
+        // If this drag started from the tray, drop also removes it from
+        // the tray so it shows up on the destination cell as expected.
+        setTrayTaskIds((prev) => prev.filter((id) => id !== task._id));
         toast("success", "Entry moved");
       } catch (err: any) {
         toast("error", err.message ?? "Failed to move entry");
@@ -480,10 +542,12 @@ export default function ContentCalendarPage() {
                 })()}
               </div>
             )}
-            {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-10 bg-white">
+            {/* Weekday Headers — sticky relative to the scrolling parent.
+                Opaque bg + bottom border + shadow so cells scrolling under
+                the row are clipped cleanly instead of bleeding through. */}
+            <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-20 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] shadow-[0_2px_4px_-2px_rgba(0,0,0,0.06)]">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide bg-white">
+                <div key={d} className="text-center py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide bg-[var(--bg-primary)]">
                   {d}
                 </div>
               ))}
@@ -530,6 +594,16 @@ export default function ContentCalendarPage() {
                             setSelectedTaskId(task._id);
                             setPopoverDate(null);
                           }}
+                          onContextMenu={
+                            isEditable
+                              ? (x, y) =>
+                                  setTrayContextMenu({
+                                    taskId: task._id,
+                                    x,
+                                    y,
+                                  })
+                              : undefined
+                          }
                         />
                       ))}
                       {dayTasks.length > 2 && (
@@ -615,7 +689,39 @@ export default function ContentCalendarPage() {
         <DragOverlay dropAnimation={null}>
           {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
         </DragOverlay>
+        {trayTasks.length > 0 && (
+          <HoldingTray
+            tasks={trayTasks}
+            collapsed={trayCollapsed}
+            onToggle={() => setTrayCollapsed((v) => !v)}
+            onRemove={handleRemoveFromTray}
+            onClear={handleClearTray}
+            onSelectTask={(id) => setSelectedTaskId(id)}
+            isDragEnabled={!!isEditable}
+          />
+        )}
         </DndContext>
+      )}
+
+      {/* Right-click → "Move to Holding Tray" popover for calendar cards. */}
+      {trayContextMenu && (
+        <div
+          className="fixed z-50 rounded-lg shadow-lg border border-[var(--border)] bg-white py-1 text-[12px]"
+          style={{
+            left: Math.min(trayContextMenu.x, window.innerWidth - 200),
+            top: Math.min(trayContextMenu.y, window.innerHeight - 60),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => handleAddToTray(trayContextMenu.taskId)}
+            className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
+          >
+            <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            Move to Holding Tray
+          </button>
+        </div>
       )}
 
       {/* Add Entry Modal */}
@@ -846,11 +952,13 @@ function DraggableTaskCard({
   isSelected,
   isDragEnabled,
   onClick,
+  onContextMenu,
 }: {
   task: any;
   isSelected: boolean;
   isDragEnabled: boolean;
   onClick: () => void;
+  onContextMenu?: (clientX: number, clientY: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task._id,
@@ -868,6 +976,15 @@ function DraggableTaskCard({
         e.stopPropagation();
         onClick();
       }}
+      onContextMenu={
+        onContextMenu
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onContextMenu(e.clientX, e.clientY);
+            }
+          : undefined
+      }
       className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
         isSelected ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
       } ${isDragging ? "opacity-30" : ""} ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -1004,6 +1121,143 @@ function DayPopover({
         </div>
       </div>
     </>
+  );
+}
+
+/* ────── Holding Tray ────── */
+
+function HoldingTray({
+  tasks,
+  collapsed,
+  onToggle,
+  onRemove,
+  onClear,
+  onSelectTask,
+  isDragEnabled,
+}: {
+  tasks: any[];
+  collapsed: boolean;
+  onToggle: () => void;
+  onRemove: (taskId: string) => void;
+  onClear: () => void;
+  onSelectTask: (taskId: string) => void;
+  isDragEnabled: boolean;
+}) {
+  return (
+    <div className="fixed bottom-4 right-4 z-30 w-[280px] rounded-xl shadow-xl border border-[var(--border)] bg-white">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2">
+          <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+            Holding Tray
+          </span>
+          <span className="text-[10px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
+            {tasks.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          {tasks.length > 0 && !collapsed && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] px-1.5 py-0.5 rounded"
+              title="Clear all"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggle}
+            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+            aria-label={collapsed ? "Expand tray" : "Collapse tray"}
+          >
+            {collapsed ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      </div>
+      {!collapsed && (
+        <div className="p-2 max-h-[260px] overflow-y-auto flex flex-col gap-1.5">
+          {tasks.map((task) => (
+            <TrayChip
+              key={task._id}
+              task={task}
+              onRemove={() => onRemove(task._id)}
+              onClick={() => onSelectTask(task._id)}
+              isDragEnabled={isDragEnabled}
+            />
+          ))}
+          <p className="text-[10px] text-[var(--text-muted)] px-1 mt-1">
+            Drag a chip onto any day to place it. Tasks here are hidden from
+            the grid until placed.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrayChip({
+  task,
+  onRemove,
+  onClick,
+  isDragEnabled,
+}: {
+  task: any;
+  onRemove: () => void;
+  onClick: () => void;
+  isDragEnabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `tray-${task._id}`,
+    data: { task },
+    disabled: !isDragEnabled,
+  });
+
+  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...(isDragEnabled ? { ...listeners, ...attributes } : {})}
+      className={`flex items-center gap-1.5 px-2 py-1 rounded-md border border-[var(--border-subtle)] ${
+        isDragging ? "opacity-30" : ""
+      } ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
+      style={{ backgroundColor: sc.bg }}
+    >
+      <div
+        className="w-1.5 h-1.5 rounded-full shrink-0"
+        style={{ backgroundColor: sc.dot }}
+      />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className="flex-1 text-left text-[11px] font-medium text-[var(--text-primary)] truncate"
+      >
+        {task.title}
+      </button>
+      <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[60px]">
+        {task.platform}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/60"
+        title="Remove from tray (no date change)"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 

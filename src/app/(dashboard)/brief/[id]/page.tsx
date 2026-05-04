@@ -468,6 +468,7 @@ export default function BriefPage() {
   const user = useQuery(api.users.getCurrentUser);
 
   const createTask = useMutation(api.tasks.createTask);
+  const updateTask = useMutation(api.tasks.updateTask);
   const updateBrief = useMutation(api.briefs.updateBrief);
   const archiveBrief = useMutation(api.briefs.archiveBrief);
   const deleteBrief = useMutation(api.briefs.deleteBrief);
@@ -650,10 +651,24 @@ export default function BriefPage() {
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {isAdmin && brief.status !== "archived" && (
             <>
-              {/* Deadline picker */}
+              {/* Deadline picker — for 1-task non-content_calendar briefs,
+                  edit the lone task's deadline directly so dashboard / Work
+                  Log views (which read task.deadline) stay in sync. For
+                  multi-task briefs, edit the brief's overall deadline. */}
               <DatePicker
                 value={brief.deadline}
-                onChange={(deadline) => updateBrief({ briefId, deadline })}
+                onChange={(deadline) => {
+                  const tasks = (tasksData ?? []) as Array<{ _id: Id<"tasks"> }>;
+                  if (
+                    deadline !== undefined &&
+                    brief.briefType !== "content_calendar" &&
+                    tasks.length === 1
+                  ) {
+                    updateTask({ taskId: tasks[0]._id, deadline });
+                  } else {
+                    updateBrief({ briefId, deadline });
+                  }
+                }}
                 placeholder="Set deadline"
                 className="w-[140px]"
               />
