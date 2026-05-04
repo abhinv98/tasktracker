@@ -5,6 +5,7 @@ import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncB
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
+import { ensureSheetForMonth } from "./contentCalendar";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -258,6 +259,24 @@ export const updateTask = mutation({
         const newDeadline = updates.deadline as number | undefined;
         if (newDeadline !== brief.deadline) {
           await ctx.db.patch(task.briefId, { deadline: newDeadline });
+        }
+      }
+
+      // Content calendar: when a parent entry's go-live date moves to a
+      // different month (e.g. April → May), auto-create the destination
+      // month sheet if missing so the row appears under the correct tab
+      // instead of silently disappearing. Without this, users had to
+      // delete and recreate the entry to move it across months.
+      const postDateChanged = "postDate" in updates;
+      if (
+        postDateChanged &&
+        brief?.briefType === "content_calendar" &&
+        !task.parentTaskId
+      ) {
+        const newPostDate = updates.postDate as string | undefined;
+        if (newPostDate && /^\d{4}-\d{2}-\d{2}$/.test(newPostDate)) {
+          const newMonth = newPostDate.slice(0, 7);
+          await ensureSheetForMonth(ctx, task.briefId, newMonth, userId);
         }
       }
 

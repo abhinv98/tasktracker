@@ -55,7 +55,7 @@ async function getOrCreateCalendarBrief(
 }
 
 /** Ensure a month sheet exists for this brief (YYYY-MM). Used by create entry mutations. */
-async function ensureSheetForMonth(
+export async function ensureSheetForMonth(
   ctx: any,
   briefId: any,
   month: string,

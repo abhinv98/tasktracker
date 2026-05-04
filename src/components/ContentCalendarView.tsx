@@ -1588,8 +1588,6 @@ export function ContentCalendarEntrySidebar({
             <input
               type="date"
               value={editPostDate}
-              min={currentSheetMonth ? monthDateBounds(currentSheetMonth).min : undefined}
-              max={currentSheetMonth ? monthDateBounds(currentSheetMonth).max : undefined}
               onChange={(e) => setEditPostDate(e.target.value)}
               className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             />
