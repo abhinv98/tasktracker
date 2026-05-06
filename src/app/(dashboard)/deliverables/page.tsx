@@ -24,6 +24,7 @@ export default function DeliverablesPage() {
   const approveDeliverable = useMutation(api.approvals.approveDeliverable);
   const rejectDeliverable = useMutation(api.approvals.rejectDeliverable);
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
+  const editDeliverableMut = useMutation(api.approvals.editDeliverable);
   const deleteDeliverableMutation = useMutation(api.approvals.deleteDeliverable);
   const teamLeadApproveMut = useMutation(api.approvals.teamLeadApprove);
   const teamLeadRejectMut = useMutation(api.approvals.teamLeadReject);
@@ -65,6 +66,8 @@ export default function DeliverablesPage() {
   const [submitMessage, setSubmitMessage] = useState("");
   const [submitLink, setSubmitLink] = useState("");
   const [submitFiles, setSubmitFiles] = useState<File[]>([]);
+  const [editingDeliverableId, setEditingDeliverableId] = useState<string | null>(null);
+  const [editKeptFiles, setEditKeptFiles] = useState<{ name: string; url: string }[]>([]);
 
   const allTeams = useQuery(api.teams.listTeams, {});
   const allUsers = useQuery(api.users.listAllUsers, {});
@@ -145,16 +148,29 @@ export default function DeliverablesPage() {
     return true;
   }) ?? [];
 
+  // Resolve master-brief connectivity for every visible task in one query.
+  // Used to decide per-card whether to hide / alert+show / show the handoff button.
+  const allHandoffTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const d of filteredDeliverables) ids.add(d.taskId as string);
+    for (const d of (managerDeliverables ?? []) as any[]) ids.add(d.taskId as string);
+    return Array.from(ids);
+  }, [filteredDeliverables, managerDeliverables]);
+
+  const handoffContexts = useQuery(
+    api.approvals.listHandoffContextsForTasks,
+    allHandoffTaskIds.length > 0 ? { taskIds: allHandoffTaskIds as Id<"tasks">[] } : "skip"
+  );
+
   const deliverableHandoffContext = useMemo(() => {
     if (!handoffDeliverableId) return null;
     const pool = [...filteredDeliverables, ...((managerDeliverables ?? []) as any[])];
     const row = pool.find((x: any) => x._id === handoffDeliverableId);
-    if (!row?.briefId) return null;
-    if (row.briefType === "single_task") return null;
+    if (!row?.taskId) return null;
     const tid = handoffTeam[handoffDeliverableId];
     const aid = handoffAssignee[handoffDeliverableId];
     if (!tid || !aid) return null;
-    return { briefId: row.briefId as Id<"briefs">, assigneeId: aid as Id<"users"> };
+    return { taskId: row.taskId as Id<"tasks">, assigneeId: aid as Id<"users"> };
   }, [handoffDeliverableId, handoffTeam, handoffAssignee, filteredDeliverables, managerDeliverables]);
 
   const deliverableHandoffCandidates = useQuery(
@@ -166,12 +182,11 @@ export default function DeliverablesPage() {
     if (!handoffTaskId) return null;
     const g = managerGroupedByTask.find((x) => x.taskId === handoffTaskId);
     const row = g?.first;
-    if (!row?.briefId) return null;
-    if (row.briefType === "single_task") return null;
+    if (!row?.taskId) return null;
     const tid = handoffTeam[handoffTaskId];
     const aid = handoffAssignee[handoffTaskId];
     if (!tid || !aid) return null;
-    return { briefId: row.briefId as Id<"briefs">, assigneeId: aid as Id<"users"> };
+    return { taskId: row.taskId as Id<"tasks">, assigneeId: aid as Id<"users"> };
   }, [handoffTaskId, handoffTeam, handoffAssignee, managerGroupedByTask]);
 
   const taskHandoffCandidates = useQuery(
@@ -292,33 +307,71 @@ export default function DeliverablesPage() {
     }
   }
 
+  function resetSubmitForm() {
+    setShowSubmit(false);
+    setEditingDeliverableId(null);
+    setSubmitTaskId("");
+    setSubmitMessage("");
+    setSubmitLink("");
+    setSubmitFiles([]);
+    setEditKeptFiles([]);
+  }
+
+  function openEdit(d: any) {
+    setEditingDeliverableId(d._id);
+    setShowSubmit(true);
+    setSubmitTaskId(d.taskId);
+    setSubmitMessage(d.message ?? "");
+    setSubmitLink(d.link ?? "");
+    setSubmitFiles([]);
+    setEditKeptFiles((d.files ?? []) as { name: string; url: string }[]);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!submitTaskId || !submitMessage.trim()) return;
+    if (!submitMessage.trim()) return;
+    if (!editingDeliverableId && !submitTaskId) return;
 
-    let fileIds: Id<"_storage">[] = [];
-    let fileNames: string[] = [];
+    let newFileIds: Id<"_storage">[] = [];
+    let newFileNames: string[] = [];
     if (submitFiles.length > 0) {
       for (const file of submitFiles) {
         const url = await generateUploadUrl();
         const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
         const { storageId } = await res.json();
-        fileIds.push(storageId);
-        fileNames.push(file.name);
+        newFileIds.push(storageId);
+        newFileNames.push(file.name);
       }
+    }
+
+    if (editingDeliverableId) {
+      // Edit mode: combined existing-kept files (filenames only — URLs are derived)
+      // are not included since we cannot recover Convex storageIds from URLs.
+      // To keep edit simple and predictable, an edit replaces the file set with
+      // exactly the newly uploaded files. If the submitter wants to keep an old
+      // file, they must re-upload. Trade-off documented in the plan.
+      try {
+        await editDeliverableMut({
+          deliverableId: editingDeliverableId as Id<"deliverables">,
+          message: submitMessage.trim(),
+          link: submitLink || undefined,
+          ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
+        });
+        toast("success", "Deliverable updated");
+        resetSubmitForm();
+      } catch (err) {
+        toast("error", err instanceof Error ? err.message : "Could not update deliverable");
+      }
+      return;
     }
 
     await submitDeliverable({
       taskId: submitTaskId as any,
       message: submitMessage.trim(),
       link: submitLink || undefined,
-      ...(fileIds.length > 0 ? { fileIds, fileNames } : {}),
+      ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
     });
-    setShowSubmit(false);
-    setSubmitTaskId("");
-    setSubmitMessage("");
-    setSubmitLink("");
-    setSubmitFiles([]);
+    resetSubmitForm();
   }
 
   const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
@@ -441,19 +494,21 @@ export default function DeliverablesPage() {
       {showSubmit && (
         <Card className="p-4">
           <h3 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
-            Submit a Deliverable
+            {editingDeliverableId ? "Edit Deliverable" : "Submit a Deliverable"}
           </h3>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <select
-              value={submitTaskId}
-              onChange={(e) => setSubmitTaskId(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-            >
-              <option value="">Select task...</option>
-              {myTasks?.filter((t) => t.status !== "done").map((t) => (
-                <option key={t._id} value={t._id}>{t.title} ({t.briefName})</option>
-              ))}
-            </select>
+            {!editingDeliverableId && (
+              <select
+                value={submitTaskId}
+                onChange={(e) => setSubmitTaskId(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              >
+                <option value="">Select task...</option>
+                {myTasks?.filter((t) => t.status !== "done").map((t) => (
+                  <option key={t._id} value={t._id}>{t.title} ({t.briefName})</option>
+                ))}
+              </select>
+            )}
             <textarea
               value={submitMessage}
               onChange={(e) => setSubmitMessage(e.target.value)}
@@ -467,10 +522,24 @@ export default function DeliverablesPage() {
               placeholder="Link (optional)"
               className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
+            {editingDeliverableId && editKeptFiles.length > 0 && (
+              <div className="px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                <div className="font-medium mb-1">Existing files on this deliverable:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {editKeptFiles.map((f, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white text-[11px] text-amber-900">
+                      <FileText className="h-3 w-3" />
+                      <span className="max-w-[200px] truncate">{f.name}</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-1.5 italic">Uploading new files will replace this set. Re-upload anything you want to keep.</div>
+              </div>
+            )}
             <div>
               <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                 <Paperclip className="h-3.5 w-3.5" />
-                Attach files (images, PDFs, etc.)
+                {editingDeliverableId ? "Replace files (optional)" : "Attach files (images, PDFs, etc.)"}
                 <input
                   type="file"
                   multiple
@@ -501,8 +570,8 @@ export default function DeliverablesPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button type="submit" variant="primary">Submit</Button>
-              <Button type="button" variant="secondary" onClick={() => setShowSubmit(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">{editingDeliverableId ? "Save Changes" : "Submit"}</Button>
+              <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
             </div>
           </form>
         </Card>
@@ -624,8 +693,40 @@ export default function DeliverablesPage() {
                   </div>
                 )}
 
-                {/* Admin actions: final approve/reject for pending deliverables */}
-                {isAdmin && status === "pending" && (
+                {/* Submitter can edit their own deliverable while no reviewer has acted yet */}
+                {(() => {
+                  const isOwnSubmission = d.submittedBy === user?._id;
+                  const tlNotActed =
+                    !isSubTask &&
+                    (d as any).teamLeadStatus === "pending" &&
+                    !(d as any).teamLeadReviewedAt;
+                  const maNotActed =
+                    isSubTask &&
+                    (d as any).mainAssigneeStatus === "pending" &&
+                    !(d as any).mainAssigneeReviewedAt;
+                  const canEdit =
+                    isOwnSubmission &&
+                    status !== "approved" &&
+                    status !== "rejected" &&
+                    (tlNotActed || maNotActed);
+                  if (!canEdit) return null;
+                  return (
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                      <button
+                        onClick={() => openEdit(d)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--accent-admin)] text-[var(--accent-admin)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <span className="text-[11px] text-[var(--text-muted)] italic">
+                        {isSubTask ? "Editable until main assignee reviews" : "Editable until team lead reviews"}
+                      </span>
+                    </div>
+                  );
+                })()}
+
+                {/* Admin actions: final approve/reject for pending deliverables (never on your own submissions) */}
+                {isAdmin && status === "pending" && d.submittedBy !== user?._id && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                     <button
                       onClick={() => handleApprove(d._id)}
@@ -648,9 +749,18 @@ export default function DeliverablesPage() {
                   </div>
                 )}
 
-                {/* Hand off approved deliverable to another team */}
-                {(isAdmin || isBrandManager) && (status === "approved" || (d as any).clientStatus === "client_approved") && (
+                {/* Hand off approved deliverable to another team — gated by master-brief connectivity */}
+                {(isAdmin || isBrandManager) && (status === "approved" || (d as any).clientStatus === "client_approved") && (() => {
+                  const hctx = handoffContexts?.[d.taskId as string];
+                  // Master brief WITH downstream connection → hide entirely; resources auto-flow.
+                  if (hctx?.inMasterBrief && hctx?.hasDownstreamConnection) return null;
+                  return (
                   <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                    {hctx?.inMasterBrief && !hctx?.hasDownstreamConnection && (
+                      <div className="mb-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                        This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor — you can hand off manually below for now.
+                      </div>
+                    )}
                     <button
                       onClick={() => setHandoffDeliverableId(handoffDeliverableId === d._id ? null : d._id)}
                       className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
@@ -710,11 +820,10 @@ export default function DeliverablesPage() {
                           </select>
                         )}
                         {handoffTeam[d._id] && handoffAssignee[d._id] && (() => {
-                          const isSingle = (d as any).briefType === "single_task";
                           const opts = deliverableHandoffCandidates ?? [];
-                          const needPick = !isSingle && opts.length > 0;
+                          const needPick = opts.length > 0;
                           const choice = handoffTargetChoice[d._id] ?? "";
-                          const showNewFields = isSingle || opts.length === 0 || choice === "__new__";
+                          const showNewFields = opts.length === 0 || choice === "__new__";
                           const canSubmit =
                             handoffTeam[d._id] &&
                             handoffAssignee[d._id] &&
@@ -741,8 +850,8 @@ export default function DeliverablesPage() {
                                   </select>
                                 </div>
                               )}
-                              {!isSingle && opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person on this brief — a new handoff task will be created.</p>
+                              {opts.length === 0 && (
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person — a new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -789,10 +898,9 @@ export default function DeliverablesPage() {
                                     const teamId = handoffTeam[d._id];
                                     const assigneeId = handoffAssignee[d._id];
                                     if (!teamId || !assigneeId) return;
-                                    const isS = (d as any).briefType === "single_task";
                                     const o = deliverableHandoffCandidates ?? [];
                                     const ch = handoffTargetChoice[d._id] ?? "";
-                                    const isNew = isS || o.length === 0 || ch === "__new__";
+                                    const isNew = o.length === 0 || ch === "__new__";
                                     try {
                                       const payload: Record<string, unknown> = {
                                         deliverableId: d._id as Id<"deliverables">,
@@ -873,7 +981,8 @@ export default function DeliverablesPage() {
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
               </Card>
             );
           })}
@@ -1365,20 +1474,36 @@ export default function DeliverablesPage() {
                       })()}
 
                       {/* Task-level Hand Off button (hands off ALL approved deliverables) */}
-                      {(allApproved || d.taskHasHandoffTarget) && !allHandedOff && (
-                        <button
-                          onClick={() => { setHandoffTaskId(handoffTaskId === group.taskId ? null : group.taskId); }}
-                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
-                            handoffTaskId === group.taskId
-                              ? "bg-indigo-600 text-white"
-                              : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                          }`}
-                        >
-                          <GitBranch className="h-3.5 w-3.5" />
-                          Hand Off to Team{isMultiCreative ? ` (all ${deliverables.filter((x: any) => !x.isHandedOff).length} creatives)` : ""}
-                        </button>
-                      )}
+                      {(allApproved || d.taskHasHandoffTarget) && !allHandedOff && (() => {
+                        const hctx = handoffContexts?.[group.taskId as string];
+                        // Master brief WITH downstream connection → hide entirely; resources auto-flow.
+                        if (hctx?.inMasterBrief && hctx?.hasDownstreamConnection) return null;
+                        return (
+                          <button
+                            onClick={() => { setHandoffTaskId(handoffTaskId === group.taskId ? null : group.taskId); }}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                              handoffTaskId === group.taskId
+                                ? "bg-indigo-600 text-white"
+                                : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                            }`}
+                          >
+                            <GitBranch className="h-3.5 w-3.5" />
+                            Hand Off to Team{isMultiCreative ? ` (all ${deliverables.filter((x: any) => !x.isHandedOff).length} creatives)` : ""}
+                          </button>
+                        );
+                      })()}
                     </div>
+
+                    {/* Master-brief unconnected-node alert */}
+                    {(() => {
+                      const hctx = handoffContexts?.[group.taskId as string];
+                      if (!hctx?.inMasterBrief || hctx?.hasDownstreamConnection) return null;
+                      return (
+                        <div className="mt-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                          This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor — you can hand off manually below for now.
+                        </div>
+                      );
+                    })()}
 
                     {/* Task-level Handoff form — hands off ALL un-handed-off deliverables */}
                     {handoffTaskId === group.taskId && (
@@ -1432,11 +1557,10 @@ export default function DeliverablesPage() {
                         )}
                         {handoffTeam[group.taskId] && handoffAssignee[group.taskId] && (() => {
                           const tk = group.taskId;
-                          const isSingle = (d as any).briefType === "single_task";
                           const opts = taskHandoffCandidates ?? [];
-                          const needPick = !isSingle && opts.length > 0;
+                          const needPick = opts.length > 0;
                           const choice = handoffTargetChoice[tk] ?? "";
-                          const showNewFields = isSingle || opts.length === 0 || choice === "__new__";
+                          const showNewFields = opts.length === 0 || choice === "__new__";
                           const canSubmit = handoffTeam[tk] && handoffAssignee[tk] && (!needPick || choice);
                           return (
                             <>
@@ -1460,8 +1584,8 @@ export default function DeliverablesPage() {
                                   </select>
                                 </div>
                               )}
-                              {!isSingle && opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person on this brief — a new handoff task will be created.</p>
+                              {opts.length === 0 && (
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person — a new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -1508,10 +1632,9 @@ export default function DeliverablesPage() {
                                     const teamId = handoffTeam[tk];
                                     const assigneeId = handoffAssignee[tk];
                                     if (!teamId || !assigneeId) return;
-                                    const isS = (d as any).briefType === "single_task";
                                     const o = taskHandoffCandidates ?? [];
                                     const ch = handoffTargetChoice[tk] ?? "";
-                                    const isNew = isS || o.length === 0 || ch === "__new__";
+                                    const isNew = o.length === 0 || ch === "__new__";
                                     try {
                                       const toHandoff = deliverables.filter((x: any) =>
                                         (x.status === "approved" || x.teamLeadStatus === "approved") && !x.isHandedOff

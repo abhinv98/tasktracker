@@ -32,6 +32,48 @@ async function propagateResourcesToDownstreamTasks(
   }
 }
 
+/**
+ * Shared post-approval cascade: when a deliverable becomes status === "approved",
+ * check whether all sibling deliverables on the task are approved and, if so,
+ * mark the task done (or review for client-facing), cascade to children, auto-
+ * approve descendant deliverables, and propagate resources downstream. Mirrors
+ * the block at the tail of teamLeadAndManagerApprove / managerApproveFromTeamLead /
+ * approveDeliverable so the new submission-auto-approve path stays consistent.
+ */
+async function finalizeApprovedDeliverable(
+  ctx: any,
+  taskId: Id<"tasks">,
+  briefId: Id<"briefs">,
+  triggeredByUserId: Id<"users">,
+  now: number
+) {
+  const allTaskDeliverables = await ctx.db
+    .query("deliverables")
+    .withIndex("by_task", (q: any) => q.eq("taskId", taskId))
+    .collect();
+  const allApproved = allTaskDeliverables.every((d: any) => d.status === "approved");
+
+  if (allApproved) {
+    const task = await ctx.db.get(taskId);
+    if (task?.clientFacing) {
+      await ctx.db.patch(taskId, { status: "review" });
+      await syncSingleTaskBriefStatus(ctx, briefId, "review");
+    } else {
+      await ctx.db.patch(taskId, {
+        status: "done",
+        completedAt: now,
+      });
+      await syncSingleTaskBriefStatus(ctx, briefId, "done");
+      await syncMultiTaskBriefStatus(ctx, briefId, taskId);
+
+      await cascadeDoneToChildren(ctx, taskId, triggeredByUserId);
+      await autoApproveDeliverablesForTaskTree(ctx, taskId, triggeredByUserId);
+    }
+    await propagateResourcesToDownstreamTasks(ctx, taskId, briefId);
+  }
+  await syncBriefStatusFromTasks(ctx, briefId);
+}
+
 // ─── Helper: find team lead for a user ─────────────
 async function findTeamLeadForUser(ctx: any, userId: string) {
   const userTeams = await ctx.db
@@ -54,6 +96,17 @@ async function findTeamLeadForUser(ctx: any, userId: string) {
 async function isBrandManager(ctx: any, userId: string, brandId: string) {
   const user = await ctx.db.get(userId);
   if (user && (user as any).isSuperAdmin === true) return true;
+  const bms = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_brand", (q: any) => q.eq("brandId", brandId))
+    .collect();
+  return bms.some((bm: any) => bm.managerId === userId);
+}
+
+// Strict brand-manager check: ignores the super-admin shortcut.
+// Used only by self-approval / TL-auto-skip detection so a super-admin who
+// happens to submit a deliverable isn't auto-treated as a peer BM.
+async function isExplicitBrandManager(ctx: any, userId: string, brandId: string) {
   const bms = await ctx.db
     .query("brandManagers")
     .withIndex("by_brand", (q: any) => q.eq("brandId", brandId))
@@ -196,7 +249,8 @@ export const listTeamLeadPendingApprovals = query({
       (d) =>
         (d.teamLeadStatus === "pending" ||
           (d.teamLeadStatus === "approved" && !d.passedToManagerAt)) &&
-        teamMemberIds.has(d.submittedBy)
+        teamMemberIds.has(d.submittedBy) &&
+        d.submittedBy !== userId
     );
 
     const users = await ctx.db.query("users").collect();
@@ -314,6 +368,7 @@ export const listManagerDeliverables = query({
     // - "with manager" (pending or approved)
     // - Approved but not yet handed off (when task has handoffTargetTeamId) — Bug 8 fix
     const passed = allDeliverables.filter((d) => {
+      if (d.submittedBy === userId) return false;
       if (d.teamLeadStatus !== "approved") return false;
       if (d.status === "rejected") return false;
       // Keep approved deliverables visible if they still need handoff
@@ -555,7 +610,10 @@ export const getTeamLeadPendingCount = query({
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
     return allDeliverables.filter(
-      (d) => d.teamLeadStatus === "pending" && teamMemberIds.has(d.submittedBy)
+      (d) =>
+        d.teamLeadStatus === "pending" &&
+        teamMemberIds.has(d.submittedBy) &&
+        d.submittedBy !== userId
     ).length;
   },
 });
@@ -780,59 +838,178 @@ export const submitDeliverable = mutation({
       parentTask = await ctx.db.get(task.parentTaskId!);
     }
 
-    const deliverableId = await ctx.db.insert("deliverables", {
+    // Resolve the submitter's role overlap with the gates this deliverable
+    // would otherwise pass through. Any gate the submitter would own gets
+    // auto-cleared with an audit note so nobody approves their own work.
+    const brief = await ctx.db.get(task.briefId);
+    const brandId = brief?.brandId ?? null;
+    const submitterIsMainAssignee = isSubTask && parentTask?.assigneeId === userId;
+    const teamInfo = await findTeamLeadForUser(ctx, userId);
+    const submitterIsTL = !!(teamInfo && teamInfo.leadId === userId);
+    const peerBMs = brandId
+      ? (await ctx.db
+          .query("brandManagers")
+          .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+          .collect()).filter((bm) => bm.managerId !== userId)
+      : [];
+    const submitterIsBM = brandId
+      ? await isExplicitBrandManager(ctx, userId, brandId)
+      : false;
+    const submitterIsSoleBM = submitterIsBM && peerBMs.length === 0;
+
+    const now = Date.now();
+    const insert: Record<string, any> = {
       taskId,
       submittedBy: userId,
       message,
       link,
-      submittedAt: Date.now(),
+      submittedAt: now,
       status: "pending",
-      ...(isSubTask
-        ? { mainAssigneeStatus: "pending" as const }
-        : { teamLeadStatus: "pending" as const }),
       ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
       ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
       ...(r2FileKeys && r2FileKeys.length > 0 ? { r2FileKeys } : {}),
       ...(r2FileNames && r2FileNames.length > 0 ? { r2FileNames } : {}),
-    });
+    };
+
+    // Layer the gates from innermost (sub-task main-assignee) outward.
+    if (isSubTask) {
+      if (submitterIsMainAssignee) {
+        // Sub-task helper IS their own main assignee — clear that gate and
+        // route straight to TL.
+        insert.mainAssigneeStatus = "approved";
+        insert.mainAssigneeReviewedBy = userId;
+        insert.mainAssigneeReviewNote = "Auto-cleared: submitter is the main assignee";
+        insert.mainAssigneeReviewedAt = now;
+        insert.teamLeadStatus = "pending";
+      } else {
+        insert.mainAssigneeStatus = "pending";
+      }
+    } else {
+      insert.teamLeadStatus = "pending";
+    }
+
+    // TL gate
+    const tlGatePending = insert.teamLeadStatus === "pending";
+    if (tlGatePending && submitterIsTL) {
+      insert.teamLeadStatus = "approved";
+      insert.teamLeadReviewedBy = userId;
+      insert.teamLeadReviewNote = "Auto-cleared: submitter is the team lead";
+      insert.teamLeadReviewedAt = now;
+      insert.passedToManagerBy = userId;
+      insert.passedToManagerAt = now;
+    }
+
+    // BM gate — only if the TL gate is now resolved (either by approval or auto-skip)
+    // and the brief actually has a brand attached (matches teamLeadAndManagerApprove guard).
+    const tlResolved = insert.teamLeadStatus === "approved";
+    const fullAutoApprove = tlResolved && submitterIsBM && !!brandId;
+    if (fullAutoApprove) {
+      insert.status = "approved";
+      insert.reviewedBy = userId;
+      insert.reviewNote = submitterIsSoleBM
+        ? "Auto-cleared: submitter is the sole BM for this brand"
+        : "Auto-cleared: submitter is a brand manager";
+      insert.reviewedAt = now;
+    }
+
+    const deliverableId = await ctx.db.insert("deliverables", insert as any);
 
     if (task.status !== "done" && task.status !== "review") {
       await ctx.db.patch(taskId, {
         status: "review",
-        ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
+        ...(!task.submittedForReviewAt ? { submittedForReviewAt: now } : {}),
       });
     } else if (!task.submittedForReviewAt) {
-      await ctx.db.patch(taskId, { submittedForReviewAt: Date.now() });
+      await ctx.db.patch(taskId, { submittedForReviewAt: now });
+    }
+
+    // Run the shared post-approval cascade if we just landed in approved state.
+    if (fullAutoApprove) {
+      await finalizeApprovedDeliverable(ctx, taskId, task.briefId, userId, now);
     }
 
     const user = await ctx.db.get(userId);
+    const submitterName = user?.name ?? "Someone";
 
-    if (isSubTask && parentTask) {
+    // Notification routing depends on which gate is the "next" one.
+    if (fullAutoApprove) {
+      // Submission already fully approved. Tell the submitter so they have a record;
+      // log activity for audit trail.
       await ctx.db.insert("notifications", {
-        recipientId: parentTask.assigneeId,
-        type: "deliverable_submitted",
-        title: "Helper deliverable for review",
-        message: `${user?.name ?? "Someone"} submitted a deliverable for their sub-task on "${parentTask.title}"`,
+        recipientId: userId,
+        type: "deliverable_approved",
+        title: "Deliverable auto-approved",
+        message: `Your deliverable for "${task.title}" was auto-approved because you hold all review gates.`,
         briefId: task.briefId,
         taskId,
         triggeredBy: userId,
         read: false,
-        createdAt: Date.now(),
+        createdAt: now,
+      });
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId,
+        userId,
+        action: "deliverable_auto_approved_on_submission",
+        details: JSON.stringify({
+          taskTitle: task.title,
+          briefTitle: brief?.title,
+          reason: "submitter_holds_all_gates",
+          soleBM: submitterIsSoleBM,
+        }),
+        timestamp: now,
+      });
+    } else if (tlResolved) {
+      // TL gate auto-cleared. Notify peer BMs of the brand (excluding submitter).
+      for (const bm of peerBMs) {
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "deliverable_submitted",
+          title: "Deliverable ready for brand-manager review",
+          message: `${submitterName} submitted a deliverable for "${task.title}". Their team-lead gate auto-cleared.`,
+          briefId: task.briefId,
+          taskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: now,
+        });
+      }
+      if (submitterIsTL) {
+        await ctx.db.insert("activityLog", {
+          briefId: task.briefId,
+          taskId,
+          userId,
+          action: "team_lead_auto_approved_on_submission",
+          details: JSON.stringify({ taskTitle: task.title, briefTitle: brief?.title }),
+          timestamp: now,
+        });
+      }
+    } else if (isSubTask && parentTask) {
+      // Standard sub-task path: notify parent task's main assignee.
+      await ctx.db.insert("notifications", {
+        recipientId: parentTask.assigneeId,
+        type: "deliverable_submitted",
+        title: "Helper deliverable for review",
+        message: `${submitterName} submitted a deliverable for their sub-task on "${parentTask.title}"`,
+        briefId: task.briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: now,
       });
     } else {
-      const teamInfo = await findTeamLeadForUser(ctx, userId);
-
+      // Standard top-level path: notify the submitter's TL and the assigner.
       if (teamInfo?.leadId) {
         await ctx.db.insert("notifications", {
           recipientId: teamInfo.leadId,
           type: "deliverable_submitted",
           title: "Deliverable submitted for review",
-          message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
+          message: `${submitterName} submitted a deliverable for "${task.title}"`,
           briefId: task.briefId,
           taskId,
           triggeredBy: userId,
           read: false,
-          createdAt: Date.now(),
+          createdAt: now,
         });
       }
 
@@ -841,17 +1018,76 @@ export const submitDeliverable = mutation({
           recipientId: task.assignedBy,
           type: "deliverable_submitted",
           title: "Deliverable submitted",
-          message: `${user?.name ?? "Someone"} submitted a deliverable for "${task.title}"`,
+          message: `${submitterName} submitted a deliverable for "${task.title}"`,
           briefId: task.briefId,
           taskId,
           triggeredBy: userId,
           read: false,
-          createdAt: Date.now(),
+          createdAt: now,
         });
       }
     }
 
     return deliverableId;
+  },
+});
+
+/**
+ * Edit a deliverable's content (message, link, files) before any reviewer
+ * has acted on it. Submitter-only; silent (no notifications fired).
+ *
+ * TODO: orphaned _storage / R2 file refs from replaced uploads accumulate —
+ * no cleanup helper exists in the repo today. Add a lazy cleanup pass when
+ * we have one.
+ */
+export const editDeliverable = mutation({
+  args: {
+    deliverableId: v.id("deliverables"),
+    message: v.string(),
+    link: v.optional(v.string()),
+    fileIds: v.optional(v.array(v.id("_storage"))),
+    fileNames: v.optional(v.array(v.string())),
+    r2FileKeys: v.optional(v.array(v.string())),
+    r2FileNames: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const deliverable = await ctx.db.get(args.deliverableId);
+    if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy !== userId) {
+      throw new Error("Only the submitter can edit this deliverable");
+    }
+    if (deliverable.status === "approved" || deliverable.status === "rejected") {
+      throw new Error("This deliverable has already been reviewed");
+    }
+    const isSubTask = !!deliverable.mainAssigneeStatus;
+    if (isSubTask) {
+      if (
+        deliverable.mainAssigneeStatus !== "pending" ||
+        deliverable.mainAssigneeReviewedAt != null
+      ) {
+        throw new Error("Cannot edit — main assignee has already acted");
+      }
+    } else {
+      if (
+        deliverable.teamLeadStatus !== "pending" ||
+        deliverable.teamLeadReviewedAt != null
+      ) {
+        throw new Error("Cannot edit — team lead has already acted");
+      }
+    }
+
+    await ctx.db.patch(args.deliverableId, {
+      message: args.message,
+      link: args.link,
+      fileIds: args.fileIds && args.fileIds.length > 0 ? args.fileIds : undefined,
+      fileNames: args.fileNames && args.fileNames.length > 0 ? args.fileNames : undefined,
+      r2FileKeys: args.r2FileKeys && args.r2FileKeys.length > 0 ? args.r2FileKeys : undefined,
+      r2FileNames: args.r2FileNames && args.r2FileNames.length > 0 ? args.r2FileNames : undefined,
+    });
   },
 });
 
@@ -866,6 +1102,10 @@ export const teamLeadApprove = mutation({
 
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
 
     const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
     if (!teamInfo || teamInfo.leadId !== userId) {
@@ -919,6 +1159,10 @@ export const teamLeadReject = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
+
     const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
     if (!teamInfo || teamInfo.leadId !== userId) {
       throw new Error("Only the team lead can reject this deliverable");
@@ -967,6 +1211,10 @@ export const passToManager = mutation({
 
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
 
     if (deliverable.teamLeadStatus !== "approved") {
       throw new Error("Deliverable must be approved by team lead first");
@@ -1106,6 +1354,10 @@ export const teamLeadAndManagerApprove = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
+
     const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
     if (!teamInfo || teamInfo.leadId !== userId) {
       throw new Error("Only the team lead can approve this deliverable");
@@ -1139,34 +1391,7 @@ export const teamLeadAndManagerApprove = mutation({
     });
 
     if (task) {
-      // Check if ALL creative-slot deliverables are approved before marking task done
-      const allTaskDeliverables = await ctx.db
-        .query("deliverables")
-        .withIndex("by_task", (q) => q.eq("taskId", task._id))
-        .collect();
-      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
-
-      if (allApproved) {
-        if (task.clientFacing) {
-          await ctx.db.patch(deliverable.taskId, { status: "review" });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-        } else {
-          await ctx.db.patch(deliverable.taskId, {
-            status: "done",
-            completedAt: now,
-          });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
-          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
-
-          // Cascade done -> linked Copy/Helper children + auto-approve any
-          // pending child deliverables so they don't sit in TL/BM queues.
-          await cascadeDoneToChildren(ctx, task._id, userId);
-          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
-        }
-        // Propagate deliverable resources to downstream connected tasks in master brief
-        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
-      }
-      await syncBriefStatusFromTasks(ctx, task.briefId);
+      await finalizeApprovedDeliverable(ctx, task._id, task.briefId, userId, now);
     }
 
     const user = await ctx.db.get(userId);
@@ -1214,6 +1439,10 @@ export const managerApproveFromTeamLead = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
+
     if (deliverable.teamLeadStatus !== "approved") {
       throw new Error("Deliverable must be approved by team lead first");
     }
@@ -1242,34 +1471,7 @@ export const managerApproveFromTeamLead = mutation({
     });
 
     if (task) {
-      // Check if ALL creative-slot deliverables are approved before marking task done
-      const allTaskDeliverables = await ctx.db
-        .query("deliverables")
-        .withIndex("by_task", (q) => q.eq("taskId", task._id))
-        .collect();
-      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
-
-      if (allApproved) {
-        if (task.clientFacing) {
-          await ctx.db.patch(deliverable.taskId, { status: "review" });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-        } else {
-          await ctx.db.patch(deliverable.taskId, {
-            status: "done",
-            completedAt: now,
-          });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
-          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
-
-          // Cascade done -> linked Copy/Helper children + auto-approve any
-          // pending child deliverables so they don't sit in TL/BM queues.
-          await cascadeDoneToChildren(ctx, task._id, userId);
-          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
-        }
-        // Propagate deliverable resources to downstream connected tasks in master brief
-        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
-      }
-      await syncBriefStatusFromTasks(ctx, task.briefId);
+      await finalizeApprovedDeliverable(ctx, task._id, task.briefId, userId, now);
     }
 
     const user = await ctx.db.get(userId);
@@ -1435,6 +1637,7 @@ export const listMainAssigneePendingReviews = query({
     const allDeliverables = await ctx.db.query("deliverables").collect();
     const subTaskDeliverables = allDeliverables.filter((d) => {
       if (d.mainAssigneeStatus !== "pending") return false;
+      if (d.submittedBy === userId) return false;
       return true;
     });
 
@@ -1495,6 +1698,7 @@ export const getMainAssigneePendingCount = query({
 
     return allDeliverables.filter((d) => {
       if (d.mainAssigneeStatus !== "pending") return false;
+      if (d.submittedBy === userId) return false;
       const subTask = tasks.find((t) => t._id === d.taskId);
       return subTask?.parentTaskId && myTaskIds.has(subTask.parentTaskId);
     }).length;
@@ -1512,6 +1716,10 @@ export const mainAssigneeApprove = mutation({
 
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
 
     const subTask = await ctx.db.get(deliverable.taskId);
     if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
@@ -1554,6 +1762,10 @@ export const mainAssigneeReject = mutation({
 
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
 
     const subTask = await ctx.db.get(deliverable.taskId);
     if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
@@ -1606,6 +1818,10 @@ export const passSubTaskToTeamLead = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
+
     if (deliverable.mainAssigneeStatus !== "approved") {
       throw new Error("Deliverable must be approved by main assignee first");
     }
@@ -1652,6 +1868,10 @@ export const approveDeliverable = mutation({
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
 
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
+
     const task = await ctx.db.get(deliverable.taskId);
     const brief = task ? await ctx.db.get(task.briefId) : null;
 
@@ -1675,40 +1895,7 @@ export const approveDeliverable = mutation({
     });
 
     if (task) {
-      // Check if ALL creative-slot deliverables are approved before marking task done
-      const allTaskDeliverables = await ctx.db
-        .query("deliverables")
-        .withIndex("by_task", (q) => q.eq("taskId", task._id))
-        .collect();
-      const allApproved = allTaskDeliverables.every((d) => d.status === "approved");
-
-      if (allApproved) {
-        if (task.clientFacing) {
-          await ctx.db.patch(deliverable.taskId, { status: "review" });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "review");
-        } else {
-          await ctx.db.patch(deliverable.taskId, {
-            status: "done",
-            completedAt: Date.now(),
-          });
-          await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
-          await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
-
-          // When a content-calendar entry's design deliverable lands as
-          // approved, the linked Copy task on the same entry should also
-          // be considered done — otherwise it sits in "review" forever
-          // even though the parent shipped. Cascade done downward and
-          // auto-approve any pending child deliverables so they stop
-          // haunting Team Lead / Brand Manager queues.
-          await cascadeDoneToChildren(ctx, task._id, userId);
-          await autoApproveDeliverablesForTaskTree(ctx, task._id, userId);
-        }
-        // Propagate deliverable resources to downstream connected tasks in master brief
-        await propagateResourcesToDownstreamTasks(ctx, task._id, task.briefId);
-      }
-      // Recompute multi-task brief status (forward + reverse) so progress
-      // tracks current task counts, not just the all-done case above.
-      await syncBriefStatusFromTasks(ctx, task.briefId);
+      await finalizeApprovedDeliverable(ctx, task._id, task.briefId, userId, Date.now());
     }
 
     await ctx.db.insert("notifications", {
@@ -1747,6 +1934,10 @@ export const rejectDeliverable = mutation({
 
     const deliverable = await ctx.db.get(deliverableId);
     if (!deliverable) throw new Error("Deliverable not found");
+
+    if (deliverable.submittedBy === userId) {
+      throw new Error("You cannot review your own deliverable");
+    }
 
     const task = await ctx.db.get(deliverable.taskId);
     const brief = task ? await ctx.db.get(task.briefId) : null;
@@ -2007,16 +2198,84 @@ export const deleteDeliverable = mutation({
 // ─── DELIVERABLE HANDOFF (cross-team pipeline) ──────────
 
 /** Open tasks for an assignee on a brief — pick when handing off to an existing task (master briefs). */
+/**
+ * Resolve whether a set of tasks live in a master-brief node graph and whether
+ * each has a downstream connection. The deliverables UI uses this to decide,
+ * per card, whether to hide the handoff button (auto-flow takes care of it),
+ * show it with an alert (master brief but unconnected — BM should wire up the
+ * next node), or show it unconditionally (single-task brief).
+ *
+ * Returns a record keyed by task id for cheap O(1) lookup in the UI.
+ */
+export const listHandoffContextsForTasks = query({
+  args: { taskIds: v.array(v.id("tasks")) },
+  handler: async (ctx, { taskIds }) => {
+    if (taskIds.length === 0) return {};
+
+    const tasks = await Promise.all(taskIds.map((id) => ctx.db.get(id)));
+    const briefIds = Array.from(
+      new Set(tasks.filter((t) => !!t).map((t) => t!.briefId as string))
+    );
+    const briefs = await Promise.all(
+      briefIds.map((bid) => ctx.db.get(bid as Id<"briefs">))
+    );
+    const briefById = new Map<string, any>();
+    for (const b of briefs) if (b) briefById.set(b._id as string, b);
+
+    const brandIds = Array.from(
+      new Set(
+        briefs
+          .filter((b) => !!b?.brandId)
+          .map((b) => b!.brandId as string)
+      )
+    );
+    const brands = await Promise.all(
+      brandIds.map((bid) => ctx.db.get(bid as Id<"brands">))
+    );
+    const brandById = new Map<string, any>();
+    for (const b of brands) if (b) brandById.set(b._id as string, b);
+
+    const result: Record<string, any> = {};
+    for (const t of tasks) {
+      if (!t) continue;
+      const brief = briefById.get(t.briefId as string);
+      if (!brief) continue;
+      const inMasterBrief = brief.briefType !== "single_task";
+      let downstreamTaskIds: string[] = [];
+      if (inMasterBrief) {
+        const conns = await ctx.db
+          .query("taskConnections")
+          .withIndex("by_source", (q) => q.eq("sourceTaskId", t._id))
+          .collect();
+        downstreamTaskIds = conns.map((c) => c.targetTaskId as string);
+      }
+      const brand = brief.brandId ? brandById.get(brief.brandId as string) : null;
+      result[t._id as string] = {
+        inMasterBrief,
+        hasDownstreamConnection: downstreamTaskIds.length > 0,
+        briefTitle: brief.title,
+        briefType: brief.briefType ?? null,
+        brandName: brand?.name ?? null,
+        brandId: brief.brandId ?? null,
+        downstreamTaskIds,
+      };
+    }
+    return result;
+  },
+});
+
 export const listHandoffCandidateTasks = query({
   args: {
-    briefId: v.id("briefs"),
+    taskId: v.id("tasks"),
     assigneeId: v.id("users"),
   },
-  handler: async (ctx, { briefId, assigneeId }) => {
+  handler: async (ctx, { taskId, assigneeId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    const brief = await ctx.db.get(briefId);
+    const sourceTask = await ctx.db.get(taskId);
+    if (!sourceTask) return [];
+    const brief = await ctx.db.get(sourceTask.briefId);
     if (!brief) return [];
 
     const user = await ctx.db.get(userId);
@@ -2026,13 +2285,64 @@ export const listHandoffCandidateTasks = query({
     }
     if (!authorized) return [];
 
-    const tasks = await ctx.db
+    const inMasterBrief = brief.briefType !== "single_task";
+
+    // Connection-driven path: master brief with downstream nodes.
+    if (inMasterBrief) {
+      const conns = await ctx.db
+        .query("taskConnections")
+        .withIndex("by_source", (q) => q.eq("sourceTaskId", taskId))
+        .collect();
+      if (conns.length > 0) {
+        const targetTasks = await Promise.all(
+          conns.map((c) => ctx.db.get(c.targetTaskId))
+        );
+        return targetTasks
+          .filter(
+            (t): t is NonNullable<typeof t> =>
+              !!t && t.assigneeId === assigneeId && t.status !== "done"
+          )
+          .map((t) => ({
+            _id: t._id,
+            title: t.title,
+            status: t.status,
+            deadline: t.deadline,
+          }))
+          .sort((a, b) => a.title.localeCompare(b.title));
+      }
+    }
+
+    // Free-form path: single-task source OR unconnected master-brief node.
+    // Scope to non-done tasks assigned to the target user within the same brand.
+    if (!brief.brandId) {
+      // No brand on source brief → no scope to filter by; fall back to any non-done task assigned to user.
+      const allAssigned = await ctx.db
+        .query("tasks")
+        .withIndex("by_assignee", (q) => q.eq("assigneeId", assigneeId))
+        .collect();
+      return allAssigned
+        .filter((t) => t.status !== "done")
+        .map((t) => ({
+          _id: t._id,
+          title: t.title,
+          status: t.status,
+          deadline: t.deadline,
+        }))
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    const allBriefs = await ctx.db.query("briefs").collect();
+    const brandBriefIds = new Set(
+      allBriefs.filter((b) => b.brandId === brief.brandId).map((b) => b._id as string)
+    );
+
+    const allAssigned = await ctx.db
       .query("tasks")
-      .withIndex("by_brief_assignee", (q) => q.eq("briefId", briefId).eq("assigneeId", assigneeId))
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", assigneeId))
       .collect();
 
-    return tasks
-      .filter((t) => t.status !== "done")
+    return allAssigned
+      .filter((t) => t.status !== "done" && brandBriefIds.has(t.briefId as string))
       .map((t) => ({
         _id: t._id,
         title: t.title,
@@ -2097,12 +2407,6 @@ export const handoffDeliverable = mutation({
     const sourceBrief = await ctx.db.get(sourceTask.briefId);
     if (!sourceBrief) throw new Error("Source brief not found");
 
-    if (targetExistingTaskId && sourceBrief.briefType === "single_task") {
-      throw new Error(
-        "Cannot attach to an existing task when handing off from a single-task brief. Use create new task instead."
-      );
-    }
-
     // Authorization: admin or brand manager
     const user = await ctx.db.get(userId);
     let authorized = user?.role === "admin";
@@ -2124,11 +2428,33 @@ export const handoffDeliverable = mutation({
       throw new Error("Selected user is not on the target team");
     }
 
-    // Determine whether to create task in same brief or new brief
+    // Determine the target brief for this handoff:
+    //  - If attaching to an existing task → use that task's brief (may be in a
+    //    different brief from source; this enables single_task → existing-task
+    //    cross-brief handoff).
+    //  - Else if source is single_task → spin up a new single_task brief in the
+    //    target team's name.
+    //  - Else (master brief source, new task) → reuse the source brief, ensure
+    //    the target team is linked.
     const isSingleTask = sourceBrief.briefType === "single_task";
     let targetBriefId: any;
 
-    if (isSingleTask) {
+    if (targetExistingTaskId) {
+      // Pre-fetch chosen task so we can use its brief as the target brief.
+      const chosenForBrief = await ctx.db.get(targetExistingTaskId);
+      if (!chosenForBrief) throw new Error("Target task not found");
+      targetBriefId = chosenForBrief.briefId;
+
+      // Ensure target team is linked to the chosen brief.
+      const existingBriefTeams = await ctx.db
+        .query("briefTeams")
+        .withIndex("by_brief", (q: any) => q.eq("briefId", targetBriefId))
+        .collect();
+      const teamAlreadyLinked = existingBriefTeams.some((bt: any) => bt.teamId === targetTeamId);
+      if (!teamAlreadyLinked) {
+        await ctx.db.insert("briefTeams", { briefId: targetBriefId, teamId: targetTeamId });
+      }
+    } else if (isSingleTask) {
       // Create a new single_task brief
       const allBriefs = await ctx.db.query("briefs").collect();
       const globalPriority = allBriefs.length + 1;
@@ -2427,7 +2753,10 @@ export const getPendingDeliverableCount = query({
         allUserTeams.filter((ut) => ledTeamIds.has(ut.teamId)).map((ut) => ut.userId)
       );
       count += allDeliverables.filter(
-        (d) => d.teamLeadStatus === "pending" && teamMemberIds.has(d.submittedBy)
+        (d) =>
+          d.teamLeadStatus === "pending" &&
+          teamMemberIds.has(d.submittedBy) &&
+          d.submittedBy !== userId
       ).length;
     }
 
@@ -2451,6 +2780,7 @@ export const getPendingDeliverableCount = query({
         const briefs = await ctx.db.query("briefs").collect();
 
         for (const d of allDeliverables) {
+          if (d.submittedBy === userId) continue;
           if (d.teamLeadStatus !== "approved") continue;
           if (d.status === "approved" || d.status === "rejected") continue;
 
