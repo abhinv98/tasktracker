@@ -387,7 +387,7 @@ export function MasterBriefBoard({
                           {task.deadline && (
                             <span
                               className={`text-[9px] font-medium tabular-nums shrink-0 ${
-                                task.status !== "done" && task.deadline < Date.now()
+                                task.status !== "done" && task.status !== "review" && task.deadline < Date.now()
                                   ? "text-red-500"
                                   : "text-[var(--text-muted)]"
                               }`}

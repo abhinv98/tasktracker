@@ -906,8 +906,17 @@ export const getOverdueHaltStatus = query({
       .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
       .collect();
 
+    // A task whose deliverable is already in review is no longer the
+    // assignee's outstanding work — the ball is in the reviewer's court.
+    // Treat "review" the same as "done" for the overdue halt prompt so the
+    // alert clears the moment the assignee submits.
     const overdueTasks = myTasks.filter(
-      (t) => t.deadline && t.deadline < now && t.status !== "done" && t.overdueAcknowledged !== true
+      (t) =>
+        t.deadline &&
+        t.deadline < now &&
+        t.status !== "done" &&
+        t.status !== "review" &&
+        t.overdueAcknowledged !== true
     );
 
     if (overdueTasks.length === 0) return null;
@@ -1075,6 +1084,9 @@ export const listOverdueTasksForManager = query({
           t.deadline &&
           t.deadline < now &&
           t.status !== "done" &&
+          // Submitted-for-review tasks are out of the assignee's hands; don't
+          // flag the manager either — it isn't the assignee's overdue work.
+          t.status !== "review" &&
           t.overdueAcknowledged !== true &&
           myBriefIds.has(t.briefId)
         )

@@ -227,7 +227,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const isAssignee = user._id === task.assigneeId;
   const isAdmin = user.role === "admin";
-  const isOverdue = task.deadline != null && task.deadline < Date.now() && task.status !== "done";
+  // Tasks already in "review" have been submitted by the assignee — the ball
+  // is in the reviewer's court, so the overdue flag should clear.
+  const isOverdue =
+    task.deadline != null &&
+    task.deadline < Date.now() &&
+    task.status !== "done" &&
+    task.status !== "review";
   const isDelivered = task.status === "done";
   const isBriefOnHold = brief?.status === "on_hold";
   const isEditLocked = isDelivered || isOverdue;

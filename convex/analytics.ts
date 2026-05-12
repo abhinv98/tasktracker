@@ -30,8 +30,14 @@ export const getDashboardAnalytics = query({
     }
 
     const doneTasks = tasks.filter((t) => t.status === "done");
+    // "review" tasks are already submitted and awaiting approval — they
+    // shouldn't count as overdue from the assignee's perspective.
     const overdueTasks = tasks.filter(
-      (t) => t.deadline && t.deadline < Date.now() && t.status !== "done"
+      (t) =>
+        t.deadline &&
+        t.deadline < Date.now() &&
+        t.status !== "done" &&
+        t.status !== "review"
     );
 
     // Avg completion time (for done tasks with completedAt)

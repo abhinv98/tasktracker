@@ -187,7 +187,7 @@ export default function ReportsPage() {
                       <tbody>
                         {emp.tasks.map((task: any) => {
                           const sc = TASK_STATUS_CONFIG[task.status];
-                          const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done";
+                          const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done" && task.status !== "review";
                           return (
                             <tr
                               key={task._id}

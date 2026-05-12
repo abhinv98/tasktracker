@@ -320,7 +320,7 @@ export default function WorkLogPage() {
                       .map((task: any) => {
                       const statusInfo = STATUS_COLORS[task.status];
                       const deadlineDate = task.deadline ? new Date(task.deadline) : null;
-                      const isTaskOverdue = deadlineDate && deadlineDate.getTime() < Date.now() && task.status !== "done";
+                      const isTaskOverdue = deadlineDate && deadlineDate.getTime() < Date.now() && task.status !== "done" && task.status !== "review";
                       return (
                         <div
                           key={task._id}
@@ -558,7 +558,7 @@ export default function WorkLogPage() {
                           <tbody>
                             {emp.tasks.map((task: any) => {
                               const sc = TASK_STATUS_CONFIG[task.status];
-                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done";
+                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done" && task.status !== "review";
                               return (
                                 <tr
                                   key={task._id}
@@ -843,7 +843,7 @@ export default function WorkLogPage() {
                                 if (!ts) return "—";
                                 return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                               };
-                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done";
+                              const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done" && task.status !== "review";
                               return (
                                 <tr
                                   key={task._id}

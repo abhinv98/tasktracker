@@ -102,8 +102,14 @@ export const getEmployeeReport = query({
       });
 
       const completedTasks = tasksInRange.filter((t) => t.status === "done");
+      // "review" tasks are already submitted and awaiting approval — they
+      // shouldn't count as overdue against the assignee.
       const overdueTasks = tasksInRange.filter(
-        (t) => t.deadline && t.deadline < Date.now() && t.status !== "done"
+        (t) =>
+          t.deadline &&
+          t.deadline < Date.now() &&
+          t.status !== "done" &&
+          t.status !== "review"
       );
 
       const timeEntries = allTimeEntries.filter(
