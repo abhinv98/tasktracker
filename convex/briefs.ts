@@ -111,6 +111,7 @@ export const getBrief = query({
     const manager = brief.assignedManagerId
       ? await ctx.db.get(brief.assignedManagerId)
       : null;
+    const brand = brief.brandId ? await ctx.db.get(brief.brandId) : null;
     const briefTeams = await ctx.db
       .query("briefTeams")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
@@ -143,6 +144,7 @@ export const getBrief = query({
       ...brief,
       deadline: effectiveDeadline,
       manager,
+      brand,
       assignedTeams,
       tasks,
       taskCount: tasks.length,

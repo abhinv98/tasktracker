@@ -883,14 +883,58 @@ export const listLinkedTasksForEntry = query({
       .collect();
 
     const users = await ctx.db.query("users").collect();
+    const teams = await ctx.db.query("teams").collect();
 
-    return tasks.map((task) => {
-      const assignee = users.find((u) => u._id === task.assigneeId);
-      return {
-        ...task,
-        assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
-        assigneeDesignation: assignee?.designation ?? "",
-      };
-    });
+    // Resolve a team for each child task. Title prefix `[Team Name]` (set by
+    // createLinkedCalendarTask / createIndividualTaskBrief) is the cheapest
+    // signal; fall back to the assignee's primary userTeams row.
+    const teamByName = new Map(teams.map((t) => [t.name.toLowerCase(), t]));
+
+    const enriched = await Promise.all(
+      tasks.map(async (task) => {
+        const assignee = users.find((u) => u._id === task.assigneeId);
+
+        let teamId: typeof teams[number]["_id"] | undefined;
+        let teamName: string | undefined;
+
+        const prefixMatch = task.title.match(/^\[([^\]]+)\]/);
+        if (prefixMatch) {
+          const raw = prefixMatch[1].trim();
+          // Discard generic envelope prefixes like "Content Calendar · Brand"
+          // so we fall through to the team lookup for legacy linked tasks.
+          if (!/content calendar/i.test(raw)) {
+            const hit = teamByName.get(raw.toLowerCase());
+            if (hit) {
+              teamId = hit._id;
+              teamName = hit.name;
+            }
+          }
+        }
+
+        if (!teamId && task.assigneeId) {
+          const userTeams = await ctx.db
+            .query("userTeams")
+            .withIndex("by_user", (q) => q.eq("userId", task.assigneeId))
+            .collect();
+          if (userTeams.length > 0) {
+            const t = teams.find((tm) => tm._id === userTeams[0].teamId);
+            if (t) {
+              teamId = t._id;
+              teamName = t.name;
+            }
+          }
+        }
+
+        return {
+          ...task,
+          assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+          assigneeDesignation: assignee?.designation ?? "",
+          teamId: teamId ?? null,
+          teamName: teamName ?? null,
+        };
+      })
+    );
+
+    return enriched;
   },
 });
