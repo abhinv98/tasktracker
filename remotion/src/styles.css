@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* Mirror of /src/app/globals.css — keep in sync with the app theme */
+:root {
+  color-scheme: light;
+
+  --bg-primary: #faf9f5;
+  --bg-secondary: #FFFFFF;
+  --bg-panel: #FFFFFF;
+  --bg-hover: #f3f1eb;
+  --bg-input: #f3f1eb;
+  --bg-elevated: #FFFFFF;
+
+  --text-primary: #141413;
+  --text-secondary: #6b6963;
+  --text-disabled: #b0aea5;
+  --text-muted: #b0aea5;
+
+  --border: #e8e6dc;
+  --border-strong: #d5d3c9;
+  --border-subtle: #f0eee6;
+
+  --accent-primary: #d97757;
+  --accent-admin: #d97757;
+  --accent-admin-dim: rgba(217, 119, 87, 0.12);
+  --accent-manager: #6a9bcc;
+  --accent-manager-dim: rgba(106, 155, 204, 0.12);
+  --accent-employee: #788c5d;
+  --accent-employee-dim: rgba(120, 140, 93, 0.12);
+
+  --surface-light: #f3f1eb;
+  --surface-cream: #faf9f5;
+
+  --danger: #c0392b;
+  --danger-dim: rgba(192, 57, 43, 0.12);
+  --warning: #d97757;
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root, #remotion-canvas {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
+}

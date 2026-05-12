@@ -728,13 +728,15 @@ export default function BriefsPage() {
                               </TableCell>
                               <TableCell className="hidden lg:table-cell">
                                 <div className="flex gap-1 flex-wrap">
-                                  {((brief as { teamNames?: string[] }).teamNames ?? []).map(
-                                    (name) => (
-                                      <Badge key={name} variant="neutral">
-                                        {name}
-                                      </Badge>
+                                  {Array.from(
+                                    new Set(
+                                      (brief as { teamNames?: string[] }).teamNames ?? []
                                     )
-                                  )}
+                                  ).map((name) => (
+                                    <Badge key={name} variant="neutral">
+                                      {name}
+                                    </Badge>
+                                  ))}
                                   {!((brief as { teamNames?: string[] }).teamNames?.length) && "—"}
                                 </div>
                               </TableCell>
@@ -913,11 +915,13 @@ export default function BriefsPage() {
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               <div className="flex gap-1 flex-wrap">
-                                {((brief as { teamNames?: string[] }).teamNames ?? []).map(
-                                  (name) => (
-                                    <Badge key={name} variant="neutral">{name}</Badge>
+                                {Array.from(
+                                  new Set(
+                                    (brief as { teamNames?: string[] }).teamNames ?? []
                                   )
-                                )}
+                                ).map((name) => (
+                                  <Badge key={name} variant="neutral">{name}</Badge>
+                                ))}
                                 {!((brief as { teamNames?: string[] }).teamNames?.length) && "—"}
                               </div>
                             </TableCell>

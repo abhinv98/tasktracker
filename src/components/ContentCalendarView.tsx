@@ -82,6 +82,47 @@ function effectiveDeadlineMs(task: {
   return null;
 }
 
+/**
+ * Row-level deadline rollup for a calendar entry. Considers parent + linked
+ * child tasks together so updating a child's deadline (e.g. extending the
+ * Design team's timeline) is reflected on the entry instead of the row
+ * showing stale "overdue" against the original parent date.
+ *
+ * Rule: while any task is incomplete, return the latest deadline among the
+ * incomplete ones; overdue only fires if that latest date is past. If every
+ * task is done, fall back to the parent's deadline and never flag overdue.
+ */
+function rowDeadlineInfo(task: {
+  deadline?: number | null;
+  postDate?: string | null;
+  status?: string;
+  linkedTasks?: Array<{
+    status: string;
+    deadline?: number | null;
+    postDate?: string | null;
+  }>;
+}): { dl: number | null; overdue: boolean } {
+  const parentDl = effectiveDeadlineMs(task);
+  const pieces: Array<{ status?: string; dl: number | null }> = [
+    { status: task.status, dl: parentDl },
+    ...((task.linkedTasks ?? []).map((lt) => ({
+      status: lt.status,
+      dl: effectiveDeadlineMs(lt),
+    }))),
+  ];
+
+  const incompleteWithDl = pieces.filter(
+    (p) => p.status !== "done" && p.dl != null
+  ) as Array<{ status?: string; dl: number }>;
+
+  if (incompleteWithDl.length === 0) {
+    return { dl: parentDl, overdue: false };
+  }
+
+  const latest = Math.max(...incompleteWithDl.map((p) => p.dl));
+  return { dl: latest, overdue: latest < Date.now() };
+}
+
 function monthLabel(month: string) {
   const [y, m] = month.split("-").map(Number);
   return new Date(y, m - 1).toLocaleDateString("en-US", {
@@ -480,10 +521,10 @@ export function ContentCalendarView({
           {(() => {
             const hasRealAssignee = (t: any) => t.assigneeId && t.assigneeId !== t.assignedBy;
             const incomplete = (tasks ?? []).filter(
-              (t: any) => !hasRealAssignee(t) || !effectiveDeadlineMs(t)
+              (t: any) => !hasRealAssignee(t) || rowDeadlineInfo(t).dl == null
             );
             const noAssignee = incomplete.filter((t: any) => !hasRealAssignee(t)).length;
-            const noDeadline = incomplete.filter((t: any) => !effectiveDeadlineMs(t)).length;
+            const noDeadline = incomplete.filter((t: any) => rowDeadlineInfo(t).dl == null).length;
             if (incomplete.length === 0) return null;
             return (
               <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
@@ -547,7 +588,7 @@ export function ContentCalendarView({
                         : isBreakDay
                           ? "bg-red-100 hover:bg-red-200"
                           : ((!task.assigneeId || task.assigneeId === task.assignedBy) ||
-                              !effectiveDeadlineMs(task))
+                              rowDeadlineInfo(task).dl == null)
                             ? "bg-amber-50/50 hover:bg-amber-50"
                             : "hover:bg-[var(--bg-hover)]"
                     }`}
@@ -607,22 +648,7 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {task.copyAssigneeName ? (
-                        <div>
-                          <span className="text-[12px] text-[var(--text-primary)]">
-                            {task.copyAssigneeName}
-                          </span>
-                          {task.copyAssigneeDesignation && (
-                            <p className="text-[10px] text-[var(--text-muted)]">
-                              {task.copyAssigneeDesignation}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
+                      {/* Copy Assignee = main entry assignee (parent task) */}
                       {task.assigneeId && task.assigneeId !== task.assignedBy ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
@@ -641,12 +667,29 @@ export function ContentCalendarView({
                       )}
                     </td>
                     <td className="px-3 py-2.5">
+                      {/* Design Assignee = linked (child) task assignee */}
+                      {task.linkedAssigneeName ? (
+                        <div>
+                          <span className="text-[12px] text-[var(--text-primary)]">
+                            {task.linkedAssigneeName}
+                          </span>
+                          {task.linkedAssigneeDesignation && (
+                            <p className="text-[10px] text-[var(--text-muted)]">
+                              {task.linkedAssigneeDesignation}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
                       {(() => {
-                        const dl = effectiveDeadlineMs(task);
+                        const { dl, overdue } = rowDeadlineInfo(task);
                         return dl != null ? (
                           <span
                             className={`text-[11px] font-medium ${
-                              task.status !== "done" && dl < Date.now()
+                              overdue
                                 ? "text-[var(--danger)]"
                                 : "text-[var(--text-secondary)]"
                             }`}
@@ -911,10 +954,11 @@ export function ContentCalendarView({
                   </select>
                 </div>
               </div>
-              {/* Team → Assignee flow */}
+              {/* Copy Team → Copy Assignee flow (primary).
+                  Design assignee is added later via the sidebar's "Assign task" panel. */}
               <div>
                 <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                  Team
+                  Copy Team
                 </label>
                 <select
                   value={newTeamFilter}
@@ -924,13 +968,21 @@ export function ContentCalendarView({
                   }}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 >
-                  <option value="">All Teams</option>
-                  {(allTeams ?? []).map((team: any) => (
-                    <option key={team._id} value={team._id}>
-                      {team.name}
-                    </option>
-                  ))}
+                  <option value="">Select copy team</option>
+                  {(allTeams ?? [])
+                    .filter((team: any) => {
+                      const n = (team.name || "").toLowerCase();
+                      return n.includes("copy") || n.includes("content") || n.includes("writing");
+                    })
+                    .map((team: any) => (
+                      <option key={team._id} value={team._id}>
+                        {team.name}
+                      </option>
+                    ))}
                 </select>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  The copy team owns the entry. Design is assigned separately from the entry's sidebar.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -953,7 +1005,7 @@ export function ContentCalendarView({
                 </div>
                 <div>
                   <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                    Assignee
+                    Copy Assignee
                   </label>
                   <select
                     value={newAssignee}
@@ -1696,7 +1748,7 @@ export function ContentCalendarEntrySidebar({
               {showAssignTask ? "Hide" : "Assign task"}
             </button>
             <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              Assign a linked task to the <strong>Copy team</strong>. The main entry assignee handles design.
+              Assign a linked task to the <strong>Design team</strong>. The main entry assignee handles copy.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
@@ -1764,19 +1816,19 @@ export function ContentCalendarEntrySidebar({
               </div>
             )}
             {showAssignTask && (() => {
-              // Only show copy-related teams — linked tasks are exclusively for the Copy team
-              const copyTeams = teams.filter((t: any) => {
+              // Only show design-related teams — linked tasks now target the Design team
+              // (the parent entry's main assignee is the Copy team).
+              const designTeams = teams.filter((t: any) => {
                 const tName = (t.name || "").toLowerCase();
-                return tName.includes("copy") || tName.includes("content") || tName.includes("writing");
+                return tName.includes("design") || tName.includes("creative") || tName.includes("graphic");
               });
-              // Check if a copy task already exists in linked tasks
-              const hasCopyTask = linkedTasks?.some((lt: any) => lt._id !== task._id);
+              const hasDesignTask = linkedTasks?.some((lt: any) => lt._id !== task._id);
               return (
               <div className="mt-3 space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                 {/* Workflow hint */}
                 <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pb-2 border-b border-[var(--border-subtle)]">
-                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasCopyTask ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
-                    Copy Team {hasCopyTask ? "✓ Assigned" : "← Assign now"}
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasDesignTask ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
+                    Design Team {hasDesignTask ? "✓ Assigned" : "← Assign now"}
                   </span>
                 </div>
                 <div>
@@ -1784,7 +1836,7 @@ export function ContentCalendarEntrySidebar({
                   <input
                     value={assignTaskTitle}
                     onChange={(e) => setAssignTaskTitle(e.target.value)}
-                    placeholder="e.g. Write copy for post"
+                    placeholder="e.g. Design creative for post"
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   />
                 </div>
@@ -1798,8 +1850,8 @@ export function ContentCalendarEntrySidebar({
                     }}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
                   >
-                    <option value="">Select copy team</option>
-                    {copyTeams.map((team: any) => (
+                    <option value="">Select design team</option>
+                    {designTeams.map((team: any) => (
                       <option key={team._id} value={team._id}>{team.name}</option>
                     ))}
                   </select>

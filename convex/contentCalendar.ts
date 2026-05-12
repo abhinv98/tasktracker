@@ -201,17 +201,27 @@ export const listTasksByBrandMonth = query({
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
         const assignor = users.find((u) => u._id === task.assignedBy);
-        // Find copy assignee from linked child tasks
+        // Linked (Design) child task — parent entry is now the Copy task.
         const childTasks = allChildTasks.filter((ct) => ct.parentTaskId === task._id);
-        const copyChild = childTasks.length > 0 ? childTasks[0] : null;
-        const copyAssignee = copyChild ? users.find((u) => u._id === copyChild.assigneeId) : null;
+        const linkedChild = childTasks.length > 0 ? childTasks[0] : null;
+        const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           assignorName: assignor?.name ?? assignor?.email ?? "—",
-          copyAssigneeName: copyAssignee ? (copyAssignee.name ?? copyAssignee.email ?? "Unknown") : "",
-          copyAssigneeDesignation: copyAssignee?.designation ?? "",
+          // `copyAssignee*` fields preserved (now points at the linked Design assignee)
+          // for any external consumers; UI reads via `linkedAssignee*`.
+          copyAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
+          copyAssigneeDesignation: linkedAssignee?.designation ?? "",
+          linkedAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
+          linkedAssigneeDesignation: linkedAssignee?.designation ?? "",
+          linkedTasks: childTasks.map((ct) => ({
+            _id: ct._id,
+            status: ct.status,
+            deadline: ct.deadline ?? null,
+            postDate: ct.postDate ?? null,
+          })),
         };
       });
   },
@@ -614,17 +624,27 @@ export const listTasksForSheet = query({
       })
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
-        // Find copy assignee from linked child tasks
+        // Linked (Design) child task — parent entry is now the Copy task.
         const childTasks = allBriefTasks.filter((ct) => ct.parentTaskId === task._id);
-        const copyChild = childTasks.length > 0 ? childTasks[0] : null;
-        const copyAssignee = copyChild ? users.find((u) => u._id === copyChild.assigneeId) : null;
+        const linkedChild = childTasks.length > 0 ? childTasks[0] : null;
+        const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           attachmentCount: attachmentCounts[task._id] ?? 0,
-          copyAssigneeName: copyAssignee ? (copyAssignee.name ?? copyAssignee.email ?? "Unknown") : "",
-          copyAssigneeDesignation: copyAssignee?.designation ?? "",
+          // `copyAssignee*` fields preserved (now point at the linked Design
+          // assignee) for any external consumers; UI reads via `linkedAssignee*`.
+          copyAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
+          copyAssigneeDesignation: linkedAssignee?.designation ?? "",
+          linkedAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
+          linkedAssigneeDesignation: linkedAssignee?.designation ?? "",
+          linkedTasks: childTasks.map((ct) => ({
+            _id: ct._id,
+            status: ct.status,
+            deadline: ct.deadline ?? null,
+            postDate: ct.postDate ?? null,
+          })),
         };
       });
   },
