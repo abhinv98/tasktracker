@@ -24,6 +24,8 @@ export default function DeliverablesPage() {
   const approveDeliverable = useMutation(api.approvals.approveDeliverable);
   const rejectDeliverable = useMutation(api.approvals.rejectDeliverable);
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
+  const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
+  const submitDirectToAssignor = useMutation(api.approvals.submitDeliverableDirectToAssignor);
   const editDeliverableMut = useMutation(api.approvals.editDeliverable);
   const deleteDeliverableMutation = useMutation(api.approvals.deleteDeliverable);
   const teamLeadApproveMut = useMutation(api.approvals.teamLeadApprove);
@@ -327,8 +329,11 @@ export default function DeliverablesPage() {
     setEditKeptFiles((d.files ?? []) as { name: string; url: string }[]);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(
+    e: React.FormEvent | null,
+    routeTo: "tl" | "bm" | "as" = "tl"
+  ) {
+    if (e) e.preventDefault();
     if (!submitMessage.trim()) return;
     if (!editingDeliverableId && !submitTaskId) return;
 
@@ -365,12 +370,22 @@ export default function DeliverablesPage() {
       return;
     }
 
-    await submitDeliverable({
+    const payload = {
       taskId: submitTaskId as any,
       message: submitMessage.trim(),
       link: submitLink || undefined,
       ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
-    });
+    };
+    if (routeTo === "bm") {
+      await submitDirectToManager(payload);
+      toast("success", "Sent directly to Brand Manager");
+    } else if (routeTo === "as") {
+      await submitDirectToAssignor(payload);
+      toast("success", "Sent directly to Assignor");
+    } else {
+      await submitDeliverable(payload);
+      toast("success", "Submitted for Team Lead review");
+    }
     resetSubmitForm();
   }
 
@@ -496,7 +511,7 @@ export default function DeliverablesPage() {
           <h3 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
             {editingDeliverableId ? "Edit Deliverable" : "Submit a Deliverable"}
           </h3>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <form onSubmit={(e) => handleSubmit(e, "tl")} className="flex flex-col gap-3">
             {!editingDeliverableId && (
               <select
                 value={submitTaskId}
@@ -569,10 +584,42 @@ export default function DeliverablesPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
-              <Button type="submit" variant="primary">{editingDeliverableId ? "Save Changes" : "Submit"}</Button>
-              <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
-            </div>
+            {editingDeliverableId ? (
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary">Save Changes</Button>
+                <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
+              </div>
+            ) : (() => {
+              const selected = myTasks?.find((t) => t._id === submitTaskId);
+              const showAssignorBtn = !!selected?.assignedBy && selected.assignedBy !== user?._id;
+              return (
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Submit to</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" variant="primary">Team Lead</Button>
+                    <button
+                      type="button"
+                      disabled={!submitMessage.trim() || !submitTaskId}
+                      onClick={() => handleSubmit(null, "bm")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                    >
+                      Brand Manager
+                    </button>
+                    {showAssignorBtn && (
+                      <button
+                        type="button"
+                        disabled={!submitMessage.trim() || !submitTaskId}
+                        onClick={() => handleSubmit(null, "as")}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      >
+                        Assignor
+                      </button>
+                    )}
+                    <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
+                  </div>
+                </div>
+              );
+            })()}
           </form>
         </Card>
       )}

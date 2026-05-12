@@ -1342,6 +1342,80 @@ export const submitDeliverableDirectToManager = mutation({
   },
 });
 
+/**
+ * Sibling of `submitDeliverableDirectToManager` that routes the deliverable
+ * straight to whoever assigned the task (`task.assignedBy`) instead of the
+ * brand manager. Both the team-lead gate and the brand-manager gate are
+ * auto-cleared so the assignor sees the deliverable immediately and can
+ * approve/reject via the existing approval-action flow.
+ */
+export const submitDeliverableDirectToAssignor = mutation({
+  args: {
+    taskId: v.id("tasks"),
+    message: v.string(),
+    link: v.optional(v.string()),
+    fileIds: v.optional(v.array(v.id("_storage"))),
+    fileNames: v.optional(v.array(v.string())),
+    r2FileKeys: v.optional(v.array(v.string())),
+    r2FileNames: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { taskId, message, link, fileIds, fileNames, r2FileKeys, r2FileNames }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+
+    if (!task.assignedBy) {
+      throw new Error("This task has no assignor on record");
+    }
+    if (task.assignedBy === userId) {
+      throw new Error("You are the assignor of this task — submit through the normal flow");
+    }
+
+    const deliverableId = await ctx.db.insert("deliverables", {
+      taskId,
+      submittedBy: userId,
+      message,
+      link,
+      submittedAt: Date.now(),
+      status: "pending",
+      teamLeadStatus: "approved" as const,
+      teamLeadReviewedBy: userId,
+      teamLeadReviewedAt: Date.now(),
+      teamLeadReviewNote: "Sent directly to Assignor",
+      passedToManagerBy: userId,
+      passedToManagerAt: Date.now(),
+      ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
+      ...(fileNames && fileNames.length > 0 ? { fileNames } : {}),
+      ...(r2FileKeys && r2FileKeys.length > 0 ? { r2FileKeys } : {}),
+      ...(r2FileNames && r2FileNames.length > 0 ? { r2FileNames } : {}),
+    });
+
+    if (task.status !== "done" && task.status !== "review") {
+      await ctx.db.patch(taskId, {
+        status: "review",
+        ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
+      });
+    }
+
+    const submitter = await ctx.db.get(userId);
+    await ctx.db.insert("notifications", {
+      recipientId: task.assignedBy,
+      type: "deliverable_submitted",
+      title: "Deliverable sent directly to you",
+      message: `${submitter?.name ?? "Someone"} sent a deliverable for "${task.title}" directly for your review`,
+      briefId: task.briefId,
+      taskId,
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+
+    return deliverableId;
+  },
+});
+
 export const teamLeadAndManagerApprove = mutation({
   args: {
     deliverableId: v.id("deliverables"),

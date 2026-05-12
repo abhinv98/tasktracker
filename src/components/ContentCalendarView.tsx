@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, useToast } from "@/components/ui";
@@ -1138,7 +1138,12 @@ export function ContentCalendarEntrySidebar({
   const [editCaption, setEditCaption] = useState(task.caption ?? "");
   const [saving, setSaving] = useState(false);
   const [sidebarTeamFilter, setSidebarTeamFilter] = useState<string>("");
-  const [submittingTo, setSubmittingTo] = useState<"tl" | "bm" | null>(null);
+  const [submittingTo, setSubmittingTo] = useState<"tl" | "bm" | "as" | null>(null);
+
+  // Three-view sidebar: Main (entry overview) / Copy (parent task editor) /
+  // Design (linked child editor). Default opens on Main; clicking the Copy
+  // or Design card switches views without leaving the sidebar.
+  const [sidebarView, setSidebarView] = useState<"main" | "copy" | "design">("main");
 
   // Query team members for sidebar team filter
   const sidebarTeamMembers = useQuery(
@@ -1150,6 +1155,7 @@ export function ContentCalendarEntrySidebar({
   const deliverables = useQuery(api.approvals.listDeliverables, { taskId: task._id });
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
   const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
+  const submitDirectToAssignor = useMutation(api.approvals.submitDeliverableDirectToAssignor);
   const createLinkedCalendarTask = useMutation(api.contentCalendar.createLinkedCalendarTask);
 
   const calendarEntryTaskId = (task.parentTaskId ?? task._id) as Id<"tasks">;
@@ -1175,6 +1181,37 @@ export function ContentCalendarEntrySidebar({
   );
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [deletingLinkedId, setDeletingLinkedId] = useState<string | null>(null);
+
+  // ── Design tab state ──────────────────────────────────────────
+  // The parent task is the Copy task; the linked child is the Design task.
+  // When the admin opens the Design tab we either edit the existing child
+  // or create one if none exists yet.
+  const designChild = useMemo(
+    () => (linkedTasks ?? []).find((lt: any) => lt._id !== task._id) ?? null,
+    [linkedTasks, task._id]
+  );
+  const [dTeam, setDTeam] = useState<string>("");
+  const [dAssignee, setDAssignee] = useState<string>("");
+  const [dDeadline, setDDeadline] = useState<string>("");
+  const [dSaving, setDSaving] = useState(false);
+  const dTeamMembers = useQuery(
+    api.teams.getTeamMembers,
+    dTeam ? { teamId: dTeam as Id<"teams"> } : "skip"
+  );
+  // Sync local design-tab inputs from the loaded child whenever it changes.
+  useEffect(() => {
+    if (designChild) {
+      setDAssignee(designChild.assigneeId ?? "");
+      setDDeadline(
+        designChild.deadline
+          ? new Date(designChild.deadline).toISOString().split("T")[0]
+          : ""
+      );
+    } else {
+      setDAssignee("");
+      setDDeadline("");
+    }
+  }, [designChild?._id, designChild?.assigneeId, designChild?.deadline]);
 
   // Reference links
   const updateReferenceLinks = useMutation(api.contentCalendar.updateReferenceLinks);
@@ -1271,6 +1308,85 @@ export function ContentCalendarEntrySidebar({
     }
   }
 
+  // Save the Design tab. If a child task already exists we patch it; otherwise
+  // we create one via createLinkedCalendarTask. The Copy task (parent) is
+  // untouched here — admins use the Copy tab for that side.
+  async function handleSaveDesign() {
+    if (!dAssignee) {
+      toast("error", "Select a design team member first");
+      return;
+    }
+    setDSaving(true);
+    try {
+      const deadlineMs = dDeadline
+        ? new Date(dDeadline + "T23:59:59").getTime()
+        : undefined;
+
+      if (designChild) {
+        const updates: Record<string, any> = {};
+        if (dAssignee !== designChild.assigneeId) updates.assigneeId = dAssignee;
+        if (deadlineMs !== undefined) {
+          if (deadlineMs !== designChild.deadline) updates.deadline = deadlineMs;
+        } else if (designChild.deadline) {
+          updates.clearDeadline = true;
+        }
+        if (Object.keys(updates).length > 0) {
+          await updateTask({ taskId: designChild._id, ...updates });
+          toast("success", "Design assignment updated");
+        } else {
+          toast("info", "No changes to save");
+        }
+      } else {
+        await createLinkedCalendarTask({
+          briefId,
+          parentTaskId: calendarEntryTaskId,
+          assigneeId: dAssignee as Id<"users">,
+          title: `[Design] ${task.title}`,
+          ...(deadlineMs !== undefined ? { deadline: deadlineMs } : {}),
+        });
+        toast("success", "Design team assigned");
+      }
+    } catch (err) {
+      toast(
+        "error",
+        err instanceof Error ? err.message : "Failed to save design assignment"
+      );
+    } finally {
+      setDSaving(false);
+    }
+  }
+
+  // Universal deliverable-submit helper for the Copy tab.
+  //   "tl" → normal team-lead review path
+  //   "bm" → skip team lead, route directly to brand manager
+  //   "as" → skip both, route directly to the task's assignor
+  // Saves the parent task first so the latest Creative Copy + Caption are
+  // captured in the deliverable message.
+  async function handleSubmitCopyDeliverable(to: "tl" | "bm" | "as") {
+    setSubmittingTo(to);
+    try {
+      await handleSave();
+      const msg = [
+        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
+        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
+      ].filter(Boolean).join("\n\n");
+      if (to === "tl") {
+        await submitDeliverable({ taskId: task._id, message: msg });
+        toast("success", "Sent to Team Lead for review");
+      } else if (to === "bm") {
+        await submitDirectToManager({ taskId: task._id, message: msg });
+        toast("success", "Sent directly to Brand Manager");
+      } else {
+        await submitDirectToAssignor({ taskId: task._id, message: msg });
+        toast("success", "Sent directly to Assignor");
+      }
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to submit");
+    } finally {
+      setSubmittingTo(null);
+    }
+  }
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1344,175 +1460,313 @@ export function ContentCalendarEntrySidebar({
 
       {/* Sidebar Content */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Task Workflow — Copy first, Design below */}
-        {(() => {
-          // Determine Copy task (linked) and Design task (parent entry)
-          const isViewingParent = !task.parentTaskId;
-          const copyTask = linkedTasks && linkedTasks.length > 0
-            ? (linkedTasks.find((lt: any) => lt._id !== task._id) ?? (isViewingParent ? null : task))
-            : (isViewingParent ? null : task);
-          const designTask = isViewingParent
-            ? task
-            : (parentEntryDetail?.task
-                ? {
-                    ...parentEntryDetail.task,
-                    assigneeName:
-                      parentEntryDetail.assignee?.name ??
-                      parentEntryDetail.assignee?.email ??
-                      "Unknown",
-                    assigneeDesignation: parentEntryDetail.assignee?.designation ?? "",
-                  }
-                : null);
-
-          const renderRow = (label: string, t: any | null, accent: string) => {
-            if (!t) {
+        {/* Tab strip — only on the parent entry. When drilled into a child
+            task directly we hide the strip and show that task's full form. */}
+        {!isViewingLinkedChild && (
+          <div className="flex gap-1 p-1 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+            {(["main", "copy", "design"] as const).map((v) => {
+              const label = v === "main" ? "Entry" : v === "copy" ? "Copy Team" : "Design Team";
+              const active = sidebarView === v;
               return (
-                <div className="flex items-center justify-between py-2 px-2.5 rounded-md border border-dashed border-[var(--border)]">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
-                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-                      {label}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-[var(--text-muted)]">Not assigned</span>
-                </div>
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setSidebarView(v)}
+                  className={`flex-1 text-[11px] font-semibold py-1.5 rounded-md transition-colors ${
+                    active
+                      ? "bg-white text-[var(--accent-admin)] shadow-sm"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {label}
+                </button>
               );
-            }
-            const ti = statusInfo(t.status);
-            const isCurrent = t._id === task._id;
-            // Clickable when there is a switch handler AND we are not already
-            // viewing this task. Clicking swaps the sidebar to that task's
-            // form so admins can drill into Copy / Design directly.
-            const canSwitch = !!onSelectTask && !isCurrent;
-            const Tag: any = canSwitch ? "button" : "div";
-            return (
-              <Tag
-                type={canSwitch ? "button" : undefined}
-                onClick={canSwitch ? () => onSelectTask!(t._id as string) : undefined}
-                className={`w-full text-left py-2 px-2.5 rounded-md border transition-colors ${
-                  isCurrent
-                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-primary)]"
-                } ${canSwitch ? "hover:bg-[var(--bg-hover)] hover:border-[var(--accent-admin)] cursor-pointer" : ""}`}
-                title={canSwitch ? `Open ${label} task to edit` : undefined}
+            })}
+          </div>
+        )}
+
+        {/* ── Main view: Copy + Design role cards + submitted text preview ── */}
+        {!isViewingLinkedChild && sidebarView === "main" && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block">
+                Roles
+              </label>
+
+              {/* Copy Team card (parent task assignee) */}
+              <button
+                type="button"
+                onClick={() => setSidebarView("copy")}
+                className="w-full text-left p-2.5 rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#3b82f6" }} />
                     <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">
-                      {label}
+                      Copy Team
                     </span>
-                    {isCurrent && (
-                      <span className="text-[9px] font-medium text-[var(--accent-admin)]">
-                        Viewing
-                      </span>
-                    )}
                   </div>
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium"
-                    style={{ color: ti.color, backgroundColor: `${ti.color}15` }}
-                  >
-                    {ti.label}
-                  </span>
+                  <span className="text-[10px] text-[var(--accent-admin)]">Open →</span>
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">
-                  {t.assigneeName || "Unassigned"}
-                  {t.assigneeDesignation ? ` · ${t.assigneeDesignation}` : ""}
-                </p>
-              </Tag>
-            );
-          };
+                {task.assigneeId && task.assigneeId !== task.assignedBy ? (
+                  <p className="text-[12px] text-[var(--text-primary)] truncate">
+                    {task.assigneeName}
+                    {task.assigneeDesignation ? (
+                      <span className="text-[var(--text-muted)]"> · {task.assigneeDesignation}</span>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-amber-700">Not assigned — click to assign</p>
+                )}
+              </button>
 
-          return (
-            <div className="space-y-1.5">
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                Task Workflow
-              </label>
-              {renderRow("Copy", copyTask, "#3b82f6")}
-              {renderRow("Design", designTask, "#8b5cf6")}
+              {/* Design Team card (linked child assignee) */}
+              <button
+                type="button"
+                onClick={() => setSidebarView("design")}
+                className="w-full text-left p-2.5 rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#8b5cf6" }} />
+                    <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                      Design Team
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[var(--accent-admin)]">Open →</span>
+                </div>
+                {designChild?.assigneeName ? (
+                  <p className="text-[12px] text-[var(--text-primary)] truncate">
+                    {designChild.assigneeName}
+                    {designChild.assigneeDesignation ? (
+                      <span className="text-[var(--text-muted)]"> · {designChild.assigneeDesignation}</span>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-amber-700">Not assigned — click to assign</p>
+                )}
+              </button>
             </div>
-          );
-        })()}
 
-        {/* Title */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Title
-          </label>
-          {isEditable ? (
-            <input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)] font-medium">
-              {task.title}
+            {/* Submitted Creative Copy + Caption preview (read-only here;
+                edit happens inside the Copy tab) */}
+            {task.creativeCopy?.trim() && (
+              <div>
+                <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                  Creative Copy
+                </label>
+                <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  {task.creativeCopy}
+                </p>
+              </div>
+            )}
+            {task.caption?.trim() && (
+              <div>
+                <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                  Caption
+                </label>
+                <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  {task.caption}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Design tab: assign / edit the linked Design child task ── */}
+        {!isViewingLinkedChild && sidebarView === "design" && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-[13px] text-[var(--text-primary)]">
+                Design Team Assignment
+              </h4>
+              {designChild && onSelectTask && (
+                <button
+                  type="button"
+                  onClick={() => onSelectTask(designChild._id as string)}
+                  className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                >
+                  Open task →
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {designChild
+                ? "Update who handles the design for this entry."
+                : "Pick the design team member who should create the visual for this entry."}
             </p>
-          )}
-        </div>
 
-        {/* Description */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Description
-          </label>
-          {isEditable ? (
-            <textarea
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-              rows={2}
-              placeholder="Add description..."
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)]">
-              {task.description || "No description"}
-            </p>
-          )}
-        </div>
+            {/* Design team filter (design / creative / graphic teams) */}
+            <div>
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Design Team
+              </label>
+              <select
+                value={dTeam}
+                onChange={(e) => {
+                  setDTeam(e.target.value);
+                  setDAssignee("");
+                }}
+                disabled={!isEditable}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+              >
+                <option value="">All design teams</option>
+                {teams
+                  .filter((t: any) => {
+                    const n = (t.name || "").toLowerCase();
+                    return n.includes("design") || n.includes("creative") || n.includes("graphic");
+                  })
+                  .map((team: any) => (
+                    <option key={team._id} value={team._id}>{team.name}</option>
+                  ))}
+              </select>
+            </div>
 
-        {/* Creative Copy */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Creative Copy
-          </label>
-          {isEditable ? (
-            <textarea
-              value={editCreativeCopy}
-              onChange={(e) => setEditCreativeCopy(e.target.value)}
-              rows={3}
-              placeholder="Add creative copy..."
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-              {task.creativeCopy || "No creative copy"}
-            </p>
-          )}
-        </div>
+            <div>
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Designer
+              </label>
+              <select
+                value={dAssignee}
+                onChange={(e) => setDAssignee(e.target.value)}
+                disabled={!isEditable}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+              >
+                <option value="">Select designer</option>
+                {(dTeam && dTeamMembers ? dTeamMembers : employees).map((emp: any) => (
+                  <option key={emp._id} value={emp._id}>
+                    {emp.name ?? emp.email}
+                    {emp.designation ? ` — ${emp.designation}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Caption */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Caption
-          </label>
-          {isEditable ? (
-            <textarea
-              value={editCaption}
-              onChange={(e) => setEditCaption(e.target.value)}
-              rows={3}
-              placeholder="Add caption..."
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-              {task.caption || "No caption"}
-            </p>
-          )}
-        </div>
+            <div>
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Deadline
+              </label>
+              <input
+                type="date"
+                value={dDeadline}
+                onChange={(e) => setDDeadline(e.target.value)}
+                disabled={!isEditable}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+              />
+            </div>
 
-        {/* Reference Links */}
+            {isEditable && (
+              <button
+                type="button"
+                disabled={dSaving || !dAssignee}
+                onClick={handleSaveDesign}
+                className="w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {dSaving ? "Saving…" : designChild ? "Update design assignment" : "Assign design team"}
+              </button>
+            )}
+
+            {designChild && (
+              <div className="pt-3 border-t border-[var(--border-subtle)]">
+                <p className="text-[10px] text-[var(--text-muted)] mb-1">
+                  Current status: <span className="font-semibold text-[var(--text-secondary)]">{statusInfo(designChild.status).label}</span>
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)]">
+                  For design files, deliverable submission, and approval history, click <span className="font-semibold">Open task</span> above.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Title — entry-level (Main view + linked-child drill-down) */}
+        {(isViewingLinkedChild || sidebarView === "main") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Title
+            </label>
+            {isEditable ? (
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)] font-medium">
+                {task.title}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Description — entry-level */}
+        {(isViewingLinkedChild || sidebarView === "main") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Description
+            </label>
+            {isEditable ? (
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={2}
+                placeholder="Add description..."
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                {task.description || "No description"}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Creative Copy — Copy tab (editable) */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Creative Copy
+            </label>
+            {isEditable ? (
+              <textarea
+                value={editCreativeCopy}
+                onChange={(e) => setEditCreativeCopy(e.target.value)}
+                rows={3}
+                placeholder="Add creative copy..."
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                {task.creativeCopy || "No creative copy"}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Caption — Copy tab (editable) */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Caption
+            </label>
+            {isEditable ? (
+              <textarea
+                value={editCaption}
+                onChange={(e) => setEditCaption(e.target.value)}
+                rows={3}
+                placeholder="Add caption..."
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                {task.caption || "No caption"}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Reference Links — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
         <div className="pt-2 border-t border-[var(--border)]">
           <div className="flex items-center justify-between mb-1.5">
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
@@ -1580,8 +1834,10 @@ export function ContentCalendarEntrySidebar({
             )}
           </div>
         </div>
+        )}
 
-        {/* Platform + Content Type */}
+        {/* Platform + Content Type — entry-level (Main view + drill-down) */}
+        {(isViewingLinkedChild || sidebarView === "main") && (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
@@ -1630,56 +1886,61 @@ export function ContentCalendarEntrySidebar({
             )}
           </div>
         </div>
+        )}
 
-        {/* Go Live Date */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Go Live Date
-          </label>
-          {isEditable ? (
-            <input
-              type="date"
-              value={editPostDate}
-              onChange={(e) => setEditPostDate(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            />
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)]">
-              {task.postDate
-                ? formatPostDate(task.postDate).display
-                : "—"}
-            </p>
-          )}
-        </div>
+        {/* Go Live Date — entry-level */}
+        {(isViewingLinkedChild || sidebarView === "main") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Go Live Date
+            </label>
+            {isEditable ? (
+              <input
+                type="date"
+                value={editPostDate}
+                onChange={(e) => setEditPostDate(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)]">
+                {task.postDate
+                  ? formatPostDate(task.postDate).display
+                  : "—"}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* Assignor */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Assignor
-          </label>
-          {isEditable ? (
-            <select
-              value={editAssignor}
-              onChange={(e) => setEditAssignor(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              <option value="">Select assignor</option>
-              {admins.map((u: any) => (
-                <option key={u._id} value={u._id}>
-                  {u.name ?? u.email}
-                  {u.designation ? ` — ${u.designation}` : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-[13px] text-[var(--text-primary)]">
-              {task.assignorName ?? "—"}
-            </p>
-          )}
-        </div>
+        {/* Assignor — entry-level */}
+        {(isViewingLinkedChild || sidebarView === "main") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Assignor
+            </label>
+            {isEditable ? (
+              <select
+                value={editAssignor}
+                onChange={(e) => setEditAssignor(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              >
+                <option value="">Select assignor</option>
+                {admins.map((u: any) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name ?? u.email}
+                    {u.designation ? ` — ${u.designation}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)]">
+                {task.assignorName ?? "—"}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* Team filter → Assignee */}
-        {isEditable && (
+        {/* Team filter → Assignee — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && isEditable && (
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
               Team
@@ -1701,43 +1962,47 @@ export function ContentCalendarEntrySidebar({
             </select>
           </div>
         )}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Assignee
-          </label>
-          {isEditable ? (
-            <select
-              value={editAssignee}
-              onChange={(e) => setEditAssignee(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              <option value="">Unassigned</option>
-              {(sidebarTeamFilter && sidebarTeamMembers
-                ? sidebarTeamMembers
-                : employees
-              ).map((emp: any) => (
-                <option key={emp._id} value={emp._id}>
-                  {emp.name ?? emp.email}
-                  {emp.designation ? ` — ${emp.designation}` : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <div>
-              <p className="text-[13px] text-[var(--text-primary)]">
-                {task.assigneeName}
-              </p>
-              {task.assigneeDesignation && (
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  {task.assigneeDesignation}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              {isViewingLinkedChild ? "Assignee" : "Copy Assignee"}
+            </label>
+            {isEditable ? (
+              <select
+                value={editAssignee}
+                onChange={(e) => setEditAssignee(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              >
+                <option value="">Unassigned</option>
+                {(sidebarTeamFilter && sidebarTeamMembers
+                  ? sidebarTeamMembers
+                  : employees
+                ).map((emp: any) => (
+                  <option key={emp._id} value={emp._id}>
+                    {emp.name ?? emp.email}
+                    {emp.designation ? ` — ${emp.designation}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div>
+                <p className="text-[13px] text-[var(--text-primary)]">
+                  {task.assigneeName}
                 </p>
-              )}
-            </div>
-          )}
-        </div>
+                {task.assigneeDesignation && (
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    {task.assigneeDesignation}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Assign another task (Copy → Design) linked to this calendar entry */}
-        {isEditable && (
+        {/* Assign another task (Copy → Design) — superseded by the Design
+            tab on the main entry. Still shown when drilled into a linked
+            child so the legacy in-place flow keeps working for sub-children. */}
+        {isViewingLinkedChild && isEditable && (
           <div className="pt-3 border-t border-[var(--border)]">
             <button
               type="button"
@@ -1922,86 +2187,92 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Assigned At */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Assigned At
-          </label>
-          <p className="text-[13px] text-[var(--text-primary)]">
-            {task.assignedAt
-              ? new Date(task.assignedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })
-              : "Not yet assigned"}
-          </p>
-        </div>
-
-        {/* Deadline */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Deadline
-          </label>
-          {isEditable ? (
-            <input
-              type="date"
-              value={editDeadline}
-              onChange={(e) => setEditDeadline(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            />
-          ) : (
+        {/* Assigned At — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Assigned At
+            </label>
             <p className="text-[13px] text-[var(--text-primary)]">
-              {(() => {
-                const dl = effectiveDeadlineMs(task);
-                return dl != null
-                  ? new Date(dl).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : "No deadline";
-              })()}
+              {task.assignedAt
+                ? new Date(task.assignedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "Not yet assigned"}
             </p>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Status — both admins and assignees can change */}
-        <div>
-          <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-            Status
-          </label>
-          {(isEditable || (user && task.assigneeId === user._id)) ? (
-            <select
-              value={task.status}
-              onChange={(e) =>
-                updateTaskStatus({
-                  taskId: task._id,
-                  newStatus: e.target.value,
-                }).catch((err: any) =>
-                  toast(
-                    "error",
-                    err instanceof Error
-                      ? err.message
-                      : "Failed to update status"
+        {/* Deadline — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Deadline
+            </label>
+            {isEditable ? (
+              <input
+                type="date"
+                value={editDeadline}
+                onChange={(e) => setEditDeadline(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)]">
+                {(() => {
+                  const dl = effectiveDeadlineMs(task);
+                  return dl != null
+                    ? new Date(dl).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "No deadline";
+                })()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Status — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Status
+            </label>
+            {(isEditable || (user && task.assigneeId === user._id)) ? (
+              <select
+                value={task.status}
+                onChange={(e) =>
+                  updateTaskStatus({
+                    taskId: task._id,
+                    newStatus: e.target.value,
+                  }).catch((err: any) =>
+                    toast(
+                      "error",
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to update status"
+                    )
                   )
-                )
-              }
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <Badge variant="neutral">{si.label}</Badge>
-          )}
-        </div>
+                }
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Badge variant="neutral">{si.label}</Badge>
+            )}
+          </div>
+        )}
 
-        {/* Handoff target team (for auto-handoff after approval) */}
-        {isEditable && (
+        {/* Handoff target team — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && isEditable && (
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
               Auto-Handoff to Team
@@ -2032,8 +2303,8 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* ── Deliverable Submission (Copy Team flow) ──────── */}
-        {task.assigneeId && (task.status === "in-progress" || task.status === "pending") && (
+        {/* ── Deliverable Submission — Copy tab ──────── */}
+        {(isViewingLinkedChild || sidebarView === "copy") && task.assigneeId && (task.status === "in-progress" || task.status === "pending") && (
           <div className="pt-3 border-t border-[var(--border)]">
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
               Submit Deliverable
@@ -2046,26 +2317,7 @@ export function ContentCalendarEntrySidebar({
               <div className="flex flex-col gap-2">
                 <button
                   disabled={submittingTo === "tl"}
-                  onClick={async () => {
-                    setSubmittingTo("tl");
-                    try {
-                      // Save first if there are changes
-                      await handleSave();
-                      const msg = [
-                        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
-                        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
-                      ].filter(Boolean).join("\n\n");
-                      await submitDeliverable({
-                        taskId: task._id,
-                        message: msg,
-                      });
-                      toast("success", "Sent to Team Lead for review");
-                    } catch (err) {
-                      toast("error", err instanceof Error ? err.message : "Failed to submit");
-                    } finally {
-                      setSubmittingTo(null);
-                    }
-                  }}
+                  onClick={() => handleSubmitCopyDeliverable("tl")}
                   className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
                   {submittingTo === "tl" ? (
@@ -2077,25 +2329,7 @@ export function ContentCalendarEntrySidebar({
                 </button>
                 <button
                   disabled={submittingTo === "bm"}
-                  onClick={async () => {
-                    setSubmittingTo("bm");
-                    try {
-                      await handleSave();
-                      const msg = [
-                        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
-                        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
-                      ].filter(Boolean).join("\n\n");
-                      await submitDirectToManager({
-                        taskId: task._id,
-                        message: msg,
-                      });
-                      toast("success", "Sent directly to Brand Manager");
-                    } catch (err) {
-                      toast("error", err instanceof Error ? err.message : "Failed to submit");
-                    } finally {
-                      setSubmittingTo(null);
-                    }
-                  }}
+                  onClick={() => handleSubmitCopyDeliverable("bm")}
                   className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                 >
                   {submittingTo === "bm" ? (
@@ -2105,13 +2339,27 @@ export function ContentCalendarEntrySidebar({
                   )}
                   Send to Brand Manager
                 </button>
+                {task.assignedBy && task.assignedBy !== user?._id && (
+                  <button
+                    disabled={submittingTo === "as"}
+                    onClick={() => handleSubmitCopyDeliverable("as")}
+                    className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                  >
+                    {submittingTo === "as" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    Send to Assignor
+                  </button>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* ── Approval Status ──────────────────────────────── */}
-        {deliverables && deliverables.length > 0 && (
+        {/* ── Approval Status — Copy tab ──────── */}
+        {(isViewingLinkedChild || sidebarView === "copy") && deliverables && deliverables.length > 0 && (
           <div className="pt-3 border-t border-[var(--border)]">
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
               Approval Status
@@ -2173,8 +2421,8 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Save button */}
-        {isEditable && (
+        {/* Save button — Main + Copy tabs */}
+        {isEditable && sidebarView !== "design" && (
           <Button
             variant="primary"
             className="w-full"
@@ -2185,7 +2433,8 @@ export function ContentCalendarEntrySidebar({
           </Button>
         )}
 
-        {/* Files section */}
+        {/* Files section — Copy tab */}
+        {(isViewingLinkedChild || sidebarView === "copy") && (
         <div className="pt-2 border-t border-[var(--border)]">
           <div className="flex items-center justify-between mb-2">
             <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
@@ -2261,6 +2510,7 @@ export function ContentCalendarEntrySidebar({
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

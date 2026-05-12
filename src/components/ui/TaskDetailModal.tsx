@@ -90,6 +90,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const user = useQuery(api.users.getCurrentUser);
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
+  const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
+  const submitDirectToAssignor = useMutation(api.approvals.submitDeliverableDirectToAssignor);
   const deliverables = useQuery(api.approvals.listDeliverables, {
     taskId: taskId as Id<"tasks">,
   });
@@ -277,8 +279,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     }
   }
 
-  async function handleSubmitDeliverable(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmitDeliverable(
+    e: React.FormEvent | null,
+    routeTo: "tl" | "bm" | "as" = "tl"
+  ) {
+    if (e) e.preventDefault();
     if (!deliverableMessage.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
@@ -305,12 +310,20 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         }
       }
 
-      await submitDeliverable({
+      const payload = {
         taskId: taskId as Id<"tasks">,
         message: deliverableMessage.trim(),
         link: deliverableLink.trim() || undefined,
         ...(r2FileKeys.length > 0 ? { r2FileKeys, r2FileNames } : {}),
-      });
+      };
+
+      if (routeTo === "bm") {
+        await submitDirectToManager(payload);
+      } else if (routeTo === "as") {
+        await submitDirectToAssignor(payload);
+      } else {
+        await submitDeliverable(payload);
+      }
       setDeliverableMessage("");
       setDeliverableLink("");
       setDeliverableFiles([]);
@@ -1097,7 +1110,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {/* Submit form */}
             {showDeliverableForm && (
               <form
-                onSubmit={handleSubmitDeliverable}
+                onSubmit={(e) => handleSubmitDeliverable(e, "tl")}
                 className="space-y-2.5 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]"
               >
                 <div>
@@ -1154,23 +1167,46 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={!deliverableMessage.trim() || isSubmitting}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Route to</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      disabled={!deliverableMessage.trim() || isSubmitting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3" />
+                      )}
+                      Team Lead
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!deliverableMessage.trim() || isSubmitting}
+                      onClick={() => handleSubmitDeliverable(null, "bm")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                    >
                       <Send className="h-3 w-3" />
+                      Brand Manager
+                    </button>
+                    {task?.assignedBy && task.assignedBy !== user?._id && (
+                      <button
+                        type="button"
+                        disabled={!deliverableMessage.trim() || isSubmitting}
+                        onClick={() => handleSubmitDeliverable(null, "as")}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                      >
+                        <Send className="h-3 w-3" />
+                        Assignor
+                      </button>
                     )}
-                    {isSubmitting ? "Submitting..." : "Submit"}
-                  </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowDeliverableForm(false)}
-                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="self-start mt-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     Cancel
                   </button>
