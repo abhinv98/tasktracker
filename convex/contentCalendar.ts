@@ -697,7 +697,10 @@ export const createCalendarEntry = mutation({
     const month = args.postDate.substring(0, 7);
     await ensureSheetForMonth(ctx, args.briefId, month, userId);
 
-    const assignor = args.assignedBy ?? userId;
+    // Calendar tasks default their assignor to the brief's brand manager —
+    // matches the policy that every calendar task is "from" the manager.
+    // Falls back to the caller when the brief has no manager set.
+    const assignor = args.assignedBy ?? brief.assignedManagerId ?? userId;
     const assignee = args.assigneeId ?? assignor;
 
     const existingTasks = await ctx.db
@@ -821,6 +824,11 @@ export const createLinkedCalendarTask = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
 
+    // Calendar tasks attribute their assignor to the brief's brand manager
+    // by default — every calendar task is "from" the manager. Fall back to
+    // the caller when the brief has no manager set.
+    const assignor = brief.assignedManagerId ?? userId;
+
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,
       title: fullTitle,
@@ -828,7 +836,7 @@ export const createLinkedCalendarTask = mutation({
         args.description ??
         `Linked to calendar entry: ${parent.title}\n\nTags: Content Calendar, ${brandName}`,
       assigneeId: args.assigneeId,
-      assignedBy: userId,
+      assignedBy: assignor,
       status: "pending",
       sortOrder: maxOrder + 1000,
       duration: "1d",

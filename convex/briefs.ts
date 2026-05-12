@@ -711,6 +711,15 @@ export const createIndividualTaskBrief = mutation({
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
 
+    // Calendar tasks attribute their assignor to the brand manager when
+    // possible — every calendar task is "from" the manager. Resolve the
+    // manager from the CC brief (created above with ccManagerId set) or
+    // the args, and fall back to the calling admin only when no manager
+    // can be found.
+    const ccBriefRecord = await ctx.db.get(ccBriefId);
+    const calendarAssignor =
+      ccBriefRecord?.assignedManagerId ?? args.assignedManagerId ?? userId;
+
     const firstHandoff =
       normalizedTeams.length > 1 ? normalizedTeams[1].teamId : undefined;
     const parentTaskId = await ctx.db.insert("tasks", {
@@ -718,7 +727,7 @@ export const createIndividualTaskBrief = mutation({
       title: args.title,
       description: args.description,
       assigneeId: userId,
-      assignedBy: userId,
+      assignedBy: calendarAssignor,
       status: "pending",
       sortOrder: maxTaskOrder + 1000,
       duration: "1d",
@@ -745,7 +754,7 @@ export const createIndividualTaskBrief = mutation({
         title: `[${teamLabel}] ${args.title}`,
         description: args.description,
         assigneeId: t.assigneeId,
-        assignedBy: userId,
+        assignedBy: calendarAssignor,
         status: "pending",
         sortOrder: maxTaskOrder + 1001 + i,
         duration: "1d",

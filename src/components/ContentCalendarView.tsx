@@ -984,46 +984,29 @@ export function ContentCalendarView({
                   The copy team owns the entry. Design is assigned separately from the entry's sidebar.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                    Assignor
-                  </label>
-                  <select
-                    value={newAssignor || (defaultAssignor as string) || ""}
-                    onChange={(e) => setNewAssignor(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                  >
-                    <option value="">Select assignor</option>
-                    {admins.map((u: any) => (
-                      <option key={u._id} value={u._id}>
-                        {u.name ?? u.email}
-                        {u.designation ? ` — ${u.designation}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                    Copy Assignee
-                  </label>
-                  <select
-                    value={newAssignee}
-                    onChange={(e) => setNewAssignee(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                  >
-                    <option value="">Unassigned</option>
-                    {(newTeamFilter && newTeamMembers
-                      ? newTeamMembers
-                      : employees
-                    ).map((emp: any) => (
-                      <option key={emp._id} value={emp._id}>
-                        {emp.name ?? emp.email}
-                        {emp.designation ? ` — ${emp.designation}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                  Copy Assignee
+                </label>
+                <select
+                  value={newAssignee}
+                  onChange={(e) => setNewAssignee(e.target.value)}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                >
+                  <option value="">Unassigned</option>
+                  {(newTeamFilter && newTeamMembers
+                    ? newTeamMembers
+                    : employees
+                  ).map((emp: any) => (
+                    <option key={emp._id} value={emp._id}>
+                      {emp.name ?? emp.email}
+                      {emp.designation ? ` — ${emp.designation}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  Assignor is auto-set to the brand manager.
+                </p>
               </div>
               <div>
                 <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
@@ -1299,8 +1282,8 @@ export function ContentCalendarEntrySidebar({
         updates.caption = editCaption;
       if (editAssignee && editAssignee !== task.assigneeId)
         updates.assigneeId = editAssignee;
-      if (editAssignor && editAssignor !== task.assignedBy)
-        updates.assignedBy = editAssignor;
+      // Assignor edits removed from UI — assignor is always the brand manager
+      // (auto-set on task creation). Leave existing task.assignedBy alone.
       if (editDeadline) {
         const ts = new Date(editDeadline + "T23:59:59").getTime();
         if (ts !== task.deadline) updates.deadline = ts;
@@ -1459,6 +1442,52 @@ export function ContentCalendarEntrySidebar({
   const viewingMain = !isViewingLinkedChild && openTaskId === null && !creatingNew;
   const editingTaskMode = openTaskId !== null || creatingNew;
   const editingParent = openTaskId === task._id;
+
+  // Upstream content propagation: the first team (parent if it has a real
+  // assignee, else linkedTasks[0]) owns the Creative Copy / Caption. When
+  // we're editing a downstream task we show those upstream fields read-only
+  // (live-read; Convex reactivity keeps it in sync as the upstream team
+  // edits and submits).
+  const upstreamInfo = useMemo(() => {
+    const parent = parentEntryDetail?.task ?? null;
+    const parentHasRealAssignee = isViewingLinkedChild && parent
+      ? !!parent.assigneeId && parent.assigneeId !== parent.assignedBy
+      : !!task.assigneeId && task.assigneeId !== task.assignedBy;
+
+    let firstTask: any = null;
+    let firstTaskLabel = "Copy";
+    if (isViewingLinkedChild) {
+      if (parentHasRealAssignee && parent) {
+        firstTask = parent;
+        firstTaskLabel = "Copy";
+      } else if (linkedTasks && linkedTasks.length > 0) {
+        const lt = linkedTasks[0] as any;
+        firstTask = lt;
+        firstTaskLabel = lt.teamName ?? "Copy";
+      }
+    } else if (parentHasRealAssignee) {
+      firstTask = task;
+      firstTaskLabel = "Copy";
+    } else if (linkedTasks && linkedTasks.length > 0) {
+      const lt = linkedTasks[0] as any;
+      firstTask = lt;
+      firstTaskLabel = lt.teamName ?? "Copy";
+    }
+
+    const isFirstTeam = firstTask ? firstTask._id === task._id : true;
+    return { upstream: isFirstTeam ? null : firstTask, label: firstTaskLabel, isFirstTeam };
+  }, [task, linkedTasks, parentEntryDetail, isViewingLinkedChild]);
+
+  function upstreamStatusBadge(statusValue?: string) {
+    const map: Record<string, { label: string; bg: string; fg: string }> = {
+      pending: { label: "Pending", bg: "#fef3c7", fg: "#92400e" },
+      "in-progress": { label: "In Progress", bg: "#dbeafe", fg: "#1e40af" },
+      review: { label: "In Review", bg: "#fae8ff", fg: "#86198f" },
+      done: { label: "Approved", bg: "#dcfce7", fg: "#166534" },
+      "on-hold": { label: "On Hold", bg: "#f3f4f6", fg: "#374151" },
+    };
+    return map[statusValue ?? "pending"] ?? map.pending;
+  }
 
   return (
     <div className="w-[360px] shrink-0 bg-white flex flex-col overflow-hidden">
@@ -1754,7 +1783,7 @@ export function ContentCalendarEntrySidebar({
         )}
 
         {/* Title — entry-level (Main view + linked-child drill-down) */}
-        {(isViewingLinkedChild || viewingMain) && (
+        {viewingMain && (
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
               Title
@@ -1774,7 +1803,7 @@ export function ContentCalendarEntrySidebar({
         )}
 
         {/* Description — entry-level */}
-        {(isViewingLinkedChild || viewingMain) && (
+        {viewingMain && (
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
               Description
@@ -1795,52 +1824,100 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Creative Copy — Copy tab (editable) */}
+        {/* Creative Copy — editable for the first team, read-only upstream
+            display for any downstream team. */}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Creative Copy
-            </label>
-            {isEditable ? (
-              <textarea
-                value={editCreativeCopy}
-                onChange={(e) => setEditCreativeCopy(e.target.value)}
-                rows={3}
-                placeholder="Add creative copy..."
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-              />
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
+                Creative Copy
+              </label>
+              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
+                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
+                return (
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold"
+                    style={{ backgroundColor: b.bg, color: b.fg }}
+                  >
+                    From {upstreamInfo.label} · {b.label}
+                  </span>
+                );
+              })()}
+            </div>
+            {upstreamInfo.isFirstTeam ? (
+              isEditable ? (
+                <textarea
+                  value={editCreativeCopy}
+                  onChange={(e) => setEditCreativeCopy(e.target.value)}
+                  rows={3}
+                  placeholder="Add creative copy..."
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {task.creativeCopy || "No creative copy"}
+                </p>
+              )
             ) : (
-              <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                {task.creativeCopy || "No creative copy"}
+              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                {upstreamInfo.upstream?.creativeCopy?.trim() || (
+                  <span className="text-[var(--text-muted)] italic text-[12px]">
+                    Waiting on the {upstreamInfo.label} team to submit creative copy.
+                  </span>
+                )}
               </p>
             )}
           </div>
         )}
 
-        {/* Caption — Copy tab (editable) */}
+        {/* Caption — same upstream-pass-through rule as Creative Copy */}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Caption
-            </label>
-            {isEditable ? (
-              <textarea
-                value={editCaption}
-                onChange={(e) => setEditCaption(e.target.value)}
-                rows={3}
-                placeholder="Add caption..."
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-              />
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
+                Caption
+              </label>
+              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
+                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
+                return (
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold"
+                    style={{ backgroundColor: b.bg, color: b.fg }}
+                  >
+                    From {upstreamInfo.label} · {b.label}
+                  </span>
+                );
+              })()}
+            </div>
+            {upstreamInfo.isFirstTeam ? (
+              isEditable ? (
+                <textarea
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  rows={3}
+                  placeholder="Add caption..."
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {task.caption || "No caption"}
+                </p>
+              )
             ) : (
-              <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                {task.caption || "No caption"}
+              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                {upstreamInfo.upstream?.caption?.trim() || (
+                  <span className="text-[var(--text-muted)] italic text-[12px]">
+                    Waiting on the {upstreamInfo.label} team to submit caption.
+                  </span>
+                )}
               </p>
             )}
           </div>
         )}
 
-        {/* Reference Links — Copy tab */}
-        {(isViewingLinkedChild || editingTaskMode) && (
+        {/* Reference Links — entry-level, lives on Main view (shared across
+            all teams). Hidden inside team-task editors. */}
+        {viewingMain && (
         <div className="pt-2 border-t border-[var(--border)]">
           <div className="flex items-center justify-between mb-1.5">
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
@@ -1911,7 +1988,7 @@ export function ContentCalendarEntrySidebar({
         )}
 
         {/* Platform + Content Type — entry-level (Main view + drill-down) */}
-        {(isViewingLinkedChild || viewingMain) && (
+        {viewingMain && (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
@@ -1963,7 +2040,7 @@ export function ContentCalendarEntrySidebar({
         )}
 
         {/* Go Live Date + Status side-by-side — entry-level */}
-        {(isViewingLinkedChild || viewingMain) && (
+        {viewingMain && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
@@ -2017,33 +2094,10 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Assignor — entry-level */}
-        {(isViewingLinkedChild || viewingMain) && (
-          <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Assignor
-            </label>
-            {isEditable ? (
-              <select
-                value={editAssignor}
-                onChange={(e) => setEditAssignor(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-              >
-                <option value="">Select assignor</option>
-                {admins.map((u: any) => (
-                  <option key={u._id} value={u._id}>
-                    {u.name ?? u.email}
-                    {u.designation ? ` — ${u.designation}` : ""}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <p className="text-[13px] text-[var(--text-primary)]">
-                {task.assignorName ?? "—"}
-              </p>
-            )}
-          </div>
-        )}
+        {/* Assignor field removed — every calendar task's assignor is the
+            brand manager (auto-set by createCalendarEntry / createLinkedCalendarTask
+            / createIndividualTaskBrief). The Brief Info "Manager" chip on
+            Main view already surfaces who that is. */}
 
         {/* Team filter → Assignee — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && isEditable && (
