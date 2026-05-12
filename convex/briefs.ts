@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
+import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -69,19 +70,20 @@ export const listBriefs = query({
       const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
       const doneCount = tasksInBrief.filter((t) => t.status === "done").length;
 
-      // Effective deadline: surface the underlying task's deadline whenever
-      // there is exactly one task and the brief isn't a content_calendar
-      // (those use postDate per entry, not a brief-level deadline). This
-      // covers single_task briefs AND multi-task briefs that happen to have
-      // only one task — users mentally treat that lone task's deadline as
-      // "the brief's date" and editing the row should mirror it everywhere.
+      // Effective deadline: the brief's "ultimate" deadline rolls up to the
+      // latest top-level task deadline ("last node in sequence"). For a brief
+      // with a single task, that simplifies to mirroring the lone task's
+      // deadline. Content-calendar briefs use per-entry postDates, so they
+      // skip the rollup entirely.
       let effectiveDeadline = b.deadline;
-      if (
-        b.briefType !== "content_calendar" &&
-        tasksInBrief.length === 1 &&
-        tasksInBrief[0].deadline !== undefined
-      ) {
-        effectiveDeadline = tasksInBrief[0].deadline;
+      if (b.briefType !== "content_calendar") {
+        const topLevel = tasksInBrief.filter((t) => t.parentTaskId === undefined);
+        const dls = topLevel
+          .map((t) => t.deadline)
+          .filter((d): d is number => d !== undefined);
+        if (dls.length > 0) {
+          effectiveDeadline = Math.max(...dls);
+        }
       }
 
       return {
@@ -123,16 +125,18 @@ export const getBrief = query({
       .collect();
     const doneCount = tasks.filter((t) => t.status === "done").length;
 
-    // Mirror listBriefs: when there's exactly one task and it isn't a
-    // content_calendar brief, the lone task's deadline is the source of
-    // truth. Covers both single_task briefs and 1-task multi-task briefs.
+    // Mirror listBriefs: the brief's "ultimate" deadline rolls up to the
+    // latest top-level task deadline. Single-task briefs trivially mirror
+    // the lone task's deadline. Content-calendar briefs are excluded.
     let effectiveDeadline = brief.deadline;
-    if (
-      brief.briefType !== "content_calendar" &&
-      tasks.length === 1 &&
-      tasks[0].deadline !== undefined
-    ) {
-      effectiveDeadline = tasks[0].deadline;
+    if (brief.briefType !== "content_calendar") {
+      const topLevel = tasks.filter((t) => t.parentTaskId === undefined);
+      const dls = topLevel
+        .map((t) => t.deadline)
+        .filter((d): d is number => d !== undefined);
+      if (dls.length > 0) {
+        effectiveDeadline = Math.max(...dls);
+      }
     }
 
     return {
@@ -595,6 +599,10 @@ export const createIndividualTaskBrief = mutation({
           });
         }
       }
+
+      // Roll the freshly-inserted per-team task deadlines up into the brief's
+      // top-level deadline so the "ultimate" deadline reflects the last node.
+      await recomputeBriefDeadline(ctx, briefId);
 
       return briefId;
     }

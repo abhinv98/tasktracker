@@ -5,6 +5,7 @@ import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncB
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
+import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 import { ensureSheetForMonth } from "./contentCalendar";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -167,6 +168,11 @@ export const createTask = mutation({
       timestamp: Date.now(),
     });
 
+    // Newly-added task may extend the brief's latest deadline.
+    if (args.deadline !== undefined) {
+      await recomputeBriefDeadline(ctx, args.briefId);
+    }
+
     return taskId;
   },
 });
@@ -250,16 +256,13 @@ export const updateTask = mutation({
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(taskId, updates);
 
-      // For single_task briefs, the brief deadline IS the task deadline.
-      // Keep the two in sync on the DB so every query (listBriefs, getBrief,
-      // and any downstream consumer reading brief.deadline directly) sees
-      // the freshest value without relying on read-time overrides.
+      // Recompute the brief's "ultimate" deadline whenever a task's deadline
+      // moves. Master briefs roll up to the latest task deadline ("last node
+      // in sequence"); single-task briefs mirror the lone task's deadline.
+      // Content-calendar briefs are skipped inside the helper.
       const deadlineChanged = "deadline" in updates;
-      if (deadlineChanged && brief && brief.briefType === "single_task") {
-        const newDeadline = updates.deadline as number | undefined;
-        if (newDeadline !== brief.deadline) {
-          await ctx.db.patch(task.briefId, { deadline: newDeadline });
-        }
+      if (deadlineChanged) {
+        await recomputeBriefDeadline(ctx, task.briefId);
       }
 
       // Content calendar: when a parent entry's go-live date moves to a
@@ -655,6 +658,9 @@ export const deleteTask = mutation({
     // last open task on a master brief should auto-complete it; deleting the
     // only blocking in-progress task should let it move to "review").
     await syncBriefStatusFromTasks(ctx, briefId);
+
+    // Removing a task may shrink the brief's latest deadline window.
+    await recomputeBriefDeadline(ctx, briefId);
   },
 });
 
@@ -1010,11 +1016,9 @@ export const extendTaskDeadline = mutation({
       overdueAcknowledged: true,
     });
 
-    // Also update the brief's deadline for single_task briefs
-    const brief = await ctx.db.get(task.briefId);
-    if (brief?.briefType === "single_task") {
-      await ctx.db.patch(task.briefId, { deadline: normalizedNewDeadline });
-    }
+    // Roll the new task deadline up to the brief (latest task deadline wins
+    // for master briefs; mirrors the lone task for single_task briefs).
+    await recomputeBriefDeadline(ctx, task.briefId);
 
     await ctx.db.insert("notifications", {
       recipientId: task.assigneeId,

@@ -31,6 +31,7 @@ import type * as jsr from "../jsr.js";
 import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverables.js";
 import type * as lib_cascadeDeleteTask from "../lib/cascadeDeleteTask.js";
 import type * as lib_cascadeTaskStatus from "../lib/cascadeTaskStatus.js";
+import type * as lib_recomputeBriefDeadline from "../lib/recomputeBriefDeadline.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as lib_taskFlowResources from "../lib/taskFlowResources.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
@@ -55,6 +56,7 @@ import type * as migrations_provisionUsersInternals from "../migrations/provisio
 import type * as migrations_repairCascadeAndOnHold from "../migrations/repairCascadeAndOnHold.js";
 import type * as migrations_resetPassword from "../migrations/resetPassword.js";
 import type * as migrations_resetPasswordLookup from "../migrations/resetPasswordLookup.js";
+import type * as migrations_rollupBriefDeadlines from "../migrations/rollupBriefDeadlines.js";
 import type * as migrations_syncSingleTaskBriefs from "../migrations/syncSingleTaskBriefs.js";
 import type * as notifications from "../notifications.js";
 import type * as passwordChange from "../passwordChange.js";
@@ -102,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   "lib/autoApproveDeliverables": typeof lib_autoApproveDeliverables;
   "lib/cascadeDeleteTask": typeof lib_cascadeDeleteTask;
   "lib/cascadeTaskStatus": typeof lib_cascadeTaskStatus;
+  "lib/recomputeBriefDeadline": typeof lib_recomputeBriefDeadline;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   "lib/taskFlowResources": typeof lib_taskFlowResources;
   meetingMinutes: typeof meetingMinutes;
@@ -126,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/repairCascadeAndOnHold": typeof migrations_repairCascadeAndOnHold;
   "migrations/resetPassword": typeof migrations_resetPassword;
   "migrations/resetPasswordLookup": typeof migrations_resetPasswordLookup;
+  "migrations/rollupBriefDeadlines": typeof migrations_rollupBriefDeadlines;
   "migrations/syncSingleTaskBriefs": typeof migrations_syncSingleTaskBriefs;
   notifications: typeof notifications;
   passwordChange: typeof passwordChange;
