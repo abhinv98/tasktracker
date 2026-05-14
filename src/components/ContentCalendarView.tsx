@@ -648,10 +648,10 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {/* Copy Assignee — resolved by entry schema. Legacy
-                          entries (parent = design) surface the copy person
-                          from the linked child; modern entries surface the
-                          parent's assignee. */}
+                      {/* Copy Assignee — resolved server-side from team
+                          membership (Copy Team → copy, Design Team → design).
+                          Works for legacy entries where the parent task holds
+                          the design assignee and the child holds the copy. */}
                       {task.copyAssigneeName ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
