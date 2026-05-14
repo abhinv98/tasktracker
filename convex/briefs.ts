@@ -68,7 +68,15 @@ export const listBriefs = query({
         .map((x) => teams.find((t) => t._id === x.teamId)?.name)
         .filter(Boolean); 
       const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
-      const doneCount = tasksInBrief.filter((t) => t.status === "done").length;
+      // Content-calendar entries are stored as a parent task plus
+      // `[Copy]`/`[Design]` children. The user-visible "task" is the entry,
+      // so progress should count parents only — otherwise 6 entries register
+      // as 12 (or 18) in the bar.
+      const countableTasks =
+        b.briefType === "content_calendar"
+          ? tasksInBrief.filter((t) => t.parentTaskId === undefined)
+          : tasksInBrief;
+      const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
       // Effective deadline: the brief's "ultimate" deadline rolls up to the
       // latest top-level task deadline ("last node in sequence"). For a brief
@@ -92,10 +100,10 @@ export const listBriefs = query({
         managerName: manager?.name ?? manager?.email,
         teamIds,
         teamNames,
-        taskCount: tasksInBrief.length,
+        taskCount: countableTasks.length,
         doneCount,
         progress:
-          tasksInBrief.length > 0 ? (doneCount / tasksInBrief.length) * 100 : 0,
+          countableTasks.length > 0 ? (doneCount / countableTasks.length) * 100 : 0,
       };
     });
   },
@@ -124,7 +132,13 @@ export const getBrief = query({
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
-    const doneCount = tasks.filter((t) => t.status === "done").length;
+    // Mirror listBriefs: content-calendar progress counts entries (parents)
+    // only, not their Copy/Design children.
+    const countableTasks =
+      brief.briefType === "content_calendar"
+        ? tasks.filter((t) => t.parentTaskId === undefined)
+        : tasks;
+    const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
     // Mirror listBriefs: the brief's "ultimate" deadline rolls up to the
     // latest top-level task deadline. Single-task briefs trivially mirror
@@ -147,9 +161,10 @@ export const getBrief = query({
       brand,
       assignedTeams,
       tasks,
-      taskCount: tasks.length,
+      taskCount: countableTasks.length,
       doneCount,
-      progress: tasks.length > 0 ? (doneCount / tasks.length) * 100 : 0,
+      progress:
+        countableTasks.length > 0 ? (doneCount / countableTasks.length) * 100 : 0,
     };
   },
 });

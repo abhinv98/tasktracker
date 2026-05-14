@@ -118,16 +118,22 @@ export const getBrand = query({
       managers,
       briefs: brandBriefs.map((b) => {
         const briefTasks = tasks.filter((t) => t.briefId === b._id);
-        const doneCount = briefTasks.filter(
+        // Content-calendar entries are stored as a parent task + Copy/Design
+        // children; count parents only so each entry registers as one task.
+        const countable =
+          b.briefType === "content_calendar"
+            ? briefTasks.filter((t) => t.parentTaskId === undefined)
+            : briefTasks;
+        const doneCount = countable.filter(
           (t) => t.status === "done"
         ).length;
         return {
           ...b,
-          taskCount: briefTasks.length,
+          taskCount: countable.length,
           doneCount,
           progress:
-            briefTasks.length > 0
-              ? (doneCount / briefTasks.length) * 100
+            countable.length > 0
+              ? (doneCount / countable.length) * 100
               : 0,
         };
       }),
