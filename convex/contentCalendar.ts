@@ -4,32 +4,56 @@ import { v } from "convex/values";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 
-// Detect legacy two-team entries created via createCalendarEntryWithCopyTask:
-// the copy task is the linked child with title `[Content Calendar · …] Copy: …`
-// and the parent is the design owner. The modern scheme is the inverse —
-// parent is copy, [Design] child is design. We classify so the row columns
-// and sidebar role labels resolve to the correct person regardless of when
-// the entry was authored.
-const LEGACY_COPY_TITLE_RE = /^\s*\[content calendar[^\]]*\]\s+copy:\s/i;
-function isLegacyCopyChildTitle(title: string | undefined | null): boolean {
-  return typeof title === "string" && LEGACY_COPY_TITLE_RE.test(title);
+// Calendar entries were authored under two schemes:
+//   • Modern: parent task = Copy, `[Copy]` / `[Design]` children, sometimes
+//     admin-owned parent + named children.
+//   • Legacy: parent = Design assignee, linked child = Copy assignee. The
+//     legacy child's title was inconsistent — `[Content Calendar · brand]
+//     Copy: title`, `[Content Calendar · brand] copy`, plain `copy`, even
+//     typos like `copyy` — so the title alone is not a reliable signal.
+// Team membership is the dependable signal: copy people sit on a team
+// named like "Copy Team" and designers on "Design Team". `roleByUser` is
+// precomputed by the caller (userTeams → team name → role) and consulted
+// first; the title-prefix patterns are a fallback when team data is missing.
+function roleFromTeamNames(names: ReadonlyArray<string>): "copy" | "design" | null {
+  for (const n of names) {
+    const low = n.toLowerCase();
+    if (low.includes("copy")) return "copy";
+    if (low.includes("design")) return "design";
+  }
+  return null;
 }
 function classifyCalendarEntry(
   parent: { _id: any; title?: string; assigneeId?: any; assignedBy?: any },
-  children: Array<{ _id: any; title?: string; assigneeId?: any }>
+  children: Array<{ _id: any; title?: string; assigneeId?: any }>,
+  roleByUser?: Map<any, "copy" | "design" | null>
 ): {
   schema: "legacy" | "modern";
   copyTaskId: any | null;
   designTaskId: any | null;
 } {
-  const legacyCopy = children.find((c) => isLegacyCopyChildTitle(c.title));
-  if (legacyCopy) {
-    return {
-      schema: "legacy",
-      copyTaskId: legacyCopy._id,
-      designTaskId: parent._id,
-    };
+  // 1. Team-membership detection (most reliable).
+  if (roleByUser) {
+    const parentRole = parent.assigneeId
+      ? roleByUser.get(parent.assigneeId) ?? null
+      : null;
+    let copyTaskId: any = parentRole === "copy" ? parent._id : null;
+    let designTaskId: any = parentRole === "design" ? parent._id : null;
+    for (const c of children) {
+      const r = c.assigneeId ? roleByUser.get(c.assigneeId) ?? null : null;
+      if (r === "copy" && !copyTaskId) copyTaskId = c._id;
+      else if (r === "design" && !designTaskId) designTaskId = c._id;
+    }
+    if (copyTaskId || designTaskId) {
+      return {
+        schema: parentRole === "design" ? "legacy" : "modern",
+        copyTaskId,
+        designTaskId,
+      };
+    }
   }
+
+  // 2. Title-prefix detection ([Copy] / [Design]).
   const explicitCopy = children.find((c) => /^\s*\[copy\]/i.test(c.title ?? ""));
   const explicitDesign = children.find((c) => /^\s*\[design\]/i.test(c.title ?? ""));
   if (explicitCopy || explicitDesign) {
@@ -41,6 +65,20 @@ function classifyCalendarEntry(
       designTaskId: explicitDesign?._id ?? null,
     };
   }
+
+  // 3. Legacy `[Content Calendar · …] Copy: …` title pattern.
+  const legacyCopy = children.find((c) =>
+    /^\s*\[content calendar[^\]]*\]\s+copy:?\s*/i.test(c.title ?? "")
+  );
+  if (legacyCopy) {
+    return {
+      schema: "legacy",
+      copyTaskId: legacyCopy._id,
+      designTaskId: parent._id,
+    };
+  }
+
+  // 4. Fallback: parent = Copy (if real assignee), first child = Design.
   const parentHasRealAssignee =
     parent.assigneeId !== undefined && parent.assigneeId !== parent.assignedBy;
   return {
@@ -48,6 +86,27 @@ function classifyCalendarEntry(
     copyTaskId: parentHasRealAssignee ? parent._id : null,
     designTaskId: children[0]?._id ?? null,
   };
+}
+
+// Build a userId → role map using each user's userTeams membership. Caches
+// nothing — invoked once per query handler.
+async function buildRoleByUserMap(ctx: any): Promise<Map<any, "copy" | "design" | null>> {
+  const userTeams = await ctx.db.query("userTeams").collect();
+  const teams = await ctx.db.query("teams").collect();
+  const teamNameById = new Map<any, string>(
+    teams.map((t: any) => [t._id, t.name as string])
+  );
+  const namesByUser = new Map<any, string[]>();
+  for (const ut of userTeams) {
+    const name = teamNameById.get(ut.teamId);
+    if (!name) continue;
+    const list = namesByUser.get(ut.userId) ?? [];
+    list.push(name);
+    namesByUser.set(ut.userId, list);
+  }
+  const out = new Map<any, "copy" | "design" | null>();
+  for (const [uid, names] of namesByUser) out.set(uid, roleFromTeamNames(names));
+  return out;
 }
 
 // ─── BRAND-BASED CONTENT CALENDAR ──────────────
@@ -235,6 +294,7 @@ export const listTasksByBrandMonth = query({
     );
 
     const users = await ctx.db.query("users").collect();
+    const roleByUser = await buildRoleByUserMap(ctx);
 
     // Fetch all child/linked tasks for these entries in one pass
     const allChildTasks = tasks.filter((t) => t.parentTaskId);
@@ -251,7 +311,7 @@ export const listTasksByBrandMonth = query({
         const linkedChild = childTasks.length > 0 ? childTasks[0] : null;
         const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
 
-        const classification = classifyCalendarEntry(task, childTasks);
+        const classification = classifyCalendarEntry(task, childTasks, roleByUser);
         const lookupTask = (tid: any) =>
           tid === task._id ? task : childTasks.find((ct) => ct._id === tid) ?? null;
         const copyTask = classification.copyTaskId ? lookupTask(classification.copyTaskId) : null;
@@ -665,6 +725,7 @@ export const listTasksForSheet = query({
     );
 
     const users = await ctx.db.query("users").collect();
+    const roleByUser = await buildRoleByUserMap(ctx);
 
     const attachmentCounts: Record<string, number> = {};
     for (const task of monthTasks) {
@@ -692,9 +753,9 @@ export const listTasksForSheet = query({
         const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
 
         // Resolve who is actually the Copy person vs Design person for this
-        // entry. Legacy entries (parent = design, [Copy:] child) come out the
-        // opposite of modern entries; the classifier handles both.
-        const classification = classifyCalendarEntry(task, childTasks);
+        // entry. Legacy entries (parent = design, copy child) flip the modern
+        // mapping; classifier prefers team membership over title prefixes.
+        const classification = classifyCalendarEntry(task, childTasks, roleByUser);
         const lookupTask = (tid: any) =>
           tid === task._id ? task : childTasks.find((ct) => ct._id === tid) ?? null;
         const copyTask = classification.copyTaskId ? lookupTask(classification.copyTaskId) : null;
@@ -978,6 +1039,7 @@ export const listLinkedTasksForEntry = query({
 
     const users = await ctx.db.query("users").collect();
     const teams = await ctx.db.query("teams").collect();
+    const roleByUser = await buildRoleByUserMap(ctx);
 
     // Resolve a team for each child task. Title prefix `[Team Name]` (set by
     // createLinkedCalendarTask / createIndividualTaskBrief) is the cheapest
@@ -987,7 +1049,7 @@ export const listLinkedTasksForEntry = query({
     // Classify so legacy entries surface "Copy" / "Design" labels on the
     // right tasks regardless of which side the assignee sits on.
     const classification = parent
-      ? classifyCalendarEntry(parent as any, tasks as any)
+      ? classifyCalendarEntry(parent as any, tasks as any, roleByUser)
       : { schema: "modern" as const, copyTaskId: null, designTaskId: null };
 
     const enriched = await Promise.all(
