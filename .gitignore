@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Convex snapshot exports — contain production data, never commit
+convex-snapshot*.zip

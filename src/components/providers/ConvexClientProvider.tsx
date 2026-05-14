@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { DesktopNotificationBridge } from "./DesktopNotificationBridge";
 
 const convex = new ConvexReactClient(
-  process.env.NEXT_PUBLIC_CONVEX_URL ?? "https://coordinated-pika-8.eu-west-1.convex.cloud"
+  process.env.NEXT_PUBLIC_CONVEX_URL ?? "https://affable-guanaco-287.convex.cloud"
 );
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
