@@ -648,15 +648,18 @@ export function ContentCalendarView({
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      {/* Copy Assignee = main entry assignee (parent task) */}
-                      {task.assigneeId && task.assigneeId !== task.assignedBy ? (
+                      {/* Copy Assignee — resolved by entry schema. Legacy
+                          entries (parent = design) surface the copy person
+                          from the linked child; modern entries surface the
+                          parent's assignee. */}
+                      {task.copyAssigneeName ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
-                            {task.assigneeName}
+                            {task.copyAssigneeName}
                           </span>
-                          {task.assigneeDesignation && (
+                          {task.copyAssigneeDesignation && (
                             <p className="text-[10px] text-[var(--text-muted)]">
-                              {task.assigneeDesignation}
+                              {task.copyAssigneeDesignation}
                             </p>
                           )}
                         </div>
@@ -667,15 +670,15 @@ export function ContentCalendarView({
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      {/* Design Assignee = linked (child) task assignee */}
-                      {task.linkedAssigneeName ? (
+                      {/* Design Assignee — resolved by entry schema. */}
+                      {task.designAssigneeName ? (
                         <div>
                           <span className="text-[12px] text-[var(--text-primary)]">
-                            {task.linkedAssigneeName}
+                            {task.designAssigneeName}
                           </span>
-                          {task.linkedAssigneeDesignation && (
+                          {task.designAssigneeDesignation && (
                             <p className="text-[10px] text-[var(--text-muted)]">
-                              {task.linkedAssigneeDesignation}
+                              {task.designAssigneeDesignation}
                             </p>
                           )}
                         </div>
@@ -1538,6 +1541,12 @@ export function ContentCalendarEntrySidebar({
         {viewingMain && (() => {
           // Build the cards array: parent (when it has a real assignee) +
           // all linked children. Each card opens the per-team editor.
+          //
+          // Card labels honour the entry's schema (see classifyCalendarEntry
+          // in convex/contentCalendar.ts). For legacy entries the linked
+          // child is "Copy" and the parent is "Design" — without this hint
+          // the parent would mislabel as "Copy" and the child would inherit
+          // its userTeams team name (e.g. "Copy Team"), confusing admins.
           const cards: Array<{
             taskId: Id<"tasks">;
             label: string;
@@ -1548,13 +1557,22 @@ export function ContentCalendarEntrySidebar({
 
           const parentHasRealAssignee =
             !!task.assigneeId && task.assigneeId !== task.assignedBy;
+          // parentRole arrives via the linked-tasks query (parent doesn't
+          // appear there; we read it off any child). Falls back to "copy".
+          const parentRole =
+            (linkedTasks?.[0] as any)?.parentRole ?? "copy";
           if (parentHasRealAssignee) {
             cards.push({
               taskId: task._id as Id<"tasks">,
-              label: "Copy",
+              label:
+                parentRole === "design"
+                  ? "Design"
+                  : parentRole === "copy"
+                    ? "Copy"
+                    : "Copy",
               assigneeName: task.assigneeName,
               assigneeDesignation: task.assigneeDesignation,
-              accent: "#3b82f6",
+              accent: parentRole === "design" ? "#8b5cf6" : "#3b82f6",
             });
           }
 
@@ -1562,9 +1580,16 @@ export function ContentCalendarEntrySidebar({
           let colorIdx = 0;
           for (const lt of (linkedTasks ?? []) as any[]) {
             if (lt._id === task._id) continue;
+            // Prefer the semantic role from the classifier; only fall back
+            // to teamName / generic labels when the entry is multi-team
+            // (createIndividualTaskBrief) and neither side is copy/design.
+            let label: string;
+            if (lt.role === "copy") label = "Copy";
+            else if (lt.role === "design") label = "Design";
+            else label = lt.teamName ?? (cards.length === 0 ? "Design" : `Team ${cards.length + 1}`);
             cards.push({
               taskId: lt._id,
-              label: lt.teamName ?? (cards.length === 0 ? "Design" : `Team ${cards.length + 1}`),
+              label,
               assigneeName: lt.assigneeName,
               assigneeDesignation: lt.assigneeDesignation,
               accent: colors[colorIdx++ % colors.length],
@@ -1605,7 +1630,11 @@ export function ContentCalendarEntrySidebar({
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.accent }} />
                       <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">
-                        {c.label} Team
+                        {/* Avoid doubling: a label resolved from userTeams
+                            (e.g. "Copy Team") already ends with "Team", so
+                            only append the suffix to bare role names. */}
+                        {c.label}
+                        {/\bteam\s*$/i.test(c.label) ? "" : " Team"}
                       </span>
                     </div>
                     <span className="text-[10px] text-[var(--accent-admin)]">Open →</span>
@@ -2125,7 +2154,11 @@ export function ContentCalendarEntrySidebar({
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              {isViewingLinkedChild ? "Assignee" : "Copy Assignee"}
+              {isViewingLinkedChild
+                ? "Assignee"
+                : ((linkedTasks?.[0] as any)?.parentRole === "design"
+                    ? "Design Assignee"
+                    : "Copy Assignee")}
             </label>
             {isEditable ? (
               <select

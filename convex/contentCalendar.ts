@@ -4,6 +4,52 @@ import { v } from "convex/values";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 
+// Detect legacy two-team entries created via createCalendarEntryWithCopyTask:
+// the copy task is the linked child with title `[Content Calendar · …] Copy: …`
+// and the parent is the design owner. The modern scheme is the inverse —
+// parent is copy, [Design] child is design. We classify so the row columns
+// and sidebar role labels resolve to the correct person regardless of when
+// the entry was authored.
+const LEGACY_COPY_TITLE_RE = /^\s*\[content calendar[^\]]*\]\s+copy:\s/i;
+function isLegacyCopyChildTitle(title: string | undefined | null): boolean {
+  return typeof title === "string" && LEGACY_COPY_TITLE_RE.test(title);
+}
+function classifyCalendarEntry(
+  parent: { _id: any; title?: string; assigneeId?: any; assignedBy?: any },
+  children: Array<{ _id: any; title?: string; assigneeId?: any }>
+): {
+  schema: "legacy" | "modern";
+  copyTaskId: any | null;
+  designTaskId: any | null;
+} {
+  const legacyCopy = children.find((c) => isLegacyCopyChildTitle(c.title));
+  if (legacyCopy) {
+    return {
+      schema: "legacy",
+      copyTaskId: legacyCopy._id,
+      designTaskId: parent._id,
+    };
+  }
+  const explicitCopy = children.find((c) => /^\s*\[copy\]/i.test(c.title ?? ""));
+  const explicitDesign = children.find((c) => /^\s*\[design\]/i.test(c.title ?? ""));
+  if (explicitCopy || explicitDesign) {
+    const parentIsAdminOwned =
+      parent.assigneeId !== undefined && parent.assigneeId === parent.assignedBy;
+    return {
+      schema: "modern",
+      copyTaskId: explicitCopy?._id ?? (parentIsAdminOwned ? null : parent._id),
+      designTaskId: explicitDesign?._id ?? null,
+    };
+  }
+  const parentHasRealAssignee =
+    parent.assigneeId !== undefined && parent.assigneeId !== parent.assignedBy;
+  return {
+    schema: "modern",
+    copyTaskId: parentHasRealAssignee ? parent._id : null,
+    designTaskId: children[0]?._id ?? null,
+  };
+}
+
 // ─── BRAND-BASED CONTENT CALENDAR ──────────────
 
 async function getOrCreateCalendarBrief(
@@ -201,21 +247,38 @@ export const listTasksByBrandMonth = query({
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
         const assignor = users.find((u) => u._id === task.assignedBy);
-        // Linked (Design) child task — parent entry is now the Copy task.
         const childTasks = allChildTasks.filter((ct) => ct.parentTaskId === task._id);
         const linkedChild = childTasks.length > 0 ? childTasks[0] : null;
         const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
+
+        const classification = classifyCalendarEntry(task, childTasks);
+        const lookupTask = (tid: any) =>
+          tid === task._id ? task : childTasks.find((ct) => ct._id === tid) ?? null;
+        const copyTask = classification.copyTaskId ? lookupTask(classification.copyTaskId) : null;
+        const designTask = classification.designTaskId ? lookupTask(classification.designTaskId) : null;
+        const copyUser = copyTask ? users.find((u) => u._id === copyTask.assigneeId) : null;
+        const designUser = designTask ? users.find((u) => u._id === designTask.assigneeId) : null;
+        const copyHasRealAssignee =
+          !!copyTask && copyTask.assigneeId !== undefined && copyTask.assigneeId !== copyTask.assignedBy;
+        const designHasRealAssignee =
+          !!designTask && designTask.assigneeId !== undefined && designTask.assigneeId !== designTask.assignedBy;
+
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           assignorName: assignor?.name ?? assignor?.email ?? "—",
-          // `copyAssignee*` fields preserved (now points at the linked Design assignee)
-          // for any external consumers; UI reads via `linkedAssignee*`.
-          copyAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
-          copyAssigneeDesignation: linkedAssignee?.designation ?? "",
           linkedAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
           linkedAssigneeDesignation: linkedAssignee?.designation ?? "",
+          entrySchema: classification.schema,
+          copyTaskId: classification.copyTaskId ?? null,
+          designTaskId: classification.designTaskId ?? null,
+          copyAssigneeName:
+            copyHasRealAssignee && copyUser ? (copyUser.name ?? copyUser.email ?? "Unknown") : "",
+          copyAssigneeDesignation: copyHasRealAssignee ? (copyUser?.designation ?? "") : "",
+          designAssigneeName:
+            designHasRealAssignee && designUser ? (designUser.name ?? designUser.email ?? "Unknown") : "",
+          designAssigneeDesignation: designHasRealAssignee ? (designUser?.designation ?? "") : "",
           linkedTasks: childTasks.map((ct) => ({
             _id: ct._id,
             status: ct.status,
@@ -624,21 +687,43 @@ export const listTasksForSheet = query({
       })
       .map((task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
-        // Linked (Design) child task — parent entry is now the Copy task.
         const childTasks = allBriefTasks.filter((ct) => ct.parentTaskId === task._id);
         const linkedChild = childTasks.length > 0 ? childTasks[0] : null;
         const linkedAssignee = linkedChild ? users.find((u) => u._id === linkedChild.assigneeId) : null;
+
+        // Resolve who is actually the Copy person vs Design person for this
+        // entry. Legacy entries (parent = design, [Copy:] child) come out the
+        // opposite of modern entries; the classifier handles both.
+        const classification = classifyCalendarEntry(task, childTasks);
+        const lookupTask = (tid: any) =>
+          tid === task._id ? task : childTasks.find((ct) => ct._id === tid) ?? null;
+        const copyTask = classification.copyTaskId ? lookupTask(classification.copyTaskId) : null;
+        const designTask = classification.designTaskId ? lookupTask(classification.designTaskId) : null;
+        const copyUser = copyTask ? users.find((u) => u._id === copyTask.assigneeId) : null;
+        const designUser = designTask ? users.find((u) => u._id === designTask.assigneeId) : null;
+        const copyHasRealAssignee =
+          !!copyTask && copyTask.assigneeId !== undefined && copyTask.assigneeId !== copyTask.assignedBy;
+        const designHasRealAssignee =
+          !!designTask && designTask.assigneeId !== undefined && designTask.assigneeId !== designTask.assignedBy;
+
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           attachmentCount: attachmentCounts[task._id] ?? 0,
-          // `copyAssignee*` fields preserved (now point at the linked Design
-          // assignee) for any external consumers; UI reads via `linkedAssignee*`.
-          copyAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
-          copyAssigneeDesignation: linkedAssignee?.designation ?? "",
+          // Legacy `linkedAssignee*` fields kept for any external consumers.
           linkedAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
           linkedAssigneeDesignation: linkedAssignee?.designation ?? "",
+          // Semantic role fields used by the calendar table + sidebar.
+          entrySchema: classification.schema,
+          copyTaskId: classification.copyTaskId ?? null,
+          designTaskId: classification.designTaskId ?? null,
+          copyAssigneeName:
+            copyHasRealAssignee && copyUser ? (copyUser.name ?? copyUser.email ?? "Unknown") : "",
+          copyAssigneeDesignation: copyHasRealAssignee ? (copyUser?.designation ?? "") : "",
+          designAssigneeName:
+            designHasRealAssignee && designUser ? (designUser.name ?? designUser.email ?? "Unknown") : "",
+          designAssigneeDesignation: designHasRealAssignee ? (designUser?.designation ?? "") : "",
           linkedTasks: childTasks.map((ct) => ({
             _id: ct._id,
             status: ct.status,
@@ -885,6 +970,7 @@ export const listLinkedTasksForEntry = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    const parent = await ctx.db.get(parentTaskId);
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_parent", (q) => q.eq("parentTaskId", parentTaskId))
@@ -897,6 +983,12 @@ export const listLinkedTasksForEntry = query({
     // createLinkedCalendarTask / createIndividualTaskBrief) is the cheapest
     // signal; fall back to the assignee's primary userTeams row.
     const teamByName = new Map(teams.map((t) => [t.name.toLowerCase(), t]));
+
+    // Classify so legacy entries surface "Copy" / "Design" labels on the
+    // right tasks regardless of which side the assignee sits on.
+    const classification = parent
+      ? classifyCalendarEntry(parent as any, tasks as any)
+      : { schema: "modern" as const, copyTaskId: null, designTaskId: null };
 
     const enriched = await Promise.all(
       tasks.map(async (task) => {
@@ -933,16 +1025,34 @@ export const listLinkedTasksForEntry = query({
           }
         }
 
+        // Semantic role for this child relative to the entry's scheme. The
+        // sidebar role-card builder uses this to label legacy children "Copy"
+        // (instead of inheriting the misleading team name) and to flip the
+        // parent label to "Design" when the linked child is the Copy task.
+        let role: "copy" | "design" | "other" = "other";
+        if (classification.copyTaskId === task._id) role = "copy";
+        else if (classification.designTaskId === task._id) role = "design";
+
         return {
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
           teamId: teamId ?? null,
           teamName: teamName ?? null,
+          role,
         };
       })
     );
 
-    return enriched;
+    return enriched.map((t) => ({
+      ...t,
+      entrySchema: classification.schema,
+      parentRole:
+        classification.copyTaskId === parentTaskId
+          ? ("copy" as const)
+          : classification.designTaskId === parentTaskId
+            ? ("design" as const)
+            : ("other" as const),
+    }));
   },
 });
