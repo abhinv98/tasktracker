@@ -150,23 +150,8 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
   const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
 
-  const baseNav = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
-
-  // Oversight is a silent, super-admin-only surface for Vivek & Mayur.
-  const nav: NavCategory[] =
-    user.isOversightAdmin === true
-      ? baseNav.map((group) =>
-          group.category === "Management"
-            ? {
-                ...group,
-                items: [
-                  ...group.items,
-                  { href: "/oversight", label: "Oversight" },
-                ],
-              }
-            : group
-        )
-      : baseNav;
+  // Oversight lives as a tab inside Work Log (no standalone nav item).
+  const nav: NavCategory[] = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
 
   // All categories open by default
   const [openCategories, setOpenCategories] = useState<Set<string>>(

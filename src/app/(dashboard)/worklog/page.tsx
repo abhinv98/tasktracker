@@ -56,9 +56,13 @@ const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order
 export default function WorkLogPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
-  const [activeTab, setActiveTab] = useState<"teamload" | "managerlog" | "oversight">("teamload");
+  const [activeTab, setActiveTab] = useState<"worklog" | "teamload" | "managerlog" | "oversight">("worklog");
+  const [selectedDate, setSelectedDate] = useState(getTodayStr());
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterSearch, setFilterSearch] = useState("");
 
   const teams = useQuery(api.teams.listTeams);
+  const worklog = useQuery(api.worklog.getEmployeeWorkLog, { date: selectedDate });
 
   const [selectedMemberId, setSelectedMemberId] = useState<Id<"users"> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -116,6 +120,7 @@ export default function WorkLogPage() {
       {/* Tab Bar */}
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
         {[
+          { key: "worklog" as const, label: "Daily Work Log", icon: Calendar },
           { key: "teamload" as const, label: "Team Load", icon: Users },
           ...(user?.isSuperAdmin || isTeamLead
             ? [
@@ -152,6 +157,219 @@ export default function WorkLogPage() {
       </div>
 
       {/* Tab Content */}
+
+      {activeTab === "worklog" && (
+        <div>
+          {/* Date Navigation */}
+          <div className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => setSelectedDate(shiftDate(selectedDate, -1))}
+              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-[var(--accent-admin)]" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              />
+              <span className="text-[13px] text-[var(--text-secondary)] font-medium hidden sm:inline">
+                {formatDate(selectedDate)}
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedDate(shiftDate(selectedDate, 1))}
+              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+            </button>
+            {selectedDate !== getTodayStr() && (
+              <button
+                onClick={() => setSelectedDate(getTodayStr())}
+                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+              >
+                Today
+              </button>
+            )}
+          </div>
+
+          {/* Summary Stats */}
+          {worklog?.summary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Active Employees</p>
+                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                  {worklog.summary.employeesActive}
+                </p>
+              </Card>
+              <Card>
+                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Tasks</p>
+                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                  {worklog.summary.totalTasks}
+                </p>
+              </Card>
+              <Card>
+                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completed</p>
+                <p className="font-bold text-[28px] mt-1 tabular-nums" style={{ color: "#10b981" }}>
+                  {worklog.summary.completedTasks}
+                </p>
+              </Card>
+              <Card>
+                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completion Rate</p>
+                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                  {worklog.summary.totalTasks > 0
+                    ? Math.round((worklog.summary.completedTasks / worklog.summary.totalTasks) * 100)
+                    : 0}%
+                </p>
+              </Card>
+            </div>
+          )}
+
+          {/* Filters */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder="Search employee..."
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] w-[180px]"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              >
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="in-progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            {(filterSearch || filterStatus) && (
+              <button onClick={() => { setFilterSearch(""); setFilterStatus(""); }} className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline">
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          {/* Employee Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[...(worklog?.employees ?? [])]
+              .filter((emp) => {
+                if (filterSearch) {
+                  const name = (emp.user.name ?? emp.user.email ?? "").toLowerCase();
+                  if (!name.includes(filterSearch.toLowerCase())) return false;
+                }
+                if (filterStatus) {
+                  if (!emp.tasks.some((t: any) => t.status === filterStatus)) return false;
+                }
+                return true;
+              })
+              .sort((a, b) => b.totalTasks - a.totalTasks).map((emp) => (
+              <Card key={emp.user._id} className={emp.totalTasks === 0 ? "opacity-50" : ""}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
+                      <span className="text-[12px] font-bold text-[var(--accent-admin)]">
+                        {(emp.user.name ?? emp.user.email ?? "?")[0]?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                          {emp.user.name ?? emp.user.email ?? "Unknown"}
+                        </p>
+                        {emp.user.role === "admin" && (
+                          <span className="px-1 py-0.5 rounded text-[8px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]">
+                            {emp.user.isSuperAdmin ? "SA" : "ADM"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)]">{emp.user.designation ?? emp.user.role}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="text-[var(--text-muted)]">
+                      {emp.completedTasks}/{emp.totalTasks} done
+                    </span>
+                  </div>
+                </div>
+                {emp.tasks.length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    {emp.tasks
+                      .filter((task: any) => !filterStatus || task.status === filterStatus)
+                      .map((task: any) => {
+                      const statusInfo = STATUS_COLORS[task.status];
+                      const deadlineDate = task.deadline ? new Date(task.deadline) : null;
+                      const isTaskOverdue = deadlineDate && deadlineDate.getTime() < Date.now() && task.status !== "done" && task.status !== "review";
+                      return (
+                        <div
+                          key={task._id}
+                          onClick={() => router.push(`/brief/${task.briefId}`)}
+                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: statusInfo?.color ?? "#6b7280" }}
+                          />
+                          <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">
+                            {task.title}
+                          </span>
+                          <span className="text-[10px] text-[var(--text-muted)] shrink-0">
+                            {task.briefTitle}
+                          </span>
+                          {deadlineDate && (
+                            <span className={`text-[10px] flex items-center gap-0.5 shrink-0 ${isTaskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
+                              <Calendar className="h-2.5 w-2.5" />
+                              {deadlineDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
+                          <span
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                            style={{ color: statusInfo?.color, backgroundColor: statusInfo?.bg }}
+                          >
+                            {statusInfo?.label}
+                          </span>
+                          {task.timeSpentMinutes > 0 && (
+                            <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-0.5 shrink-0">
+                              <Clock className="h-2.5 w-2.5" />
+                              {Math.round(task.timeSpentMinutes)}m
+                            </span>
+                          )}
+                          {(task as any).changesCount > 0 && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 text-amber-700 bg-amber-50">
+                              {(task as any).changesCount} {(task as any).changesCount === 1 ? "change" : "changes"}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-[var(--text-muted)]">No tasks for this day</p>
+                )}
+              </Card>
+            ))}
+          </div>
+
+          {worklog && worklog.employees.length === 0 && (
+            <Card>
+              <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
+                No employee data available.
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
 
       {activeTab === "teamload" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
