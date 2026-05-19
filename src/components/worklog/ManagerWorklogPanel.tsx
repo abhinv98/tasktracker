@@ -137,7 +137,15 @@ export default function ManagerWorklogPanel() {
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+                <Card className="p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                    Supervising (open)
+                  </p>
+                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
+                    {day.summary.supervisingOpen ?? 0}
+                  </p>
+                </Card>
                 <Card className="p-4">
                   <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
                     Brands logged
@@ -206,6 +214,80 @@ export default function ManagerWorklogPanel() {
                   ))}
                 </div>
               )}
+
+              <div className="mb-6">
+                <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-1">
+                  Supervising — open delegated tasks
+                </h3>
+                <p className="text-[12px] text-[var(--text-muted)] mb-2">
+                  Pending, in-progress and review tasks this manager
+                  delegated and is responsible for tracking.
+                </p>
+                {(day.supervising ?? []).length === 0 ? (
+                  <p className="text-[13px] text-[var(--text-muted)]">None.</p>
+                ) : (
+                  <div className="rounded-xl border border-[var(--border)] bg-white overflow-x-auto">
+                    <table className="w-full text-[12px]">
+                      <thead>
+                        <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
+                          <th className="px-4 py-2.5 font-medium">Task</th>
+                          <th className="px-4 py-2.5 font-medium">Assigned to</th>
+                          <th className="px-4 py-2.5 font-medium">Brand</th>
+                          <th className="px-4 py-2.5 font-medium">Status</th>
+                          <th className="px-4 py-2.5 font-medium">Deadline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {day.supervising.map((t: any) => {
+                          const sc =
+                            t.status === "review"
+                              ? { c: "#8b5cf6", b: "rgba(139,92,246,0.12)" }
+                              : t.status === "in-progress"
+                                ? { c: "#f59e0b", b: "rgba(245,158,11,0.14)" }
+                                : { c: "#6b7280", b: "var(--bg-hover)" };
+                          return (
+                            <tr
+                              key={t._id}
+                              className="border-b border-[var(--border-subtle)]"
+                            >
+                              <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium max-w-[240px]">
+                                <span className="line-clamp-2">{t.title}</span>
+                              </td>
+                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">
+                                {t.assigneeName}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                                  style={{ background: t.brandColor }}
+                                >
+                                  {t.brandName}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize"
+                                  style={{ background: sc.b, color: sc.c }}
+                                >
+                                  {t.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">
+                                {t.deadline
+                                  ? new Date(t.deadline).toLocaleDateString(
+                                      "en-US",
+                                      { month: "short", day: "numeric" }
+                                    )
+                                  : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>

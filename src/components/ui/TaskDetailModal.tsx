@@ -1260,7 +1260,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         )}
                       </div>
                     </div>
-                    <p className="text-[12px] text-[var(--text-primary)] leading-relaxed">
+                    <p className="text-[12px] text-[var(--text-primary)] leading-relaxed break-words">
                       {d.message}
                     </p>
                     {d.link && (
@@ -1268,10 +1268,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         href={d.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-[var(--accent-admin)] hover:underline"
+                        className="flex items-start gap-1 mt-1.5 text-[11px] text-[var(--accent-admin)] hover:underline min-w-0"
                       >
-                        <ExternalLink className="h-3 w-3" />
-                        {d.link}
+                        <ExternalLink className="h-3 w-3 shrink-0 mt-0.5" />
+                        <span className="min-w-0 break-all">{d.link}</span>
                       </a>
                     )}
                     {(d as any).files?.length > 0 && (

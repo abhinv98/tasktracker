@@ -289,6 +289,43 @@ export const getManagerWorklogDay = query({
         brandName: brandMap.get(m.brandId)?.name ?? "—",
       }));
 
+    // Open tasks this manager delegated to others (their supervising
+    // responsibility): pending / in-progress / review, non-archived brief.
+    const allUsers = await ctx.db.query("users").collect();
+    const userMap = new Map(allUsers.map((u) => [u._id, u]));
+    const OPEN = new Set(["pending", "in-progress", "review"]);
+    const supervising = allTasks
+      .filter(
+        (t) =>
+          t.assignedBy === managerId &&
+          t.assigneeId !== managerId &&
+          OPEN.has(t.status) &&
+          (() => {
+            const b = briefMap.get(t.briefId);
+            return b && b.status !== "archived";
+          })()
+      )
+      .map((t) => {
+        const brief = briefMap.get(t.briefId);
+        const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
+        const assignee = userMap.get(t.assigneeId);
+        return {
+          _id: t._id,
+          title: t.title,
+          status: t.status,
+          assigneeName:
+            assignee?.name ?? assignee?.email ?? "Unknown",
+          brandName: brand?.name ?? "No Brand",
+          brandColor: brand?.color ?? "#6b7280",
+          deadline: t.deadline ?? null,
+        };
+      })
+      .sort((a, b) => {
+        const rank = (s: string) =>
+          s === "review" ? 0 : s === "in-progress" ? 1 : 2;
+        return rank(a.status) - rank(b.status);
+      });
+
     return {
       manager: {
         _id: manager._id,
@@ -304,11 +341,13 @@ export const getManagerWorklogDay = query({
       })),
       tasks: tasksToday,
       moms: momsToday,
+      supervising,
       summary: {
         brandsLogged: new Set(entries.map((e) => e.brandId)).size,
         totalHours: entries.reduce((s, e) => s + (e.hoursSpent ?? 0), 0),
         tasksHandled: tasksToday.length,
         momCount: momsToday.length,
+        supervisingOpen: supervising.length,
       },
     };
   },
