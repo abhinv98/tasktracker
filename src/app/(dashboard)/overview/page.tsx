@@ -99,7 +99,11 @@ export default function OverviewPage() {
                 )}
               </div>
               <button
-                onClick={() => router.push(`/brands/${brand._id}`)}
+                onClick={() =>
+                  router.push(
+                    `/brands/${brand._id}?returnTo=${encodeURIComponent("/overview")}`
+                  )
+                }
                 className="text-[var(--text-muted)] hover:text-[var(--accent-admin)] transition-colors"
               >
                 <Eye className="h-5 w-5" />

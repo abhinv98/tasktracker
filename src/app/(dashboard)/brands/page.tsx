@@ -48,7 +48,9 @@ export default function BrandsPage() {
       setDescription("");
       setColor(BRAND_COLORS[0]);
       toast("success", "Brand created");
-      router.push(`/brands/${brandId}`);
+      router.push(
+        `/brands/${brandId}?returnTo=${encodeURIComponent("/brands")}`
+      );
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brand");
     }
@@ -100,7 +102,11 @@ export default function BrandsPage() {
         {(filteredBrands ?? []).map((brand) => (
           <Card
             key={brand._id}
-            onClick={() => router.push(`/brands/${brand._id}`)}
+            onClick={() =>
+              router.push(
+                `/brands/${brand._id}?returnTo=${encodeURIComponent("/brands")}`
+              )
+            }
             hover
           >
             <div className="flex items-center gap-3 mb-3">

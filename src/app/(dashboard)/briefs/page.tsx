@@ -3,10 +3,11 @@
 import { useMutation, useQuery } from "convex/react";
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
-import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye } from "lucide-react";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
 /** Designing / copywriting only. */
@@ -849,9 +850,20 @@ export default function BriefsPage() {
                   style={{ borderLeft: `3px solid ${folder.brandColor}`, paddingLeft: "10px" }}
                 >
                   <FolderOpen className="h-4 w-4 shrink-0" style={{ color: folder.brandColor }} />
-                  <span className="font-semibold text-[14px] text-[var(--text-primary)]">
-                    {folder.brandName}
-                  </span>
+                  {folder.brandId !== "__no_brand__" ? (
+                    <Link
+                      href={`/brands/${folder.brandId}?returnTo=${encodeURIComponent("/briefs")}`}
+                      className="group inline-flex items-center gap-1 font-semibold text-[14px] text-[var(--text-primary)] hover:text-[var(--accent-admin)] hover:underline transition-colors"
+                      title={`Open ${folder.brandName}`}
+                    >
+                      {folder.brandName}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-[14px] text-[var(--text-primary)]">
+                      {folder.brandName}
+                    </span>
+                  )}
                   <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
                     ({folder.briefs.length} brief{folder.briefs.length !== 1 ? "s" : ""})
                   </span>

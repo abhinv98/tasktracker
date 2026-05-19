@@ -13,12 +13,28 @@ import MomTab from "@/components/brand/MomTab";
 
 type BrandTab = "overview" | "client-jsr" | "internal-jsr" | "mom";
 
+/** Only allow same-origin in-app paths as a back target. */
+function safeReturnPath(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) return decoded;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 export default function BrandDetailPage() {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const brandId = params.id as Id<"brands">;
+
+  // Back navigation returns the user to wherever they came from.
+  const returnTo = safeReturnPath(searchParams.get("returnTo"));
+  const backHref = returnTo ?? "/brands";
 
   const tabParam = searchParams.get("tab");
   const activeTab: BrandTab =
@@ -347,8 +363,9 @@ export default function BrandDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => router.push("/brands")}
+          onClick={() => router.push(backHref)}
           className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          title="Back"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -945,8 +962,18 @@ export default function BrandDetailPage() {
                   <div
                     key={brief._id}
                     onClick={() => {
-                      router.push("/briefs");
-                      queueMicrotask(() => router.push(`/brief/${brief._id}`));
+                      // Back from this brief returns to this brand page,
+                      // preserving the brand page's own back target.
+                      const brandSelf = `/brands/${brandId}${
+                        returnTo
+                          ? `?returnTo=${encodeURIComponent(returnTo)}`
+                          : ""
+                      }`;
+                      router.push(
+                        `/brief/${brief._id}?returnTo=${encodeURIComponent(
+                          brandSelf
+                        )}`
+                      );
                     }}
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] hover:border-[var(--accent-admin)] cursor-pointer transition-all"
                   >
