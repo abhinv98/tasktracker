@@ -476,14 +476,12 @@ export const updateTaskStatus = mutation({
     if (newStatus === "done") {
       await cascadeDoneToChildren(ctx, taskId, userId);
 
-      // BM / Super Admin override: when an admin force-marks a task done
-      // (skipping the normal deliverable approval flow), auto-approve every
-      // non-rejected deliverable on this task and on every cascaded child
-      // so deliverables stop sitting in Team Lead / Brand Manager queues.
-      // Employees can never reach this branch (the throw above blocks them).
-      if (user?.role === "admin") {
-        await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
-      }
+      // Marking a task done is authoritative: auto-approve every
+      // non-rejected deliverable on this task and every cascaded child so
+      // they can never re-enter Team Lead / Brand Manager review queues
+      // (e.g. a team lead approving days later). Only admins/BMs reach
+      // here — the throw above blocks employees.
+      await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
     }
 
     if (task.assignedBy !== userId) {
@@ -842,9 +840,7 @@ export const bulkUpdateStatus = mutation({
       // doing a bulk override.
       if (newStatus === "done") {
         await cascadeDoneToChildren(ctx, taskId, userId);
-        if (user?.role === "admin") {
-          await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
-        }
+        await autoApproveDeliverablesForTaskTree(ctx, taskId, userId);
       }
 
       await syncSingleTaskBriefStatus(ctx, task.briefId, newStatus);

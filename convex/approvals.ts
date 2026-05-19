@@ -245,16 +245,22 @@ export const listTeamLeadPendingApprovals = query({
     );
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+    const doneTaskIds = new Set(
+      tasks.filter((t) => t.status === "done").map((t) => t._id as string)
+    );
     const pending = allDeliverables.filter(
       (d) =>
         (d.teamLeadStatus === "pending" ||
           (d.teamLeadStatus === "approved" && !d.passedToManagerAt)) &&
         teamMemberIds.has(d.submittedBy) &&
-        d.submittedBy !== userId
+        d.submittedBy !== userId &&
+        // A closed (done) task is authoritative — drop its deliverables
+        // from the Team Lead review queue too.
+        !doneTaskIds.has(d.taskId as string)
     );
 
     const users = await ctx.db.query("users").collect();
-    const tasks = await ctx.db.query("tasks").collect();
     const briefs = await ctx.db.query("briefs").collect();
     const brands = await ctx.db.query("brands").collect();
 
@@ -371,6 +377,11 @@ export const listManagerDeliverables = query({
       if (d.submittedBy === userId) return false;
       if (d.teamLeadStatus !== "approved") return false;
       if (d.status === "rejected") return false;
+      // A closed (done) task is authoritative — never re-surface its
+      // deliverables in the Brand Manager review queue, even if a team
+      // lead approves them late.
+      const dTask = tasks.find((t) => t._id === d.taskId);
+      if (dTask?.status === "done") return false;
       // Keep approved deliverables visible if they still need handoff
       if (d.status === "approved") {
         if (handedOffDeliverableIds.has(d._id as string)) return false; // already handed off
@@ -609,11 +620,16 @@ export const getTeamLeadPendingCount = query({
     );
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
+    const tasks = await ctx.db.query("tasks").collect();
+    const doneTaskIds = new Set(
+      tasks.filter((t) => t.status === "done").map((t) => t._id as string)
+    );
     return allDeliverables.filter(
       (d) =>
         d.teamLeadStatus === "pending" &&
         teamMemberIds.has(d.submittedBy) &&
-        d.submittedBy !== userId
+        d.submittedBy !== userId &&
+        !doneTaskIds.has(d.taskId as string)
     ).length;
   },
 });
@@ -1112,6 +1128,55 @@ export const teamLeadApprove = mutation({
       throw new Error("Only the team lead can approve this deliverable");
     }
 
+    const user = await ctx.db.get(userId);
+    const task = await ctx.db.get(deliverable.taskId);
+    const brief = task ? await ctx.db.get(task.briefId) : null;
+
+    // The parent task is already closed (the AM/BM marked it done). The
+    // AM's decision is authoritative — a late team-lead approval must NOT
+    // re-inject this deliverable into the Brand Manager queue. Close the
+    // deliverable straight through instead and stop here.
+    if (task && task.status === "done") {
+      const closedNote =
+        note ?? "Task already completed — auto-closed on team lead approval";
+      await ctx.db.patch(deliverableId, {
+        teamLeadStatus: "approved",
+        teamLeadReviewedBy: userId,
+        teamLeadReviewNote: closedNote,
+        teamLeadReviewedAt: Date.now(),
+        status: deliverable.status === "rejected" ? deliverable.status : "approved",
+        reviewedBy: deliverable.reviewedBy ?? userId,
+        reviewedAt: deliverable.reviewedAt ?? Date.now(),
+        reviewNote: deliverable.reviewNote ?? closedNote,
+        passedToManagerBy: deliverable.passedToManagerBy ?? userId,
+        passedToManagerAt: deliverable.passedToManagerAt ?? Date.now(),
+      });
+      await ctx.db.insert("notifications", {
+        recipientId: deliverable.submittedBy,
+        type: "deliverable_approved",
+        title: "Deliverable approved",
+        message: `Your deliverable for "${task.title}" was approved (the task was already completed).`,
+        briefId: task.briefId,
+        taskId: deliverable.taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+      await ctx.db.insert("activityLog", {
+        briefId: task.briefId,
+        taskId: task._id,
+        userId,
+        action: "team_lead_approved",
+        details: JSON.stringify({
+          taskTitle: task.title,
+          briefTitle: brief?.title,
+          autoClosed: true,
+        }),
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
     await ctx.db.patch(deliverableId, {
       teamLeadStatus: "approved",
       teamLeadReviewedBy: userId,
@@ -1119,9 +1184,6 @@ export const teamLeadApprove = mutation({
       teamLeadReviewedAt: Date.now(),
     });
 
-    const user = await ctx.db.get(userId);
-    const task = await ctx.db.get(deliverable.taskId);
-    const brief = task ? await ctx.db.get(task.briefId) : null;
     await ctx.db.insert("notifications", {
       recipientId: deliverable.submittedBy,
       type: "deliverable_approved",
@@ -2817,6 +2879,12 @@ export const getPendingDeliverableCount = query({
     if (!isAdmin && !isTeamLead) return 0;
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
+    const allTasksForDone = await ctx.db.query("tasks").collect();
+    const doneTaskIds = new Set(
+      allTasksForDone
+        .filter((t) => t.status === "done")
+        .map((t) => t._id as string)
+    );
     let count = 0;
 
     // ── Team lead count: deliverables pending TL review from their team members ──
@@ -2830,7 +2898,8 @@ export const getPendingDeliverableCount = query({
         (d) =>
           d.teamLeadStatus === "pending" &&
           teamMemberIds.has(d.submittedBy) &&
-          d.submittedBy !== userId
+          d.submittedBy !== userId &&
+          !doneTaskIds.has(d.taskId as string)
       ).length;
     }
 
@@ -2860,6 +2929,7 @@ export const getPendingDeliverableCount = query({
 
           const task = tasks.find((t) => t._id === d.taskId);
           if (!task) continue;
+          if (task.status === "done") continue;
           const brief = briefs.find((b) => b._id === task.briefId);
           if (!brief?.brandId || !managedBrandIds.has(brief.brandId)) continue;
 
