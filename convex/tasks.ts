@@ -566,8 +566,12 @@ export const requestTaskRedo = mutation({
   args: {
     taskId: v.id("tasks"),
     note: v.string(),
+    /** Fresh deadline for the reopened task. Required by the UI when the
+     *  existing deadline is already in the past, so the employee doesn't
+     *  get an instant "overdue" alert on a just-reopened task. */
+    newDeadline: v.optional(v.number()),
   },
-  handler: async (ctx, { taskId, note }) => {
+  handler: async (ctx, { taskId, note, newDeadline }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
@@ -600,13 +604,30 @@ export const requestTaskRedo = mutation({
     const trimmedNote = note?.trim();
     if (!trimmedNote) throw new Error("A reason is required for redo");
 
-    // Reopen the task itself
-    await ctx.db.patch(taskId, {
+    // Reopen the task itself. A redo starts a fresh cycle, so clear the
+    // stale overdue acknowledgements (otherwise the old overdue state
+    // bleeds into the reopened task). If a new deadline was supplied,
+    // apply it (end-of-day) and keep the first original for audit.
+    const redoPatch: Record<string, unknown> = {
       status: "in-progress",
       completedAt: undefined,
       changesCount: (task.changesCount ?? 0) + 1,
       submittedForReviewAt: undefined,
-    });
+      overdueAcknowledged: undefined,
+      overdueContacted: undefined,
+      overdueContactDenied: undefined,
+    };
+    if (newDeadline !== undefined) {
+      redoPatch.deadline = normalizeDeadlineToEndOfDay(newDeadline);
+      redoPatch.originalDeadline = task.originalDeadline ?? task.deadline;
+      redoPatch.deadlineExtended = true;
+    }
+    await ctx.db.patch(taskId, redoPatch);
+
+    // Keep the brief's rolled-up deadline in sync with the new task date.
+    if (newDeadline !== undefined && brief?.briefType !== "content_calendar") {
+      await recomputeBriefDeadline(ctx, task.briefId);
+    }
 
     // Reopen the latest deliverable on this task (if one exists) so the
     // approval flow re-runs end-to-end. Earlier deliverables are left as-is

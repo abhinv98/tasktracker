@@ -114,6 +114,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     ) ?? false;
   const [showRedoForm, setShowRedoForm] = useState(false);
   const [redoNote, setRedoNote] = useState("");
+  const [redoDeadline, setRedoDeadline] = useState("");
   const [isSubmittingRedo, setIsSubmittingRedo] = useState(false);
   const briefId = detail?.task?.briefId;
   const graphData = useQuery(
@@ -674,20 +675,65 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
                   autoFocus
                 />
+                {(() => {
+                  const deadlinePast =
+                    !!task.deadline && task.deadline < Date.now();
+                  return (
+                    <div>
+                      <label className="text-[11px] font-medium text-amber-800 block mb-1">
+                        New deadline{deadlinePast ? " (required — old deadline has passed)" : " (optional)"}
+                      </label>
+                      <input
+                        type="date"
+                        value={redoDeadline}
+                        onChange={(e) => setRedoDeadline(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                      {deadlinePast && !redoDeadline && (
+                        <p className="text-[10px] text-amber-700 mt-1">
+                          This task's deadline already passed — set a new one so the assignee isn't flagged overdue immediately.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={isSubmittingRedo || !redoNote.trim()}
+                    disabled={
+                      isSubmittingRedo ||
+                      !redoNote.trim() ||
+                      (!!task.deadline &&
+                        task.deadline < Date.now() &&
+                        !redoDeadline)
+                    }
                     onClick={async () => {
                       if (!redoNote.trim()) return;
+                      const deadlinePast =
+                        !!task.deadline && task.deadline < Date.now();
+                      if (deadlinePast && !redoDeadline) {
+                        toast(
+                          "error",
+                          "Set a new deadline — the old one has passed."
+                        );
+                        return;
+                      }
                       setIsSubmittingRedo(true);
                       try {
                         await requestTaskRedo({
                           taskId: taskId as Id<"tasks">,
                           note: redoNote.trim(),
+                          ...(redoDeadline
+                            ? {
+                                newDeadline: new Date(
+                                  redoDeadline + "T23:59:59"
+                                ).getTime(),
+                              }
+                            : {}),
                         });
                         setShowRedoForm(false);
                         setRedoNote("");
+                        setRedoDeadline("");
                         toast("success", "Redo requested");
                       } catch (err) {
                         toast(
@@ -714,6 +760,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     onClick={() => {
                       setShowRedoForm(false);
                       setRedoNote("");
+                      setRedoDeadline("");
                     }}
                     className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >

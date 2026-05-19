@@ -1561,15 +1561,25 @@ export function ContentCalendarEntrySidebar({
           // appear there; we read it off any child). Falls back to "copy".
           const parentRole =
             (linkedTasks?.[0] as any)?.parentRole ?? "copy";
+
+          // One card per role. A role owned by an assigned task (the parent,
+          // for legacy entries where Copy lives on the entry itself) is the
+          // single source of truth — a stray unassigned linked child for the
+          // same role must NOT be surfaced as a separate editable task
+          // (that's the "ROLES says Ananya / Linked Task says Unassigned"
+          // mismatch). Unassigned children are still shown when their role
+          // has no other (assigned) owner, so it can still be assigned.
+          const seen = new Set<string>();
+          const normRole = (s: string) =>
+            s.toLowerCase().replace(/\s*team\s*$/i, "").trim();
+
           if (parentHasRealAssignee) {
+            const parentLabel =
+              parentRole === "design" ? "Design" : "Copy";
+            seen.add(normRole(parentLabel));
             cards.push({
               taskId: task._id as Id<"tasks">,
-              label:
-                parentRole === "design"
-                  ? "Design"
-                  : parentRole === "copy"
-                    ? "Copy"
-                    : "Copy",
+              label: parentLabel,
               assigneeName: task.assigneeName,
               assigneeDesignation: task.assigneeDesignation,
               accent: parentRole === "design" ? "#8b5cf6" : "#3b82f6",
@@ -1587,6 +1597,12 @@ export function ContentCalendarEntrySidebar({
             if (lt.role === "copy") label = "Copy";
             else if (lt.role === "design") label = "Design";
             else label = lt.teamName ?? (cards.length === 0 ? "Design" : `Team ${cards.length + 1}`);
+            const key = normRole(label);
+            // Skip a stray unassigned child whose role is already owned by
+            // an assigned task (the orphan-duplicate that caused the
+            // ROLES vs Linked-Task contradiction).
+            if (!lt.assigneeId && seen.has(key)) continue;
+            seen.add(key);
             cards.push({
               taskId: lt._id,
               label,
