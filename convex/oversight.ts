@@ -24,8 +24,13 @@ export const getOversightBoard = query({
     assigneeId: v.optional(v.id("users")),
     managerId: v.optional(v.id("users")),
     search: v.optional(v.string()),
+    /** "YYYY-MM-DD" — match tasks created, due, or completed that day. */
+    date: v.optional(v.string()),
   },
-  handler: async (ctx, { status, brandId, assigneeId, managerId, search }) => {
+  handler: async (
+    ctx,
+    { status, brandId, assigneeId, managerId, search, date }
+  ) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
@@ -66,6 +71,16 @@ export const getOversightBoard = query({
       };
     });
 
+    if (date) {
+      const dayStart = new Date(date + "T00:00:00").getTime();
+      const dayEnd = new Date(date + "T23:59:59.999").getTime();
+      const onDay = (ts: number | null) =>
+        ts != null && ts >= dayStart && ts <= dayEnd;
+      rows = rows.filter(
+        (r) =>
+          onDay(r.createdAt) || onDay(r.deadline) || onDay(r.completedAt)
+      );
+    }
     if (status) rows = rows.filter((r) => r.status === status);
     if (brandId) rows = rows.filter((r) => r.brandId === brandId);
     if (assigneeId) rows = rows.filter((r) => r.assigneeId === assigneeId);

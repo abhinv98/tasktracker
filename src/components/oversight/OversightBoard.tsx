@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   ExternalLink,
   FileText,
+  CalendarDays,
+  X,
 } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
@@ -31,6 +33,11 @@ function fmt(ts: number | null): string {
 }
 
 const isImg = (n: string) => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(n);
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
   const work = useQuery(api.oversight.getApprovedWorkForTask, { taskId });
@@ -130,6 +137,7 @@ export default function OversightBoard() {
   const [managerId, setManagerId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [search, setSearch] = useState("");
+  const [date, setDate] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const board = useQuery(api.oversight.getOversightBoard, {
@@ -138,6 +146,7 @@ export default function OversightBoard() {
     ...(managerId ? { managerId: managerId as Id<"users"> } : {}),
     ...(assigneeId ? { assigneeId: assigneeId as Id<"users"> } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
+    ...(date ? { date } : {}),
   });
 
   if (board === undefined)
@@ -237,6 +246,31 @@ export default function OversightBoard() {
             placeholder="Search..."
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px]"
           />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+            title="Tasks created, due, or completed on this day"
+          />
+          <button
+            onClick={() => setDate(todayStr())}
+            className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          >
+            Today
+          </button>
+          {date && (
+            <button
+              onClick={() => setDate("")}
+              title="Clear date"
+              className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <span className="text-[12px] text-[var(--text-muted)] ml-auto">
           {board.total} task{board.total !== 1 ? "s" : ""}
