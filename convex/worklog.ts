@@ -204,6 +204,45 @@ export const getTeamMemberTasks = query({
       (t) => activeBriefIds.has(t.briefId) && t.status !== "done"
     );
 
+    // Tasks this member delegated to others that they must supervise:
+    // pending / in-progress / review, on a non-archived brief.
+    const OPEN = new Set(["pending", "in-progress", "review"]);
+    const delegated = await ctx.db
+      .query("tasks")
+      .withIndex("by_assigned_by", (q) => q.eq("assignedBy", targetUserId))
+      .collect();
+    const archivedBriefIds = new Set(
+      allBriefs.filter((b) => b.status === "archived").map((b) => b._id)
+    );
+    const supervising = delegated
+      .filter(
+        (t) =>
+          t.assigneeId !== targetUserId &&
+          OPEN.has(t.status) &&
+          !archivedBriefIds.has(t.briefId)
+      )
+      .map((t) => {
+        const brief = allBriefs.find((b) => b._id === t.briefId);
+        const brand = brief?.brandId
+          ? allBrands.find((br) => br._id === brief.brandId)
+          : null;
+        const assignee = allUsers.find((u) => u._id === t.assigneeId);
+        return {
+          _id: t._id,
+          title: t.title,
+          status: t.status,
+          assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+          brandName: brand?.name ?? "No Brand",
+          brandColor: brand?.color ?? "#6b7280",
+          deadline: t.deadline ?? null,
+        };
+      })
+      .sort((a, b) => {
+        const rank = (s: string) =>
+          s === "review" ? 0 : s === "in-progress" ? 1 : 2;
+        return rank(a.status) - rank(b.status);
+      });
+
     return {
       user: {
         _id: targetUser._id,
@@ -212,6 +251,7 @@ export const getTeamMemberTasks = query({
         designation: targetUser.designation,
         avatarUrl: targetUser.avatarUrl,
       },
+      supervising,
       tasks: activeTasks.map((t) => {
         const brief = activeBriefs.find((b) => b._id === t.briefId);
         const brand = brief?.brandId ? allBrands.find((br) => br._id === brief.brandId) : null;

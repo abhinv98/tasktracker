@@ -617,6 +617,69 @@ export default function WorkLogPage() {
                       </table>
                     </div>
                   )}
+
+                  {/* Supervising — open delegated tasks */}
+                  <div className="mt-6">
+                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                      {(memberTasks.supervising?.length ?? 0)} supervising (delegated) task{(memberTasks.supervising?.length ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                    {(memberTasks.supervising?.length ?? 0) === 0 ? (
+                      <p className="text-[13px] text-[var(--text-muted)] mt-1">None.</p>
+                    ) : (
+                      <div className="mt-2 rounded-lg border border-[var(--border)] overflow-x-auto">
+                        <table className="w-full text-left min-w-[640px]">
+                          <thead>
+                            <tr className="bg-[var(--bg-hover)]">
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned to</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
+                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {memberTasks.supervising.map((t: any, idx: number) => {
+                              const config = MEMBER_STATUS_CONFIG[t.status] ?? { color: "var(--text-muted)", label: t.status, order: 99 };
+                              return (
+                                <tr
+                                  key={t._id}
+                                  className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"}`}
+                                >
+                                  <td className="px-3 py-2.5">
+                                    <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
+                                      {t.title}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <span className="text-[11px] text-[var(--text-secondary)]">{t.assigneeName}</span>
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white" style={{ background: t.brandColor }}>
+                                      {t.brandName}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <span
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap"
+                                      style={{ color: config.color, backgroundColor: config.color + "18" }}
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
+                                      {config.label}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
+                                      {t.deadline ? new Date(t.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
