@@ -7,6 +7,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { AttachmentList } from "./AttachmentList";
 import { CommentThread } from "../comments/CommentThread";
 import { DatePicker } from "./DatePicker";
+import { useToast } from "./Toast";
 import {
   X,
   Clock,
@@ -104,7 +105,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
   const subTasks = useQuery(api.tasks.getSubTasks, { parentTaskId: taskId as Id<"tasks"> });
   const createSubTask = useMutation(api.tasks.createSubTask);
+  const { toast } = useToast();
   const requestTaskRedo = useMutation(api.tasks.requestTaskRedo);
+  const canRedo =
+    useQuery(
+      api.tasks.canRequestRedo,
+      taskId ? { taskId: taskId as Id<"tasks"> } : "skip"
+    ) ?? false;
   const [showRedoForm, setShowRedoForm] = useState(false);
   const [redoNote, setRedoNote] = useState("");
   const [isSubmittingRedo, setIsSubmittingRedo] = useState(false);
@@ -578,7 +585,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   🔒 Task Done by Employee
                 </span>
               )}
-              {isDelivered && isAdmin && !showRedoForm && (
+              {isDelivered && canRedo && !showRedoForm && (
                 <button
                   type="button"
                   onClick={() => setShowRedoForm(true)}
@@ -681,12 +688,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         });
                         setShowRedoForm(false);
                         setRedoNote("");
+                        toast("success", "Redo requested");
                       } catch (err) {
-                        // Surface inline; toast plumbing not available in this modal.
-                        // Keeping console for visibility while we standardise on toast.
-                        // eslint-disable-next-line no-console
-                        console.error("requestTaskRedo failed", err);
-                        alert(
+                        toast(
+                          "error",
                           err instanceof Error
                             ? err.message
                             : "Could not request redo"
@@ -856,8 +861,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       await addDailySummary({ taskId: taskId as Id<"tasks">, date: summaryDate, summary: summaryText.trim() });
                       setShowSummaryForm(false);
                       setSummaryText("");
+                      toast("success", "Summary added");
                     } catch (err: any) {
-                      alert(err.message ?? "Failed to add summary");
+                      toast("error", err.message ?? "Failed to add summary");
                     } finally { setIsAddingSummary(false); }
                   }}
                   disabled={isAddingSummary || !summaryText.trim()}

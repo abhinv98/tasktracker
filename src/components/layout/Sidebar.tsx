@@ -27,6 +27,8 @@ import {
   ClipboardList,
   BookOpen,
   FileBarChart,
+  NotebookPen,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -57,6 +59,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/content-calendar": CalendarRange,
   "/history": BookOpen,
   "/reports": FileBarChart,
+  "/notebook": NotebookPen,
+  "/oversight": Eye,
 };
 
 interface NavCategory {
@@ -99,6 +103,10 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/users", label: "Users & Roles" },
       { href: "/archive", label: "Archive" },
     ],
+  },
+  {
+    category: "Personal",
+    items: [{ href: "/notebook", label: "My Notebook" }],
   },
   {
     category: "Account",
@@ -182,10 +190,23 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
   const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
 
-  const nav =
-    role === "admin"
-      ? ADMIN_NAV
-      : EMPLOYEE_NAV;
+  const baseNav = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+
+  // Oversight is a silent, super-admin-only surface for Vivek & Mayur.
+  const nav: NavCategory[] =
+    user.isOversightAdmin === true
+      ? baseNav.map((group) =>
+          group.category === "Management"
+            ? {
+                ...group,
+                items: [
+                  ...group.items,
+                  { href: "/oversight", label: "Oversight" },
+                ],
+              }
+            : group
+        )
+      : baseNav;
 
   // All categories open by default
   const [openCategories, setOpenCategories] = useState<Set<string>>(

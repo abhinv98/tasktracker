@@ -3,6 +3,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
+import { tagForOversight } from "./lib/tagForOversight";
 
 // Calendar entries were authored under two schemes:
 //   • Modern: parent task = Copy, `[Copy]` / `[Design]` children, sometimes
@@ -403,6 +404,14 @@ export const createEntryForBrand = mutation({
       ...(args.handoffTargetTeamId ? { handoffTargetTeamId: args.handoffTargetTeamId } : {}),
     });
 
+    await tagForOversight(ctx, {
+      taskId,
+      briefId,
+      assigneeId: assignee,
+      assignedBy: assignor,
+      source: "content_calendar",
+    });
+
     if (args.assigneeId) {
       await ctx.db.insert("notifications", {
         recipientId: args.assigneeId,
@@ -481,6 +490,14 @@ export const createCalendarEntryWithCopyTask = mutation({
       ...(args.designDeadline ? { deadline: args.designDeadline } : {}),
     });
 
+    await tagForOversight(ctx, {
+      taskId: parentTaskId,
+      briefId,
+      assigneeId: args.designAssigneeId,
+      assignedBy: userId,
+      source: "content_calendar",
+    });
+
     if (args.designAssigneeId !== userId) {
       await ctx.db.insert("notifications", {
         recipientId: args.designAssigneeId,
@@ -518,6 +535,14 @@ export const createCalendarEntryWithCopyTask = mutation({
         parentTaskId,
         assignedAt: Date.now(),
         ...(args.copyDeadline ? { deadline: args.copyDeadline } : {}),
+      });
+
+      await tagForOversight(ctx, {
+        taskId: copyTaskId,
+        briefId,
+        assigneeId: args.copyAssigneeId,
+        assignedBy: userId,
+        source: "content_calendar",
       });
 
       await ctx.db.insert("notifications", {
@@ -877,6 +902,14 @@ export const createCalendarEntry = mutation({
       ...(args.handoffTargetTeamId ? { handoffTargetTeamId: args.handoffTargetTeamId } : {}),
     });
 
+    await tagForOversight(ctx, {
+      taskId,
+      briefId: args.briefId,
+      assigneeId: assignee,
+      assignedBy: assignor,
+      source: "content_calendar",
+    });
+
     if (args.assigneeId) {
       await ctx.db.insert("notifications", {
         recipientId: args.assigneeId,
@@ -993,6 +1026,14 @@ export const createLinkedCalendarTask = mutation({
       ...(postDate ? { postDate } : {}),
       ...(args.deadline !== undefined ? { deadline: args.deadline } : {}),
       assignedAt: Date.now(),
+    });
+
+    await tagForOversight(ctx, {
+      taskId,
+      briefId: args.briefId,
+      assigneeId: args.assigneeId,
+      assignedBy: assignor,
+      source: "content_calendar",
     });
 
     await ctx.db.insert("notifications", {

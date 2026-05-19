@@ -329,6 +329,30 @@ export const setSuperAdmins = internalMutation({
   },
 });
 
+// Flags ONLY Vivek & Mayur as oversight admins (silent task tag + oversight
+// board + daily digest). Deliberately excludes Abhinav and other super-admins.
+// Run once after deploy: `npx convex run users:setOversightAdmins`.
+export const setOversightAdmins = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allUsers = await ctx.db.query("users").collect();
+    let updated = 0;
+    for (const u of allUsers) {
+      const name = (u.name ?? "").toLowerCase();
+      const shouldTag = name.includes("mayur") || name.includes("vivek");
+      if (shouldTag && u.isOversightAdmin !== true) {
+        await ctx.db.patch(u._id, { isOversightAdmin: true });
+        updated++;
+      } else if (!shouldTag && u.isOversightAdmin === true) {
+        // Keep the set strictly Vivek & Mayur if names change.
+        await ctx.db.patch(u._id, { isOversightAdmin: false });
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});
+
 export const migrateManagersToAdmin = internalMutation({
   args: {},
   handler: async (ctx) => {

@@ -6,6 +6,7 @@ import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
+import { tagForOversight } from "./lib/tagForOversight";
 import { ensureSheetForMonth } from "./contentCalendar";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -145,6 +146,14 @@ export const createTask = mutation({
       assignedBy: userId,
       status: "pending",
       sortOrder,
+    });
+
+    await tagForOversight(ctx, {
+      taskId,
+      briefId: args.briefId,
+      assigneeId: args.assigneeId,
+      assignedBy: userId,
+      source: "individual_task",
     });
 
     await ctx.db.insert("notifications", {
@@ -424,6 +433,34 @@ export const updateTaskStatus = mutation({
  * (a child being redone does not invalidate the parent's done state). It
  * also does not cascade downward through the handoff chain by default.
  */
+// Mirrors requestTaskRedo's authorisation exactly so the UI can hide the
+// control when the viewer can't actually request a redo (prevents the
+// silent-failure "looks broken" case).
+export const canRequestRedo = query({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+    const user = await ctx.db.get(userId);
+    if (!user) return false;
+    const task = await ctx.db.get(taskId);
+    if (!task) return false;
+    const brief = await ctx.db.get(task.briefId);
+
+    if ((user as any).isSuperAdmin === true) return true;
+    if (brief?.brandId) {
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
+        .collect();
+      if (bms.some((bm) => bm.managerId === userId)) return true;
+    }
+    if (!!brief?.assignedManagerId && brief.assignedManagerId === userId)
+      return true;
+    return false;
+  },
+});
+
 export const requestTaskRedo = mutation({
   args: {
     taskId: v.id("tasks"),
@@ -768,6 +805,14 @@ export const createSubTask = mutation({
       parentTaskId: args.parentTaskId,
     });
 
+    await tagForOversight(ctx, {
+      taskId,
+      briefId: parentTask.briefId,
+      assigneeId: args.assigneeId,
+      assignedBy: userId,
+      source: "sub_task",
+    });
+
     await ctx.db.insert("notifications", {
       recipientId: args.assigneeId,
       type: "task_assigned",
@@ -854,6 +899,14 @@ export const createEmployeeTask = mutation({
       ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
       ...(empDeadline ? { deadline: empDeadline } : {}),
       assignedAt: Date.now(),
+    });
+
+    await tagForOversight(ctx, {
+      taskId,
+      briefId: args.briefId,
+      assigneeId: userId,
+      assignedBy: args.assignorId,
+      source: "employee_task",
     });
 
     await ctx.db.insert("notifications", {

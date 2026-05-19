@@ -23,6 +23,8 @@ export default defineSchema({
     avatarUrl: v.optional(v.string()),
     designation: v.optional(v.string()),
     isSuperAdmin: v.optional(v.boolean()),
+    /** Oversight admins (Vivek & Mayur) — get the silent task tag, oversight board & daily digest */
+    isOversightAdmin: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
@@ -296,7 +298,9 @@ export default defineSchema({
       v.literal("client_denied"),
       v.literal("client_input_requested"),
       v.literal("overdue_contact"),
-      v.literal("deadline_extended")
+      v.literal("deadline_extended"),
+      v.literal("note_reminder"),
+      v.literal("oversight_digest")
     ),
     title: v.string(),
     message: v.string(),
@@ -523,7 +527,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_brand", ["brandId"])
-    .index("by_brand_date", ["brandId", "meetingDate"]),
+    .index("by_brand_date", ["brandId", "meetingDate"])
+    .index("by_creator", ["createdBy"]),
 
   // ─── JSR LINKS ────────────────────────
   jsrLinks: defineTable({
@@ -630,4 +635,80 @@ export default defineSchema({
   })
     .index("by_deliverable", ["deliverableId"])
     .index("by_brand", ["brandId"]),
+
+  // ─── PERSONAL NOTES (private notepad / task manager) ──
+  // Strictly private: only the author (an admin/super-admin) can ever read/write.
+  personalNotes: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    content: v.string(),
+    date: v.string(), // "YYYY-MM-DD" — day-wise bucket
+    brandId: v.optional(v.id("brands")), // brand-wise (optional)
+    tags: v.optional(v.array(v.string())),
+    color: v.optional(v.string()),
+    pinned: v.optional(v.boolean()),
+    checklist: v.optional(
+      v.array(v.object({ text: v.string(), done: v.boolean() }))
+    ),
+    remindAt: v.optional(v.number()), // "revisit later" timestamp
+    reminderSentAt: v.optional(v.number()), // dedupe guard for note_reminder
+    archived: v.optional(v.boolean()),
+    convertedTo: v.optional(
+      v.object({
+        kind: v.union(
+          v.literal("task"),
+          v.literal("calendar"),
+          v.literal("brief"),
+          v.literal("mom")
+        ),
+        refId: v.string(),
+        at: v.number(),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"])
+    .index("by_user_brand", ["userId", "brandId"])
+    .index("by_user_remind", ["userId", "remindAt"]),
+
+  // ─── MANAGER WORKLOG (brand-wise daily self-log, supervised) ──
+  // Self-authored by a brand/account manager; readable by their team lead
+  // (teams.leadId) and super-admins.
+  managerWorklog: defineTable({
+    userId: v.id("users"),
+    brandId: v.id("brands"),
+    date: v.string(), // "YYYY-MM-DD"
+    content: v.string(),
+    hoursSpent: v.optional(v.number()),
+    taskRefs: v.optional(v.array(v.id("tasks"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_user_brand", ["userId", "brandId"])
+    .index("by_brand_date", ["brandId", "date"]),
+
+  // ─── TASK OVERSIGHT TAG (silent, super-admin-only) ──
+  // One row per created task; powers the oversight board + daily digest.
+  taskOversight: defineTable({
+    taskId: v.id("tasks"),
+    briefId: v.id("briefs"),
+    brandId: v.optional(v.id("brands")),
+    assigneeId: v.id("users"),
+    assignedBy: v.id("users"),
+    source: v.union(
+      v.literal("individual_task"),
+      v.literal("master_brief"),
+      v.literal("content_calendar"),
+      v.literal("sub_task"),
+      v.literal("employee_task")
+    ),
+    createdAt: v.number(),
+    digestedAt: v.optional(v.number()),
+  })
+    .index("by_digested", ["digestedAt"])
+    .index("by_task", ["taskId"])
+    .index("by_created", ["createdAt"]),
 });

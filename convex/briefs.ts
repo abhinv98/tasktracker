@@ -6,6 +6,7 @@ import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
+import { tagForOversight } from "./lib/tagForOversight";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -333,6 +334,14 @@ export const createBrief = mutation({
         ...(ccDesignTeamId ? { handoffTargetTeamId: ccDesignTeamId } : {}),
       });
 
+      await tagForOversight(ctx, {
+        taskId: parentTaskId,
+        briefId,
+        assigneeId: userId,
+        assignedBy: userId,
+        source: "content_calendar",
+      });
+
       // Create Copy team linked task (step 1)
       if (ccCopyTeamId) {
         const copyAssignee = ccCopyAssigneeId ?? userId;
@@ -352,6 +361,14 @@ export const createBrief = mutation({
           parentTaskId,
           assignedAt: Date.now(),
           ...(ccDesignTeamId ? { handoffTargetTeamId: ccDesignTeamId } : {}),
+        });
+
+        await tagForOversight(ctx, {
+          taskId: copyTaskId,
+          briefId,
+          assigneeId: copyAssignee,
+          assignedBy: userId,
+          source: "content_calendar",
         });
 
         // Link copy team to brief
@@ -392,6 +409,14 @@ export const createBrief = mutation({
           assignedAt: Date.now(),
         });
 
+        await tagForOversight(ctx, {
+          taskId: designTaskId,
+          briefId,
+          assigneeId: designAssignee,
+          assignedBy: userId,
+          source: "content_calendar",
+        });
+
         // Link design team to brief
         await ctx.db.insert("briefTeams", { briefId, teamId: ccDesignTeamId, order: 1 });
 
@@ -426,6 +451,14 @@ export const createBrief = mutation({
         ...(taskDeadline ? { deadline: taskDeadline } : {}),
         assignedAt: Date.now(),
         ...(taskClientFacing ? { clientFacing: true } : {}),
+      });
+
+      await tagForOversight(ctx, {
+        taskId,
+        briefId,
+        assigneeId: taskAssigneeId,
+        assignedBy: userId,
+        source: "individual_task",
       });
 
       await ctx.db.insert("notifications", {
@@ -602,6 +635,14 @@ export const createIndividualTaskBrief = mutation({
           assignedAt: now,
         });
 
+        await tagForOversight(ctx, {
+          taskId,
+          briefId,
+          assigneeId: t.assigneeId,
+          assignedBy: userId,
+          source: "individual_task",
+        });
+
         if (t.assigneeId !== userId) {
           await ctx.db.insert("notifications", {
             recipientId: t.assigneeId,
@@ -755,6 +796,14 @@ export const createIndividualTaskBrief = mutation({
       assignedAt: now,
     });
 
+    await tagForOversight(ctx, {
+      taskId: parentTaskId,
+      briefId: ccBriefId,
+      assigneeId: userId,
+      assignedBy: calendarAssignor,
+      source: "content_calendar",
+    });
+
     // Child tasks per team, chained Copy → Design via handoffTargetTeamId
     for (let i = 0; i < normalizedTeams.length; i++) {
       const t = normalizedTeams[i];
@@ -782,6 +831,14 @@ export const createIndividualTaskBrief = mutation({
         ...(nextTeamId ? { handoffTargetTeamId: nextTeamId } : {}),
         ...(args.clientFacing ? { clientFacing: true } : {}),
         assignedAt: now,
+      });
+
+      await tagForOversight(ctx, {
+        taskId: childId,
+        briefId: ccBriefId,
+        assigneeId: t.assigneeId,
+        assignedBy: calendarAssignor,
+        source: "content_calendar",
       });
 
       if (t.assigneeId !== userId) {
