@@ -48,6 +48,15 @@ function dayBounds(date: string) {
   };
 }
 
+// YYYY-MM-DD for a timestamp. Used for timezone-tolerant day matching:
+// MoM meetingDate is stored from the browser's local midnight, so a raw
+// UTC epoch window on the server can miss "same day" MoMs for non-UTC
+// users. Matching on the calendar-date string of meetingDate/createdAt
+// (the day it was actually logged) is robust.
+function ymd(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
 // ── Author side (self only) ────────────────────────────────────
 
 export const myManagedBrands = query({
@@ -268,7 +277,12 @@ export const getManagerWorklogDay = query({
       .withIndex("by_creator", (q) => q.eq("createdBy", managerId))
       .collect();
     const momsToday = moms
-      .filter((m) => m.meetingDate >= start && m.meetingDate <= end)
+      .filter(
+        (m) =>
+          ymd(m.meetingDate) === date ||
+          ymd(m.createdAt) === date ||
+          (m.meetingDate >= start && m.meetingDate <= end)
+      )
       .map((m) => ({
         _id: m._id,
         title: m.title,
@@ -339,9 +353,15 @@ export const getManagerWorklogReport = query({
       .query("meetingMinutes")
       .withIndex("by_creator", (q) => q.eq("createdBy", managerId))
       .collect();
-    const momsInRange = moms.filter(
-      (m) => m.meetingDate >= rangeStart && m.meetingDate <= rangeEnd
-    );
+    const momsInRange = moms.filter((m) => {
+      const md = ymd(m.meetingDate);
+      const cd = ymd(m.createdAt);
+      return (
+        (md >= from && md <= to) ||
+        (cd >= from && cd <= to) ||
+        (m.meetingDate >= rangeStart && m.meetingDate <= rangeEnd)
+      );
+    });
 
     type BrandReport = {
       brandId: string;
