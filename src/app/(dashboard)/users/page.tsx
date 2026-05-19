@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import TeamsPanel from "@/components/teams/TeamsPanel";
 import {
   Badge,
   Button,
@@ -180,13 +182,19 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
                 ]}
               />
               {teams && teams.length > 0 && (
-                <Select
-                  label="Team (optional)"
-                  value={teamId}
-                  onChange={(e) => setTeamId(e.target.value)}
-                  placeholder="No team"
-                  options={teamOptions}
-                />
+                <div>
+                  <Select
+                    label="Assign Team"
+                    value={teamId}
+                    onChange={(e) => setTeamId(e.target.value)}
+                    placeholder="No team"
+                    options={teamOptions}
+                  />
+                  <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+                    They'll be added to this team automatically when they sign
+                    up. You can change it later in the Teams tab.
+                  </p>
+                </div>
               )}
 
               {error && (
@@ -220,6 +228,10 @@ export default function UsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<{ id: Id<"users">; name: string } | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab: "users" | "teams" =
+    searchParams.get("tab") === "teams" ? "teams" : "users";
 
   if (users === null) {
     return (
@@ -267,22 +279,47 @@ export default function UsersPage() {
   return (
     <div className="p-8">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight mb-1">
-            Users &amp; Roles
+            Users &amp; Teams
           </h1>
           <p className="text-[14px] text-[var(--text-secondary)]">
-            Manage user roles and permissions
+            Manage users, roles and team membership
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <UserPlus size={15} />
-          Create User
-        </Button>
+        {tab === "users" && (
+          <Button onClick={() => setShowCreateModal(true)}>
+            <UserPlus size={15} />
+            Create User
+          </Button>
+        )}
       </div>
 
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
+        {([
+          { key: "users", label: "Users" },
+          { key: "teams", label: "Teams" },
+        ] as const).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => router.replace(key === "users" ? "/users" : "/users?tab=teams")}
+            className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+              tab === key
+                ? "bg-white shadow-sm text-[var(--text-primary)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "teams" && <TeamsPanel />}
+
       {/* Table */}
+      {tab === "users" && (
       <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
@@ -357,6 +394,7 @@ export default function UsersPage() {
           </TableBody>
         </Table>
       </div>
+      )}
 
       {/* Create User Modal */}
       {showCreateModal && (

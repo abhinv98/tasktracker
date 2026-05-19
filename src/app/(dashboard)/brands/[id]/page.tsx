@@ -34,7 +34,7 @@ export default function BrandDetailPage() {
 
   // Back navigation returns the user to wherever they came from.
   const returnTo = safeReturnPath(searchParams.get("returnTo"));
-  const backHref = returnTo ?? "/brands";
+  const backHref = returnTo ?? "/brands-overview";
 
   const tabParam = searchParams.get("tab");
   const activeTab: BrandTab =
@@ -214,7 +214,7 @@ export default function BrandDetailPage() {
     try {
       await deleteBrand({ brandId });
       toast("success", "Brand deleted");
-      router.push("/brands");
+      router.push("/brands-overview");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to delete brand");
     }

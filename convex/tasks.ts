@@ -83,6 +83,109 @@ export const listTasksForUser = query({
   },
 });
 
+// Personal "My Tasks" surface for brand managers & super-admins.
+// Two streams:
+//   - assignedToMe: real tasks where I'm the assignee (my own work).
+//   - supervising: a derived "track & review" item for every task I
+//     delegated to someone else for my brand — checking progress,
+//     reviewing and marking it done is my responsibility. These auto-
+//     update from the underlying task and drop off once it's done.
+export const listMyWork = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || me.role !== "admin") return null;
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const briefMap = new Map(briefs.map((b) => [b._id, b]));
+    const brands = await ctx.db.query("brands").collect();
+    const brandMap = new Map(brands.map((b) => [b._id, b]));
+    const users = await ctx.db.query("users").collect();
+    const userMap = new Map(users.map((u) => [u._id, u]));
+
+    const liveBrief = (briefId: any) => {
+      const b = briefMap.get(briefId);
+      return b && b.status !== "archived" ? b : null;
+    };
+    const decorate = (t: any) => {
+      const brief = briefMap.get(t.briefId);
+      const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
+      return {
+        _id: t._id,
+        title: t.title,
+        status: t.status,
+        deadline: t.deadline ?? null,
+        completedAt: t.completedAt ?? null,
+        briefId: t.briefId,
+        briefTitle: brief?.title ?? "Unknown",
+        briefType: (brief as any)?.briefType ?? null,
+        brandId: brief?.brandId ?? null,
+        brandName: brand?.name ?? "No Brand",
+        brandColor: brand?.color ?? "#6b7280",
+        assigneeId: t.assigneeId,
+        assigneeName:
+          userMap.get(t.assigneeId)?.name ??
+          userMap.get(t.assigneeId)?.email ??
+          "Unknown",
+        assignedById: t.assignedBy,
+        assignedByName:
+          userMap.get(t.assignedBy)?.name ??
+          userMap.get(t.assignedBy)?.email ??
+          "Unknown",
+      };
+    };
+
+    const mine = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
+      .collect();
+    const assignedToMe = mine
+      .filter((t) => liveBrief(t.briefId))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(decorate);
+
+    const delegated = await ctx.db
+      .query("tasks")
+      .withIndex("by_assigned_by", (q) => q.eq("assignedBy", userId))
+      .collect();
+    const supervising = delegated
+      .filter(
+        (t) => t.assigneeId !== userId && liveBrief(t.briefId)
+      )
+      .map((t) => {
+        const d = decorate(t);
+        return {
+          ...d,
+          // Awaiting my review when the task is back in review state.
+          needsReview: t.status === "review",
+          isDone: t.status === "done",
+        };
+      })
+      .sort((a, b) => {
+        // Needs-review first, then active, then done; newest-ish by deadline.
+        const rank = (x: any) =>
+          x.needsReview ? 0 : x.isDone ? 2 : 1;
+        return rank(a) - rank(b);
+      });
+
+    return {
+      assignedToMe,
+      supervising,
+      counts: {
+        assignedToMe: assignedToMe.length,
+        assignedToMeOpen: assignedToMe.filter(
+          (t) => t.status !== "done"
+        ).length,
+        supervising: supervising.length,
+        supervisingOpen: supervising.filter((t) => !t.isDone).length,
+        needsReview: supervising.filter((t) => t.needsReview).length,
+      },
+    };
+  },
+});
+
 export const getTaskDetail = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {

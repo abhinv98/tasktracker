@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card } from "@/components/ui";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileBarChart, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import ManagerWorklogPanel from "@/components/worklog/ManagerWorklogPanel";
+import OversightBoard from "@/components/oversight/OversightBoard";
 
 const STATUS_COLORS = TASK_STATUS_CONFIG;
 
@@ -55,7 +56,7 @@ const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order
 export default function WorkLogPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
-  const [activeTab, setActiveTab] = useState<"worklog" | "reports" | "teamload" | "managerlog">("worklog");
+  const [activeTab, setActiveTab] = useState<"worklog" | "reports" | "teamload" | "managerlog" | "oversight">("teamload");
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterSearch, setFilterSearch] = useState("");
@@ -149,8 +150,6 @@ export default function WorkLogPage() {
       {/* Tab Bar */}
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
         {[
-          { key: "worklog" as const, label: "Daily Work Log", icon: Calendar },
-          { key: "reports" as const, label: "Reports", icon: FileBarChart },
           { key: "teamload" as const, label: "Team Load", icon: Users },
           ...(user?.isSuperAdmin || isTeamLead
             ? [
@@ -158,6 +157,15 @@ export default function WorkLogPage() {
                   key: "managerlog" as const,
                   label: "Manager Worklog",
                   icon: UsersRound,
+                },
+              ]
+            : []),
+          ...(user?.isOversightAdmin
+            ? [
+                {
+                  key: "oversight" as const,
+                  label: "Oversight",
+                  icon: Eye,
                 },
               ]
             : []),
@@ -930,6 +938,10 @@ export default function WorkLogPage() {
 
       {activeTab === "managerlog" && (user?.isSuperAdmin || isTeamLead) && (
         <ManagerWorklogPanel />
+      )}
+
+      {activeTab === "oversight" && user?.isOversightAdmin && (
+        <OversightBoard />
       )}
     </div>
   );

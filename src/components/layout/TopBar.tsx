@@ -17,16 +17,20 @@ interface TopBarProps {
 
 const PATH_TO_TITLE: Record<string, string> = {
   "/dashboard": "Overview",
+  "/my-tasks": "My Tasks",
   "/briefs": "Briefs",
   "/brief": "Brief Details",
-  "/teams": "Teams",
-  "/users": "Users & Roles",
+  "/users": "Users & Teams",
+  "/teams": "Users & Teams",
   "/archive": "Archive",
   "/profile": "Profile",
   "/deliverables": "Deliverables",
+  "/brands-overview": "Brands Overview",
   "/brands": "Brands",
-  "/overview": "Brand Overview",
-  "/analytics": "Analytics",
+  "/overview": "Brands Overview",
+  "/analytics": "Brands Overview",
+  "/oversight": "Oversight",
+  "/notebook": "My Notebook",
   "/worklog": "Work Log",
 };
 

@@ -8,8 +8,8 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
-const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/oversight"];
-const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics"];
+const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/oversight", "/my-tasks"];
+const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
 
 export default function DashboardLayout({
   children,

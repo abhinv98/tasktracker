@@ -167,7 +167,8 @@ export default defineSchema({
     .index("by_assignee", ["assigneeId"])
     .index("by_assignee_sort", ["assigneeId", "sortOrder"])
     .index("by_brief_assignee", ["briefId", "assigneeId"])
-    .index("by_parent", ["parentTaskId"]),
+    .index("by_parent", ["parentTaskId"])
+    .index("by_assigned_by", ["assignedBy"]),
 
   // ─── DELIVERABLES ────────────────────────────
   deliverables: defineTable({

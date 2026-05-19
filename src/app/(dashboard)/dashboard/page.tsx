@@ -491,7 +491,7 @@ export default function DashboardPage() {
           </div>
           {(myBrandIds ?? []).length > 0 && (
             <button
-              onClick={() => router.push("/brands?filter=mine")}
+              onClick={() => router.push("/brands-overview?filter=mine")}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
             >
               <Briefcase className="h-4 w-4" />
@@ -518,7 +518,7 @@ export default function DashboardPage() {
               {scopedOpenTasks}
             </p>
           </Card>
-          <Card accent="employee" hover onClick={() => router.push(isSuperAdmin ? "/teams" : "/brands?filter=mine")} className="cursor-pointer">
+          <Card accent="employee" hover onClick={() => router.push(isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine")} className="cursor-pointer">
             <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
               {isSuperAdmin ? "Teams" : "My Brands"}
             </p>
@@ -541,7 +541,7 @@ export default function DashboardPage() {
           <Card
             hover
             accent="admin"
-            onClick={() => router.push("/overview")}
+            onClick={() => router.push("/brands-overview?tab=work-data")}
             className="cursor-pointer"
           >
             <div className="flex items-center gap-3">
@@ -986,68 +986,29 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* My Tasks (for admins who have tasks assigned) */}
+        {/* My Tasks moved to its own page (/my-tasks) */}
         {adminActiveTasks.length > 0 && (
-          <div className="mb-6 sm:mb-8">
-            <h2 className="font-semibold text-[14px] text-[var(--text-secondary)] mb-3">
-              My Tasks ({adminActiveTasks.length})
-            </h2>
-            <div className="flex flex-col gap-2">
-              {adminActiveTasks.map((task) => {
-                const sc: Record<string, { color: string; bg: string }> = {
-                  "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
-                  "in-progress": { color: "#3B82F6", bg: "#EFF6FF" },
-                  "review": { color: "#F59E0B", bg: "#FFFBEB" },
-                };
-                const s = sc[task.status] ?? sc.pending;
-                const isSubTask = !!(task as any).parentTaskId;
-                return (
-                  <Card
-                    key={task._id}
-                    hover
-                    onClick={() => setAdminSelectedTaskId(task._id)}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          {isSubTask && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                              HELPER
-                            </span>
-                          )}
-                          {(task as any).deadlineExtended && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
-                              EXTENDED
-                            </span>
-                          )}
-                          {(task as any).briefStatus === "on_hold" && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                              ⏸ ON HOLD
-                            </span>
-                          )}
-                          <h3 className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
-                            {task.title}
-                          </h3>
-                        </div>
-                        <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
-                          {task.briefName}{task.deadline ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
-                        </p>
-                        {(task.description || (task as any).briefDescription) && (
-                          <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">{task.description || (task as any).briefDescription}</p>
-                        )}
-                      </div>
-                      <span
-                        className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium"
-                        style={{ color: s.color, backgroundColor: s.bg }}
-                      >
-                        {task.status}
-                      </span>
-                    </div>
-                  </Card>
-                );
-              })}
+          <Card
+            hover
+            onClick={() => router.push("/my-tasks")}
+            className="mb-6 sm:mb-8 p-4"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                  My Tasks
+                </h2>
+                <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+                  {adminActiveTasks.length} open task
+                  {adminActiveTasks.length !== 1 ? "s" : ""} assigned to you —
+                  plus the tasks you delegated and need to review.
+                </p>
+              </div>
+              <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)]">
+                Open My Tasks
+              </span>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Recent Activity Feed */}

@@ -29,6 +29,7 @@ import {
   FileBarChart,
   NotebookPen,
   Eye,
+  ListTodo,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -42,7 +43,9 @@ interface SidebarProps {
 
 const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LayoutGrid,
+  "/my-tasks": ListTodo,
   "/briefs": Briefcase,
+  "/brands-overview": BarChart3,
   "/brands": Tag,
   "/overview": BarChart3,
   "/analytics": TrendingUp,
@@ -50,7 +53,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   // "/planner": CalendarDays,
   "/messages": MessageSquare,
   "/teams": Users,
-  "/users": Shield,
+  "/users": Users,
   "/archive": Archive,
   "/profile": UserCircle,
   "/deliverables": FileCheck,
@@ -73,34 +76,31 @@ const ADMIN_NAV: NavCategory[] = [
     category: "Work",
     items: [
       { href: "/dashboard", label: "Dashboard" },
+      { href: "/my-tasks", label: "My Tasks" },
       { href: "/briefs", label: "Briefs" },
-      { href: "/discussions", label: "Discussions" },
     ],
   },
   {
-    category: "Planning",
+    category: "Communication",
     items: [
-      // { href: "/planner", label: "Planner" },
-      { href: "/content-calendar", label: "Content Calendar" },
+      { href: "/discussions", label: "Discussions" },
       { href: "/messages", label: "Messages" },
     ],
   },
   {
+    category: "Planning",
+    items: [{ href: "/content-calendar", label: "Content Calendar" }],
+  },
+  {
     category: "Organization",
-    items: [
-      { href: "/brands", label: "Brands" },
-      { href: "/overview", label: "Brand Overview" },
-      { href: "/analytics", label: "Analytics" },
-    ],
+    items: [{ href: "/brands-overview", label: "Brands Overview" }],
   },
   {
     category: "Management",
     items: [
       { href: "/deliverables", label: "Deliverables" },
-      { href: "/approved-work", label: "Approved Work" },
       { href: "/worklog", label: "Work Log" },
-      { href: "/teams", label: "Teams" },
-      { href: "/users", label: "Users & Roles" },
+      { href: "/users", label: "Users & Teams" },
       { href: "/archive", label: "Archive" },
     ],
   },
@@ -114,58 +114,18 @@ const ADMIN_NAV: NavCategory[] = [
   },
 ];
 
-const MANAGER_NAV: NavCategory[] = [
-  {
-    category: "Work",
-    items: [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/briefs", label: "Briefs" },
-      { href: "/discussions", label: "Discussions" },
-    ],
-  },
-  {
-    category: "Planning",
-    items: [
-      // { href: "/planner", label: "Planner" },
-      { href: "/content-calendar", label: "Content Calendar" },
-      { href: "/messages", label: "Messages" },
-    ],
-  },
-  {
-    category: "Organization",
-    items: [
-      { href: "/brands", label: "Brands" },
-      { href: "/analytics", label: "Analytics" },
-    ],
-  },
-  {
-    category: "Management",
-    items: [
-      { href: "/deliverables", label: "Deliverables" },
-      { href: "/approved-work", label: "Approved Work" },
-      { href: "/teams", label: "Teams" },
-      { href: "/archive", label: "Archive" },
-    ],
-  },
-  {
-    category: "Account",
-    items: [{ href: "/profile", label: "Profile" }],
-  },
-];
-
 const EMPLOYEE_NAV: NavCategory[] = [
   {
     category: "Work",
     items: [
       { href: "/dashboard", label: "Queue" },
-      { href: "/discussions", label: "Discussions" },
       { href: "/history", label: "History" },
     ],
   },
   {
-    category: "Planning",
+    category: "Communication",
     items: [
-      // { href: "/planner", label: "Planner" },
+      { href: "/discussions", label: "Discussions" },
       { href: "/messages", label: "Messages" },
     ],
   },

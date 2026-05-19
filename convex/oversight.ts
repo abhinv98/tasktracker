@@ -112,6 +112,90 @@ export const getOversightBoard = query({
   },
 });
 
+// Approved work (approved deliverables) for one task — powers the
+// expandable row on the oversight board. Oversight-admin gated.
+// Resolves both legacy Convex-storage and R2 files.
+export const getApprovedWorkForTask = query({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const user = await ctx.db.get(userId);
+    if (!user || user.isOversightAdmin !== true) return null;
+
+    const task = await ctx.db.get(taskId);
+    if (!task) return [];
+
+    const deliverables = await ctx.db
+      .query("deliverables")
+      .withIndex("by_task", (q) => q.eq("taskId", taskId))
+      .collect();
+
+    const approved = deliverables.filter((d) => {
+      if (d.clientStatus === "client_approved") return true;
+      if (d.status !== "approved") return false;
+      if (task.clientFacing) return false;
+      return true;
+    });
+    if (approved.length === 0) return [];
+
+    const users = await ctx.db.query("users").collect();
+    const userMap = new Map(users.map((u) => [u._id, u]));
+
+    return await Promise.all(
+      approved
+        .sort(
+          (a, b) =>
+            (b.clientReviewedAt ?? b.reviewedAt ?? b.submittedAt) -
+            (a.clientReviewedAt ?? a.reviewedAt ?? a.submittedAt)
+        )
+        .map(async (d) => {
+          let files: { name: string; url: string }[] = [];
+          if (d.fileIds && d.fileIds.length > 0) {
+            files = (
+              await Promise.all(
+                d.fileIds.map(async (fileId, idx) => {
+                  const url = await ctx.storage.getUrl(fileId);
+                  return {
+                    name: d.fileNames?.[idx] ?? "file",
+                    url: url ?? "",
+                  };
+                })
+              )
+            ).filter((f) => f.url);
+          }
+          if (d.r2FileKeys && d.r2FileKeys.length > 0) {
+            files = [
+              ...files,
+              ...d.r2FileKeys.map((key, idx) => ({
+                name: d.r2FileNames?.[idx] ?? "file",
+                url: `/api/r2-file?key=${encodeURIComponent(key)}`,
+              })),
+            ];
+          }
+          const submitter = userMap.get(d.submittedBy);
+          return {
+            _id: d._id,
+            message: d.message,
+            link: d.link ?? null,
+            submitterName:
+              submitter?.name ?? submitter?.email ?? "Unknown",
+            submittedAt: d.submittedAt,
+            approvedAt:
+              d.clientReviewedAt ?? d.reviewedAt ?? d.submittedAt,
+            approvalSource:
+              d.clientStatus === "client_approved"
+                ? ("client" as const)
+                : ("internal" as const),
+            clientNote: d.clientNote ?? null,
+            reviewNote: d.reviewNote ?? null,
+            files,
+          };
+        })
+    );
+  },
+});
+
 // Daily rolled-up digest: one notification per oversight admin summarising
 // every task tagged since the last digest. Run by a daily cron.
 export const sendOversightDigest = internalMutation({
