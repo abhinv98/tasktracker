@@ -339,7 +339,11 @@ export const setOversightAdmins = internalMutation({
     let updated = 0;
     for (const u of allUsers) {
       const name = (u.name ?? "").toLowerCase();
-      const shouldTag = name.includes("mayur") || name.includes("vivek");
+      // Abhinav included so the owner can verify the oversight feature.
+      const shouldTag =
+        name.includes("mayur") ||
+        name.includes("vivek") ||
+        name.includes("abhinav");
       if (shouldTag && u.isOversightAdmin !== true) {
         await ctx.db.patch(u._id, { isOversightAdmin: true });
         updated++;
