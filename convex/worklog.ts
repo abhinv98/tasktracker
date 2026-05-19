@@ -307,12 +307,21 @@ export const getTeamLoadView = query({
           const u = allUsers.find((usr) => usr._id === mid);
           if (!u) return null;
           const memberTasks = activeTasks.filter((t) => t.assigneeId === mid);
+          const supervisingCount = activeTasks.filter(
+            (t) =>
+              t.assignedBy === mid &&
+              t.assigneeId !== mid &&
+              (t.status === "pending" ||
+                t.status === "in-progress" ||
+                t.status === "review")
+          ).length;
           return {
             _id: u._id,
             name: u.name,
             email: u.email,
             role: u.role,
             taskCount: memberTasks.length,
+            supervisingCount,
             pendingTasks: memberTasks.filter((t) => t.status === "pending").length,
             inProgressTasks: memberTasks.filter((t) => t.status === "in-progress").length,
             reviewTasks: memberTasks.filter((t) => t.status === "review").length,
