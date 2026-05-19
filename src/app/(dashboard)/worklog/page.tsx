@@ -438,6 +438,11 @@ export default function WorkLogPage() {
                       <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
                         {member.taskCount} tasks
                       </span>
+                      {member.supervisingCount > 0 && (
+                        <span className="text-[10px] font-medium tabular-nums px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] whitespace-nowrap">
+                          {member.supervisingCount} supervising
+                        </span>
+                      )}
                       {member.taskCount > 0 && (
                         <div className="flex h-1.5 w-16 rounded-full overflow-hidden bg-[var(--bg-hover)]">
                           <div style={{ width: `${(member.doneTasks / member.taskCount) * 100}%`, backgroundColor: "var(--accent-employee)" }} />
