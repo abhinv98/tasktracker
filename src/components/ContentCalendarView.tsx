@@ -1393,6 +1393,19 @@ export function ContentCalendarEntrySidebar({
       }
       if (oCreativeCopy !== (openTask.creativeCopy ?? "")) updates.creativeCopy = oCreativeCopy;
       if (oCaption !== (openTask.caption ?? "")) updates.caption = oCaption;
+      // Number of Creatives — applies to the Design role's task only.
+      if (editingTaskRole === "design") {
+        const current = (openTask as any).creativesRequired ?? null;
+        const trimmed = editCreativesRequired.trim();
+        const next =
+          trimmed === ""
+            ? null
+            : Math.max(1, Math.min(99, parseInt(trimmed, 10) || 0));
+        if (next !== current) {
+          if (next === null) updates.clearCreativesRequired = true;
+          else updates.creativesRequired = next;
+        }
+      }
       if (Object.keys(updates).length > 0) {
         await updateTask({ taskId: openTask._id, ...updates });
         toast("success", "Task updated");
@@ -1480,6 +1493,23 @@ export function ContentCalendarEntrySidebar({
   const viewingMain = !isViewingLinkedChild && openTaskId === null && !creatingNew;
   const editingTaskMode = openTaskId !== null || creatingNew;
   const editingParent = openTaskId === task._id;
+
+  // Role of the task being edited in the drill-in view. Used to pick the
+  // header label ("Design Team" vs "Copy Team") and to gate role-specific
+  // fields (Creative Copy / Caption are Copy-only; Number of Creatives is
+  // a Design field).
+  const taskMeta = task as any;
+  const editingTaskRole: "copy" | "design" | null = (() => {
+    if (creatingNew || !openTaskId) return null;
+    if (taskMeta.designTaskId && openTaskId === taskMeta.designTaskId) return "design";
+    if (taskMeta.copyTaskId && openTaskId === taskMeta.copyTaskId) return "copy";
+    const lt = (linkedTasks ?? []).find((l: any) => l._id === openTaskId) as any;
+    if (lt?.role === "design") return "design";
+    if (lt?.role === "copy") return "copy";
+    return null;
+  })();
+  const editingRoleLabel =
+    editingTaskRole === "design" ? "Design Team" : "Copy Team";
 
   // Upstream content propagation: the first team (parent if it has a real
   // assignee, else linkedTasks[0]) owns the Creative Copy / Caption. When
@@ -1791,7 +1821,7 @@ export function ContentCalendarEntrySidebar({
               <ChevronRight className="h-3.5 w-3.5 rotate-180" />
             </button>
             <h4 className="font-semibold text-[13px] text-[var(--text-primary)]">
-              {creatingNew ? "New team task" : "Copy Team"}
+              {creatingNew ? "New team task" : editingRoleLabel}
             </h4>
           </div>
         )}
@@ -1854,6 +1884,26 @@ export function ContentCalendarEntrySidebar({
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
               />
             </div>
+            {editingTaskRole === "design" && (
+              <div>
+                <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                  Number of Creatives
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={editCreativesRequired}
+                  onChange={(e) => setEditCreativesRequired(e.target.value)}
+                  disabled={!isEditable}
+                  placeholder="e.g. 4"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  Shows on this design assignee's task as "X / N creatives required" with separate deliverable slots.
+                </p>
+              </div>
+            )}
             {isEditable && (
               <button
                 type="button"
@@ -1913,8 +1963,9 @@ export function ContentCalendarEntrySidebar({
         )}
 
         {/* Creative Copy — editable for the first team, read-only upstream
-            display for any downstream team. */}
-        {(isViewingLinkedChild || editingTaskMode) && (
+            display for any downstream team. Hidden when the editor is the
+            Design role (which doesn't author copy). */}
+        {(isViewingLinkedChild || editingTaskMode) && editingTaskRole !== "design" && (
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
@@ -1958,8 +2009,9 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Caption — same upstream-pass-through rule as Creative Copy */}
-        {(isViewingLinkedChild || editingTaskMode) && (
+        {/* Caption — same upstream-pass-through rule as Creative Copy.
+            Hidden when editing the Design role. */}
+        {(isViewingLinkedChild || editingTaskMode) && editingTaskRole !== "design" && (
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
