@@ -438,6 +438,7 @@ export default function DashboardPage() {
     const overdueTasksForManager = useQuery(api.tasks.listOverdueTasksForManager);
     const actionNeededTasks = useQuery(api.tasks.listActionNeededTasks);
     const adminOverdueHalt = useQuery(api.tasks.getOverdueHaltStatus);
+    const myWork = useQuery(api.tasks.listMyWork);
     const resumeOverdueTask = useMutation(api.tasks.resumeOverdueTask);
     const extendTaskDeadline = useMutation(api.tasks.extendTaskDeadline);
     const confirmOverdueContact = useMutation(api.tasks.confirmOverdueContact);
@@ -987,37 +988,49 @@ export default function DashboardPage() {
         )}
 
         {/* My Tasks moved to its own page (/my-tasks) */}
-        {adminActiveTasks.length > 0 && (
-          <Card
-            hover
-            onClick={() => router.push("/my-tasks")}
-            className="mb-6 sm:mb-8 p-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">
-                  My Tasks
-                </h2>
-                <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
-                  {adminActiveTasks.length} open task
-                  {adminActiveTasks.length !== 1 ? "s" : ""} assigned to you —
-                  plus the tasks you delegated and need to review.
-                </p>
+        {(() => {
+          const mine = myWork?.counts.assignedToMeOpen ?? 0;
+          const supervising = myWork?.counts.supervisingOpen ?? 0;
+          if (mine === 0 && supervising === 0) return null;
+          return (
+            <Card
+              hover
+              onClick={() => router.push("/my-tasks")}
+              className="mb-6 sm:mb-8 p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                    My Tasks
+                  </h2>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="text-[12px] text-[var(--text-secondary)]">
+                      <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                        {mine}
+                      </span>{" "}
+                      your task{mine !== 1 ? "s" : ""}
+                    </span>
+                    <span className="h-3 w-px bg-[var(--border)]" aria-hidden />
+                    <span className="text-[12px] text-[var(--text-secondary)]">
+                      <span className="font-semibold text-[var(--text-primary)] tabular-nums">
+                        {supervising}
+                      </span>{" "}
+                      supervising
+                    </span>
+                    {(myWork?.counts.needsReview ?? 0) > 0 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
+                        {myWork!.counts.needsReview} awaiting your review
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)]">
+                  Open My Tasks
+                </span>
               </div>
-              <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)]">
-                Open My Tasks
-              </span>
-            </div>
-          </Card>
-        )}
-
-        {/* Recent Activity Feed */}
-        <Card className="mb-6 sm:mb-8 p-4">
-          <h3 className="font-semibold text-[13px] text-[var(--text-secondary)] uppercase tracking-wide mb-3">
-            Recent Activity
-          </h3>
-          <ActivityFeed />
-        </Card>
+            </Card>
+          );
+        })()}
 
         {/* Team Lead Overview */}
         {((teamLeadOverview ?? []).length > 0 || (pendingApprovalCount ?? 0) > 0) && (

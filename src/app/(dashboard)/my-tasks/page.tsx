@@ -11,6 +11,9 @@ import {
   Eye,
   ClipboardCheck,
   CalendarClock,
+  Filter,
+  Search,
+  X,
 } from "lucide-react";
 
 const STATUS = TASK_STATUS_CONFIG as Record<
@@ -48,6 +51,13 @@ export default function MyTasksPage() {
   const data = useQuery(api.tasks.listMyWork);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [brandFilter, setBrandFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const [scope, setScope] = useState<"all" | "mine" | "supervising">("all");
+  const [hideDone, setHideDone] = useState(true);
+
   if (user === undefined || data === undefined) {
     return (
       <div className="p-8">
@@ -66,6 +76,52 @@ export default function MyTasksPage() {
   }
 
   const { assignedToMe, supervising, counts } = data;
+
+  // Build brand filter options from whatever brands appear in either list.
+  const brandMap = new Map<string, string>();
+  for (const t of [...assignedToMe, ...supervising] as any[]) {
+    if (t.brandId) brandMap.set(t.brandId, t.brandName ?? "—");
+  }
+  const brandOptions = [...brandMap.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const s = search.trim().toLowerCase();
+  const matches = (t: any) => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (brandFilter && t.brandId !== brandFilter) return false;
+    if (hideDone && t.status === "done") return false;
+    if (s) {
+      const hay = [
+        t.title,
+        t.brandName,
+        t.briefTitle,
+        t.assigneeName,
+        t.assignedByName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+    return true;
+  };
+  const filteredMine = (assignedToMe as any[]).filter(matches);
+  const filteredSup = (supervising as any[]).filter(matches);
+
+  const filtersActive =
+    !!statusFilter || !!brandFilter || !!search.trim() || !hideDone || scope !== "all";
+
+  const clearFilters = () => {
+    setStatusFilter("");
+    setBrandFilter("");
+    setSearch("");
+    setScope("all");
+    setHideDone(true);
+  };
+
+  const showMine = scope !== "supervising";
+  const showSup = scope !== "mine";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -100,13 +156,91 @@ export default function MyTasksPage() {
         ))}
       </div>
 
+      {/* Filter bar */}
+      <div className="rounded-xl border border-[var(--border)] bg-white p-3 mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)]">
+          {([
+            { k: "all", l: "All" },
+            { k: "mine", l: "Assigned to me" },
+            { k: "supervising", l: "Supervising" },
+          ] as const).map(({ k, l }) => (
+            <button
+              key={k}
+              onClick={() => setScope(k)}
+              className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                scope === k
+                  ? "bg-white shadow-sm text-[var(--text-primary)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+          <Filter className="h-3.5 w-3.5" />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+        >
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="in-progress">In Progress</option>
+          <option value="review">Review</option>
+          <option value="done">Done</option>
+          <option value="on-hold">On Hold</option>
+        </select>
+        <select
+          value={brandFilter}
+          onChange={(e) => setBrandFilter(e.target.value)}
+          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+        >
+          <option value="">All brands</option>
+          {brandOptions.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px] w-[180px]"
+          />
+        </div>
+        <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hideDone}
+            onChange={(e) => setHideDone(e.target.checked)}
+          />
+          Hide done
+        </label>
+        {filtersActive && (
+          <button
+            onClick={clearFilters}
+            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          >
+            <X className="h-3 w-3" />
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Assigned to me */}
+      {showMine && (
       <section className="mb-8">
         <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <ClipboardCheck className="h-4 w-4 text-[var(--text-muted)]" />
-          Assigned to me ({assignedToMe.length})
+          Assigned to me ({filteredMine.length}
+          {filteredMine.length !== assignedToMe.length ? ` of ${assignedToMe.length}` : ""})
         </h2>
-        {assignedToMe.length === 0 ? (
+        {filteredMine.length === 0 ? (
           <div className="text-center py-10 rounded-xl border border-[var(--border)] bg-white">
             <p className="text-[13px] text-[var(--text-muted)]">
               Nothing is assigned to you right now.
@@ -126,7 +260,7 @@ export default function MyTasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {assignedToMe.map((t: any) => (
+                {filteredMine.map((t: any) => (
                   <tr
                     key={t._id}
                     onClick={() => setOpenTaskId(t._id)}
@@ -162,18 +296,21 @@ export default function MyTasksPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* Supervising */}
+      {showSup && (
       <section>
         <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-[var(--text-muted)]" />
-          Supervising — tasks I delegated ({supervising.length})
+          Supervising — tasks I delegated ({filteredSup.length}
+          {filteredSup.length !== supervising.length ? ` of ${supervising.length}` : ""})
         </h2>
         <p className="text-[12px] text-[var(--text-muted)] mb-3">
           Tracking progress, reviewing and marking these done is your
           responsibility. They clear once the work is approved/done.
         </p>
-        {supervising.length === 0 ? (
+        {filteredSup.length === 0 ? (
           <div className="text-center py-10 rounded-xl border border-[var(--border)] bg-white">
             <p className="text-[13px] text-[var(--text-muted)]">
               You haven't delegated any active tasks.
@@ -193,7 +330,7 @@ export default function MyTasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {supervising.map((t: any) => (
+                {filteredSup.map((t: any) => (
                   <tr
                     key={t._id}
                     onClick={() => setOpenTaskId(t._id)}
@@ -249,6 +386,7 @@ export default function MyTasksPage() {
           </div>
         )}
       </section>
+      )}
 
       {openTaskId && (
         <TaskDetailModal

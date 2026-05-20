@@ -1185,6 +1185,7 @@ function WorklogTab() {
   const addEntry = useMutation(api.managerWorklog.addEntry);
   const updateEntry = useMutation(api.managerWorklog.updateEntry);
   const deleteEntry = useMutation(api.managerWorklog.deleteEntry);
+  const toggleDone = useMutation(api.managerWorklog.toggleDone);
 
   const [brandId, setBrandId] = useState<string>("");
   const [content, setContent] = useState("");
@@ -1320,12 +1321,31 @@ function WorklogTab() {
               className="rounded-xl border border-[var(--border)] bg-white p-4"
             >
               <div className="flex items-center justify-between mb-2">
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                  style={{ background: e.brandColor }}
-                >
-                  {e.brandName}
-                </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => toggleDone({ entryId: e._id })}
+                    title={e.done ? "Mark as not done" : "Mark as done"}
+                    className="shrink-0 text-[var(--text-muted)] hover:text-[var(--accent-employee)] transition-colors"
+                  >
+                    {e.done ? (
+                      <CheckSquare className="h-4 w-4 text-[var(--accent-employee)]" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </button>
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
+                    style={{ background: e.brandColor }}
+                  >
+                    {e.brandName}
+                  </span>
+                  {e.done && (
+                    <span className="text-[10px] font-medium text-[var(--accent-employee)] uppercase tracking-wider">
+                      Done
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {e.hoursSpent != null && (
                     <span className="text-[11px] text-[var(--text-muted)]">
@@ -1394,7 +1414,13 @@ function WorklogTab() {
                   </div>
                 </div>
               ) : (
-                <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
+                <p
+                  className={`text-[13px] whitespace-pre-wrap ${
+                    e.done
+                      ? "line-through text-[var(--text-muted)]"
+                      : "text-[var(--text-primary)]"
+                  }`}
+                >
                   {e.content}
                 </p>
               )}

@@ -57,6 +57,43 @@ function ymd(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10);
 }
 
+const WORKLOG_BRIEF_TITLE = "Manager Worklog Tasks";
+
+/** Find (or create) the per-(brand, manager) holder brief for auto-tasks
+ *  generated from this manager's worklog entries. One brief per pair. */
+async function getOrCreateWorklogBrief(
+  ctx: any,
+  brandId: Id<"brands">,
+  userId: Id<"users">
+): Promise<Id<"briefs">> {
+  const existing = await ctx.db
+    .query("briefs")
+    .withIndex("by_manager", (q: any) => q.eq("assignedManagerId", userId))
+    .collect();
+  const match = existing.find(
+    (b: any) => b.brandId === brandId && b.title === WORKLOG_BRIEF_TITLE
+  );
+  if (match) return match._id as Id<"briefs">;
+
+  const all = await ctx.db.query("briefs").collect();
+  return await ctx.db.insert("briefs", {
+    title: WORKLOG_BRIEF_TITLE,
+    description:
+      "Auto-created. Holds tasks generated from this manager's daily worklog.",
+    status: "active" as const,
+    createdBy: userId,
+    assignedManagerId: userId,
+    brandId,
+    globalPriority: all.length + 1,
+  });
+}
+
+function worklogTaskTitle(content: string): string {
+  const firstLine = (content || "").split("\n")[0].trim();
+  if (!firstLine) return "Worklog task";
+  return firstLine.length > 80 ? firstLine.slice(0, 77) + "..." : firstLine;
+}
+
 // ── Author side (self only) ────────────────────────────────────
 
 export const myManagedBrands = query({
@@ -120,12 +157,61 @@ export const addEntry = mutation({
   handler: async (ctx, args) => {
     const { userId } = await requireAdmin(ctx);
     const now = Date.now();
+
+    // Auto-create a mirror task so the worklog entry shows up in My Tasks
+    // and counts wherever a regular task counts. Self-assigned (assignee =
+    // assignedBy = the manager) so it never enters anyone else's queue.
+    const briefId = await getOrCreateWorklogBrief(ctx, args.brandId, userId);
+    const sibTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
+      .collect();
+    const maxOrder = sibTasks.length
+      ? Math.max(...sibTasks.map((t) => t.sortOrder))
+      : 0;
+    const linkedTaskId = await ctx.db.insert("tasks", {
+      briefId,
+      title: worklogTaskTitle(args.content),
+      description: args.content,
+      assigneeId: userId,
+      assignedBy: userId,
+      status: "pending" as const,
+      sortOrder: maxOrder + 1000,
+      assignedAt: now,
+    });
+
     return await ctx.db.insert("managerWorklog", {
       ...args,
       userId,
+      done: false,
+      linkedTaskId,
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+/** Check off / uncheck a worklog entry. Mirrors the state onto the linked
+ *  task so it disappears from "open" tasks counts when checked. */
+export const toggleDone = mutation({
+  args: { entryId: v.id("managerWorklog") },
+  handler: async (ctx, { entryId }) => {
+    const { userId } = await requireAdmin(ctx);
+    const entry = await ctx.db.get(entryId);
+    if (!entry || entry.userId !== userId)
+      throw new Error("Worklog entry not found");
+    const now = Date.now();
+    const nextDone = !entry.done;
+    await ctx.db.patch(entryId, { done: nextDone, updatedAt: now });
+    if (entry.linkedTaskId) {
+      const task = await ctx.db.get(entry.linkedTaskId);
+      if (task) {
+        await ctx.db.patch(entry.linkedTaskId, {
+          status: nextDone ? ("done" as const) : ("pending" as const),
+          completedAt: nextDone ? now : undefined,
+        });
+      }
+    }
   },
 });
 
@@ -150,6 +236,27 @@ export const updateEntry = mutation({
     if (fields.hoursSpent !== undefined) updates.hoursSpent = fields.hoursSpent;
     if (fields.taskRefs !== undefined) updates.taskRefs = fields.taskRefs;
     await ctx.db.patch(entryId, updates);
+
+    // Keep the mirror task in sync with content/brand edits.
+    if (entry.linkedTaskId && (fields.content !== undefined || fields.brandId !== undefined)) {
+      const taskUpdates: Record<string, unknown> = {};
+      if (fields.content !== undefined) {
+        taskUpdates.title = worklogTaskTitle(fields.content);
+        taskUpdates.description = fields.content;
+      }
+      if (fields.brandId !== undefined && fields.brandId !== entry.brandId) {
+        // Brand changed — move the task under the new brand's worklog brief.
+        const newBriefId = await getOrCreateWorklogBrief(
+          ctx,
+          fields.brandId,
+          userId
+        );
+        taskUpdates.briefId = newBriefId;
+      }
+      if (Object.keys(taskUpdates).length > 0) {
+        await ctx.db.patch(entry.linkedTaskId, taskUpdates);
+      }
+    }
   },
 });
 
@@ -160,6 +267,11 @@ export const deleteEntry = mutation({
     const entry = await ctx.db.get(entryId);
     if (!entry || entry.userId !== userId)
       throw new Error("Worklog entry not found");
+    // Cascade-delete the mirror task so no orphan task lingers.
+    if (entry.linkedTaskId) {
+      const task = await ctx.db.get(entry.linkedTaskId);
+      if (task) await ctx.db.delete(entry.linkedTaskId);
+    }
     await ctx.db.delete(entryId);
   },
 });

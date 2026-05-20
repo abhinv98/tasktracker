@@ -684,6 +684,11 @@ export default defineSchema({
     content: v.string(),
     hoursSpent: v.optional(v.number()),
     taskRefs: v.optional(v.array(v.id("tasks"))),
+    /** Whether the manager has checked this worklog item off as done. */
+    done: v.optional(v.boolean()),
+    /** The auto-created task that mirrors this worklog entry so it shows in
+     *  the manager's My Tasks and counts everywhere a task counts. */
+    linkedTaskId: v.optional(v.id("tasks")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
