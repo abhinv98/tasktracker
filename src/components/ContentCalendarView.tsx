@@ -1110,6 +1110,15 @@ export function ContentCalendarEntrySidebar({
     task.contentType ?? ""
   );
   const [editPostDate, setEditPostDate] = useState(task.postDate ?? "");
+  // Number of creatives required from the design assignee for this entry.
+  // Lives on the design task (parent in design-first, child in modern); the
+  // sidebar reads and writes it via `designCreativesRequired` exposed by
+  // the calendar query.
+  const [editCreativesRequired, setEditCreativesRequired] = useState<string>(
+    (task as any).designCreativesRequired != null
+      ? String((task as any).designCreativesRequired)
+      : ""
+  );
   const [editDeadline, setEditDeadline] = useState(
     task.deadline
       ? new Date(task.deadline).toISOString().split("T")[0]
@@ -1296,6 +1305,32 @@ export function ContentCalendarEntrySidebar({
 
       if (Object.keys(updates).length > 0) {
         await updateTask({ taskId: task._id, ...updates });
+      }
+
+      // Write Number of Creatives onto the design task (parent in
+      // design-first entries, design child in the modern split). Updated
+      // separately so it routes to the correct task.
+      const designTaskId =
+        ((task as any).designTaskId as Id<"tasks"> | null) ?? null;
+      const currentCreatives =
+        (task as any).designCreativesRequired ?? null;
+      const trimmed = editCreativesRequired.trim();
+      const nextCreatives = trimmed === "" ? null : Math.max(1, Math.min(99, parseInt(trimmed, 10) || 0));
+      if (designTaskId && nextCreatives !== currentCreatives) {
+        if (nextCreatives === null) {
+          await updateTask({
+            taskId: designTaskId,
+            clearCreativesRequired: true,
+          });
+        } else {
+          await updateTask({
+            taskId: designTaskId,
+            creativesRequired: nextCreatives,
+          });
+        }
+      }
+
+      if (Object.keys(updates).length > 0 || (designTaskId && nextCreatives !== currentCreatives)) {
         toast("success", "Entry updated");
       } else {
         toast("info", "No changes to save");
@@ -1557,10 +1592,18 @@ export function ContentCalendarEntrySidebar({
 
           const parentHasRealAssignee =
             !!task.assigneeId && task.assigneeId !== task.assignedBy;
-          // parentRole arrives via the linked-tasks query (parent doesn't
-          // appear there; we read it off any child). Falls back to "copy".
-          const parentRole =
-            (linkedTasks?.[0] as any)?.parentRole ?? "copy";
+          // parentRole — prefer the calendar query's own classifier result
+          // (copyTaskId / designTaskId on the task), which is populated even
+          // when there are no linked children (the design-first case where
+          // someone assigns a designer directly to the parent entry).
+          // Fall back to linkedTasks[0].parentRole then "copy".
+          const taskAny = task as any;
+          const parentRole: "copy" | "design" =
+            taskAny.designTaskId && taskAny.designTaskId === task._id
+              ? "design"
+              : taskAny.copyTaskId && taskAny.copyTaskId === task._id
+                ? "copy"
+                : ((linkedTasks?.[0] as any)?.parentRole ?? "copy");
 
           // One card per role. A role owned by an assigned task (the parent,
           // for legacy entries where Copy lives on the entry itself) is the
@@ -2136,6 +2179,38 @@ export function ContentCalendarEntrySidebar({
                 <Badge variant="neutral">{si.label}</Badge>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Number of creatives — only when the entry has a design task
+            (modern split or design-first parent). Writes to the design
+            task so the design assignee sees "X / N creatives" on their
+            task. */}
+        {viewingMain && (task as any).designTaskId && (
+          <div>
+            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              Number of Creatives
+            </label>
+            {isEditable ? (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={editCreativesRequired}
+                  onChange={(e) => setEditCreativesRequired(e.target.value)}
+                  placeholder="e.g. 4"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  Shows on the design assignee's task as "X / N creatives required" with separate deliverable slots.
+                </p>
+              </>
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)]">
+                {(task as any).designCreativesRequired ?? "—"}
+              </p>
+            )}
           </div>
         )}
 

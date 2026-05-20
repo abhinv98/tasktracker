@@ -162,6 +162,11 @@ export default defineSchema({
      *  day a non-done worklog task's deadline rolls forward. Powers the
      *  "Carried over by N days" chip in the oversight view. */
     carryOverDays: v.optional(v.number()),
+    /** Per-task override of how many creative deliverables are expected.
+     *  Used by content-calendar entries (design assignee can have a
+     *  per-entry count, e.g. 4 creatives) and any task the design team
+     *  works on. Falls back to brief.creativesRequired when unset. */
+    creativesRequired: v.optional(v.number()),
     /** Flow canvas position (X coordinate) */
     flowX: v.optional(v.number()),
     /** Flow canvas position (Y coordinate) */

@@ -33,7 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
-import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
+import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -257,8 +257,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     ((!assignee && isAdmin) || (assignee && showReassign));
   // Handoff tasks should NOT show creative slots — they reference the original deliverables
   const isHandoffTask = !!task.handoffSourceTaskId;
-  const showCreativeSlots = !isHandoffTask && brief ? briefUsesCreativeSlots(brief) : false;
-  const creativesRequired = brief ? creativesSlotTarget(brief) : 1;
+  const showCreativeSlots = !isHandoffTask ? taskUsesCreativeSlots(task, brief) : false;
+  const creativesRequired = taskCreativesTarget(task, brief);
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 

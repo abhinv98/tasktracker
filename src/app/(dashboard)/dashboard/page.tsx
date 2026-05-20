@@ -117,6 +117,14 @@ function EmployeeTaskCard({
                 ⏸ ON HOLD
               </span>
             )}
+            {(task as any).creativesRequired > 0 && (
+              <span
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0"
+                title={`${(task as any).creativesRequired} creative deliverables required`}
+              >
+                {(task as any).creativesRequired} CREATIVES REQUIRED
+              </span>
+            )}
             <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
               {task.title}
             </h3>

@@ -308,8 +308,12 @@ export const updateTask = mutation({
     caption: v.optional(v.string()),
     handoffTargetTeamId: v.optional(v.id("teams")),
     clearHandoffTarget: v.optional(v.boolean()),
+    /** Per-task creatives override. Surfaces "X / N creatives" on the
+     *  assignee's task view and pass 0/undefined to clear. */
+    creativesRequired: v.optional(v.number()),
+    clearCreativesRequired: v.optional(v.boolean()),
   },
-  handler: async (ctx, { taskId, clearDeadline, clearHandoffTarget, ...fields }) => {
+  handler: async (ctx, { taskId, clearDeadline, clearHandoffTarget, clearCreativesRequired, ...fields }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const task = await ctx.db.get(taskId);
@@ -336,6 +340,12 @@ export const updateTask = mutation({
     if (fields.caption !== undefined) updates.caption = fields.caption;
     if (fields.handoffTargetTeamId !== undefined) updates.handoffTargetTeamId = fields.handoffTargetTeamId;
     if (clearHandoffTarget) updates.handoffTargetTeamId = undefined;
+    if (clearCreativesRequired) {
+      updates.creativesRequired = undefined;
+    } else if (fields.creativesRequired !== undefined) {
+      const n = fields.creativesRequired;
+      updates.creativesRequired = n > 0 ? Math.min(99, Math.max(1, Math.round(n))) : undefined;
+    }
 
     if (fields.assigneeId !== undefined && fields.assigneeId !== task.assigneeId) {
       updates.assigneeId = fields.assigneeId;

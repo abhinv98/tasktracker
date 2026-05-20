@@ -340,6 +340,8 @@ export const listTasksByBrandMonth = query({
           designAssigneeName:
             designHasRealAssignee && designUser ? (designUser.name ?? designUser.email ?? "Unknown") : "",
           designAssigneeDesignation: designHasRealAssignee ? (designUser?.designation ?? "") : "",
+          designCreativesRequired:
+            designTask?.creativesRequired ?? null,
           linkedTasks: childTasks.map((ct) => ({
             _id: ct._id,
             status: ct.status,
@@ -810,6 +812,8 @@ export const listTasksForSheet = query({
           designAssigneeName:
             designHasRealAssignee && designUser ? (designUser.name ?? designUser.email ?? "Unknown") : "",
           designAssigneeDesignation: designHasRealAssignee ? (designUser?.designation ?? "") : "",
+          designCreativesRequired:
+            designTask?.creativesRequired ?? null,
           linkedTasks: childTasks.map((ct) => ({
             _id: ct._id,
             status: ct.status,
