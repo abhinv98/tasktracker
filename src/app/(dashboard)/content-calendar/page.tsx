@@ -106,8 +106,11 @@ export default function ContentCalendarPage() {
 
   // Holding Tray (sheets-like staging area). Tasks added here are hidden
   // from the calendar grid until either dropped on a day cell (which patches
-  // postDate) or removed manually. State is client-only / per-session — we
-  // never mutate `postDate` just to park a task in the tray.
+  // postDate) or removed manually. IDs are persisted per-brand in
+  // localStorage so the tray survives month navigation AND page refreshes,
+  // and the actual task records are resolved via listEntriesByIds (so a
+  // task parked in April still shows when viewing May). We never mutate
+  // `postDate` just to park a task in the tray.
   const [trayTaskIds, setTrayTaskIds] = useState<string[]>([]);
   const [trayCollapsed, setTrayCollapsed] = useState(false);
   const [trayContextMenu, setTrayContextMenu] = useState<{
@@ -204,16 +207,54 @@ export default function ContentCalendarPage() {
     return map;
   }, [tasks, trayTaskIdSet]);
 
-  // Tray view-models — preserve user-defined order. Tasks vanish from the
-  // tray automatically if their underlying record is no longer in scope
-  // (e.g. month switch loaded a different result set).
+  // Cross-month tray resolution: fetch tray tasks by id so April-parked
+  // tasks still render when viewing May.
+  const trayServerTasks = useQuery(
+    api.contentCalendar.listEntriesByIds,
+    trayTaskIds.length > 0
+      ? { ids: trayTaskIds as unknown as Id<"tasks">[] }
+      : "skip"
+  );
+
+  // Tray view-models — preserve user-defined order. Drops any id that no
+  // longer resolves (e.g. the task was deleted).
   const trayTasks = useMemo(() => {
-    if (!tasks) return [];
-    const byId = new Map((tasks as any[]).map((t) => [t._id, t]));
+    if (trayTaskIds.length === 0) return [];
+    const list = (trayServerTasks ?? []) as any[];
+    const byId = new Map(list.map((t) => [t._id, t]));
     return trayTaskIds
       .map((id) => byId.get(id))
       .filter((t): t is any => !!t);
-  }, [tasks, trayTaskIds]);
+  }, [trayServerTasks, trayTaskIds]);
+
+  // Persistence: load tray ids on brand change, save on every change.
+  // Keyed per-brand so each brand has its own staging area.
+  useEffect(() => {
+    if (!selectedBrandId) {
+      setTrayTaskIds([]);
+      return;
+    }
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(`cc:tray:${selectedBrandId}`);
+      setTrayTaskIds(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      setTrayTaskIds([]);
+    }
+  }, [selectedBrandId]);
+
+  useEffect(() => {
+    if (!selectedBrandId) return;
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        `cc:tray:${selectedBrandId}`,
+        JSON.stringify(trayTaskIds)
+      );
+    } catch {
+      /* quota / private-mode — ignore */
+    }
+  }, [selectedBrandId, trayTaskIds]);
 
   const handleAddToTray = useCallback(
     (taskId: string) => {

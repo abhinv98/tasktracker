@@ -353,6 +353,52 @@ export const listTasksByBrandMonth = query({
   },
 });
 
+/** Fetch a list of calendar entry tasks by id, regardless of which month
+ *  they fall under. Powers the Holding Tray so tasks parked while viewing
+ *  one month still resolve and render after navigating to another month. */
+export const listEntriesByIds = query({
+  args: { ids: v.array(v.id("tasks")) },
+  handler: async (ctx, { ids }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+    if (ids.length === 0) return [];
+
+    const fetched = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    const present = fetched.filter(
+      (t): t is NonNullable<typeof t> => !!t
+    );
+    if (present.length === 0) return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const briefMap = new Map(briefs.map((b) => [b._id, b]));
+    const brands = await ctx.db.query("brands").collect();
+    const brandMap = new Map(brands.map((b) => [b._id, b]));
+    const users = await ctx.db.query("users").collect();
+
+    return present
+      .filter((t) => {
+        const b = briefMap.get(t.briefId);
+        return b && b.briefType === "content_calendar";
+      })
+      .map((t) => {
+        const brief = briefMap.get(t.briefId);
+        const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
+        const assignee = users.find((u) => u._id === t.assigneeId);
+        return {
+          ...t,
+          briefId: t.briefId,
+          brandId: brief?.brandId ?? null,
+          brandName: brand?.name ?? "No Brand",
+          brandColor: brand?.color ?? "#6b7280",
+          assigneeName:
+            assignee?.name ?? assignee?.email ?? "Unknown",
+        };
+      });
+  },
+});
+
 export const createEntryForBrand = mutation({
   args: {
     brandId: v.id("brands"),
