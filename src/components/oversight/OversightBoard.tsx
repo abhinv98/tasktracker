@@ -393,7 +393,17 @@ function FragmentRow({
           {r.briefTitle}
         </td>
         <td className="px-4 py-3 text-[var(--text-secondary)]">
-          {fmt(r.deadline)}
+          <div className="flex items-center gap-1.5">
+            <span>{fmt(r.deadline)}</span>
+            {r.carryOverDays > 0 && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+                title="Worklog task rolled forward — not completed by its original deadline"
+              >
+                Carried over · {r.carryOverDays}d
+              </span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-3 text-[var(--text-muted)]">
           {fmt(r.createdAt)}

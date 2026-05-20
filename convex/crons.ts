@@ -24,4 +24,13 @@ crons.daily(
   internal.oversight.sendOversightDigest
 );
 
+// Roll forward worklog auto-tasks whose deadline has passed without
+// being checked off. Runs once per day shortly after midnight UTC so
+// the "Carried over by N day(s)" count increments daily.
+crons.daily(
+  "roll worklog deadlines",
+  { hourUTC: 0, minuteUTC: 15 },
+  internal.managerWorklog.rollWorklogDeadlines
+);
+
 export default crons;

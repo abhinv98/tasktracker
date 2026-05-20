@@ -165,6 +165,7 @@ function NotesTab() {
   const [content, setContent] = useState("");
   const [tagsStr, setTagsStr] = useState("");
   const [color, setColor] = useState("");
+  const [noteBrandId, setNoteBrandId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
 
   const [editing, setEditing] = useState<Note | null>(null);
@@ -177,11 +178,14 @@ function NotesTab() {
     if (!title.trim() && !content.trim()) return;
     setSubmitting(true);
     try {
+      // Brand: explicit per-note pick, else falls back to the page's brand
+      // filter (handy when you're already drilled into one brand).
+      const effectiveBrand = noteBrandId || brandFilter;
       await createNote({
         title: title.trim() || "Untitled note",
         content: content.trim(),
         date,
-        ...(brandFilter ? { brandId: brandFilter as Id<"brands"> } : {}),
+        ...(effectiveBrand ? { brandId: effectiveBrand as Id<"brands"> } : {}),
         tags: tagsStr
           .split(",")
           .map((t) => t.trim())
@@ -192,6 +196,7 @@ function NotesTab() {
       setContent("");
       setTagsStr("");
       setColor("");
+      setNoteBrandId("");
       setShowAdd(false);
       toast("success", "Note saved");
     } catch (err) {
@@ -353,6 +358,25 @@ function NotesTab() {
               rows={5}
               className={`${inputCls} resize-y`}
             />
+          </div>
+          <div className="mb-4">
+            <label className={labelCls}>Brand (optional)</label>
+            <select
+              value={noteBrandId}
+              onChange={(e) => setNoteBrandId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">
+                {brandFilter
+                  ? `Use current filter (${brands.find((b: any) => b._id === brandFilter)?.name ?? "brand"})`
+                  : "No brand"}
+              </option>
+              {brands.map((b: any) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
@@ -1190,6 +1214,7 @@ function WorklogTab() {
   const [brandId, setBrandId] = useState<string>("");
   const [content, setContent] = useState("");
   const [hours, setHours] = useState("");
+  const [deadline, setDeadline] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] =
     useState<Id<"managerWorklog"> | null>(null);
@@ -1211,9 +1236,13 @@ function WorklogTab() {
         date,
         content: content.trim(),
         ...(hours ? { hoursSpent: Number(hours) } : {}),
+        ...(deadline
+          ? { deadline: new Date(deadline + "T23:59:59").getTime() }
+          : {}),
       });
       setContent("");
       setHours("");
+      setDeadline("");
       toast("success", "Worklog saved");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to save");
@@ -1276,7 +1305,7 @@ function WorklogTab() {
               ))}
             </select>
           </div>
-          <div className="sm:col-span-2">
+          <div>
             <label className={labelCls}>Hours spent (optional)</label>
             <input
               type="number"
@@ -1287,6 +1316,18 @@ function WorklogTab() {
               placeholder="e.g. 2.5"
               className={inputCls}
             />
+          </div>
+          <div>
+            <label className={labelCls}>Deadline (optional)</label>
+            <input
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className={inputCls}
+            />
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+              If not completed by this date, the task rolls forward daily and is flagged "carried over".
+            </p>
           </div>
         </div>
         <div className="mb-4">
@@ -1345,8 +1386,21 @@ function WorklogTab() {
                       Done
                     </span>
                   )}
+                  {!e.done && e.carryOverDays > 0 && (
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700"
+                      title="Not completed by its original deadline — rolled forward each day"
+                    >
+                      Carried over · {e.carryOverDays}d
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {e.taskDeadline != null && (
+                    <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
+                      Due {new Date(e.taskDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                  )}
                   {e.hoursSpent != null && (
                     <span className="text-[11px] text-[var(--text-muted)]">
                       {e.hoursSpent}h

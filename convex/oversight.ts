@@ -68,6 +68,7 @@ export const getOversightBoard = query({
         assigneeAvatar: assignee?.avatarUrl ?? null,
         managerId: t.assignedBy,
         managerName: manager?.name ?? manager?.email ?? "Unknown",
+        carryOverDays: t.carryOverDays ?? 0,
       };
     });
 

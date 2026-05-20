@@ -158,6 +158,10 @@ export default defineSchema({
     handoffSourceTaskId: v.optional(v.id("tasks")),
     /** Number of times changes were requested on deliverables for this task */
     changesCount: v.optional(v.number()),
+    /** Daily auto-roll counter for worklog-linked tasks. Incremented each
+     *  day a non-done worklog task's deadline rolls forward. Powers the
+     *  "Carried over by N days" chip in the oversight view. */
+    carryOverDays: v.optional(v.number()),
     /** Flow canvas position (X coordinate) */
     flowX: v.optional(v.number()),
     /** Flow canvas position (Y coordinate) */
@@ -689,6 +693,11 @@ export default defineSchema({
     /** The auto-created task that mirrors this worklog entry so it shows in
      *  the manager's My Tasks and counts everywhere a task counts. */
     linkedTaskId: v.optional(v.id("tasks")),
+    /** Deadline picked by the manager when adding the worklog item. The
+     *  mirror task uses this as its deadline; if it's not completed by
+     *  end-of-day, a daily cron rolls it forward and increments
+     *  carryOverDays on the task. */
+    deadline: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

@@ -195,17 +195,39 @@ export default function ManagerWorklogPanel() {
                       className="rounded-xl border border-[var(--border)] bg-white p-4"
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                          style={{ background: e.brandColor }}
-                        >
-                          {e.brandName}
-                        </span>
-                        {e.hoursSpent != null && (
-                          <span className="text-[11px] text-[var(--text-muted)]">
-                            {e.hoursSpent}h
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
+                            style={{ background: e.brandColor }}
+                          >
+                            {e.brandName}
                           </span>
-                        )}
+                          {e.done && (
+                            <span className="text-[10px] font-medium text-[var(--accent-employee)] uppercase tracking-wider">
+                              Done
+                            </span>
+                          )}
+                          {!e.done && (e.carryOverDays ?? 0) > 0 && (
+                            <span
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+                              title="Not completed by its original deadline — rolled forward each day"
+                            >
+                              Carried over · {e.carryOverDays}d
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {e.taskDeadline != null && (
+                            <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
+                              Due {new Date(e.taskDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
+                          {e.hoursSpent != null && (
+                            <span className="text-[11px] text-[var(--text-muted)]">
+                              {e.hoursSpent}h
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
                         {e.content}

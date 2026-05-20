@@ -1,7 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { tagForOversight } from "./lib/tagForOversight";
 
 // ── Manager Worklog ────────────────────────────────────────────
 // A brand/account manager logs, per brand per day, what they did.
@@ -136,13 +137,32 @@ export const listMine = query({
     if (brandId) entries = entries.filter((e) => e.brandId === brandId);
 
     const brands = await ctx.db.query("brands").collect();
-    return entries
-      .map((e) => ({
-        ...e,
-        brandName: brands.find((b) => b._id === e.brandId)?.name ?? "—",
-        brandColor: brands.find((b) => b._id === e.brandId)?.color ?? "#6b7280",
-      }))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    // Pull each linked task's deadline + carry-over so the card can show
+    // both the chosen deadline and the "Carried over · Nd" chip.
+    const enriched = await Promise.all(
+      entries.map(async (e) => {
+        let taskDeadline: number | null = null;
+        let carryOverDays = 0;
+        if (e.linkedTaskId) {
+          const t = await ctx.db.get(e.linkedTaskId);
+          if (t) {
+            taskDeadline = t.deadline ?? null;
+            carryOverDays = t.carryOverDays ?? 0;
+          }
+        }
+        return {
+          ...e,
+          brandName: brands.find((b) => b._id === e.brandId)?.name ?? "—",
+          brandColor:
+            brands.find((b) => b._id === e.brandId)?.color ?? "#6b7280",
+          taskDeadline,
+          carryOverDays,
+        };
+      })
+    );
+    return enriched.sort((a, b) =>
+      a.date < b.date ? 1 : a.date > b.date ? -1 : 0
+    );
   },
 });
 
@@ -153,6 +173,8 @@ export const addEntry = mutation({
     content: v.string(),
     hoursSpent: v.optional(v.number()),
     taskRefs: v.optional(v.array(v.id("tasks"))),
+    /** Deadline for the mirror task, end-of-day epoch ms. Optional. */
+    deadline: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireAdmin(ctx);
@@ -178,6 +200,20 @@ export const addEntry = mutation({
       status: "pending" as const,
       sortOrder: maxOrder + 1000,
       assignedAt: now,
+      ...(args.deadline !== undefined
+        ? { deadline: args.deadline, originalDeadline: args.deadline }
+        : {}),
+    });
+
+    // Silent super-admin oversight tag (Mayur/Vivek/Abhinav) — keep the
+    // worklog auto-tasks visible in the oversight digest like every other
+    // task-creation path.
+    await tagForOversight(ctx, {
+      taskId: linkedTaskId,
+      briefId,
+      assigneeId: userId,
+      assignedBy: userId,
+      source: "individual_task",
     });
 
     return await ctx.db.insert("managerWorklog", {
@@ -223,8 +259,10 @@ export const updateEntry = mutation({
     content: v.optional(v.string()),
     hoursSpent: v.optional(v.number()),
     taskRefs: v.optional(v.array(v.id("tasks"))),
+    deadline: v.optional(v.number()),
+    clearDeadline: v.optional(v.boolean()),
   },
-  handler: async (ctx, { entryId, ...fields }) => {
+  handler: async (ctx, { entryId, clearDeadline, ...fields }) => {
     const { userId } = await requireAdmin(ctx);
     const entry = await ctx.db.get(entryId);
     if (!entry || entry.userId !== userId)
@@ -235,10 +273,18 @@ export const updateEntry = mutation({
     if (fields.content !== undefined) updates.content = fields.content;
     if (fields.hoursSpent !== undefined) updates.hoursSpent = fields.hoursSpent;
     if (fields.taskRefs !== undefined) updates.taskRefs = fields.taskRefs;
+    if (clearDeadline) updates.deadline = undefined;
+    else if (fields.deadline !== undefined) updates.deadline = fields.deadline;
     await ctx.db.patch(entryId, updates);
 
-    // Keep the mirror task in sync with content/brand edits.
-    if (entry.linkedTaskId && (fields.content !== undefined || fields.brandId !== undefined)) {
+    // Keep the mirror task in sync with content/brand/deadline edits.
+    if (
+      entry.linkedTaskId &&
+      (fields.content !== undefined ||
+        fields.brandId !== undefined ||
+        fields.deadline !== undefined ||
+        clearDeadline)
+    ) {
       const taskUpdates: Record<string, unknown> = {};
       if (fields.content !== undefined) {
         taskUpdates.title = worklogTaskTitle(fields.content);
@@ -253,10 +299,61 @@ export const updateEntry = mutation({
         );
         taskUpdates.briefId = newBriefId;
       }
+      if (clearDeadline) {
+        taskUpdates.deadline = undefined;
+        taskUpdates.originalDeadline = undefined;
+        taskUpdates.deadlineExtended = undefined;
+        taskUpdates.carryOverDays = undefined;
+      } else if (fields.deadline !== undefined) {
+        taskUpdates.deadline = fields.deadline;
+        // Editing the deadline manually resets the carry-over counter.
+        taskUpdates.originalDeadline = fields.deadline;
+        taskUpdates.deadlineExtended = undefined;
+        taskUpdates.carryOverDays = undefined;
+      }
       if (Object.keys(taskUpdates).length > 0) {
         await ctx.db.patch(entry.linkedTaskId, taskUpdates);
       }
     }
+  },
+});
+
+/** Daily cron: any worklog-mirror task whose deadline has passed and is
+ *  not done gets rolled forward to end-of-today. carryOverDays increments
+ *  by 1 each roll so the oversight view can chip "Carried over by N day(s)". */
+export const rollWorklogDeadlines = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const todayStart = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+    const todayEnd = todayStart + 24 * 60 * 60 * 1000 - 1;
+
+    const entries = await ctx.db.query("managerWorklog").collect();
+    let rolled = 0;
+    for (const e of entries) {
+      if (e.done) continue;
+      if (!e.linkedTaskId) continue;
+      const task = await ctx.db.get(e.linkedTaskId);
+      if (!task) continue;
+      if (task.status === "done") continue;
+      if (task.deadline == null) continue;
+      // Only roll if the deadline has actually elapsed.
+      if (task.deadline >= todayStart) continue;
+
+      const prevCount = task.carryOverDays ?? 0;
+      await ctx.db.patch(e.linkedTaskId, {
+        deadline: todayEnd,
+        originalDeadline: task.originalDeadline ?? e.deadline ?? task.deadline,
+        deadlineExtended: true,
+        carryOverDays: prevCount + 1,
+        // Clear any stale overdue acknowledgements so the new cycle is clean.
+        overdueAcknowledged: undefined,
+        overdueContacted: undefined,
+        overdueContactDenied: undefined,
+      });
+      rolled++;
+    }
+    return { rolled, ranAt: now };
   },
 });
 
@@ -446,11 +543,26 @@ export const getManagerWorklogDay = query({
         avatarUrl: manager.avatarUrl,
       },
       date,
-      entries: entries.map((e) => ({
-        ...e,
-        brandName: brandMap.get(e.brandId)?.name ?? "—",
-        brandColor: brandMap.get(e.brandId)?.color ?? "#6b7280",
-      })),
+      entries: await Promise.all(
+        entries.map(async (e) => {
+          let taskDeadline: number | null = null;
+          let carryOverDays = 0;
+          if (e.linkedTaskId) {
+            const t = await ctx.db.get(e.linkedTaskId);
+            if (t) {
+              taskDeadline = t.deadline ?? null;
+              carryOverDays = t.carryOverDays ?? 0;
+            }
+          }
+          return {
+            ...e,
+            brandName: brandMap.get(e.brandId)?.name ?? "—",
+            brandColor: brandMap.get(e.brandId)?.color ?? "#6b7280",
+            taskDeadline,
+            carryOverDays,
+          };
+        })
+      ),
       tasks: tasksToday,
       moms: momsToday,
       supervising,
