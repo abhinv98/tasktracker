@@ -245,7 +245,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           href={item.href}
                           onClick={onClose}
                           className={`
-                            flex items-center gap-3 rounded-lg px-3 py-2 relative
+                            group flex items-center gap-3 rounded-lg px-3 py-2 relative
                             font-medium text-[13px] transition-colors duration-150
                             ${
                               isActive
@@ -254,7 +254,13 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             }
                           `}
                         >
-                          <Icon className="h-[18px] w-[18px] shrink-0" />
+                          <Icon
+                            className={`h-[18px] w-[18px] shrink-0 transition-all duration-200 ease-out group-hover:scale-110 group-hover:-translate-y-px ${
+                              isActive
+                                ? ""
+                                : "group-hover:text-[var(--accent-admin)]"
+                            }`}
+                          />
                           <span className="flex-1">{item.label}</span>
                           {item.href === "/messages" && unreadDmCount > 0 && (
                             <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
