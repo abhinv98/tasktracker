@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card } from "@/components/ui";
+import { Card, TaskDetailModal } from "@/components/ui";
 import { ChevronLeft, ChevronRight, FileText, ClipboardList } from "lucide-react";
 
 function getTodayStr(): string {
@@ -34,6 +34,7 @@ export default function ManagerWorklogPanel() {
   const managers = useQuery(api.managerWorklog.listSupervisableManagers) ?? [];
   const [managerId, setManagerId] = useState<string>("");
   const [mode, setMode] = useState<"day" | "report">("day");
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [date, setDate] = useState(getTodayStr());
   const [from, setFrom] = useState(getMonthAgoStr());
   const [to, setTo] = useState(getTodayStr());
@@ -270,7 +271,9 @@ export default function ManagerWorklogPanel() {
                           return (
                             <tr
                               key={t._id}
-                              className="border-b border-[var(--border-subtle)]"
+                              onClick={() => setOpenTaskId(t._id)}
+                              className="border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)]"
+                              title="Open task"
                             >
                               <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium max-w-[240px]">
                                 <span className="line-clamp-2">{t.title}</span>
@@ -323,7 +326,9 @@ export default function ManagerWorklogPanel() {
                       {day.tasks.map((t: any) => (
                         <div
                           key={t._id}
-                          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px]"
+                          onClick={() => setOpenTaskId(t._id)}
+                          title="Open task"
+                          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] cursor-pointer hover:bg-[var(--bg-hover)]"
                         >
                           <p className="font-medium text-[var(--text-primary)]">
                             {t.title}
@@ -517,6 +522,13 @@ export default function ManagerWorklogPanel() {
             </>
           )}
         </div>
+      )}
+
+      {openTaskId && (
+        <TaskDetailModal
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+        />
       )}
     </div>
   );

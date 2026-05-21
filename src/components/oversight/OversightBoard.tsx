@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card } from "@/components/ui";
+import { Card, TaskDetailModal } from "@/components/ui";
 import {
   Search,
   Filter,
@@ -139,6 +139,7 @@ export default function OversightBoard() {
   const [search, setSearch] = useState("");
   const [date, setDate] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   const board = useQuery(api.oversight.getOversightBoard, {
     ...(status ? { status } : {}),
@@ -318,6 +319,7 @@ export default function OversightBoard() {
                     onToggle={() =>
                       isDone && setExpanded(isOpen ? null : r._id)
                     }
+                    onOpenTask={() => setOpenTaskId(r._id)}
                     r={r}
                     cfg={cfg}
                   />
@@ -327,6 +329,13 @@ export default function OversightBoard() {
           </tbody>
         </table>
       </div>
+
+      {openTaskId && (
+        <TaskDetailModal
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -337,31 +346,39 @@ function FragmentRow({
   isDone,
   isOpen,
   onToggle,
+  onOpenTask,
 }: {
   r: any;
   cfg: { color: string; label: string };
   isDone: boolean;
   isOpen: boolean;
   onToggle: () => void;
+  onOpenTask: () => void;
 }) {
   return (
     <>
       <tr
-        onClick={onToggle}
-        className={`border-b border-[var(--border-subtle)] ${
-          isDone
-            ? "cursor-pointer hover:bg-[var(--bg-hover)]"
-            : ""
-        } ${isOpen ? "bg-[var(--bg-hover)]" : ""}`}
-        title={isDone ? "Show approved work" : undefined}
+        onClick={onOpenTask}
+        className="border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)]"
+        title="Open task"
       >
         <td className="px-3 py-3 text-[var(--text-muted)]">
           {isDone ? (
-            isOpen ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              title={isOpen ? "Hide approved work" : "Show approved work"}
+              className="hover:text-[var(--text-primary)]"
+            >
+              {isOpen ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
           ) : null}
         </td>
         <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[240px]">

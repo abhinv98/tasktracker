@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, TaskDetailModal } from "@/components/ui";
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import ManagerWorklogPanel from "@/components/worklog/ManagerWorklogPanel";
@@ -57,6 +57,7 @@ export default function WorkLogPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
   const [activeTab, setActiveTab] = useState<"worklog" | "teamload" | "managerlog" | "oversight">("worklog");
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [filterSearch, setFilterSearch] = useState("");
@@ -648,7 +649,9 @@ export default function WorkLogPage() {
                               return (
                                 <tr
                                   key={t._id}
-                                  className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"}`}
+                                  onClick={() => setOpenTaskId(t._id)}
+                                  title="Open task"
+                                  className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"}`}
                                 >
                                   <td className="px-3 py-2.5">
                                     <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
@@ -698,6 +701,13 @@ export default function WorkLogPage() {
 
       {activeTab === "oversight" && user?.isOversightAdmin && (
         <OversightBoard />
+      )}
+
+      {openTaskId && (
+        <TaskDetailModal
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+        />
       )}
     </div>
   );

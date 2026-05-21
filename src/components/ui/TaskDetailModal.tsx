@@ -460,6 +460,34 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Brief-status notice — explains why this task can show in
+              Worklog / My Tasks / Oversight but not on the Briefs page. */}
+          {!brief && (
+            <div className="px-5 py-3 bg-red-50 border-b border-red-200">
+              <p className="text-[12px] font-semibold text-[var(--danger)]">
+                The brief this task belonged to was deleted.
+              </p>
+              <p className="text-[11px] text-red-700 mt-0.5">
+                The task still appears in Worklog / My Tasks / Oversight
+                because the task record itself still exists — but it is
+                gone from the Briefs page because its brief no longer
+                exists.
+              </p>
+            </div>
+          )}
+          {brief && brief.status === "archived" && (
+            <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
+              <p className="text-[12px] font-semibold text-amber-800">
+                This task's brief is archived.
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                Archived briefs are hidden from the Briefs page, so this
+                task still shows in Worklog / My Tasks / Oversight but not
+                under Briefs. Restore the brief from Archive to bring it
+                back.
+              </p>
+            </div>
+          )}
           {/* Delete confirmation */}
           {confirmDelete && (
             <div className="px-5 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between gap-3">
