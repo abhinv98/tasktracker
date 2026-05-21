@@ -1214,7 +1214,7 @@ function WorklogTab() {
   const [brandId, setBrandId] = useState<string>("");
   const [content, setContent] = useState("");
   const [hours, setHours] = useState("");
-  const [deadline, setDeadline] = useState<string>("");
+  const [lineDeadlines, setLineDeadlines] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] =
     useState<Id<"managerWorklog"> | null>(null);
@@ -1223,27 +1223,47 @@ function WorklogTab() {
   const [deletingId, setDeletingId] =
     useState<Id<"managerWorklog"> | null>(null);
 
+  // Each non-empty line becomes a separate action item on save.
+  const taskLines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!brandId || !content.trim()) {
-      toast("error", "Pick a brand and write what you did");
+    if (!brandId) {
+      toast("error", "Pick a brand");
+      return;
+    }
+    if (taskLines.length === 0) {
+      toast("error", "Write at least one task line");
       return;
     }
     setSubmitting(true);
     try {
-      await addEntry({
-        brandId: brandId as Id<"brands">,
-        date,
-        content: content.trim(),
-        ...(hours ? { hoursSpent: Number(hours) } : {}),
-        ...(deadline
-          ? { deadline: new Date(deadline + "T23:59:59").getTime() }
-          : {}),
-      });
+      for (let i = 0; i < taskLines.length; i++) {
+        const lineDeadline = lineDeadlines[i];
+        await addEntry({
+          brandId: brandId as Id<"brands">,
+          date,
+          content: taskLines[i],
+          // Attach total hours to the first task only so the day's total
+          // doesn't get multiplied across split lines.
+          ...(i === 0 && hours ? { hoursSpent: Number(hours) } : {}),
+          ...(lineDeadline
+            ? { deadline: new Date(lineDeadline + "T23:59:59").getTime() }
+            : {}),
+        });
+      }
       setContent("");
       setHours("");
-      setDeadline("");
-      toast("success", "Worklog saved");
+      setLineDeadlines({});
+      toast(
+        "success",
+        taskLines.length > 1
+          ? `${taskLines.length} tasks saved`
+          : "Worklog saved"
+      );
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to save");
     }
@@ -1289,7 +1309,7 @@ function WorklogTab() {
         <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-4">
           Log work for {formatDate(date)}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className={labelCls}>Brand</label>
             <select
@@ -1317,18 +1337,6 @@ function WorklogTab() {
               className={inputCls}
             />
           </div>
-          <div>
-            <label className={labelCls}>Deadline (optional)</label>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className={inputCls}
-            />
-            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-              If not completed by this date, the task rolls forward daily and is flagged "carried over".
-            </p>
-          </div>
         </div>
         <div className="mb-4">
           <label className={labelCls}>What did you do for this brand?</label>
@@ -1336,12 +1344,55 @@ function WorklogTab() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={4}
-            placeholder="Summary of work done today for this brand..."
+            placeholder={"One task per line. Each becomes its own action item with its own deadline.\n\ne.g.\nDrafted Feb content calendar\nReviewed influencer outreach list\nApproved reel edits"}
             className={`${inputCls} resize-y`}
           />
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+            Each new line is saved as a separate task. Set a per-task deadline below — tasks past their deadline roll forward daily and are flagged "carried over".
+          </p>
         </div>
+
+        {taskLines.length > 0 && (
+          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--bg-hover)]/40 p-3">
+            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+              {taskLines.length} {taskLines.length === 1 ? "task" : "tasks"} will be created
+            </p>
+            <div className="space-y-2">
+              {taskLines.map((line, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-[12px] text-[var(--text-muted)] w-5 shrink-0 text-right">
+                    {i + 1}.
+                  </span>
+                  <span
+                    className="flex-1 text-[13px] text-[var(--text-primary)] truncate"
+                    title={line}
+                  >
+                    {line}
+                  </span>
+                  <input
+                    type="date"
+                    value={lineDeadlines[i] ?? ""}
+                    onChange={(ev) =>
+                      setLineDeadlines((prev) => ({
+                        ...prev,
+                        [i]: ev.target.value,
+                      }))
+                    }
+                    title="Deadline (optional)"
+                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[12px] shrink-0"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving..." : "Save Worklog"}
+          {submitting
+            ? "Saving..."
+            : taskLines.length > 1
+              ? `Save ${taskLines.length} Tasks`
+              : "Save Worklog"}
         </Button>
       </form>
 
