@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Card, TaskDetailModal } from "@/components/ui";
+import { TaskNavigator } from "@/components/TaskNavigator";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
   ListTodo,
@@ -50,6 +51,7 @@ export default function MyTasksPage() {
   const user = useQuery(api.users.getCurrentUser);
   const data = useQuery(api.tasks.listMyWork);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [navTaskId, setNavTaskId] = useState<string | null>(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -333,7 +335,7 @@ export default function MyTasksPage() {
                 {filteredSup.map((t: any) => (
                   <tr
                     key={t._id}
-                    onClick={() => setOpenTaskId(t._id)}
+                    onClick={() => setNavTaskId(t._id)}
                     className={`border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer ${
                       t.needsReview ? "bg-purple-50/60" : ""
                     }`}
@@ -387,6 +389,11 @@ export default function MyTasksPage() {
         )}
       </section>
       )}
+
+      <TaskNavigator
+        taskId={navTaskId}
+        onClose={() => setNavTaskId(null)}
+      />
 
       {openTaskId && (
         <TaskDetailModal

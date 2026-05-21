@@ -5,7 +5,8 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Card, TaskDetailModal } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
+import { TaskNavigator } from "@/components/TaskNavigator";
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import ManagerWorklogPanel from "@/components/worklog/ManagerWorklogPanel";
@@ -703,12 +704,10 @@ export default function WorkLogPage() {
         <OversightBoard />
       )}
 
-      {openTaskId && (
-        <TaskDetailModal
-          taskId={openTaskId}
-          onClose={() => setOpenTaskId(null)}
-        />
-      )}
+      <TaskNavigator
+        taskId={openTaskId}
+        onClose={() => setOpenTaskId(null)}
+      />
     </div>
   );
 }

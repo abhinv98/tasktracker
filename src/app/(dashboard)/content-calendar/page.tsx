@@ -84,8 +84,17 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function ContentCalendarPage() {
   const searchParams = useSearchParams();
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth());
+  // Optional ?month=YYYY-MM deep-link (used when jumping in from a task).
+  const monthParam = searchParams.get("month");
+  const parsedMonth =
+    monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+      ? {
+          year: parseInt(monthParam.slice(0, 4), 10),
+          month: parseInt(monthParam.slice(5, 7), 10) - 1,
+        }
+      : null;
+  const [year, setYear] = useState(parsedMonth?.year ?? now.getFullYear());
+  const [month, setMonth] = useState(parsedMonth?.month ?? now.getMonth());
   const [selectedBrandId, setSelectedBrandId] = useState<string>(searchParams.get("brand") ?? "");
   const [showCreateBrand, setShowCreateBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState("");

@@ -187,6 +187,59 @@ export const listMyWork = query({
   },
 });
 
+// Resolves where a task lives so the UI can jump to it: a normal brief
+// opens the brief page; a content-calendar task opens the calendar at the
+// right brand + month. If the brief was deleted or archived (so the task
+// can't be shown anywhere), returns an explanatory reason instead.
+export const getTaskLocation = query({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { ok: false as const, reason: "Not signed in." };
+
+    const task = await ctx.db.get(taskId);
+    if (!task)
+      return {
+        ok: false as const,
+        reason: "This task no longer exists — it was deleted.",
+      };
+
+    const brief = await ctx.db.get(task.briefId);
+    if (!brief)
+      return {
+        ok: false as const,
+        reason:
+          "The brief this task belonged to was deleted, so the task can't be opened in Briefs or the Content Calendar. It still shows in Worklog / My Tasks / Oversight only because the task record itself survived.",
+      };
+    if (brief.status === "archived")
+      return {
+        ok: false as const,
+        reason: `This task's brief "${brief.title}" is archived. Archived briefs are hidden from Briefs and the Content Calendar — restore it from Archive to open the task there.`,
+      };
+
+    if (brief.briefType === "content_calendar") {
+      // Month comes from the task's own postDate, else its parent entry's.
+      let postDate = task.postDate;
+      if (!postDate && task.parentTaskId) {
+        const parent = await ctx.db.get(task.parentTaskId);
+        postDate = parent?.postDate ?? undefined;
+      }
+      return {
+        ok: true as const,
+        kind: "content_calendar" as const,
+        brandId: brief.brandId ?? null,
+        month: postDate ? postDate.slice(0, 7) : null,
+      };
+    }
+
+    return {
+      ok: true as const,
+      kind: "brief" as const,
+      briefId: task.briefId,
+    };
+  },
+});
+
 export const getTaskDetail = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {

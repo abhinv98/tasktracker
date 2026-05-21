@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, TaskDetailModal } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { TaskNavigator } from "@/components/TaskNavigator";
 import { ChevronLeft, ChevronRight, FileText, ClipboardList } from "lucide-react";
 
 function getTodayStr(): string {
@@ -524,12 +525,10 @@ export default function ManagerWorklogPanel() {
         </div>
       )}
 
-      {openTaskId && (
-        <TaskDetailModal
-          taskId={openTaskId}
-          onClose={() => setOpenTaskId(null)}
-        />
-      )}
+      <TaskNavigator
+        taskId={openTaskId}
+        onClose={() => setOpenTaskId(null)}
+      />
     </div>
   );
 }
