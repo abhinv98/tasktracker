@@ -1209,17 +1209,14 @@ function WorklogTab() {
   const addEntry = useMutation(api.managerWorklog.addEntry);
   const updateEntry = useMutation(api.managerWorklog.updateEntry);
   const deleteEntry = useMutation(api.managerWorklog.deleteEntry);
-  const toggleDone = useMutation(api.managerWorklog.toggleDone);
+  const setEntryStatus = useMutation(api.managerWorklog.setEntryStatus);
 
   const [brandId, setBrandId] = useState<string>("");
   const [content, setContent] = useState("");
-  const [hours, setHours] = useState("");
-  const [lineDeadlines, setLineDeadlines] = useState<Record<number, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] =
     useState<Id<"managerWorklog"> | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [editHours, setEditHours] = useState("");
   const [deletingId, setDeletingId] =
     useState<Id<"managerWorklog"> | null>(null);
 
@@ -1242,22 +1239,13 @@ function WorklogTab() {
     setSubmitting(true);
     try {
       for (let i = 0; i < taskLines.length; i++) {
-        const lineDeadline = lineDeadlines[i];
         await addEntry({
           brandId: brandId as Id<"brands">,
           date,
           content: taskLines[i],
-          // Attach total hours to the first task only so the day's total
-          // doesn't get multiplied across split lines.
-          ...(i === 0 && hours ? { hoursSpent: Number(hours) } : {}),
-          ...(lineDeadline
-            ? { deadline: new Date(lineDeadline + "T23:59:59").getTime() }
-            : {}),
         });
       }
       setContent("");
-      setHours("");
-      setLineDeadlines({});
       toast(
         "success",
         taskLines.length > 1
@@ -1309,34 +1297,20 @@ function WorklogTab() {
         <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-4">
           Log work for {formatDate(date)}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className={labelCls}>Brand</label>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Select brand</option>
-              {managedBrands.map((b: any) => (
-                <option key={b._id} value={b._id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Hours spent (optional)</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0"
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder="e.g. 2.5"
-              className={inputCls}
-            />
-          </div>
+        <div className="mb-4">
+          <label className={labelCls}>Brand</label>
+          <select
+            value={brandId}
+            onChange={(e) => setBrandId(e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Select brand</option>
+            {managedBrands.map((b: any) => (
+              <option key={b._id} value={b._id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="mb-4">
           <label className={labelCls}>What did you do for this brand?</label>
@@ -1344,48 +1318,13 @@ function WorklogTab() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={4}
-            placeholder={"One task per line. Each becomes its own action item with its own deadline.\n\ne.g.\nDrafted Feb content calendar\nReviewed influencer outreach list\nApproved reel edits"}
+            placeholder={"One task per line.\n\ne.g.\nDrafted Feb content calendar\nReviewed influencer outreach list\nApproved reel edits"}
             className={`${inputCls} resize-y`}
           />
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-            Each new line is saved as a separate task. Set a per-task deadline below — tasks past their deadline roll forward daily and are flagged "carried over".
+            Each line is saved as a separate task. Set its deadline and status on the task card after saving.
           </p>
         </div>
-
-        {taskLines.length > 0 && (
-          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--bg-hover)]/40 p-3">
-            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-              {taskLines.length} {taskLines.length === 1 ? "task" : "tasks"} will be created
-            </p>
-            <div className="space-y-2">
-              {taskLines.map((line, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-[12px] text-[var(--text-muted)] w-5 shrink-0 text-right">
-                    {i + 1}.
-                  </span>
-                  <span
-                    className="flex-1 text-[13px] text-[var(--text-primary)] truncate"
-                    title={line}
-                  >
-                    {line}
-                  </span>
-                  <input
-                    type="date"
-                    value={lineDeadlines[i] ?? ""}
-                    onChange={(ev) =>
-                      setLineDeadlines((prev) => ({
-                        ...prev,
-                        [i]: ev.target.value,
-                      }))
-                    }
-                    title="Deadline (optional)"
-                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[12px] shrink-0"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <Button type="submit" disabled={submitting}>
           {submitting
@@ -1407,37 +1346,25 @@ function WorklogTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {entries.map((e: any) => (
+          {entries.map((e: any) => {
+            const isDone = e.taskStatus === "done";
+            const deadlineVal = e.taskDeadline
+              ? new Date(e.taskDeadline).toISOString().slice(0, 10)
+              : "";
+            return (
             <div
               key={e._id}
               className="rounded-xl border border-[var(--border)] bg-white p-4"
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-2 min-w-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleDone({ entryId: e._id })}
-                    title={e.done ? "Mark as not done" : "Mark as done"}
-                    className="shrink-0 text-[var(--text-muted)] hover:text-[var(--accent-employee)] transition-colors"
-                  >
-                    {e.done ? (
-                      <CheckSquare className="h-4 w-4 text-[var(--accent-employee)]" />
-                    ) : (
-                      <Square className="h-4 w-4" />
-                    )}
-                  </button>
                   <span
                     className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
                     style={{ background: e.brandColor }}
                   >
                     {e.brandName}
                   </span>
-                  {e.done && (
-                    <span className="text-[10px] font-medium text-[var(--accent-employee)] uppercase tracking-wider">
-                      Done
-                    </span>
-                  )}
-                  {!e.done && e.carryOverDays > 0 && (
+                  {!isDone && e.carryOverDays > 0 && (
                     <span
                       className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700"
                       title="Not completed by its original deadline — rolled forward each day"
@@ -1447,23 +1374,64 @@ function WorklogTab() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {e.taskDeadline != null && (
-                    <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
-                      Due {new Date(e.taskDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </span>
-                  )}
-                  {e.hoursSpent != null && (
-                    <span className="text-[11px] text-[var(--text-muted)]">
-                      {e.hoursSpent}h
-                    </span>
-                  )}
+                  {/* Status — like a brief's status control */}
+                  <select
+                    value={e.taskStatus}
+                    onChange={async (ev) => {
+                      try {
+                        await setEntryStatus({
+                          entryId: e._id,
+                          status: ev.target.value as
+                            | "pending"
+                            | "in-progress"
+                            | "review"
+                            | "done",
+                        });
+                      } catch (err) {
+                        toast(
+                          "error",
+                          err instanceof Error ? err.message : "Failed"
+                        );
+                      }
+                    }}
+                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                  </select>
+                  {/* Deadline — settable any time, even after saving */}
+                  <input
+                    type="date"
+                    value={deadlineVal}
+                    title="Deadline"
+                    onChange={async (ev) => {
+                      const v = ev.target.value;
+                      try {
+                        await updateEntry(
+                          v
+                            ? {
+                                entryId: e._id,
+                                deadline: new Date(
+                                  v + "T23:59:59"
+                                ).getTime(),
+                              }
+                            : { entryId: e._id, clearDeadline: true }
+                        );
+                      } catch (err) {
+                        toast(
+                          "error",
+                          err instanceof Error ? err.message : "Failed"
+                        );
+                      }
+                    }}
+                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
                   <button
                     onClick={() => {
                       setEditingId(e._id);
                       setEditContent(e.content);
-                      setEditHours(
-                        e.hoursSpent != null ? String(e.hoursSpent) : ""
-                      );
                     }}
                     className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   >
@@ -1485,24 +1453,12 @@ function WorklogTab() {
                     rows={3}
                     className={`${inputCls} resize-y`}
                   />
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={editHours}
-                    onChange={(ev) => setEditHours(ev.target.value)}
-                    placeholder="Hours"
-                    className={inputCls}
-                  />
                   <div className="flex gap-2">
                     <Button
                       onClick={async () => {
                         await updateEntry({
                           entryId: e._id,
                           content: editContent.trim(),
-                          ...(editHours
-                            ? { hoursSpent: Number(editHours) }
-                            : {}),
                         });
                         setEditingId(null);
                         toast("success", "Updated");
@@ -1521,7 +1477,7 @@ function WorklogTab() {
               ) : (
                 <p
                   className={`text-[13px] whitespace-pre-wrap ${
-                    e.done
+                    isDone
                       ? "line-through text-[var(--text-muted)]"
                       : "text-[var(--text-primary)]"
                   }`}
@@ -1530,7 +1486,8 @@ function WorklogTab() {
                 </p>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

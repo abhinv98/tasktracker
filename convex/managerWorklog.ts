@@ -143,11 +143,13 @@ export const listMine = query({
       entries.map(async (e) => {
         let taskDeadline: number | null = null;
         let carryOverDays = 0;
+        let taskStatus: string = e.done ? "done" : "pending";
         if (e.linkedTaskId) {
           const t = await ctx.db.get(e.linkedTaskId);
           if (t) {
             taskDeadline = t.deadline ?? null;
             carryOverDays = t.carryOverDays ?? 0;
+            taskStatus = t.status;
           }
         }
         return {
@@ -157,6 +159,7 @@ export const listMine = query({
             brands.find((b) => b._id === e.brandId)?.color ?? "#6b7280",
           taskDeadline,
           carryOverDays,
+          taskStatus,
         };
       })
     );
@@ -245,6 +248,39 @@ export const toggleDone = mutation({
         await ctx.db.patch(entry.linkedTaskId, {
           status: nextDone ? ("done" as const) : ("pending" as const),
           completedAt: nextDone ? now : undefined,
+        });
+      }
+    }
+  },
+});
+
+/** Set an explicit status on a worklog item (pending / in-progress /
+ *  review / done) — mirrors the brief-style status control. Keeps the
+ *  entry's `done` flag and the linked task's status in sync. */
+export const setEntryStatus = mutation({
+  args: {
+    entryId: v.id("managerWorklog"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in-progress"),
+      v.literal("review"),
+      v.literal("done")
+    ),
+  },
+  handler: async (ctx, { entryId, status }) => {
+    const { userId } = await requireAdmin(ctx);
+    const entry = await ctx.db.get(entryId);
+    if (!entry || entry.userId !== userId)
+      throw new Error("Worklog entry not found");
+    const now = Date.now();
+    const isDone = status === "done";
+    await ctx.db.patch(entryId, { done: isDone, updatedAt: now });
+    if (entry.linkedTaskId) {
+      const task = await ctx.db.get(entry.linkedTaskId);
+      if (task) {
+        await ctx.db.patch(entry.linkedTaskId, {
+          status,
+          completedAt: isDone ? now : undefined,
         });
       }
     }
