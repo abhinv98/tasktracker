@@ -21,6 +21,7 @@ import {
   AlertCircle,
   Clock,
   Users,
+  RotateCcw,
 } from "lucide-react";
 
 const PLATFORMS = [
@@ -2234,6 +2235,15 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
+        {/* Request Changes — entry-level. Reopens the parent calendar
+            task when it has been marked done. */}
+        {viewingMain && task.status === "done" && (
+          <RequestChangesControl
+            taskId={task._id}
+            currentDeadlineMs={task.deadline ?? null}
+          />
+        )}
+
         {/* Number of creatives — only when the entry has a design task
             (modern split or design-first parent). Writes to the design
             task so the design assignee sees "X / N creatives" on their
@@ -2607,6 +2617,18 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
+        {/* Request Changes — appears whenever this Copy / Design task is
+            done. Reopens the task, captures the iteration count, and
+            prompts for a new deadline. */}
+        {(isViewingLinkedChild || editingTaskMode) && task.status === "done" && (
+          <div>
+            <RequestChangesControl
+              taskId={task._id}
+              currentDeadlineMs={task.deadline ?? null}
+            />
+          </div>
+        )}
+
         {/* Auto-Handoff UI removed per design refinement — the schema field
             `handoffTargetTeamId` still drives the post-approval chain in
             createIndividualTaskBrief, but admins no longer pick it here. */}
@@ -2821,6 +2843,159 @@ export function ContentCalendarEntrySidebar({
           </div>
         </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline "Request Changes" control for a done calendar task.
+ *
+ * Surfaced wherever a content-calendar task (parent entry or a Copy/Design
+ * child) is shown as completed. Clicking the button expands a small panel
+ * that captures a required note and an optional new deadline (required if
+ * the existing deadline is already past), then calls `requestTaskRedo` —
+ * which reopens the task to in-progress, increments `changesCount`, and
+ * rejects the latest deliverable so it re-flows through approvals.
+ *
+ * Visibility is server-gated by `canRequestRedo`; the button is hidden
+ * outright for viewers who can't actually request a redo (avoids the
+ * silent-failure case).
+ */
+function RequestChangesControl({
+  taskId,
+  currentDeadlineMs,
+}: {
+  taskId: Id<"tasks">;
+  currentDeadlineMs: number | null | undefined;
+}) {
+  const { toast } = useToast();
+  const canRedo = useQuery(api.tasks.canRequestRedo, { taskId });
+  const requestTaskRedo = useMutation(api.tasks.requestTaskRedo);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!canRedo) return null;
+
+  const deadlinePast =
+    currentDeadlineMs != null && currentDeadlineMs < Date.now();
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+        title="Reopen this task and send it back for changes"
+      >
+        <RotateCcw className="h-3 w-3" />
+        Request Changes
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+      <div className="flex items-center gap-1.5">
+        <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
+        <p className="text-[12px] font-semibold text-amber-800">
+          Request changes
+        </p>
+      </div>
+      <p className="text-[11px] text-amber-700">
+        Reopens this task (status returns to In Progress), pushes the latest
+        deliverable back through approvals, and counts as one more iteration.
+      </p>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Why does this need to be redone? (required)"
+        rows={2}
+        className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+        autoFocus
+      />
+      <div>
+        <label className="text-[11px] font-medium text-amber-800 block mb-1">
+          New deadline
+          {deadlinePast ? " (required — old deadline has passed)" : " (optional)"}
+        </label>
+        <input
+          type="date"
+          value={newDeadline}
+          onChange={(e) => setNewDeadline(e.target.value)}
+          className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+        />
+        {deadlinePast && !newDeadline && (
+          <p className="text-[10px] text-amber-700 mt-1">
+            The old deadline already passed — set a new one so the assignee
+            isn't flagged overdue immediately.
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={
+            submitting ||
+            !note.trim() ||
+            (deadlinePast && !newDeadline)
+          }
+          onClick={async () => {
+            if (!note.trim()) return;
+            if (deadlinePast && !newDeadline) {
+              toast("error", "Set a new deadline — the old one has passed.");
+              return;
+            }
+            setSubmitting(true);
+            try {
+              await requestTaskRedo({
+                taskId,
+                note: note.trim(),
+                ...(newDeadline
+                  ? {
+                      newDeadline: new Date(
+                        newDeadline + "T23:59:59"
+                      ).getTime(),
+                    }
+                  : {}),
+              });
+              setOpen(false);
+              setNote("");
+              setNewDeadline("");
+              toast("success", "Changes requested");
+            } catch (err) {
+              toast(
+                "error",
+                err instanceof Error
+                  ? err.message
+                  : "Could not request changes"
+              );
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
+        >
+          {submitting ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <RotateCcw className="h-3 w-3" />
+          )}
+          Send Back for Changes
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setNote("");
+            setNewDeadline("");
+          }}
+          className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
