@@ -99,6 +99,7 @@ export const getOversightBoard = query({
   args: {
     status: v.optional(v.string()),
     brandId: v.optional(v.id("brands")),
+    teamId: v.optional(v.id("teams")),
     assigneeId: v.optional(v.id("users")),
     managerId: v.optional(v.id("users")),
     search: v.optional(v.string()),
@@ -112,7 +113,16 @@ export const getOversightBoard = query({
   },
   handler: async (
     ctx,
-    { status, brandId, assigneeId, managerId, search, startDate, endDate }
+    {
+      status,
+      brandId,
+      teamId,
+      assigneeId,
+      managerId,
+      search,
+      startDate,
+      endDate,
+    }
   ) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -124,10 +134,21 @@ export const getOversightBoard = query({
     const allBrands = await ctx.db.query("brands").collect();
     const allUsers = await ctx.db.query("users").collect();
     const allDeliverables = await ctx.db.query("deliverables").collect();
+    const allTeams = await ctx.db.query("teams").collect();
+    const allUserTeams = await ctx.db.query("userTeams").collect();
 
     const briefMap = new Map(allBriefs.map((b) => [b._id, b]));
     const brandMap = new Map(allBrands.map((b) => [b._id, b]));
     const userMap = new Map(allUsers.map((u) => [u._id, u]));
+
+    // userId → set of teamIds they belong to (for team filter)
+    const teamsByUser = new Map<string, Set<string>>();
+    for (const ut of allUserTeams) {
+      const uid = ut.userId as unknown as string;
+      const tid = ut.teamId as unknown as string;
+      if (!teamsByUser.has(uid)) teamsByUser.set(uid, new Set());
+      teamsByUser.get(uid)!.add(tid);
+    }
 
     // Latest deliverable submission per task — what the employee "submitted".
     // A task with multiple revisions reports the most recent submission.
@@ -138,11 +159,13 @@ export const getOversightBoard = query({
       if (d.submittedAt > prev) lastSubmissionByTask.set(key, d.submittedAt);
     }
 
+    const now = Date.now();
     let rows = allTasks.map((t) => {
       const brief = briefMap.get(t.briefId);
       const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
       const assignee = userMap.get(t.assigneeId);
       const manager = userMap.get(t.assignedBy);
+      const createdAt = (t as any)._creationTime as number;
       return {
         _id: t._id,
         title: t.title,
@@ -151,7 +174,18 @@ export const getOversightBoard = query({
         completedAt: t.completedAt ?? null,
         lastSubmittedAt:
           lastSubmissionByTask.get(t._id as unknown as string) ?? null,
-        createdAt: (t as any)._creationTime as number,
+        createdAt,
+        // When the task was actually assigned to the employee. Falls back to
+        // _creationTime for legacy tasks that pre-date the field.
+        assignedAt: t.assignedAt ?? createdAt,
+        changesCount: t.changesCount ?? 0,
+        deadlineExtended: t.deadlineExtended === true,
+        // Past deadline and still actively open (not done/under review).
+        isOverdue:
+          t.deadline != null &&
+          t.deadline < now &&
+          t.status !== "done" &&
+          t.status !== "review",
         briefId: t.briefId,
         briefTitle: brief?.title ?? "Unknown",
         briefType: (brief as any)?.briefType ?? null,
@@ -198,6 +232,15 @@ export const getOversightBoard = query({
     if (brandId) rows = rows.filter((r) => r.brandId === brandId);
     if (assigneeId) rows = rows.filter((r) => r.assigneeId === assigneeId);
     if (managerId) rows = rows.filter((r) => r.managerId === managerId);
+    if (teamId) {
+      const teamIdStr = teamId as unknown as string;
+      rows = rows.filter((r) => {
+        const userTeams = teamsByUser.get(
+          r.assigneeId as unknown as string
+        );
+        return userTeams?.has(teamIdStr) === true;
+      });
+    }
     if (search && search.trim()) {
       const s = search.trim().toLowerCase();
       rows = rows.filter(
@@ -218,6 +261,7 @@ export const getOversightBoard = query({
       brands: { _id: any; name: string }[];
       managers: { _id: any; name: string }[];
       assignees: { _id: any; name: string }[];
+      teams: { _id: any; name: string }[];
     };
 
     if (scope.kind === "admin") {
@@ -232,17 +276,28 @@ export const getOversightBoard = query({
         assignees: allUsers
           .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
           .sort((a, b) => a.name.localeCompare(b.name)),
+        teams: allTeams
+          .map((t) => ({ _id: t._id, name: t.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
       };
     } else {
       const scopedBrandIds = new Set<string>();
       const scopedManagerIds = new Set<string>();
       const scopedAssigneeIds = new Set<string>();
+      const scopedTeamIds = new Set<string>();
       for (const r of rows) {
         if (r.brandId) scopedBrandIds.add(r.brandId as unknown as string);
         if (r.managerId)
           scopedManagerIds.add(r.managerId as unknown as string);
-        if (r.assigneeId)
+        if (r.assigneeId) {
           scopedAssigneeIds.add(r.assigneeId as unknown as string);
+          const userTeams = teamsByUser.get(
+            r.assigneeId as unknown as string
+          );
+          if (userTeams) {
+            for (const tid of userTeams) scopedTeamIds.add(tid);
+          }
+        }
       }
       filterOptions = {
         brands: allBrands
@@ -256,6 +311,10 @@ export const getOversightBoard = query({
         assignees: allUsers
           .filter((u) => scopedAssigneeIds.has(u._id as unknown as string))
           .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        teams: allTeams
+          .filter((t) => scopedTeamIds.has(t._id as unknown as string))
+          .map((t) => ({ _id: t._id, name: t.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
       };
     }

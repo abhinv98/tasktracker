@@ -136,6 +136,7 @@ export default function OversightBoard() {
   const [status, setStatus] = useState("");
   const [brandId, setBrandId] = useState("");
   const [managerId, setManagerId] = useState("");
+  const [teamId, setTeamId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [search, setSearch] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -150,6 +151,7 @@ export default function OversightBoard() {
   const board = useQuery(api.oversight.getOversightBoard, {
     ...(status ? { status } : {}),
     ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
+    ...(teamId ? { teamId: teamId as Id<"teams"> } : {}),
     ...(managerId ? { managerId: managerId as Id<"users"> } : {}),
     ...(assigneeId ? { assigneeId: assigneeId as Id<"users"> } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
@@ -266,6 +268,19 @@ export default function OversightBoard() {
             </option>
           ))}
         </select>
+        <select
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
+          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          title="Filter by team — shows tasks owned by anyone on that team"
+        >
+          <option value="">All teams</option>
+          {board.filterOptions.teams.map((t) => (
+            <option key={t._id} value={t._id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
           <input
@@ -352,17 +367,19 @@ export default function OversightBoard() {
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Assigned by</th>
               <th className="px-4 py-3 font-medium">Brief</th>
+              <th className="px-4 py-3 font-medium">Assigned</th>
               <th className="px-4 py-3 font-medium">Deadline</th>
               <th className="px-4 py-3 font-medium">Submitted</th>
               <th className="px-4 py-3 font-medium">Completed</th>
-              <th className="px-4 py-3 font-medium">Created</th>
+              <th className="px-4 py-3 font-medium text-center">Changes</th>
+              <th className="px-4 py-3 font-medium">Remarks</th>
             </tr>
           </thead>
           <tbody>
             {board.rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="px-4 py-10 text-center text-[var(--text-muted)]"
                 >
                   No tasks match these filters.
@@ -472,6 +489,12 @@ function FragmentRow({
         <td className="px-4 py-3 text-[var(--text-muted)] max-w-[160px] truncate">
           {r.briefTitle}
         </td>
+        <td
+          className="px-4 py-3 text-[var(--text-secondary)]"
+          title="When this task was assigned to the employee"
+        >
+          {fmt(r.assignedAt)}
+        </td>
         <td className="px-4 py-3 text-[var(--text-secondary)]">
           <div className="flex items-center gap-1.5">
             <span>{fmt(r.deadline)}</span>
@@ -498,13 +521,36 @@ function FragmentRow({
         <td className="px-4 py-3 text-[var(--text-secondary)]">
           {fmt(r.completedAt)}
         </td>
-        <td className="px-4 py-3 text-[var(--text-muted)]">
-          {fmt(r.createdAt)}
+        <td className="px-4 py-3 text-center" title="Number of change-request rounds on this task">
+          {r.changesCount > 0 ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700">
+              {r.changesCount}
+            </span>
+          ) : (
+            <span className="text-[11px] text-[var(--text-muted)]">0</span>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex flex-wrap gap-1">
+            {r.deadlineExtended && (
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+                EXTENDED
+              </span>
+            )}
+            {r.isOverdue && (
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
+                OVERDUE
+              </span>
+            )}
+            {!r.deadlineExtended && !r.isOverdue && (
+              <span className="text-[11px] text-[var(--text-muted)]">—</span>
+            )}
+          </div>
         </td>
       </tr>
       {isDone && isOpen && (
         <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-          <td colSpan={11} className="px-6 py-2">
+          <td colSpan={12} className="px-6 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mt-2 mb-1">
               Approved work
             </p>
