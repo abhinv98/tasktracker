@@ -123,10 +123,20 @@ export const getOversightBoard = query({
     const allBriefs = await ctx.db.query("briefs").collect();
     const allBrands = await ctx.db.query("brands").collect();
     const allUsers = await ctx.db.query("users").collect();
+    const allDeliverables = await ctx.db.query("deliverables").collect();
 
     const briefMap = new Map(allBriefs.map((b) => [b._id, b]));
     const brandMap = new Map(allBrands.map((b) => [b._id, b]));
     const userMap = new Map(allUsers.map((u) => [u._id, u]));
+
+    // Latest deliverable submission per task — what the employee "submitted".
+    // A task with multiple revisions reports the most recent submission.
+    const lastSubmissionByTask = new Map<string, number>();
+    for (const d of allDeliverables) {
+      const key = d.taskId as unknown as string;
+      const prev = lastSubmissionByTask.get(key) ?? 0;
+      if (d.submittedAt > prev) lastSubmissionByTask.set(key, d.submittedAt);
+    }
 
     let rows = allTasks.map((t) => {
       const brief = briefMap.get(t.briefId);
@@ -139,6 +149,8 @@ export const getOversightBoard = query({
         status: t.status,
         deadline: t.deadline ?? null,
         completedAt: t.completedAt ?? null,
+        lastSubmittedAt:
+          lastSubmissionByTask.get(t._id as unknown as string) ?? null,
         createdAt: (t as any)._creationTime as number,
         briefId: t.briefId,
         briefTitle: brief?.title ?? "Unknown",

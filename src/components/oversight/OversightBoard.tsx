@@ -353,6 +353,8 @@ export default function OversightBoard() {
               <th className="px-4 py-3 font-medium">Assigned by</th>
               <th className="px-4 py-3 font-medium">Brief</th>
               <th className="px-4 py-3 font-medium">Deadline</th>
+              <th className="px-4 py-3 font-medium">Submitted</th>
+              <th className="px-4 py-3 font-medium">Completed</th>
               <th className="px-4 py-3 font-medium">Created</th>
             </tr>
           </thead>
@@ -360,7 +362,7 @@ export default function OversightBoard() {
             {board.rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={11}
                   className="px-4 py-10 text-center text-[var(--text-muted)]"
                 >
                   No tasks match these filters.
@@ -483,13 +485,26 @@ function FragmentRow({
             )}
           </div>
         </td>
+        <td
+          className="px-4 py-3 text-[var(--text-secondary)]"
+          title={
+            r.lastSubmittedAt
+              ? "Most recent deliverable submitted by the employee"
+              : "No deliverable submitted yet"
+          }
+        >
+          {fmt(r.lastSubmittedAt)}
+        </td>
+        <td className="px-4 py-3 text-[var(--text-secondary)]">
+          {fmt(r.completedAt)}
+        </td>
         <td className="px-4 py-3 text-[var(--text-muted)]">
           {fmt(r.createdAt)}
         </td>
       </tr>
       {isDone && isOpen && (
         <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-          <td colSpan={9} className="px-6 py-2">
+          <td colSpan={11} className="px-6 py-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mt-2 mb-1">
               Approved work
             </p>
