@@ -255,6 +255,7 @@ export const getCalendarBriefForBrand = query({
   handler: async (ctx, { brandId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
+    if (!(await canViewBrandCalendar(ctx, userId, brandId))) return null;
 
     const allBriefs = await ctx.db.query("briefs").collect();
     const existing = allBriefs.find(
@@ -267,6 +268,104 @@ export const getCalendarBriefForBrand = query({
   },
 });
 
+/**
+ * Read-side gate used by every calendar query. Admins see all calendars;
+ * employees only see brands where they have ever been assigned a task in
+ * that brand's content-calendar brief. Returns true to allow.
+ */
+async function canViewBrandCalendar(
+  ctx: any,
+  userId: any,
+  brandId: any
+): Promise<boolean> {
+  const user = await ctx.db.get(userId);
+  if (!user) return false;
+  if (user.role === "admin") return true;
+
+  // Find the brand's CC brief (if any) and check the employee has at least
+  // one task on it.
+  const allBriefs = await ctx.db.query("briefs").collect();
+  const ccBrief = allBriefs.find(
+    (b: any) =>
+      b.brandId === brandId &&
+      b.briefType === "content_calendar" &&
+      b.status !== "archived"
+  );
+  if (!ccBrief) return false;
+
+  const myTask = await ctx.db
+    .query("tasks")
+    .withIndex("by_assignee", (q: any) => q.eq("assigneeId", userId))
+    .filter((q: any) => q.eq(q.field("briefId"), ccBrief._id))
+    .first();
+  return myTask != null;
+}
+
+/**
+ * Brand IDs whose content calendar the current user is allowed to view.
+ *
+ * - Admins (incl. super-admins): every brand that has a non-archived
+ *   content-calendar brief.
+ * - Employees: every such brand where they have ever been assigned a task
+ *   inside that brand's content-calendar brief. Access is sticky — once an
+ *   employee has been assigned a calendar task on a brand, they keep
+ *   read-only access to that brand's calendar indefinitely, including
+ *   months where they have no assignment and tasks that are now done.
+ */
+export const getMyAccessibleCalendarBrandIds = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user) return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const ccBriefs = briefs.filter(
+      (b: any) =>
+        b.briefType === "content_calendar" && b.status !== "archived"
+    );
+    if (ccBriefs.length === 0) return [];
+
+    if (user.role === "admin") {
+      const ids = new Set<string>();
+      for (const b of ccBriefs) {
+        if (b.brandId) ids.add(b.brandId as unknown as string);
+      }
+      return [...ids];
+    }
+
+    const ccBriefIds = new Set(
+      ccBriefs.map((b) => b._id as unknown as string)
+    );
+    const brandByBrief = new Map<string, string>();
+    for (const b of ccBriefs) {
+      if (b.brandId) {
+        brandByBrief.set(
+          b._id as unknown as string,
+          b.brandId as unknown as string
+        );
+      }
+    }
+
+    // Tasks the employee has been (or is) assigned to. Status doesn't
+    // matter — "involved once → keeps access".
+    const myTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+      .collect();
+
+    const brandIds = new Set<string>();
+    for (const t of myTasks) {
+      const briefIdStr = t.briefId as unknown as string;
+      if (!ccBriefIds.has(briefIdStr)) continue;
+      const brandId = brandByBrief.get(briefIdStr);
+      if (brandId) brandIds.add(brandId);
+    }
+    return [...brandIds];
+  },
+});
+
 export const listTasksByBrandMonth = query({
   args: {
     brandId: v.id("brands"),
@@ -275,6 +374,7 @@ export const listTasksByBrandMonth = query({
   handler: async (ctx, { brandId, month }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    if (!(await canViewBrandCalendar(ctx, userId, brandId))) return [];
 
     const allBriefs = await ctx.db.query("briefs").collect();
     const ccBrief = allBriefs.find(
@@ -645,6 +745,10 @@ export const listBreakDays = query({
   handler: async (ctx, { briefId, month }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    const brief = await ctx.db.get(briefId);
+    if (!brief?.brandId) return [];
+    if (!(await canViewBrandCalendar(ctx, userId, brief.brandId))) return [];
+
     const all = await ctx.db
       .query("contentCalendarBreakDays")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))

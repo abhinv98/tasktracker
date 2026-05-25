@@ -142,7 +142,20 @@ export default function ContentCalendarPage() {
   const { toast } = useToast();
 
   const user = useQuery(api.users.getCurrentUser);
-  const brands = useQuery(api.brands.listBrands);
+  const allBrands = useQuery(api.brands.listBrands);
+  // For employees, the set of brand IDs whose calendar they're allowed to
+  // see (sticky — based on any past task in that brand's calendar brief).
+  // Admins get null here and see every brand.
+  const accessibleBrandIds = useQuery(
+    api.contentCalendar.getMyAccessibleCalendarBrandIds
+  );
+  const brands = useMemo(() => {
+    if (!allBrands) return allBrands;
+    if (user?.role === "admin") return allBrands;
+    if (!accessibleBrandIds) return undefined; // still loading scope
+    const allowed = new Set(accessibleBrandIds);
+    return allBrands.filter((b: any) => allowed.has(b._id));
+  }, [allBrands, accessibleBrandIds, user?.role]);
   const allUsers = useQuery(api.users.listAllUsers);
   const allTeams = useQuery(api.teams.listTeams, {});
   const createBrand = useMutation(api.brands.createBrand);
@@ -197,6 +210,21 @@ export default function ContentCalendarPage() {
   }, [brandManagers, admins]);
 
   const isEditable = user?.role === "admin";
+  const hasNoAccess =
+    user?.role === "employee" &&
+    accessibleBrandIds !== undefined &&
+    accessibleBrandIds.length === 0;
+
+  // If an employee deep-linked to a brand they no longer have access to,
+  // drop the selection so they don't see an empty/permission-denied view.
+  useEffect(() => {
+    if (user?.role !== "employee") return;
+    if (!selectedBrandId) return;
+    if (!accessibleBrandIds) return;
+    if (!accessibleBrandIds.includes(selectedBrandId)) {
+      setSelectedBrandId("");
+    }
+  }, [user?.role, selectedBrandId, accessibleBrandIds]);
 
   const selectedBrand = useMemo(
     () => (brands ?? []).find((b: any) => b._id === selectedBrandId),
@@ -488,7 +516,20 @@ export default function ContentCalendarPage() {
       </div>
 
       {/* Main Content */}
-      {!selectedBrandId ? (
+      {hasNoAccess ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md px-6">
+            <Calendar className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
+            <p className="text-[15px] text-[var(--text-secondary)] font-medium">
+              No content calendars to show yet
+            </p>
+            <p className="text-[13px] text-[var(--text-muted)] mt-1">
+              You'll see a brand's content calendar here as soon as you're
+              assigned a task in it. Access stays open after that.
+            </p>
+          </div>
+        </div>
+      ) : !selectedBrandId ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Calendar className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />

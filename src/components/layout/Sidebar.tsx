@@ -130,6 +130,10 @@ const EMPLOYEE_NAV: NavCategory[] = [
     ],
   },
   {
+    category: "Planning",
+    items: [{ href: "/content-calendar", label: "Content Calendar" }],
+  },
+  {
     category: "Management",
     items: [{ href: "/deliverables", label: "Deliverables" }],
   },
