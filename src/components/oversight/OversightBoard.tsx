@@ -138,9 +138,14 @@ export default function OversightBoard() {
   const [managerId, setManagerId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [search, setSearch] = useState("");
-  const [date, setDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+
+  const rangeInvalid = Boolean(
+    startDate && endDate && startDate > endDate
+  );
 
   const board = useQuery(api.oversight.getOversightBoard, {
     ...(status ? { status } : {}),
@@ -148,7 +153,8 @@ export default function OversightBoard() {
     ...(managerId ? { managerId: managerId as Id<"users"> } : {}),
     ...(assigneeId ? { assigneeId: assigneeId as Id<"users"> } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
-    ...(date ? { date } : {}),
+    ...(startDate && !rangeInvalid ? { startDate } : {}),
+    ...(endDate && !rangeInvalid ? { endDate } : {}),
   });
 
   if (board === undefined)
@@ -160,14 +166,34 @@ export default function OversightBoard() {
   if (board === null)
     return (
       <p className="text-[14px] text-[var(--text-secondary)] py-8">
-        Access denied. Oversight is restricted to super-admin oversight.
+        Access denied. Oversight is open to oversight admins, brand managers,
+        and team leads.
       </p>
     );
 
   const s = board.summary;
+  const access = board.access;
+  const scopeLabel =
+    access.kind === "admin"
+      ? "Showing every task across the org."
+      : (() => {
+          const parts: string[] = [];
+          if (access.brandCount > 0) {
+            parts.push(
+              `${access.brandCount} brand${access.brandCount === 1 ? "" : "s"} you manage`
+            );
+          }
+          if (access.teamMemberCount > 0) {
+            parts.push(
+              `${access.teamMemberCount} team member${access.teamMemberCount === 1 ? "" : "s"} you lead`
+            );
+          }
+          return `Scoped to ${parts.join(" + ")}.`;
+        })();
 
   return (
     <div>
+      <p className="text-[12px] text-[var(--text-muted)] mb-4">{scopeLabel}</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {[
           { label: "Total", value: s.total },
@@ -249,29 +275,65 @@ export default function OversightBoard() {
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px]"
           />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" />
           <input
             type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            max={endDate || undefined}
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
-            title="Tasks created, due, or completed on this day"
+            title="From — start of range (inclusive)"
+          />
+          <span className="text-[12px] text-[var(--text-muted)]">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            min={startDate || undefined}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+            title="To — end of range (inclusive)"
           />
           <button
-            onClick={() => setDate(todayStr())}
+            onClick={() => {
+              const t = todayStr();
+              setStartDate(t);
+              setEndDate(t);
+            }}
             className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             Today
           </button>
-          {date && (
+          <button
+            onClick={() => {
+              const end = new Date();
+              const start = new Date();
+              start.setDate(start.getDate() - 6);
+              const fmtIso = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              setStartDate(fmtIso(start));
+              setEndDate(fmtIso(end));
+            }}
+            className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          >
+            Last 7 days
+          </button>
+          {(startDate || endDate) && (
             <button
-              onClick={() => setDate("")}
-              title="Clear date"
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              title="Clear range"
               className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
+          )}
+          {rangeInvalid && (
+            <span className="text-[11px] text-rose-600">
+              From must be on or before To
+            </span>
           )}
         </div>
         <span className="text-[12px] text-[var(--text-muted)] ml-auto">

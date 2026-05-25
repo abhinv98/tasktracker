@@ -1,11 +1,68 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, internalMutation } from "./_generated/server";
+import { query, internalMutation, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
-// ── Super-admin Oversight (Vivek & Mayur only) ─────────────────
-// A simplified, filterable board of every task — who's doing it, for
-// which brand, status, and which brand manager assigned it — plus a
-// once-a-day rolled-up digest notification.
+// ── Oversight access ───────────────────────────────────────────
+// Oversight is a filterable board of tasks — who's doing them, for which
+// brand, status, and which brand manager assigned them.
+//
+// Access tiers:
+//   • "admin" — oversight admins (Vivek/Mayur) and super-admins see everything.
+//   • "scoped" — brand managers see tasks for the brands they manage; team
+//     leads see tasks owned by anyone on the teams they lead. A user who is
+//     both gets the union of those two scopes.
+//   • null    — no oversight access.
+
+type OversightScope =
+  | { kind: "admin" }
+  | {
+      kind: "scoped";
+      brandIds: Set<string>;
+      employeeIds: Set<string>;
+    };
+
+async function resolveOversightScope(
+  ctx: QueryCtx,
+  userId: Id<"users">
+): Promise<OversightScope | null> {
+  const user = await ctx.db.get(userId);
+  if (!user) return null;
+
+  if (user.isOversightAdmin === true || user.isSuperAdmin === true) {
+    return { kind: "admin" };
+  }
+
+  const managedBrands = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_manager", (q) => q.eq("managerId", userId))
+    .collect();
+  const brandIds = new Set<string>(
+    managedBrands.map((m) => m.brandId as unknown as string)
+  );
+
+  const ledTeams = await ctx.db
+    .query("teams")
+    .withIndex("by_lead", (q) => q.eq("leadId", userId))
+    .collect();
+  const ledTeamIds = new Set<string>(
+    ledTeams.map((t) => t._id as unknown as string)
+  );
+
+  const employeeIds = new Set<string>();
+  if (ledTeamIds.size > 0) {
+    const memberships = await ctx.db.query("userTeams").collect();
+    for (const m of memberships) {
+      if (ledTeamIds.has(m.teamId as unknown as string)) {
+        employeeIds.add(m.userId as unknown as string);
+      }
+    }
+    employeeIds.add(userId as unknown as string);
+  }
+
+  if (brandIds.size === 0 && employeeIds.size === 0) return null;
+  return { kind: "scoped", brandIds, employeeIds };
+}
 
 export const amOversightAdmin = query({
   args: {},
@@ -17,6 +74,27 @@ export const amOversightAdmin = query({
   },
 });
 
+/**
+ * Lightweight access check for UI gating. Returns the viewer's scope so the
+ * sidebar / worklog tab / page chrome can decide whether to show Oversight
+ * without fetching the whole board.
+ */
+export const getOversightAccess = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const scope = await resolveOversightScope(ctx, userId);
+    if (!scope) return null;
+    if (scope.kind === "admin") return { kind: "admin" as const };
+    return {
+      kind: "scoped" as const,
+      brandCount: scope.brandIds.size,
+      teamMemberCount: scope.employeeIds.size,
+    };
+  },
+});
+
 export const getOversightBoard = query({
   args: {
     status: v.optional(v.string()),
@@ -24,17 +102,22 @@ export const getOversightBoard = query({
     assigneeId: v.optional(v.id("users")),
     managerId: v.optional(v.id("users")),
     search: v.optional(v.string()),
-    /** "YYYY-MM-DD" — match tasks created, due, or completed that day. */
-    date: v.optional(v.string()),
+    /**
+     * "YYYY-MM-DD" range — match tasks whose created/deadline/completed date
+     * intersects the range. Either bound is optional: an open-ended range
+     * (only `startDate` or only `endDate`) is allowed.
+     */
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { status, brandId, assigneeId, managerId, search, date }
+    { status, brandId, assigneeId, managerId, search, startDate, endDate }
   ) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const user = await ctx.db.get(userId);
-    if (!user || user.isOversightAdmin !== true) return null;
+    const scope = await resolveOversightScope(ctx, userId);
+    if (!scope) return null;
 
     const allTasks = await ctx.db.query("tasks").collect();
     const allBriefs = await ctx.db.query("briefs").collect();
@@ -72,14 +155,31 @@ export const getOversightBoard = query({
       };
     });
 
-    if (date) {
-      const dayStart = new Date(date + "T00:00:00").getTime();
-      const dayEnd = new Date(date + "T23:59:59.999").getTime();
-      const onDay = (ts: number | null) =>
-        ts != null && ts >= dayStart && ts <= dayEnd;
+    // Scope: brand managers see tasks on their brands; team leads see tasks
+    // owned by their team members; a user with both roles gets the union.
+    if (scope.kind === "scoped") {
       rows = rows.filter(
         (r) =>
-          onDay(r.createdAt) || onDay(r.deadline) || onDay(r.completedAt)
+          (r.brandId != null &&
+            scope.brandIds.has(r.brandId as unknown as string)) ||
+          scope.employeeIds.has(r.assigneeId as unknown as string)
+      );
+    }
+
+    if (startDate || endDate) {
+      const lo = startDate
+        ? new Date(startDate + "T00:00:00").getTime()
+        : -Infinity;
+      const hi = endDate
+        ? new Date(endDate + "T23:59:59.999").getTime()
+        : Infinity;
+      const inRange = (ts: number | null) =>
+        ts != null && ts >= lo && ts <= hi;
+      rows = rows.filter(
+        (r) =>
+          inRange(r.createdAt) ||
+          inRange(r.deadline) ||
+          inRange(r.completedAt)
       );
     }
     if (status) rows = rows.filter((r) => r.status === status);
@@ -99,20 +199,64 @@ export const getOversightBoard = query({
 
     rows.sort((a, b) => b.createdAt - a.createdAt);
 
-    const filterOptions = {
-      brands: allBrands
-        .map((b) => ({ _id: b._id, name: b.name }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-      managers: allUsers
-        .filter((u) => u.role === "admin")
-        .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-      assignees: allUsers
-        .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+    // Filter dropdowns: admins see every option; scoped users only see the
+    // brands / managers / employees that appear in their visible rows so the
+    // dropdowns can't reveal anything outside their scope.
+    let filterOptions: {
+      brands: { _id: any; name: string }[];
+      managers: { _id: any; name: string }[];
+      assignees: { _id: any; name: string }[];
     };
 
+    if (scope.kind === "admin") {
+      filterOptions = {
+        brands: allBrands
+          .map((b) => ({ _id: b._id, name: b.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        managers: allUsers
+          .filter((u) => u.role === "admin")
+          .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        assignees: allUsers
+          .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    } else {
+      const scopedBrandIds = new Set<string>();
+      const scopedManagerIds = new Set<string>();
+      const scopedAssigneeIds = new Set<string>();
+      for (const r of rows) {
+        if (r.brandId) scopedBrandIds.add(r.brandId as unknown as string);
+        if (r.managerId)
+          scopedManagerIds.add(r.managerId as unknown as string);
+        if (r.assigneeId)
+          scopedAssigneeIds.add(r.assigneeId as unknown as string);
+      }
+      filterOptions = {
+        brands: allBrands
+          .filter((b) => scopedBrandIds.has(b._id as unknown as string))
+          .map((b) => ({ _id: b._id, name: b.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        managers: allUsers
+          .filter((u) => scopedManagerIds.has(u._id as unknown as string))
+          .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        assignees: allUsers
+          .filter((u) => scopedAssigneeIds.has(u._id as unknown as string))
+          .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }
+
     return {
+      access:
+        scope.kind === "admin"
+          ? { kind: "admin" as const }
+          : {
+              kind: "scoped" as const,
+              brandCount: scope.brandIds.size,
+              teamMemberCount: scope.employeeIds.size,
+            },
       rows: rows.slice(0, 1000),
       total: rows.length,
       summary: {
@@ -136,11 +280,23 @@ export const getApprovedWorkForTask = query({
   handler: async (ctx, { taskId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const user = await ctx.db.get(userId);
-    if (!user || user.isOversightAdmin !== true) return null;
+    const scope = await resolveOversightScope(ctx, userId);
+    if (!scope) return null;
 
     const task = await ctx.db.get(taskId);
     if (!task) return [];
+
+    if (scope.kind === "scoped") {
+      const brief = await ctx.db.get(task.briefId);
+      const taskBrandId = brief?.brandId
+        ? (brief.brandId as unknown as string)
+        : null;
+      const taskAssigneeId = task.assigneeId as unknown as string;
+      const inScope =
+        (taskBrandId && scope.brandIds.has(taskBrandId)) ||
+        scope.employeeIds.has(taskAssigneeId);
+      if (!inScope) return null;
+    }
 
     const deliverables = await ctx.db
       .query("deliverables")

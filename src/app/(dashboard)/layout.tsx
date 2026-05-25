@@ -8,7 +8,10 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
-const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/oversight", "/my-tasks"];
+// Note: /oversight is gated server-side by oversight access (super-admins,
+// oversight admins, brand managers, and team leads). Don't list it here or
+// employee team leads get bounced.
+const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
 
 export default function DashboardLayout({

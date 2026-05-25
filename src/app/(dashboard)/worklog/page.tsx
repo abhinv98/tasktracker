@@ -96,9 +96,11 @@ export default function WorkLogPage() {
   }, [selectedMemberId]);
 
   const teamLoad = useQuery(api.worklog.getTeamLoadView);
+  const oversightAccess = useQuery(api.oversight.getOversightAccess);
 
   const isAdmin = user?.role === "admin";
   const isTeamLead = (teams ?? []).some((t: any) => t.leadId === user?._id);
+  const hasOversight = oversightAccess != null;
 
   if (!user || (!isAdmin && !isTeamLead)) {
     return (
@@ -133,7 +135,7 @@ export default function WorkLogPage() {
                 },
               ]
             : []),
-          ...(user?.isOversightAdmin
+          ...(hasOversight
             ? [
                 {
                   key: "oversight" as const,
@@ -700,7 +702,7 @@ export default function WorkLogPage() {
         <ManagerWorklogPanel />
       )}
 
-      {activeTab === "oversight" && user?.isOversightAdmin && (
+      {activeTab === "oversight" && hasOversight && (
         <OversightBoard />
       )}
 
