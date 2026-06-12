@@ -61,6 +61,7 @@ export default function BriefsPage() {
   const createIndividualTaskBrief = useMutation(api.briefs.createIndividualTaskBrief);
   const deleteBrief = useMutation(api.briefs.deleteBrief);
   const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [brandId, setBrandId] = useState<string>("");
@@ -386,6 +387,8 @@ export default function BriefsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       const isIndividual = briefMode === "individual";
       type BriefType = "developmental" | "designing" | "video_editing" | "copywriting";
@@ -481,6 +484,8 @@ export default function BriefsPage() {
       toast("success", "Brief created");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -1235,7 +1240,9 @@ export default function BriefsPage() {
                 </div>
               )}
               <div className="flex gap-2">
-                <Button type="submit" variant="primary">Create</Button>
+                <Button type="submit" variant="primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating…" : "Create"}
+                </Button>
                 <Button type="button" variant="secondary" onClick={closeCreateModal}>Cancel</Button>
               </div>
             </form>
@@ -1733,7 +1740,7 @@ function TeamBlockRow({
           </option>
           {(members ?? []).map((m: any) => (
             <option key={m._id} value={m._id}>
-              {m.name ?? m.email}
+              {m.name ?? m.email}{m.isFreelancer ? " (Freelancer)" : ""}
             </option>
           ))}
         </select>

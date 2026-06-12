@@ -170,6 +170,26 @@ export const getBrief = query({
   },
 });
 
+// Guard against accidental double-submission (double-click / Enter+click):
+// if this creator just made a brief with the same title, treat the second
+// call as a replay and hand back the existing brief.
+const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
+
+async function findRecentDuplicateBrief(
+  ctx: { db: { query: (table: "briefs") => any } },
+  userId: Id<"users">,
+  title: string
+): Promise<Id<"briefs"> | null> {
+  const recent = await ctx.db.query("briefs").order("desc").take(25);
+  const dup = recent.find(
+    (b: { createdBy: Id<"users">; title: string; _creationTime: number; _id: Id<"briefs"> }) =>
+      b.createdBy === userId &&
+      b.title === title &&
+      Date.now() - b._creationTime < DUPLICATE_SUBMIT_WINDOW_MS
+  );
+  return dup ? dup._id : null;
+}
+
 export const createBrief = mutation({
   args: {
     title: v.string(),
@@ -210,6 +230,9 @@ export const createBrief = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can create briefs");
     }
+
+    const duplicateId = await findRecentDuplicateBrief(ctx, userId, args.title);
+    if (duplicateId) return duplicateId;
 
     const count = await ctx.db.query("briefs").collect();
     const globalPriority = count.length + 1;
@@ -550,6 +573,9 @@ export const createIndividualTaskBrief = mutation({
 
     // ─── Branch A/B: single_task brief (no CC) ───
     if (!useCalendar) {
+      const duplicateId = await findRecentDuplicateBrief(ctx, userId, args.title);
+      if (duplicateId) return duplicateId;
+
       let assignedManagerId = args.assignedManagerId;
       if (!assignedManagerId && args.brandId) {
         const brandMgrs = await ctx.db
@@ -766,6 +792,18 @@ export const createIndividualTaskBrief = mutation({
     const maxTaskOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
+
+    // The CC brief is find-or-create, so a double-submit shows up as a
+    // duplicate parent entry task rather than a duplicate brief. Replay-guard
+    // on the parent task instead.
+    const duplicateEntry = existingTasks.find(
+      (t) =>
+        t.parentTaskId === undefined &&
+        t.title === args.title &&
+        t.assigneeId === userId &&
+        Date.now() - t._creationTime < DUPLICATE_SUBMIT_WINDOW_MS
+    );
+    if (duplicateEntry) return ccBriefId;
 
     // Calendar tasks attribute their assignor to the brand manager when
     // possible — every calendar task is "from" the manager. Resolve the
