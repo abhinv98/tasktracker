@@ -11,7 +11,7 @@ import { CommandPalette } from "@/components/layout/CommandPalette";
 // Note: /oversight is gated server-side by oversight access (super-admins,
 // oversight admins, brand managers, and team leads). Don't list it here or
 // employee team leads get bounced.
-const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks"];
+const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks", "/freelancers"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
 
 export default function DashboardLayout({

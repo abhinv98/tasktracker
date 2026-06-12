@@ -40,6 +40,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           // Apply invite settings
           const updates: Record<string, unknown> = {};
           if (invite.role) updates.role = invite.role;
+          if (invite.isFreelancer) updates.isFreelancer = true;
           if (invite.name) updates.name = invite.name;
           if (invite.designation) updates.designation = invite.designation;
 

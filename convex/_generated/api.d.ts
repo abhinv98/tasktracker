@@ -26,6 +26,7 @@ import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
+import type * as freelancers from "../freelancers.js";
 import type * as http from "../http.js";
 import type * as jsr from "../jsr.js";
 import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverables.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   debug: typeof debug;
   deliverables: typeof deliverables;
   dm: typeof dm;
+  freelancers: typeof freelancers;
   http: typeof http;
   jsr: typeof jsr;
   "lib/autoApproveDeliverables": typeof lib_autoApproveDeliverables;

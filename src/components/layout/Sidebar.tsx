@@ -30,6 +30,7 @@ import {
   NotebookPen,
   Eye,
   ListTodo,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -64,6 +65,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/reports": FileBarChart,
   "/notebook": NotebookPen,
   "/oversight": Eye,
+  "/freelancers": UserCog,
 };
 
 interface NavCategory {
@@ -101,6 +103,7 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
       { href: "/users", label: "Users & Teams" },
+      { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
     ],
   },

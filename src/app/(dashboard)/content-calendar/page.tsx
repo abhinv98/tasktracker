@@ -898,7 +898,7 @@ export default function ContentCalendarPage() {
                   <option value="">Unassigned</option>
                   {employees.map((emp: any) => (
                     <option key={emp._id} value={emp._id}>
-                      {emp.name ?? emp.email}{emp.designation ? ` — ${emp.designation}` : ""}
+                      {emp.name ?? emp.email}{emp.isFreelancer ? " (Freelancer)" : ""}{emp.designation ? ` — ${emp.designation}` : ""}
                     </option>
                   ))}
                 </select>

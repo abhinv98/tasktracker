@@ -25,6 +25,8 @@ export default defineSchema({
     isSuperAdmin: v.optional(v.boolean()),
     /** Oversight admins (Vivek & Mayur) — get the silent task tag, oversight board & daily digest */
     isOversightAdmin: v.optional(v.boolean()),
+    /** Freelancers keep role "employee" (same login & views) — this flag scopes them onto the admin Freelancers page */
+    isFreelancer: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
@@ -345,6 +347,7 @@ export default defineSchema({
       v.literal("admin"),
       v.literal("employee")
     ),
+    isFreelancer: v.optional(v.boolean()),
     teamId: v.optional(v.id("teams")),
     token: v.string(),
     createdBy: v.id("users"),

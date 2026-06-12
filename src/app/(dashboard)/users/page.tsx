@@ -32,7 +32,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [designation, setDesignation] = useState("");
-  const [role, setRole] = useState<"admin" | "employee">("employee");
+  const [role, setRole] = useState<"admin" | "employee" | "freelancer">("employee");
   const [teamId, setTeamId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +56,8 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
         name: name.trim(),
         email: email.trim(),
         designation: designation.trim() || undefined,
-        role,
+        role: role === "freelancer" ? "employee" : role,
+        isFreelancer: role === "freelancer" ? true : undefined,
         teamId: teamId ? (teamId as Id<"teams">) : undefined,
       });
       const link = `${window.location.origin}/sign-up?invite=${result.token}`;
@@ -174,11 +175,12 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
                 label="Role"
                 value={role}
                 onChange={(e) =>
-                  setRole(e.target.value as "admin" | "employee")
+                  setRole(e.target.value as "admin" | "employee" | "freelancer")
                 }
                 options={[
                   { value: "admin", label: "Brand Manager" },
                   { value: "employee", label: "Employee" },
+                  { value: "freelancer", label: "Freelancer" },
                 ]}
               />
               {teams && teams.length > 0 && (
@@ -255,10 +257,14 @@ export default function UsersPage() {
 
   async function handleRoleChange(
     userId: Id<"users">,
-    newRole: "admin" | "employee"
+    newRole: "admin" | "employee" | "freelancer"
   ) {
     try {
-      await updateRole({ userId, newRole });
+      await updateRole({
+        userId,
+        newRole: newRole === "freelancer" ? "employee" : newRole,
+        isFreelancer: newRole === "freelancer",
+      });
       toast("success", "Role updated");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to update role");
@@ -353,17 +359,22 @@ export default function UsersPage() {
                     </span>
                   ) : (
                     <select
-                      value={user.role ?? "employee"}
+                      value={
+                        (user as any).isFreelancer
+                          ? "freelancer"
+                          : user.role ?? "employee"
+                      }
                       onChange={(e) =>
                         handleRoleChange(
                           user._id,
-                          e.target.value as "admin" | "employee"
+                          e.target.value as "admin" | "employee" | "freelancer"
                         )
                       }
                       className="bg-[var(--bg-input)] rounded-lg border border-[var(--border)] text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                     >
                       <option value="admin">Brand Manager</option>
                       <option value="employee">Employee</option>
+                      <option value="freelancer">Freelancer</option>
                     </select>
                   )}
                 </TableCell>

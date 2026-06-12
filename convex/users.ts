@@ -115,8 +115,9 @@ export const updateUserRole = mutation({
       v.literal("admin"),
       v.literal("employee")
     ),
+    isFreelancer: v.optional(v.boolean()),
   },
-  handler: async (ctx, { userId, newRole }) => {
+  handler: async (ctx, { userId, newRole, isFreelancer }) => {
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
@@ -138,7 +139,11 @@ export const updateUserRole = mutation({
         throw new Error("Cannot demote the last admin");
       }
     }
-    await ctx.db.patch(userId, { role: newRole });
+    await ctx.db.patch(userId, {
+      role: newRole,
+      // Admins are never freelancers — clear the flag on promotion.
+      isFreelancer: newRole === "admin" ? false : isFreelancer ?? false,
+    });
   },
 });
 
@@ -172,6 +177,7 @@ export const createInvite = mutation({
     name: v.string(),
     designation: v.optional(v.string()),
     role: v.union(v.literal("admin"), v.literal("employee")),
+    isFreelancer: v.optional(v.boolean()),
     teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
@@ -187,6 +193,8 @@ export const createInvite = mutation({
 
     const inviteId = await ctx.db.insert("invites", {
       ...args,
+      // Freelancer is an employee-side flag only
+      isFreelancer: args.role === "employee" ? args.isFreelancer : undefined,
       token,
       createdBy: userId,
       createdAt: Date.now(),
