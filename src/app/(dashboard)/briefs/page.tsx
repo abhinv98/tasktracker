@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
@@ -491,25 +491,18 @@ export default function BriefsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 sm:mb-8">
-        <div>
-          <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-            Briefs
-          </h1>
-          <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-            Manage your briefs and priorities
-          </p>
-        </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2">
+      <PageHeader
+        title="Briefs"
+        subtitle="Manage your briefs and priorities"
+        actions={
+          isAdmin && (
             <Button variant="primary" onClick={() => openCreateModalForBrand()}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Create Brief
             </Button>
-          </div>
-        )}
-      </div>
+          )
+        }
+      />
 
       {/* Tab Bar */}
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-4">

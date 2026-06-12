@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button, ConfirmModal, useToast } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal, PageHeader, useToast } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
   Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
@@ -470,16 +470,16 @@ export default function DeliverablesPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="font-bold text-[20px] text-[var(--text-primary)] tracking-tight">
-          Deliverables
-        </h1>
-        {(myTasks ?? []).some((t) => t.status !== "done") && (
-          <Button variant="primary" onClick={() => setShowSubmit(!showSubmit)}>
-            Submit Deliverable
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Deliverables"
+        actions={
+          (myTasks ?? []).some((t) => t.status !== "done") && (
+            <Button variant="primary" onClick={() => setShowSubmit(!showSubmit)}>
+              Submit Deliverable
+            </Button>
+          )
+        }
+      />
 
       {/* Tabs */}
       {availableTabs.length > 1 && (

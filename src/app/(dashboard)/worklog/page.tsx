@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
@@ -112,14 +112,10 @@ export default function WorkLogPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-          Work Log
-        </h1>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-          Employee task tracking, manifest, and team workload
-        </p>
-      </div>
+      <PageHeader
+        title="Work Log"
+        subtitle="Employee task tracking, manifest, and team workload"
+      />
 
       {/* Tab Bar */}
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">

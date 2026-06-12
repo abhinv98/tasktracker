@@ -252,17 +252,17 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           href={item.href}
                           onClick={onClose}
                           className={`
-                            group flex items-center gap-3 rounded-lg px-3 py-2 relative
+                            group flex items-center gap-2.5 rounded-md px-3 py-1.5 relative
                             font-medium text-[13px] transition-colors duration-150
                             ${
                               isActive
-                                ? "bg-[var(--accent-admin)] text-white"
+                                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-[var(--accent-admin)]"
                                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                             }
                           `}
                         >
                           <Icon
-                            className={`h-[18px] w-[18px] shrink-0 transition-all duration-200 ease-out group-hover:scale-110 group-hover:-translate-y-px ${
+                            className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
                               isActive
                                 ? ""
                                 : "group-hover:text-[var(--accent-admin)]"
@@ -275,16 +275,12 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             </span>
                           )}
                           {item.href === "/content-calendar" && pendingCalendarCount > 0 && (
-                            <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
-                              isActive ? "bg-white/30 text-white" : "bg-amber-500 text-white"
-                            }`}>
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
                               {pendingCalendarCount}
                             </span>
                           )}
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
-                            <span className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold px-1 ${
-                              isActive ? "bg-white/30 text-white" : "bg-purple-500 text-white"
-                            }`}>
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[9px] font-bold px-1">
                               {pendingDeliverableCount}
                             </span>
                           )}

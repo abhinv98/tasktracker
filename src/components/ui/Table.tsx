@@ -23,7 +23,7 @@ export function TableHeader({ children }: { children: React.ReactNode }) {
 
 export function TableHead({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-4 py-3 text-left font-medium text-[12px] text-[var(--text-secondary)] ${className}`}>
+    <th className={`px-4 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap ${className}`}>
       {children}
     </th>
   );
@@ -45,6 +45,7 @@ export function TableRow({
       className={`
         border-b border-[var(--border-subtle)] bg-white
         transition-colors duration-150
+        hover:bg-[var(--bg-primary)]
         ${onClick ? "hover:bg-[var(--bg-hover)] cursor-pointer" : ""}
       `}
       onClick={onClick}
@@ -63,7 +64,7 @@ export function TableCell({
 }) {
   return (
     <td
-      className={`px-4 py-3 text-[13px] text-[var(--text-primary)] ${className}`}
+      className={`px-4 py-2 text-[13px] text-[var(--text-primary)] ${className}`}
     >
       {children}
     </td>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Card, TaskDetailModal } from "@/components/ui";
+import { Card, PageHeader, TaskDetailModal } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
@@ -127,18 +127,11 @@ export default function MyTasksPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 flex items-center gap-2">
-        <ListTodo className="h-5 w-5 text-[var(--accent-admin)]" />
-        <div>
-          <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-            My Tasks
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Work assigned to you, plus the tasks you delegated and need to
-            track &amp; sign off.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="My Tasks"
+        icon={ListTodo}
+        subtitle="Work assigned to you, plus the tasks you delegated and need to track & sign off."
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[

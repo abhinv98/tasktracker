@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, TaskDetailModal, DatePicker } from "@/components/ui";
+import { Card, PageHeader, TaskDetailModal, DatePicker } from "@/components/ui";
 import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon } from "lucide-react";
 
 function getGreeting() {
@@ -489,26 +489,22 @@ export default function DashboardPage() {
 
     return (
       <div className="p-4 sm:p-6 lg:p-8 relative">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 sm:mb-8">
-          <div>
-            <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-              {greeting}, {displayName}
-            </h1>
-            <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-              Here&apos;s your operational overview
-            </p>
-          </div>
-          {(myBrandIds ?? []).length > 0 && (
-            <button
-              onClick={() => router.push("/brands-overview?filter=mine")}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
-            >
-              <Briefcase className="h-4 w-4" />
-              My Brands
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+        <PageHeader
+          title={`${greeting}, ${displayName}`}
+          subtitle="Here's your operational overview"
+          actions={
+            (myBrandIds ?? []).length > 0 && (
+              <button
+                onClick={() => router.push("/brands-overview?filter=mine")}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+              >
+                <Briefcase className="h-4 w-4" />
+                My Brands
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )
+          }
+        />
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card accent="admin" hover onClick={() => router.push("/briefs")} className="cursor-pointer">
@@ -1208,14 +1204,10 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 relative">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-          {greeting}, {displayName}
-        </h1>
-        <p className="mt-1 text-[13px] sm:text-[14px] text-[var(--text-secondary)]">
-          Here are your active tasks &mdash; click a task for details
-        </p>
-      </div>
+      <PageHeader
+        title={`${greeting}, ${displayName}`}
+        subtitle="Here are your active tasks — click a task for details"
+      />
 
       {/* Reminders Section */}
       {isHalted && (

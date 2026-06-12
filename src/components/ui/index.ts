@@ -1,6 +1,7 @@
-export { Badge } from "./Badge";
+export { Badge, StatusBadge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
+export { PageHeader } from "./PageHeader";
 export { ConfirmModal } from "./ConfirmModal";
 export { DatePicker } from "./DatePicker";
 export { Input } from "./Input";

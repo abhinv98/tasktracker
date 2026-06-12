@@ -27,14 +27,14 @@ export function Card({
   return (
     <div
       className={`
-        relative bg-white rounded-xl border border-[var(--border)] shadow-sm
+        relative bg-white rounded-lg border border-[var(--border)]
         p-5 transition-all duration-150
-        ${hover || onClick ? "hover:shadow-md hover:border-[var(--border-strong)] cursor-pointer" : ""}
+        ${hover || onClick ? "hover:shadow-sm hover:border-[var(--border-strong)] cursor-pointer" : ""}
         ${className}
       `}
       style={{
         ...(hasAccent && accentColor
-          ? { borderLeft: `3px solid ${accentColor}` }
+          ? { borderLeft: `2px solid ${accentColor}` }
           : {}),
         ...style,
       }}

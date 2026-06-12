@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, PageHeader } from "@/components/ui";
 import {
   ChevronDown,
   ChevronRight,
@@ -135,16 +135,11 @@ export default function HistoryPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-            Work History
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            Your portfolio of brands, briefs, tasks, and deliverables
-          </p>
-        </div>
-        <div className="relative">
+      <PageHeader
+        title="Work History"
+        subtitle="Your portfolio of brands, briefs, tasks, and deliverables"
+        actions={
+          <div className="relative">
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-admin)] text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-opacity print:hidden"
@@ -174,8 +169,9 @@ export default function HistoryPage() {
               </div>
             </>
           )}
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">

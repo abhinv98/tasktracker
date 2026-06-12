@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, ConfirmModal, useToast } from "@/components/ui";
+import { Button, ConfirmModal, PageHeader, useToast } from "@/components/ui";
 import {
   Plus,
   NotebookPen,
@@ -101,14 +101,10 @@ export default function NotebookPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-          My Notebook
-        </h1>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-          Private notes &amp; your brand-wise daily worklog. Only you can see this.
-        </p>
-      </div>
+      <PageHeader
+        title="My Notebook"
+        subtitle="Private notes & your brand-wise daily worklog. Only you can see this."
+      />
 
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
         {[

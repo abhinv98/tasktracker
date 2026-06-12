@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card } from "@/components/ui";
+import { Card, StatusBadge } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import {
   Search,
@@ -476,12 +476,7 @@ function FragmentRow({
           </span>
         </td>
         <td className="px-4 py-3">
-          <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-            style={{ background: `${cfg.color}1a`, color: cfg.color }}
-          >
-            {cfg.label}
-          </span>
+          <StatusBadge color={cfg.color} label={cfg.label} />
         </td>
         <td className="px-4 py-3 text-[var(--text-secondary)]">
           {r.managerName}

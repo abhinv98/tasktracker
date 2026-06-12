@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   Input,
+  PageHeader,
   Select,
   Textarea,
   useToast,
@@ -214,12 +215,7 @@ export default function ProfilePage() {
     // truncated the tab underline). Drop the page-level cap; the Account
     // form keeps its own max-w-xl below so it stays compact.
     <div className="p-8">
-      <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight mb-2">
-        Profile
-      </h1>
-      <p className="text-[14px] text-[var(--text-secondary)] mb-6">
-        Manage your account
-      </p>
+      <PageHeader title="Profile" subtitle="Manage your account" />
 
       {/* ═══ TAB BAR ═══ */}
       <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-8 px-8">

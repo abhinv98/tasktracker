@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tag, BarChart3, TrendingUp } from "lucide-react";
+import { PageHeader } from "@/components/ui";
 import BrandsTab from "@/components/brandsOverview/BrandsTab";
 import WorkDataTab from "@/components/brandsOverview/WorkDataTab";
 import AnalyticsTab from "@/components/brandsOverview/AnalyticsTab";
@@ -27,14 +28,10 @@ export default function BrandsOverviewPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-          Brands Overview
-        </h1>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-          Brands, work data, and workspace analytics.
-        </p>
-      </div>
+      <PageHeader
+        title="Brands Overview"
+        subtitle="Brands, work data, and workspace analytics."
+      />
 
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
         {(

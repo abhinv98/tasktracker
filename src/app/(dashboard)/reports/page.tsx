@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 import { Calendar, Clock, CheckCircle2, AlertTriangle, FileText, Briefcase } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 
@@ -46,14 +46,10 @@ export default function ReportsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-          Reports
-        </h1>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-          Individual employee performance reports
-        </p>
-      </div>
+      <PageHeader
+        title="Reports"
+        subtitle="Individual employee performance reports"
+      />
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-6 flex-wrap">

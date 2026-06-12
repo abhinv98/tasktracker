@@ -12,6 +12,7 @@ import {
   Card,
   ConfirmModal,
   Input,
+  PageHeader,
   Select,
   Table,
   TableBody,
@@ -285,22 +286,18 @@ export default function UsersPage() {
   return (
     <div className="p-8">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight mb-1">
-            Users &amp; Teams
-          </h1>
-          <p className="text-[14px] text-[var(--text-secondary)]">
-            Manage users, roles and team membership
-          </p>
-        </div>
-        {tab === "users" && (
-          <Button onClick={() => setShowCreateModal(true)}>
-            <UserPlus size={15} />
-            Create User
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Users & Teams"
+        subtitle="Manage users, roles and team membership"
+        actions={
+          tab === "users" && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <UserPlus size={15} />
+              Create User
+            </Button>
+          )
+        }
+      />
 
       {/* Tab bar */}
       <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
@@ -354,7 +351,7 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell>
                   {(user as any).isSuperAdmin ? (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
                       Super Admin
                     </span>
                   ) : (
@@ -370,7 +367,7 @@ export default function UsersPage() {
                           e.target.value as "admin" | "employee" | "freelancer"
                         )
                       }
-                      className="bg-[var(--bg-input)] rounded-lg border border-[var(--border)] text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      className="bg-transparent rounded-md border border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] px-2 py-1 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] transition-colors duration-150"
                     >
                       <option value="admin">Brand Manager</option>
                       <option value="employee">Employee</option>

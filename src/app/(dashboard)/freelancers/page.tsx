@@ -4,7 +4,8 @@ import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Briefcase } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import { Badge, StatusBadge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/ui/PageHeader";
 import {
   Table,
   TableHeader,
@@ -59,19 +60,15 @@ export default function FreelancersPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 flex items-center gap-2">
-        <Briefcase className="h-5 w-5 text-[var(--accent-admin)]" />
-        <div>
-          <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight">
-            Freelancers
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-            {data.isSuperAdmin
-              ? "All freelancers and the briefs assigned to them."
-              : "Freelancers working on brands you manage."}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Freelancers"
+        icon={Briefcase}
+        subtitle={
+          data.isSuperAdmin
+            ? "All freelancers and the briefs assigned to them."
+            : "Freelancers working on brands you manage."
+        }
+      />
 
       {data.freelancers.length === 0 ? (
         <Card>
@@ -181,7 +178,6 @@ export default function FreelancersPage() {
                             const cfg = TASK_STATUS_CONFIG[t.status] ?? {
                               label: t.status,
                               color: "#6b7280",
-                              bg: "rgba(107,114,128,0.1)",
                             };
                             const overdue =
                               t.deadline !== undefined &&
@@ -191,12 +187,7 @@ export default function FreelancersPage() {
                               <TableRow key={t._id}>
                                 <TableCell>{t.title}</TableCell>
                                 <TableCell>
-                                  <span
-                                    className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-md"
-                                    style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                                  >
-                                    {cfg.label}
-                                  </span>
+                                  <StatusBadge color={cfg.color} label={cfg.label} />
                                 </TableCell>
                                 <TableCell>{formatDate(t.assignedAt)}</TableCell>
                                 <TableCell
