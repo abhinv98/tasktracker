@@ -147,6 +147,22 @@ export const updateUserRole = mutation({
   },
 });
 
+/** Super-admin-only: resolve a target user's email so their password can be reset from the dashboard. Throws if the caller isn't a super admin or the target has no email. */
+export const adminGetUserEmail = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const currentUserId = await getAuthUserId(ctx);
+    if (!currentUserId) throw new Error("Not authenticated");
+    const currentUser = await ctx.db.get(currentUserId);
+    if (!currentUser?.isSuperAdmin) {
+      throw new Error("Only super admins can reset passwords");
+    }
+    const target = await ctx.db.get(userId);
+    if (!target?.email) throw new Error("Target user has no email on file");
+    return target.email;
+  },
+});
+
 export const getUserWorkload = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

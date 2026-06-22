@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import TeamsPanel from "@/components/teams/TeamsPanel";
@@ -22,7 +22,7 @@ import {
   TableRow,
   useToast,
 } from "@/components/ui";
-import { Trash2, UserPlus, Copy, X, Check, Link2 } from "lucide-react";
+import { Trash2, UserPlus, Copy, X, Check, Link2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { getDisplayRole } from "@/lib/roles";
 
 /* ─── Create-User Modal ─── */
@@ -222,14 +222,192 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ─── Reset-Password Modal (super admin only) ─── */
+function ResetPasswordModal({
+  user,
+  onClose,
+}: {
+  user: { id: Id<"users">; name: string };
+  onClose: () => void;
+}) {
+  const resetPassword = useAction(api.passwordChange.adminResetPassword);
+  const { toast } = useToast();
+
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function generate() {
+    const chars =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$";
+    const next = Array.from(
+      { length: 12 },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
+    setPassword(next);
+    setShow(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await resetPassword({ userId: user.id, newPassword: password });
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reset password");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 backdrop-blur-[2px]"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        {/* header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
+              <KeyRound size={16} className="text-[var(--accent-admin)]" />
+            </div>
+            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] tracking-tight">
+              Reset Password
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[var(--bg-hover)] transition-colors duration-150"
+          >
+            <X size={16} className="text-[var(--text-secondary)]" />
+          </button>
+        </div>
+
+        {/* body */}
+        <div className="px-6 py-5">
+          {done ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--accent-employee)]">
+                <Check size={16} />
+                Password updated for {user.name}
+              </div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-3.5">
+                <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                  New Password — share it securely
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center flex-1 min-w-0 bg-white border border-[var(--border)] rounded-lg px-3 py-2">
+                    <span className="text-[13px] text-[var(--text-primary)] font-mono truncate">
+                      {password}
+                    </span>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={handleCopy}
+                    className="shrink-0 !px-3"
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button variant="secondary" onClick={onClose}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <p className="text-[13px] text-[var(--text-secondary)]">
+                Set a new password for{" "}
+                <span className="font-medium text-[var(--text-primary)]">
+                  {user.name}
+                </span>
+                . They can sign in with it immediately and change it later from
+                their profile.
+              </p>
+              <div>
+                <div className="relative">
+                  <Input
+                    label="New Password"
+                    type={show ? "text" : "password"}
+                    placeholder="At least 8 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShow((s) => !s)}
+                    className="absolute right-2.5 top-[30px] flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    title={show ? "Hide" : "Show"}
+                  >
+                    {show ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={generate}
+                  className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                >
+                  Generate a strong password
+                </button>
+              </div>
+
+              {error && (
+                <p className="text-[13px] font-medium text-[var(--danger)]">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button variant="secondary" type="button" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Resetting…" : "Reset Password"}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Page ─── */
 export default function UsersPage() {
   const users = useQuery(api.users.listAllUsers);
+  const currentUser = useQuery(api.users.getCurrentUser);
   const updateRole = useMutation(api.users.updateUserRole);
   const deleteUser = useMutation(api.users.deleteUser);
 
+  const isSuperAdmin = currentUser?.isSuperAdmin === true;
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<{ id: Id<"users">; name: string } | null>(null);
+  const [resettingUser, setResettingUser] = useState<{ id: Id<"users">; name: string } | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -386,16 +564,32 @@ export default function UsersPage() {
                     ) ?? "—"}
                   </div>
                 </TableCell>
-                <TableCell className="w-[48px]">
-                  <button
-                    onClick={() =>
-                      setDeletingUser({ id: user._id, name: user.name ?? user.email ?? "User" })
-                    }
-                    className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all duration-150"
-                    title="Delete user"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                <TableCell className="w-[88px]">
+                  <div className="flex items-center justify-end gap-0.5">
+                    {isSuperAdmin && user.email && (
+                      <button
+                        onClick={() =>
+                          setResettingUser({
+                            id: user._id,
+                            name: user.name ?? user.email ?? "User",
+                          })
+                        }
+                        className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
+                        title="Reset password"
+                      >
+                        <KeyRound size={15} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        setDeletingUser({ id: user._id, name: user.name ?? user.email ?? "User" })
+                      }
+                      className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all duration-150"
+                      title="Delete user"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -407,6 +601,14 @@ export default function UsersPage() {
       {/* Create User Modal */}
       {showCreateModal && (
         <CreateUserModal onClose={() => setShowCreateModal(false)} />
+      )}
+
+      {/* Reset Password Modal (super admin only) */}
+      {resettingUser && (
+        <ResetPasswordModal
+          user={resettingUser}
+          onClose={() => setResettingUser(null)}
+        />
       )}
 
       <ConfirmModal
