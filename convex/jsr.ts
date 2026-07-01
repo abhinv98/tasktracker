@@ -544,6 +544,9 @@ export const reassignClientTask = mutation({
     if (!clientTask.linkedTaskId) throw new Error("Task has not been accepted yet");
 
     await ctx.db.patch(clientTask.linkedTaskId, { assigneeId, assignedBy: userId });
+    // Track the assignment explicitly so the Client Requests queue reflects it
+    // regardless of the placeholder assignee used on accept.
+    await ctx.db.patch(clientTaskId, { assignedTo: assigneeId });
 
     // Send notification to the assignee
     const brand = await ctx.db.get(clientTask.brandId);
@@ -644,6 +647,16 @@ export const updateClientTaskStatus = mutation({
         .withIndex("by_brief", (q) => q.eq("briefId", briefId))
         .collect();
 
+      // Carry the client's references onto the real task so the assignee sees
+      // them (external links + R2-uploaded files served via /api/r2-file).
+      const referenceLinks = (clientTask.references ?? [])
+        .map((r) =>
+          r.fileKey
+            ? `/api/r2-file?key=${encodeURIComponent(r.fileKey)}`
+            : r.url ?? null
+        )
+        .filter((u): u is string => !!u);
+
       // Create the real task (unassigned initially — assigneeId = current user as placeholder)
       const realTaskId = await ctx.db.insert("tasks", {
         briefId,
@@ -656,6 +669,7 @@ export const updateClientTaskStatus = mutation({
         duration: "2 Hours",
         durationMinutes: 120,
         deadline: clientTask.finalDeadline,
+        ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
       });
 
       // Link back
@@ -1338,22 +1352,16 @@ export const listPendingClientRequests = query({
     for (const t of relevant) {
       const brand = await ctx.db.get(t.brandId);
       let assigneeName: string | null = null;
-      if (t.linkedTaskId) {
-        const realTask = await ctx.db.get(t.linkedTaskId);
-        if (realTask) {
-          const a = users.find((u) => u._id === realTask.assigneeId);
-          // The current admin is used as a placeholder assignee on accept.
-          if (realTask.assigneeId !== userId) {
-            assigneeName = a?.name ?? a?.email ?? null;
-          }
-        }
+      if (t.assignedTo) {
+        const a = users.find((u) => u._id === t.assignedTo);
+        assigneeName = a?.name ?? a?.email ?? null;
       }
       result.push({
         ...t,
         brandName: brand?.name ?? "Unknown",
         brandColor: brand?.color ?? "#171717",
         assigneeName,
-        assigned: assigneeName !== null,
+        assigned: !!t.assignedTo,
       });
     }
     return result.sort((a, b) => b.createdAt - a.createdAt);

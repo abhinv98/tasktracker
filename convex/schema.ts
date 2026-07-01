@@ -598,6 +598,8 @@ export default defineSchema({
     ),
     linkedTaskId: v.optional(v.id("tasks")),
     linkedBriefId: v.optional(v.id("briefs")),
+    /** The user the accepted task has been assigned to (via Client Requests). */
+    assignedTo: v.optional(v.id("users")),
     createdAt: v.number(),
   })
     .index("by_brand", ["brandId"])

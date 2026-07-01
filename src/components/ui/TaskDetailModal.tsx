@@ -1132,7 +1132,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 </p>
                 <div className="space-y-2 mt-2">
                   {task.referenceLinks.map((url: string, i: number) => {
-                    const isFile = url.includes("/storage/") || url.includes("convex.cloud");
+                    const isFile = url.includes("/storage/") || url.includes("convex.cloud") || url.includes("/api/r2-file");
                     const label = isFile
                       ? `File ${i + 1}`
                       : (() => {
