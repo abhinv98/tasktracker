@@ -199,7 +199,7 @@ export default function IntakePublicPage() {
       {/* ═══ BRANDED HEADER ═══ */}
       <header className="sticky top-0 z-20">
         <div style={{ background: `linear-gradient(135deg, ${bc}, ${bc}dd)` }}>
-          <div className="max-w-2xl mx-auto px-6 py-6">
+          <div className="max-w-5xl mx-auto px-6 py-6">
             <div className="flex items-center gap-4">
               {intake.brand.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -222,7 +222,8 @@ export default function IntakePublicPage() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-6 space-y-5">
+      <main className="max-w-5xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         {/* ═══ REQUEST FORM ═══ */}
         <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
           <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
@@ -372,16 +373,26 @@ export default function IntakePublicPage() {
           </div>
         </section>
 
-        {/* ═══ YOUR REQUESTS ═══ */}
-        {tasks.length > 0 && (
-          <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
-            <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
-              <div className="w-7 h-7 rounded-lg bg-[#f0f0f0] flex items-center justify-center">
-                <Clock className="h-3.5 w-3.5 text-[#525252]" />
-              </div>
-              <h2 className="font-semibold text-[15px] text-[#171717]">Your Requests</h2>
-              <span className="text-[12px] text-[#a3a3a3] ml-1">{tasks.length}</span>
+        {/* ═══ YOUR REQUESTS (right column) ═══ */}
+        <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm lg:sticky lg:top-[104px]">
+          <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
+            <div className="w-7 h-7 rounded-lg bg-[#f0f0f0] flex items-center justify-center">
+              <Clock className="h-3.5 w-3.5 text-[#525252]" />
             </div>
+            <h2 className="font-semibold text-[15px] text-[#171717]">Your Requests</h2>
+            <span className="text-[12px] text-[#a3a3a3] ml-1">{tasks.length}</span>
+          </div>
+          {tasks.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3">
+                <Inbox className="h-6 w-6 text-[#c4c4c4]" />
+              </div>
+              <p className="text-[13px] text-[#737373]">No requests yet.</p>
+              <p className="text-[12px] text-[#a3a3a3] mt-0.5">
+                Submitted tasks and their status will appear here.
+              </p>
+            </div>
+          ) : (
             <div>
               {tasks.map((t, i) => {
                 const meta = STATUS_META[t.status] ?? STATUS_META.pending_review;
@@ -429,8 +440,9 @@ export default function IntakePublicPage() {
                 );
               })}
             </div>
-          </section>
-        )}
+          )}
+        </section>
+        </div>
 
         <footer className="text-center pt-2 pb-8">
           <p className="text-[11px] text-[#d4d4d4]">Powered by Ecultify</p>

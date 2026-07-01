@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, DatePicker, useToast } from "@/components/ui";
+import { PageHeader, useToast } from "@/components/ui";
 import {
   Inbox,
   X,
@@ -61,6 +61,21 @@ function timeAgo(ts: number): string {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
   return formatDate(ts);
+}
+
+function toDateInput(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function fromDateInput(val: string): number | undefined {
+  if (!val) return undefined;
+  // End-of-day local time, matching the app's DatePicker semantics.
+  return new Date(val + "T23:59:59").getTime();
 }
 
 function refUrl(r: RefItem): string | undefined {
@@ -329,25 +344,27 @@ export default function ClientRequestsPage() {
                   <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-3">
                     References ({selected.references.length})
                   </h4>
-                  <div className="grid grid-cols-3 gap-2 mb-2">
-                    {selected.references
-                      .filter((r) => r.kind === "image")
-                      .map((r, i) => {
-                        const url = refUrl(r);
-                        return (
-                          <a
-                            key={`img-${i}`}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block aspect-square rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-hover)]"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={r.name ?? "reference"} className="w-full h-full object-cover" />
-                          </a>
-                        );
-                      })}
-                  </div>
+                  {selected.references.some((r) => r.kind === "image") && (
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      {selected.references
+                        .filter((r) => r.kind === "image")
+                        .map((r, i) => {
+                          const url = refUrl(r);
+                          return (
+                            <a
+                              key={`img-${i}`}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block h-16 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-hover)]"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={r.name ?? "reference"} className="w-full h-full object-cover" />
+                            </a>
+                          );
+                        })}
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1.5">
                     {selected.references
                       .filter((r) => r.kind !== "image")
@@ -379,12 +396,17 @@ export default function ClientRequestsPage() {
                   Set the date we commit to. This is shown to the client and used as the task deadline.
                 </p>
                 <div className="flex items-center gap-2">
-                  <DatePicker value={counterDate} onChange={setCounterDate} placeholder="Set completion date" />
+                  <input
+                    type="date"
+                    value={toDateInput(counterDate)}
+                    onChange={(e) => setCounterDate(fromDateInput(e.target.value))}
+                    className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
                   {selected.status === "pending_review" && (
                     <button
                       onClick={handleSaveCounterDate}
                       disabled={busy || counterDate === undefined}
-                      className="px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
+                      className="shrink-0 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
                     >
                       Save
                     </button>
