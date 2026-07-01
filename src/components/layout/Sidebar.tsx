@@ -31,6 +31,7 @@ import {
   Eye,
   ListTodo,
   UserCog,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -66,6 +67,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/notebook": NotebookPen,
   "/oversight": Eye,
   "/freelancers": UserCog,
+  "/client-requests": Inbox,
 };
 
 interface NavCategory {
@@ -100,6 +102,7 @@ const ADMIN_NAV: NavCategory[] = [
   {
     category: "Management",
     items: [
+      { href: "/client-requests", label: "Client Requests" },
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
       { href: "/users", label: "Users & Teams" },
@@ -156,6 +159,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
   const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
   const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
+  const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
 
   // Oversight lives as a tab inside Work Log (no standalone nav item).
   const nav: NavCategory[] = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
@@ -282,6 +286,11 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
                             <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[9px] font-bold px-1">
                               {pendingDeliverableCount}
+                            </span>
+                          )}
+                          {item.href === "/client-requests" && pendingClientRequestCount > 0 && (
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
+                              {pendingClientRequestCount}
                             </span>
                           )}
                         </Link>

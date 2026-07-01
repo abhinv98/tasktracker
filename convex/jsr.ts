@@ -426,6 +426,22 @@ export const addClientTask = mutation({
     description: v.optional(v.string()),
     proposedDeadline: v.optional(v.number()),
     clientName: v.optional(v.string()),
+    references: v.optional(
+      v.array(
+        v.object({
+          kind: v.union(
+            v.literal("image"),
+            v.literal("document"),
+            v.literal("video"),
+            v.literal("link")
+          ),
+          name: v.optional(v.string()),
+          url: v.optional(v.string()),
+          fileKey: v.optional(v.string()),
+          contentType: v.optional(v.string()),
+        })
+      )
+    ),
   },
   handler: async (ctx, { token, ...taskData }) => {
     const jsrLinks = await ctx.db
@@ -434,7 +450,7 @@ export const addClientTask = mutation({
       .collect();
     const jsrLink = jsrLinks[0];
     if (!jsrLink || !jsrLink.isActive)
-      throw new Error("Invalid or inactive JSR link");
+      throw new Error("Invalid or inactive intake link");
 
     const taskId = await ctx.db.insert("jsrClientTasks", {
       brandId: jsrLink.brandId,
@@ -442,6 +458,7 @@ export const addClientTask = mutation({
       title: taskData.title,
       description: taskData.description,
       proposedDeadline: taskData.proposedDeadline,
+      references: taskData.references,
       status: "pending_review",
       clientName: taskData.clientName,
       createdAt: Date.now(),
@@ -1204,5 +1221,158 @@ export const listJsrRemarks = query({
           taskTitle: task?.title ?? "Unknown",
         };
       });
+  },
+});
+
+// ═══════════════════════════════════════════════════════════
+// CLIENT INTAKE — dedicated per-brand task-request page + queue
+// ═══════════════════════════════════════════════════════════
+
+/** Generate a shareable client intake link for a brand. */
+export const generateIntakeLink = mutation({
+  args: { brandId: v.id("brands"), label: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can generate intake links");
+
+    const token = generateToken();
+    return await ctx.db.insert("jsrLinks", {
+      brandId: args.brandId,
+      token,
+      createdBy: userId,
+      createdAt: Date.now(),
+      isActive: true,
+      label: args.label,
+      linkType: "intake",
+    });
+  },
+});
+
+/**
+ * Public — resolve an intake link by token. Returns brand branding and the
+ * tasks this client has submitted through this link (with their status).
+ */
+export const getIntakeByToken = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const links = await ctx.db
+      .query("jsrLinks")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .collect();
+    const link = links[0];
+    if (!link || !link.isActive) return null;
+
+    const brand = await ctx.db.get(link.brandId);
+    if (!brand) return null;
+
+    const logoUrl = brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null;
+
+    const tasks = await ctx.db
+      .query("jsrClientTasks")
+      .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", link._id))
+      .collect();
+
+    return {
+      brand: {
+        name: brand.name,
+        color: brand.color,
+        logoUrl,
+      },
+      tasks: tasks
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map((t) => ({
+          _id: t._id,
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          proposedDeadline: t.proposedDeadline,
+          // Only reveal the committed date once we've accepted the request.
+          finalDeadline: t.status === "pending_review" ? undefined : t.finalDeadline,
+          referenceCount: (t.references ?? []).length,
+          createdAt: t.createdAt,
+        })),
+    };
+  },
+});
+
+/** Brand ids the current admin may see client requests for. null = all (super admin). */
+async function visibleBrandIdsForRequests(
+  ctx: any,
+  userId: string
+): Promise<Set<string> | null> {
+  const user = await ctx.db.get(userId);
+  if (!user || user.role !== "admin") return new Set();
+  if (user.isSuperAdmin) return null; // all brands
+  const assignments = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_manager", (q: any) => q.eq("managerId", userId))
+    .collect();
+  return new Set(assignments.map((a: any) => a.brandId));
+}
+
+/**
+ * Client-request queue for the dashboard. Super admins see every brand;
+ * brand managers see only brands they manage.
+ */
+export const listPendingClientRequests = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const visible = await visibleBrandIdsForRequests(ctx, userId);
+    if (visible !== null && visible.size === 0) return [];
+
+    const all = await ctx.db.query("jsrClientTasks").collect();
+    const relevant = all.filter(
+      (t) =>
+        t.status !== "declined" &&
+        t.status !== "completed" &&
+        (visible === null || visible.has(t.brandId))
+    );
+
+    const users = await ctx.db.query("users").collect();
+    const result = [];
+    for (const t of relevant) {
+      const brand = await ctx.db.get(t.brandId);
+      let assigneeName: string | null = null;
+      if (t.linkedTaskId) {
+        const realTask = await ctx.db.get(t.linkedTaskId);
+        if (realTask) {
+          const a = users.find((u) => u._id === realTask.assigneeId);
+          // The current admin is used as a placeholder assignee on accept.
+          if (realTask.assigneeId !== userId) {
+            assigneeName = a?.name ?? a?.email ?? null;
+          }
+        }
+      }
+      result.push({
+        ...t,
+        brandName: brand?.name ?? "Unknown",
+        brandColor: brand?.color ?? "#171717",
+        assigneeName,
+        assigned: assigneeName !== null,
+      });
+    }
+    return result.sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
+/** Badge count — number of requests still awaiting first review. */
+export const countPendingClientRequests = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const visible = await visibleBrandIdsForRequests(ctx, userId);
+    if (visible !== null && visible.size === 0) return 0;
+    const all = await ctx.db.query("jsrClientTasks").collect();
+    return all.filter(
+      (t) =>
+        t.status === "pending_review" &&
+        (visible === null || visible.has(t.brandId))
+    ).length;
   },
 });

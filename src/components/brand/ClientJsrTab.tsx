@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Activity,
   CalendarDays,
+  Inbox,
 } from "lucide-react";
 import {
   DndContext,
@@ -131,6 +132,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
 
   const jsrLinks = useQuery(api.jsr.listJsrLinks, { brandId });
   const generateJsrLink = useMutation(api.jsr.generateJsrLink);
+  const generateIntakeLink = useMutation(api.jsr.generateIntakeLink);
   const deactivateJsrLink = useMutation(api.jsr.deactivateJsrLink);
   const jsrMessages = useQuery(api.jsr.listJsrMessages, { brandId });
   const sendManagerMessage = useMutation(api.jsr.sendManagerMessage);
@@ -219,7 +221,23 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
     toast("success", "Link copied to clipboard");
   }
 
-  const activeLinks = (jsrLinks ?? []).filter((l) => l.isActive);
+  async function handleGenerateIntake() {
+    try {
+      await generateIntakeLink({ brandId });
+      toast("success", "Intake link generated");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to generate link");
+    }
+  }
+
+  function copyIntakeLink(token: string) {
+    const url = `${window.location.origin}/intake/${token}`;
+    navigator.clipboard.writeText(url);
+    toast("success", "Intake link copied to clipboard");
+  }
+
+  const activeLinks = (jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake");
+  const activeIntakeLinks = (jsrLinks ?? []).filter((l) => l.isActive && l.linkType === "intake");
   const hiddenBlocks = blocks.filter((b) => !b.visible);
 
   const totalTasks = brand.totalTasks ?? 0;
@@ -414,6 +432,63 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                       className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/10 transition-colors"
                     >
                       <MessageCircle className="h-3 w-3" /> Show Chat
+                    </button>
+                    <button
+                      onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                    >
+                      Deactivate
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Client Intake Links */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+            <div className="flex items-center gap-2">
+              <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
+              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Client Intake Links</h3>
+              <span className="text-[11px] text-[var(--text-muted)]">({activeIntakeLinks.length})</span>
+            </div>
+            {canManageLinks && (
+              <button
+                onClick={handleGenerateIntake}
+                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="p-4">
+            <p className="text-[11px] text-[var(--text-muted)] mb-3">
+              Share this link with the client so they can submit task requests. Requests land in{" "}
+              <span className="font-medium text-[var(--text-secondary)]">Client Requests</span> for review.
+            </p>
+            {activeIntakeLinks.length === 0 && (
+              <div className="text-center py-6">
+                <Inbox className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
+                <p className="text-[12px] text-[var(--text-muted)]">No active intake links. Click + to generate one.</p>
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {activeIntakeLinks.map((link) => (
+                <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-admin)] shrink-0" />
+                    <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
+                      {typeof window !== "undefined" ? `${window.location.origin}/intake/${link.token}` : `/intake/${link.token}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => copyIntakeLink(link.token)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      <Copy className="h-3 w-3" /> Copy
                     </button>
                     <button
                       onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}

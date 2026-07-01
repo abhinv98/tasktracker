@@ -555,6 +555,8 @@ export default defineSchema({
     hiddenSections: v.optional(v.array(v.string())),
     /** Which month to show on the client calendar (YYYY-MM format). Empty/unset = all months. */
     calendarMonth: v.optional(v.string()),
+    /** "jsr" (full status report, default) or "intake" (client task-request page). */
+    linkType: v.optional(v.union(v.literal("jsr"), v.literal("intake"))),
   })
     .index("by_token", ["token"])
     .index("by_brand", ["brandId"]),
@@ -577,6 +579,23 @@ export default defineSchema({
     ),
     internalNotes: v.optional(v.string()),
     clientName: v.optional(v.string()),
+    /** Client-supplied references: uploaded files (fileKey) or external links (url). */
+    references: v.optional(
+      v.array(
+        v.object({
+          kind: v.union(
+            v.literal("image"),
+            v.literal("document"),
+            v.literal("video"),
+            v.literal("link")
+          ),
+          name: v.optional(v.string()),
+          url: v.optional(v.string()),
+          fileKey: v.optional(v.string()),
+          contentType: v.optional(v.string()),
+        })
+      )
+    ),
     linkedTaskId: v.optional(v.id("tasks")),
     linkedBriefId: v.optional(v.id("briefs")),
     createdAt: v.number(),

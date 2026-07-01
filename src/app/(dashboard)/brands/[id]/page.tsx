@@ -1011,7 +1011,7 @@ export default function BrandDetailPage() {
                 <div className="flex items-center gap-2">
                   <ExternalLink className="h-4 w-4 text-[var(--text-secondary)]" />
                   <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">JSR Links</h3>
-                  <span className="text-[11px] text-[var(--text-muted)]">({(jsrLinks ?? []).filter((l) => l.isActive).length})</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">({(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length})</span>
                 </div>
                 <button
                   onClick={handleGenerateJsr}
@@ -1021,14 +1021,14 @@ export default function BrandDetailPage() {
                 </button>
               </div>
               <div className="p-4">
-                {(jsrLinks ?? []).filter((l) => l.isActive).length === 0 && (
+                {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length === 0 && (
                   <div className="text-center py-6">
                     <ExternalLink className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
                     <p className="text-[12px] text-[var(--text-muted)]">No active JSR links. Click + to generate one.</p>
                   </div>
                 )}
                 <div className="flex flex-col gap-2">
-                  {(jsrLinks ?? []).filter((l) => l.isActive).map((link) => (
+                  {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").map((link) => (
                     <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                       <div className="flex items-center gap-2 mb-2">
                         <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee)] shrink-0" />
