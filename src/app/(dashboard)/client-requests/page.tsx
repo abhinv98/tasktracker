@@ -19,6 +19,7 @@ import {
   Ban,
   Trash2,
   Clock,
+  Loader2,
 } from "lucide-react";
 
 type RefItem = {
@@ -112,7 +113,10 @@ export default function ClientRequestsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [counterDate, setCounterDate] = useState<number | undefined>(undefined);
   const [assigneeId, setAssigneeId] = useState<string>("");
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<
+    null | "date" | "action" | "assign" | "decline" | "delete"
+  >(null);
+  const busy = busyAction !== null;
 
   const selected = useMemo(
     () => (requests ?? []).find((r) => r._id === selectedId) ?? null,
@@ -150,14 +154,14 @@ export default function ClientRequestsPage() {
 
   async function handleSaveCounterDate() {
     if (!selected || counterDate === undefined) return;
-    setBusy(true);
+    setBusyAction("date");
     try {
       await setDeadline({ taskId: selected._id as Id<"jsrClientTasks">, finalDeadline: counterDate });
       toast("success", "Counter date saved");
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to save date");
     }
-    setBusy(false);
+    setBusyAction(null);
   }
 
   async function handleTakeAction() {
@@ -166,7 +170,7 @@ export default function ClientRequestsPage() {
       toast("error", "Set a counter completion date first");
       return;
     }
-    setBusy(true);
+    setBusyAction("action");
     try {
       // Persist the committed date, then convert into a real brief task.
       await setDeadline({ taskId: selected._id as Id<"jsrClientTasks">, finalDeadline: counterDate });
@@ -175,12 +179,12 @@ export default function ClientRequestsPage() {
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to take action");
     }
-    setBusy(false);
+    setBusyAction(null);
   }
 
   async function handleAssign() {
     if (!selected || !assigneeId) return;
-    setBusy(true);
+    setBusyAction("assign");
     try {
       await reassign({
         clientTaskId: selected._id as Id<"jsrClientTasks">,
@@ -191,12 +195,12 @@ export default function ClientRequestsPage() {
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to assign");
     }
-    setBusy(false);
+    setBusyAction(null);
   }
 
   async function handleDecline() {
     if (!selected) return;
-    setBusy(true);
+    setBusyAction("decline");
     try {
       await setStatus({ taskId: selected._id as Id<"jsrClientTasks">, status: "declined" });
       toast("success", "Request declined");
@@ -204,12 +208,12 @@ export default function ClientRequestsPage() {
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to decline");
     }
-    setBusy(false);
+    setBusyAction(null);
   }
 
   async function handleDelete() {
     if (!selected) return;
-    setBusy(true);
+    setBusyAction("delete");
     try {
       await deleteTask({ clientTaskId: selected._id as Id<"jsrClientTasks"> });
       toast("success", "Deleted");
@@ -217,7 +221,7 @@ export default function ClientRequestsPage() {
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to delete");
     }
-    setBusy(false);
+    setBusyAction(null);
   }
 
   return (
@@ -406,8 +410,9 @@ export default function ClientRequestsPage() {
                     <button
                       onClick={handleSaveCounterDate}
                       disabled={busy || counterDate === undefined}
-                      className="shrink-0 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
                     >
+                      {busyAction === "date" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Save
                     </button>
                   )}
@@ -446,7 +451,12 @@ export default function ClientRequestsPage() {
                       disabled={busy || !assigneeId}
                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-40 transition-colors"
                     >
-                      <UserPlus className="h-3.5 w-3.5" /> Assign
+                      {busyAction === "assign" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                      {busyAction === "assign" ? "Assigning…" : "Assign"}
                     </button>
                   </div>
                 </div>
@@ -463,14 +473,24 @@ export default function ClientRequestsPage() {
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
                     style={{ backgroundColor: "var(--accent-admin)" }}
                   >
-                    <CheckCircle2 className="h-4 w-4" /> Take Action — Add to Briefs
+                    {busyAction === "action" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+                    {busyAction === "action" ? "Adding to Briefs…" : "Take Action — Add to Briefs"}
                   </button>
                   <button
                     onClick={handleDecline}
                     disabled={busy}
                     className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors"
                   >
-                    <Ban className="h-4 w-4" /> Decline
+                    {busyAction === "decline" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Ban className="h-4 w-4" />
+                    )}
+                    Decline
                   </button>
                 </>
               ) : (
@@ -479,7 +499,12 @@ export default function ClientRequestsPage() {
                   disabled={busy}
                   className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
                 >
-                  <Trash2 className="h-4 w-4" /> Delete (removes brief task)
+                  {busyAction === "delete" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {busyAction === "delete" ? "Deleting…" : "Delete (removes brief task)"}
                 </button>
               )}
             </div>
