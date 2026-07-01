@@ -32,6 +32,7 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/oversight": "Oversight",
   "/notebook": "My Notebook",
   "/worklog": "Work Log",
+  "/client-requests": "Client Requests",
 };
 
 function getPageTitle(pathname: string): string {

@@ -206,7 +206,7 @@ export default function ClientRequestsPage() {
   }
 
   return (
-    <div>
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Client Requests"
         subtitle="Tasks submitted by clients through brand intake links. Review, set a completion date, then take action."
