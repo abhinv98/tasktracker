@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -19,6 +20,8 @@ import {
 import { PortalCard, PortalCardHeader, EmptyState, timeAgo } from "@/components/portal/shared";
 
 export default function PortalPendingClientPage() {
+  const params = useParams();
+  const token = params.token as string;
   const session = useQuery(api.clientPortal.getPortalSession);
   const pending = useQuery(api.clientPortal.getClientPendingWork);
   const approveMut = useMutation(api.clientPortal.approveDeliverable);
@@ -150,7 +153,7 @@ export default function PortalPendingClientPage() {
                   <p className="text-[12px] text-[#525252] leading-relaxed">{req.clientInputMessage}</p>
                 </div>
                 <p className="text-[11px] text-[#a3a3a3] mt-2">
-                  Reply via the Messages thread on <Link href="/portal/jsr" className="underline" style={{ color: bc }}>JSR Track</Link>.
+                  Reply from the <Link href={`/portal/${token}/messages`} className="underline" style={{ color: bc }}>Messages</Link> tab.
                 </p>
               </div>
             ))}
@@ -171,7 +174,7 @@ export default function PortalPendingClientPage() {
             {pending.pendingDeck.map((item: any, i: number) => (
               <Link
                 key={item._id}
-                href="/portal/deck"
+                href={`/portal/${token}/deck`}
                 className={`flex items-center gap-3 px-6 py-3.5 hover:bg-[#fafafa] transition-colors ${i < pending.pendingDeck.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "12" }}>

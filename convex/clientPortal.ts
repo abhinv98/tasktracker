@@ -498,6 +498,7 @@ export const getPortalSession = query({
         logoUrl: brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null,
       },
       portalActive: !!portal,
+      portalToken: portal?.token ?? null,
       hiddenTabs: portal?.hiddenTabs ?? [],
       calendarMonth: portal?.calendarMonth ?? "",
       pendingCounts: {

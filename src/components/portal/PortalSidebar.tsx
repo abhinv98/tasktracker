@@ -31,21 +31,27 @@ export type PortalTabKey =
 export const PORTAL_TABS: {
   key: PortalTabKey;
   label: string;
-  href: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { key: "jsr", label: "JSR Track", href: "/portal/jsr", icon: LayoutDashboard },
-  { key: "calendar", label: "Content Calendar", href: "/portal/calendar", icon: CalendarDays },
-  { key: "deck", label: "Client Deck", href: "/portal/deck", icon: Presentation },
-  { key: "new-task", label: "New Task", href: "/portal/new-task", icon: Plus },
-  { key: "messages", label: "Messages", href: "/portal/messages", icon: MessageCircle },
-  { key: "monthly-log", label: "Monthly Log", href: "/portal/monthly-log", icon: ClipboardList },
-  { key: "pending-client", label: "Your Pending Work", href: "/portal/pending-client", icon: Inbox },
-  { key: "pending-agency", label: "Ecultify Pending Work", href: "/portal/pending-agency", icon: Activity },
-  { key: "feedback", label: "Feedback Log", href: "/portal/feedback", icon: MessageSquareText },
+  { key: "jsr", label: "JSR Track", icon: LayoutDashboard },
+  { key: "calendar", label: "Content Calendar", icon: CalendarDays },
+  { key: "deck", label: "Client Deck", icon: Presentation },
+  { key: "new-task", label: "New Task", icon: Plus },
+  { key: "messages", label: "Messages", icon: MessageCircle },
+  { key: "monthly-log", label: "Monthly Log", icon: ClipboardList },
+  { key: "pending-client", label: "Your Pending Work", icon: Inbox },
+  { key: "pending-agency", label: "Ecultify Pending Work", icon: Activity },
+  { key: "feedback", label: "Feedback Log", icon: MessageSquareText },
 ];
 
+/** The tab segment of /portal/{token}/{segment}. */
+export function currentPortalTab(pathname: string): PortalTabKey | null {
+  const seg = pathname.split("/")[3];
+  return PORTAL_TABS.some((t) => t.key === seg) ? (seg as PortalTabKey) : null;
+}
+
 export function PortalSidebar({
+  token,
   brand,
   userName,
   hiddenTabs,
@@ -53,6 +59,7 @@ export function PortalSidebar({
   open,
   onClose,
 }: {
+  token: string;
   brand: { name: string; color: string; logoUrl: string | null };
   userName: string;
   hiddenTabs: string[];
@@ -63,6 +70,7 @@ export function PortalSidebar({
   const pathname = usePathname();
   const { signOut } = useAuthActions();
   const bc = brand.color;
+  const activeTab = currentPortalTab(pathname);
 
   const tabs = PORTAL_TABS.filter((t) => t.key === "jsr" || !hiddenTabs.includes(t.key));
 
@@ -104,13 +112,13 @@ export function PortalSidebar({
       {/* Tabs */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
+          const active = activeTab === tab.key;
           const Icon = tab.icon;
           const badge = tab.key === "pending-client" && pendingCount > 0 ? pendingCount : null;
           return (
             <Link
               key={tab.key}
-              href={tab.href}
+              href={`/portal/${token}/${tab.key}`}
               onClick={onClose}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors min-w-0 ${
                 active ? "text-white" : "text-[#525252] hover:bg-[#f5f5f5]"

@@ -1,14 +1,16 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { usePathname, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Inbox, Menu } from "lucide-react";
-import { PortalSidebar, PORTAL_TABS } from "@/components/portal/PortalSidebar";
+import { PortalSidebar, currentPortalTab } from "@/components/portal/PortalSidebar";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  const params = useParams();
+  const urlToken = params.token as string;
   const user = useQuery(api.users.getCurrentUser);
   const session = useQuery(
     api.clientPortal.getPortalSession,
@@ -20,21 +22,24 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Logged out → back to the brand's portal login (remembered from the link)
+  // Logged out: back to this brand's login. Internal users: back to the dashboard.
   useEffect(() => {
     if (user === null) {
-      let token: string | null = null;
-      try {
-        token = localStorage.getItem("portalToken");
-      } catch {}
-      router.replace(token ? `/portal/${token}` : "/sign-in");
+      router.replace(`/portal/${urlToken}`);
     } else if (user && user.role !== "client") {
       router.replace("/dashboard");
     }
-  }, [user, router]);
+  }, [user, urlToken, router]);
 
-  // Record the login once the authenticated session is up (deduped server-side,
-  // so reloads within 30 minutes don't spam the activity feed).
+  // Canonical URL: the signed-in client's own brand slug. Visiting another
+  // brand's slug (or a stale one) lands them on their own portal.
+  useEffect(() => {
+    if (!session?.portalToken || session.portalToken === urlToken) return;
+    const tab = currentPortalTab(pathname) ?? "jsr";
+    router.replace(`/portal/${session.portalToken}/${tab}`);
+  }, [session, urlToken, pathname, router]);
+
+  // Record the login once the authenticated session is up (deduped server-side).
   const loginLogged = useRef(false);
   useEffect(() => {
     if (!session?.portalActive || loginLogged.current) return;
@@ -45,9 +50,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   // Track tab views (deduped server-side)
   useEffect(() => {
     if (user?.role !== "client") return;
-    const tab = PORTAL_TABS.find((t) => pathname.startsWith(t.href));
+    const tab = currentPortalTab(pathname);
     if (tab) {
-      void logEvent({ action: "view_tab", details: tab.key }).catch(() => {});
+      void logEvent({ action: "view_tab", details: tab }).catch(() => {});
     }
   }, [pathname, user, logEvent]);
 
@@ -55,12 +60,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     setSidebarOpen(false);
   }, [pathname]);
 
-  // Hidden tab guard — bounce to JSR Track if the admin hid the current tab
+  // Hidden tab guard: bounce to JSR Track if the admin hid the current tab
   useEffect(() => {
-    if (!session) return;
-    const tab = PORTAL_TABS.find((t) => pathname.startsWith(t.href));
-    if (tab && tab.key !== "jsr" && session.hiddenTabs.includes(tab.key)) {
-      router.replace("/portal/jsr");
+    if (!session?.portalToken) return;
+    const tab = currentPortalTab(pathname);
+    if (tab && tab !== "jsr" && session.hiddenTabs.includes(tab)) {
+      router.replace(`/portal/${session.portalToken}/jsr`);
     }
   }, [session, pathname, router]);
 
@@ -75,13 +80,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     );
   }
 
-  if (user === null || user.role !== "client" || session === null) {
+  if (user === null || user.role !== "client" || !session) {
     return null;
   }
 
-  if (!session) return null;
-
-  // Portal deactivated by the team — block access without deleting the account
+  // Portal deactivated by the team: block access without deleting the account
   if (!session.portalActive) {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
@@ -110,6 +113,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#f8f8f8" }}>
       <PortalSidebar
+        token={session.portalToken ?? urlToken}
         brand={session.brand}
         userName={session.user.name ?? session.user.email ?? "Client"}
         hiddenTabs={session.hiddenTabs}

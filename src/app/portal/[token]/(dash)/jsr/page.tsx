@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -27,6 +28,8 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
 };
 
 export default function PortalJsrPage() {
+  const params = useParams();
+  const token = params.token as string;
   const session = useQuery(api.clientPortal.getPortalSession);
   const dashboard = useQuery(api.clientPortal.getPortalDashboard);
   const addTaskRemark = useMutation(api.clientPortal.addTaskRemark);
@@ -138,7 +141,7 @@ export default function PortalJsrPage() {
             </p>
             {dashboard.rows.length === 0 && (
               <Link
-                href="/portal/new-task"
+                href={`/portal/${token}/new-task`}
                 className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-white text-[13px] font-semibold"
                 style={{ backgroundColor: bc }}
               >

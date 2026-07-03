@@ -33,14 +33,15 @@ export default function PortalLoginPage() {
     }
   }, [info, token]);
 
-  // Already signed in as a client → straight to the dashboard;
+  // Already signed in as a client → straight to the dashboard (the layout
+  // canonicalizes to their own brand slug if this token isn't theirs);
   // internal users keep their session and go to the internal dashboard.
   useEffect(() => {
     if (!currentUser) return;
     if (currentUser.role === "client") {
-      router.replace("/portal");
+      router.replace(`/portal/${token}/jsr`);
     }
-  }, [currentUser, router]);
+  }, [currentUser, router, token]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,7 +54,7 @@ export default function PortalLoginPage() {
       const user = await convex.query(api.users.getCurrentUser, {});
       if (user?.role === "client") {
         // "login" activity is recorded by the portal layout once the session loads
-        router.push("/portal");
+        router.push(`/portal/${token}/jsr`);
       } else if (user) {
         // Internal account logged in through the portal link — send them home.
         router.push("/dashboard");
