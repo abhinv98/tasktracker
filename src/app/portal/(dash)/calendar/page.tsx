@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Tag as TagIcon } from "lucide-react";
 import { TASK_STATUS, PortalCard, EmptyState, monthLabel } from "@/components/portal/shared";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -205,7 +205,7 @@ export default function PortalCalendarPage() {
         </div>
       </PortalCard>
 
-      {/* List below the grid */}
+      {/* List below the grid, segregated by tag when tags exist */}
       {monthEntries.length === 0 ? (
         <PortalCard>
           <EmptyState
@@ -215,34 +215,60 @@ export default function PortalCalendarPage() {
           />
         </PortalCard>
       ) : (
-        <PortalCard>
-          <div className="divide-y divide-[#f5f5f5]">
-            {[...monthEntries]
-              .sort((a: any, b: any) => (a.postDate || "z").localeCompare(b.postDate || "z"))
-              .map((e: any) => {
-                const info = TASK_STATUS[e.status] ?? { label: e.status, color: "#a3a3a3" };
-                return (
-                  <div key={e._id} className={`flex items-center gap-3 px-5 py-2.5 ${e.status === "done" ? "opacity-55" : ""}`}>
-                    <span className="text-[11px] text-[#737373] tabular-nums w-14 shrink-0">
-                      {e.postDate ? e.postDate.slice(8, 10) + " " + monthLabel(month).slice(0, 3) : "TBD"}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] text-[#171717] truncate ${e.status === "done" ? "line-through" : ""}`}>{e.title}</p>
+        (() => {
+          const sorted = [...monthEntries].sort((a: any, b: any) =>
+            (a.postDate || "z").localeCompare(b.postDate || "z")
+          );
+          const tags = [...new Set(sorted.map((e: any) => e.tag).filter(Boolean))].sort() as string[];
+          const groups: { label: string | null; entries: any[] }[] =
+            tags.length > 0
+              ? [
+                  ...tags.map((t) => ({ label: t, entries: sorted.filter((e: any) => e.tag === t) })),
+                  ...(sorted.some((e: any) => !e.tag)
+                    ? [{ label: "Uncategorised", entries: sorted.filter((e: any) => !e.tag) }]
+                    : []),
+                ]
+              : [{ label: null, entries: sorted }];
+          return (
+            <PortalCard>
+              {groups.map((group, gi) => (
+                <div key={group.label ?? "all"}>
+                  {group.label && (
+                    <div className={`flex items-center gap-1.5 px-5 py-2 bg-[#fafafa] ${gi > 0 ? "border-t border-[#f0f0f0]" : ""} border-b border-[#f0f0f0]`}>
+                      <TagIcon className="h-3 w-3" style={{ color: bc }} />
+                      <span className="text-[12px] font-semibold text-[#525252]">{group.label}</span>
+                      <span className="text-[11px] text-[#a3a3a3]">{group.entries.length}</span>
                     </div>
-                    {e.platform && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
-                        {e.platform}
-                      </span>
-                    )}
-                    {e.contentType && <span className="text-[10px] text-[#a3a3a3] shrink-0">{e.contentType}</span>}
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: info.color, backgroundColor: info.color + "12" }}>
-                      {info.label}
-                    </span>
+                  )}
+                  <div className="divide-y divide-[#f5f5f5]">
+                    {group.entries.map((e: any) => {
+                      const info = TASK_STATUS[e.status] ?? { label: e.status, color: "#a3a3a3" };
+                      return (
+                        <div key={e._id} className={`flex items-center gap-3 px-5 py-2.5 ${e.status === "done" ? "opacity-55" : ""}`}>
+                          <span className="text-[11px] text-[#737373] tabular-nums w-14 shrink-0">
+                            {e.postDate ? e.postDate.slice(8, 10) + " " + monthLabel(month).slice(0, 3) : "TBD"}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[13px] text-[#171717] truncate ${e.status === "done" ? "line-through" : ""}`}>{e.title}</p>
+                          </div>
+                          {e.platform && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
+                              {e.platform}
+                            </span>
+                          )}
+                          {e.contentType && <span className="text-[10px] text-[#a3a3a3] shrink-0">{e.contentType}</span>}
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: info.color, backgroundColor: info.color + "12" }}>
+                            {info.label}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-          </div>
-        </PortalCard>
+                </div>
+              ))}
+            </PortalCard>
+          );
+        })()
       )}
     </div>
   );

@@ -39,6 +39,7 @@ const PORTAL_TAB_OPTIONS: { key: string; label: string }[] = [
   { key: "calendar", label: "Content Calendar" },
   { key: "deck", label: "Client Deck" },
   { key: "new-task", label: "New Task" },
+  { key: "messages", label: "Messages" },
   { key: "monthly-log", label: "Monthly Log" },
   { key: "pending-client", label: "Your Pending Work" },
   { key: "pending-agency", label: "Ecultify Pending Work" },

@@ -635,26 +635,28 @@ export const getPortalDashboard = query({
     const tags = [...new Set(rows.map((r) => r.tag).filter((t): t is string => !!t))].sort();
     const months = [...new Set(rows.map((r) => r.monthKey))].sort().reverse();
 
+    return { summary, rows, tags, months };
+  },
+});
+
+/** Messages tab — the brand-level thread between the client and the team. */
+export const getPortalMessages = query({
+  args: {},
+  handler: async (ctx) => {
+    const client = await requireClient(ctx);
     const messages = await ctx.db
       .query("jsrMessages")
-      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
       .collect();
-
-    return {
-      summary,
-      rows,
-      tags,
-      months,
-      messages: messages
-        .sort((a, b) => a.createdAt - b.createdAt)
-        .map((m) => ({
-          _id: m._id,
-          senderType: m.senderType,
-          senderName: m.senderName,
-          content: m.content,
-          createdAt: m.createdAt,
-        })),
-    };
+    return messages
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((m) => ({
+        _id: m._id,
+        senderType: m.senderType,
+        senderName: m.senderName,
+        content: m.content,
+        createdAt: m.createdAt,
+      }));
   },
 });
 
@@ -678,6 +680,7 @@ export const getContentCalendar = query({
       contentType: t.contentType ?? "",
       postDate: t.postDate ?? "",
       status: t.status,
+      tag: t.tag ?? null,
       monthKey: t.postDate ? t.postDate.substring(0, 7) : "unscheduled",
     }));
 
@@ -988,28 +991,37 @@ export const listMyRequests = query({
   },
 });
 
-/** Monthly Log — completed work bucketed by month. */
+/**
+ * Monthly Log — completed CLIENT-REQUESTED work bucketed by month.
+ * Only tasks that came in through the portal (or intake) count here, so
+ * historical internal work stays out of the client's log.
+ */
 export const getMonthlyLog = query({
   args: {},
   handler: async (ctx) => {
     const client = await requireClient(ctx);
-    const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, client.clientBrandId);
-
-    const doneTasks = brandTasks.filter((t) => t.status === "done");
+    const requests = await ctx.db
+      .query("jsrClientTasks")
+      .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
+      .collect();
     const allDeliverables = await ctx.db.query("deliverables").collect();
 
-    const entries = doneTasks.map((t) => {
-      const brief = brandBriefs.find((b) => b._id === t.briefId);
-      const completedAt = t.completedAt ?? t.deadline ?? t._creationTime;
-      return {
-        _id: t._id,
-        title: t.title,
-        briefTitle: brief?.title ?? "",
+    const entries = [];
+    for (const r of requests) {
+      if (!r.linkedTaskId) continue;
+      const task = await ctx.db.get(r.linkedTaskId);
+      if (!task || task.status !== "done") continue;
+      const completedAt = task.completedAt ?? task.deadline ?? task._creationTime;
+      entries.push({
+        _id: r._id,
+        title: r.title,
+        tag: task.tag ?? null,
+        requestedBy: r.clientName,
         completedAt,
         monthKey: monthKeyFromTimestamp(completedAt),
-        deliverableCount: allDeliverables.filter((d) => d.taskId === t._id).length,
-      };
-    });
+        deliverableCount: allDeliverables.filter((d) => d.taskId === task._id).length,
+      });
+    }
 
     const months = [...new Set(entries.map((e) => e.monthKey))].sort().reverse();
     return { entries: entries.sort((a, b) => b.completedAt - a.completedAt), months };
@@ -1073,47 +1085,38 @@ export const getClientPendingWork = query({
   },
 });
 
-/** Ecultify Pending Work — everything in flight on the agency side, by month. */
+/**
+ * Ecultify Pending Work — client-requested tasks the agency is currently
+ * working on, by month. Only portal/intake-originated work is shown, so
+ * legacy internal tasks stay out of this view.
+ */
 export const getEcultifyPendingWork = query({
   args: {},
   handler: async (ctx) => {
     const client = await requireClient(ctx);
-    const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, client.clientBrandId);
-
-    const openTasks = brandTasks
-      .filter((t) => t.status === "pending" || t.status === "in-progress" || t.status === "review")
-      .map((t) => {
-        const brief = brandBriefs.find((b) => b._id === t.briefId);
-        return {
-          _id: t._id,
-          title: t.title,
-          status: t.status,
-          briefTitle: brief?.title ?? "",
-          deadline: t.deadline,
-          monthKey: taskMonthKey(t),
-        };
-      });
-
-    // Accepted client requests not yet completed
     const requests = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
       .collect();
-    const openRequests = requests
-      .filter((r) => r.status === "accepted" || r.status === "in_progress")
-      .map((r) => ({
+
+    const openRequests = [];
+    for (const r of requests) {
+      if (r.status === "declined" || r.status === "completed") continue;
+      if (!r.linkedTaskId) continue; // not accepted yet: shown as Awaiting Review on the dashboard
+      const task = await ctx.db.get(r.linkedTaskId);
+      if (!task || task.status === "done") continue;
+      openRequests.push({
         _id: r._id,
         title: r.title,
-        status: r.status,
+        status: task.status,
+        tag: task.tag ?? null,
         finalDeadline: r.finalDeadline,
         monthKey: monthKeyFromTimestamp(r.finalDeadline ?? r.createdAt),
-      }));
+      });
+    }
 
-    const months = [
-      ...new Set([...openTasks.map((t) => t.monthKey), ...openRequests.map((r) => r.monthKey)]),
-    ].sort();
-
-    return { openTasks, openRequests, months };
+    const months = [...new Set(openRequests.map((r) => r.monthKey))].sort();
+    return { openRequests, months };
   },
 });
 

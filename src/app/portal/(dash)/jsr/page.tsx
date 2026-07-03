@@ -10,13 +10,11 @@ import {
   ChevronDown,
   ChevronUp,
   LayoutDashboard,
-  MessageCircle,
   Paperclip,
   Plus,
-  Send,
   Tag,
 } from "lucide-react";
-import { PortalCard, formatDate, monthLabel, timeAgo } from "@/components/portal/shared";
+import { PortalCard, formatDate, monthLabel } from "@/components/portal/shared";
 import { DeliverableCard, RemarkComposer, RemarkThread } from "@/components/portal/DeliverableCard";
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -31,15 +29,11 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
 export default function PortalJsrPage() {
   const session = useQuery(api.clientPortal.getPortalSession);
   const dashboard = useQuery(api.clientPortal.getPortalDashboard);
-  const sendMessage = useMutation(api.clientPortal.sendPortalMessage);
   const addTaskRemark = useMutation(api.clientPortal.addTaskRemark);
 
   const [monthFilter, setMonthFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [msgContent, setMsgContent] = useState("");
-  const [sendingMsg, setSendingMsg] = useState(false);
-  const [messagesOpen, setMessagesOpen] = useState(false);
 
   const rows = useMemo(() => {
     if (!dashboard) return [];
@@ -60,16 +54,6 @@ export default function PortalJsrPage() {
   if (!dashboard) return null;
 
   const bc = session.brand.color;
-
-  async function handleSend() {
-    if (!msgContent.trim() || sendingMsg) return;
-    setSendingMsg(true);
-    try {
-      await sendMessage({ content: msgContent.trim() });
-      setMsgContent("");
-    } catch {}
-    setSendingMsg(false);
-  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-4">
@@ -201,76 +185,6 @@ export default function PortalJsrPage() {
         )}
       </PortalCard>
 
-      {/* Messages */}
-      <PortalCard>
-        <button
-          onClick={() => setMessagesOpen(!messagesOpen)}
-          className="flex items-center justify-between w-full px-6 py-4 hover:bg-[#fafafa] transition-colors"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: bc + "12" }}>
-              <MessageCircle className="h-3.5 w-3.5" style={{ color: bc }} />
-            </div>
-            <h2 className="font-semibold text-[15px] text-[#171717]">Messages</h2>
-            {(dashboard.messages ?? []).length > 0 && (
-              <span className="text-[12px] text-[#a3a3a3] ml-1">({dashboard.messages.length})</span>
-            )}
-          </div>
-          {messagesOpen ? <ChevronUp className="h-4 w-4 text-[#a3a3a3]" /> : <ChevronDown className="h-4 w-4 text-[#a3a3a3]" />}
-        </button>
-        {messagesOpen && (
-          <div className="border-t border-[#f0f0f0]">
-            <div className="px-6 py-4 max-h-[360px] overflow-y-auto space-y-3">
-              {(dashboard.messages ?? []).length === 0 && (
-                <p className="text-[13px] text-[#a3a3a3] text-center py-4">
-                  No messages yet. Say hello to the team.
-                </p>
-              )}
-              {(dashboard.messages ?? []).map((msg: any) => (
-                <div key={msg._id} className={`flex ${msg.senderType === "client" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-xl px-4 py-2.5 ${
-                      msg.senderType === "client" ? "rounded-br-md text-white" : "rounded-bl-md bg-[#f0f0f0] text-[#171717]"
-                    }`}
-                    style={msg.senderType === "client" ? { backgroundColor: bc } : {}}
-                  >
-                    <p className={`text-[10px] font-semibold mb-0.5 ${msg.senderType === "client" ? "text-white/70" : "text-[#737373]"}`}>
-                      {msg.senderName || (msg.senderType === "client" ? "You" : "Team")}
-                    </p>
-                    <p className="text-[13px] leading-relaxed">{msg.content}</p>
-                    <p className={`text-[9px] mt-1 ${msg.senderType === "client" ? "text-white/50" : "text-[#a3a3a3]"}`}>
-                      {timeAgo(msg.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-[#f0f0f0] px-6 py-3 flex items-center gap-2">
-              <input
-                value={msgContent}
-                onChange={(e) => setMsgContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void handleSend();
-                  }
-                }}
-                placeholder="Type a message for the team"
-                className="flex-1 px-3 py-2 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
-                style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
-              />
-              <button
-                onClick={() => void handleSend()}
-                disabled={sendingMsg || !msgContent.trim()}
-                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-50"
-                style={{ backgroundColor: bc }}
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </PortalCard>
     </div>
   );
 }

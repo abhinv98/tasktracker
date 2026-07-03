@@ -120,7 +120,7 @@ export function DeliverableCard({
             href={deliverable.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[12px] font-medium underline mb-2 block"
+            className="text-[12px] font-medium underline mb-2 block break-all"
             style={{ color: brandColor }}
           >
             {deliverable.link}

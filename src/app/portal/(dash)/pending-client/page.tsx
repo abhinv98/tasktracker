@@ -213,7 +213,7 @@ export default function PortalPendingClientPage() {
                 <h5 className="font-medium text-[13px] text-[#171717] mb-3">Deliverable</h5>
                 {reviewItem.message && <p className="text-[13px] text-[#525252] mb-3 leading-relaxed">{reviewItem.message}</p>}
                 {reviewItem.link && (
-                  <a href={reviewItem.link} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium underline block mb-3" style={{ color: bc }}>
+                  <a href={reviewItem.link} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium underline block mb-3 break-all" style={{ color: bc }}>
                     {reviewItem.link}
                   </a>
                 )}

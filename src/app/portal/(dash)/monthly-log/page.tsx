@@ -47,7 +47,9 @@ export default function PortalMonthlyLogPage() {
         <ClipboardList className="h-5 w-5" style={{ color: bc }} />
         <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">Monthly Log</h1>
       </div>
-      <p className="text-[13px] text-[#737373] -mt-2">Work completed for you, month by month.</p>
+      <p className="text-[13px] text-[#737373] -mt-2">
+        Completed tasks that were requested through this portal, month by month.
+      </p>
 
       {log.months.length > 1 && (
         <MonthChips months={log.months} selected={selectedMonth} onSelect={setSelectedMonth} brandColor={bc} />
@@ -76,9 +78,14 @@ export default function PortalMonthlyLogPage() {
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-[#10b981]" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] text-[#171717]">{e.title}</p>
-                    <p className="text-[10px] text-[#a3a3a3]">{e.briefTitle}</p>
+                    {e.requestedBy && <p className="text-[10px] text-[#a3a3a3]">Requested by {e.requestedBy}</p>}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {e.tag && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: bc, backgroundColor: bc + "10" }}>
+                        {e.tag}
+                      </span>
+                    )}
                     {e.deliverableCount > 0 && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: bc, backgroundColor: bc + "10" }}>
                         <Package className="h-3 w-3" />

@@ -10,6 +10,7 @@ import {
   Inbox,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   MessageSquareText,
   Plus,
   Presentation,
@@ -21,6 +22,7 @@ export type PortalTabKey =
   | "calendar"
   | "deck"
   | "new-task"
+  | "messages"
   | "monthly-log"
   | "pending-client"
   | "pending-agency"
@@ -36,6 +38,7 @@ export const PORTAL_TABS: {
   { key: "calendar", label: "Content Calendar", href: "/portal/calendar", icon: CalendarDays },
   { key: "deck", label: "Client Deck", href: "/portal/deck", icon: Presentation },
   { key: "new-task", label: "New Task", href: "/portal/new-task", icon: Plus },
+  { key: "messages", label: "Messages", href: "/portal/messages", icon: MessageCircle },
   { key: "monthly-log", label: "Monthly Log", href: "/portal/monthly-log", icon: ClipboardList },
   { key: "pending-client", label: "Your Pending Work", href: "/portal/pending-client", icon: Inbox },
   { key: "pending-agency", label: "Ecultify Pending Work", href: "/portal/pending-agency", icon: Activity },
