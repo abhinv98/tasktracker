@@ -59,7 +59,7 @@ export default function PortalFeedbackPage() {
         <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">Feedback Log</h1>
       </div>
       <p className="text-[13px] text-[#737373] -mt-2">
-        A history of your feedback — comments, change requests and general notes to the team.
+        A history of your feedback: comments, change requests and general notes to the team.
       </p>
 
       {/* Compose */}

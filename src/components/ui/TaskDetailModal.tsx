@@ -27,6 +27,7 @@ import {
   Eye,
   Pencil,
   Trash2,
+  Tag as TagIcon,
   AlertTriangle,
   UserPlus,
   Play,
@@ -99,6 +100,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
   const updateTask = useMutation(api.tasks.updateTask);
+  const setTaskTagMut = useMutation(api.tasks.setTaskTag);
   const reassignTaskMutation = useMutation(api.tasks.reassignTask);
   const deleteTaskMutation = useMutation(api.tasks.deleteTask);
   const deleteDeliverable = useMutation(api.approvals.deleteDeliverable);
@@ -115,6 +117,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const [showRedoForm, setShowRedoForm] = useState(false);
   const [redoNote, setRedoNote] = useState("");
   const [redoDeadline, setRedoDeadline] = useState("");
+  const [editingTag, setEditingTag] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
   const [isSubmittingRedo, setIsSubmittingRedo] = useState(false);
   const briefId = detail?.task?.briefId;
   const graphData = useQuery(
@@ -429,6 +433,45 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             <p className="text-[12px] text-[var(--text-secondary)] mt-1">
               {brief?.title ?? "Unknown brief"}
             </p>
+            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+              {editingTag ? (
+                <input
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void setTaskTagMut({ taskId: task._id, tag: tagDraft.trim() || undefined }).catch(() => {});
+                      setEditingTag(false);
+                    }
+                    if (e.key === "Escape") setEditingTag(false);
+                  }}
+                  onBlur={() => {
+                    void setTaskTagMut({ taskId: task._id, tag: tagDraft.trim() || undefined }).catch(() => {});
+                    setEditingTag(false);
+                  }}
+                  placeholder="Tag name"
+                  className="w-32 px-2 py-1 rounded-md border border-[var(--border)] text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                  autoFocus
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTag(true);
+                    setTagDraft((task as { tag?: string }).tag ?? "");
+                  }}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                    (task as { tag?: string }).tag
+                      ? "text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-80"
+                      : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  }`}
+                  title="Edit category tag"
+                >
+                  <TagIcon className="h-3 w-3" />
+                  {(task as { tag?: string }).tag ?? "Add tag"}
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {isAdmin && !isEditLocked && (

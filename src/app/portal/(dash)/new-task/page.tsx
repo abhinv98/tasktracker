@@ -231,7 +231,7 @@ export default function PortalNewTaskPage() {
                       )}
                       <span className="flex-1 text-[12px] text-[#525252] truncate">
                         {r.name || r.url}
-                        {r._uploading && <span className="text-[#a3a3a3]"> — uploading…</span>}
+                        {r._uploading && <span className="text-[#a3a3a3]"> (uploading...)</span>}
                       </span>
                       <button onClick={() => setRefs((prev) => prev.filter((_, i) => i !== idx))} className="p-1 rounded hover:bg-[#f0f0f0] text-[#a3a3a3]">
                         <Trash2 className="h-3.5 w-3.5" />

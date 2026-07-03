@@ -608,8 +608,10 @@ export const updateClientTaskStatus = mutation({
       v.literal("completed"),
       v.literal("declined")
     ),
+    /** Category tag applied to the real task on accept (portal segregation). */
+    tag: v.optional(v.string()),
   },
-  handler: async (ctx, { taskId, status }) => {
+  handler: async (ctx, { taskId, status, tag }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
@@ -681,11 +683,17 @@ export const updateClientTaskStatus = mutation({
         duration: "2 Hours",
         durationMinutes: 120,
         deadline: clientTask.finalDeadline,
+        ...(tag?.trim() ? { tag: tag.trim() } : {}),
         ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
       });
 
       // Link back
       await ctx.db.patch(taskId, { linkedTaskId: realTaskId, linkedBriefId: briefId });
+    }
+
+    // Tag can also be set/updated when re-acting on an already-linked request
+    if (tag?.trim() && clientTask.linkedTaskId) {
+      await ctx.db.patch(clientTask.linkedTaskId, { tag: tag.trim() });
     }
 
     // Sync status to linked real task if it exists

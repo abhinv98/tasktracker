@@ -81,7 +81,7 @@ export default function PortalPendingClientPage() {
         <Inbox className="h-5 w-5" style={{ color: bc }} />
         <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">Your Pending Work</h1>
       </div>
-      <p className="text-[13px] text-[#737373] -mt-2">Everything waiting on you — approvals, input requests and documents.</p>
+      <p className="text-[13px] text-[#737373] -mt-2">Everything waiting on you: approvals, input requests and documents.</p>
 
       {isEmpty && (
         <PortalCard>

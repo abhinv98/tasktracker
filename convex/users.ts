@@ -79,7 +79,9 @@ export const listAllUsers = query({
     if (!currentUser || currentUser.role !== "admin") {
       return null;
     }
-    const users = await ctx.db.query("users").collect();
+    const allUsers = await ctx.db.query("users").collect();
+    // Portal client logins live in the Clients tab (clientUsers.listAllClientUsers)
+    const users = allUsers.filter((u) => u.role !== "client");
     const userTeams = await ctx.db.query("userTeams").collect();
     const teams = await ctx.db.query("teams").collect();
 

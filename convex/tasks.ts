@@ -1529,3 +1529,36 @@ export const confirmOverdueContact = mutation({
     }
   },
 });
+
+// ─── TASK TAGS (segregation on internal JSR + client portal) ──
+
+/** Set or clear a task's category tag. Any internal user. */
+export const setTaskTag = mutation({
+  args: { taskId: v.id("tasks"), tag: v.optional(v.string()) },
+  handler: async (ctx, { taskId, tag }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    await ctx.db.patch(taskId, { tag: tag?.trim() || undefined });
+  },
+});
+
+/** Distinct tags in use across a brand's tasks, for tag-input suggestions. */
+export const listBrandTags = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const briefs = await ctx.db.query("briefs").collect();
+    const briefIds = new Set(
+      briefs.filter((b) => b.brandId === brandId).map((b) => b._id)
+    );
+    const tasks = await ctx.db.query("tasks").collect();
+    const tags = new Set<string>();
+    for (const t of tasks) {
+      if (t.tag && briefIds.has(t.briefId)) tags.add(t.tag);
+    }
+    return [...tags].sort();
+  },
+});

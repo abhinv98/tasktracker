@@ -1,11 +1,11 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Filter, Inbox } from "lucide-react";
+import { Filter, Inbox, Tag as TagIcon } from "lucide-react";
 
 interface InternalJsrTabProps {
   brandId: Id<"brands">;
@@ -39,8 +39,21 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   const router = useRouter();
   const pathname = usePathname();
   const overview = useQuery(api.brands.getBrandTeamOverview, { brandId });
+  const brandTags = useQuery(api.tasks.listBrandTags, { brandId });
+  const setTaskTag = useMutation(api.tasks.setTaskTag);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterMember, setFilterMember] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [editingTagFor, setEditingTagFor] = useState<Id<"tasks"> | null>(null);
+  const [tagDraft, setTagDraft] = useState("");
+
+  async function saveTag(taskId: Id<"tasks">) {
+    try {
+      await setTaskTag({ taskId, tag: tagDraft.trim() || undefined });
+    } catch {}
+    setEditingTagFor(null);
+    setTagDraft("");
+  }
 
   const goToBrief = useCallback(
     (briefId: Id<"briefs">) => {
@@ -64,9 +77,10 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
     return overview.filter((t) => {
       if (filterStatus && t.taskStatus !== filterStatus) return false;
       if (filterMember && t.assigneeId !== filterMember) return false;
+      if (filterTag && t.tag !== filterTag) return false;
       return true;
     });
-  }, [overview, filterStatus, filterMember]);
+  }, [overview, filterStatus, filterMember, filterTag]);
 
   const sortedRows = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -132,12 +146,27 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
             </option>
           ))}
         </select>
-        {(filterStatus || filterMember) && (
+        {(brandTags ?? []).length > 0 && (
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          >
+            <option value="">All tags</option>
+            {(brandTags ?? []).map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
+        {(filterStatus || filterMember || filterTag) && (
           <button
             type="button"
             onClick={() => {
               setFilterStatus("");
               setFilterMember("");
+              setFilterTag("");
             }}
             className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
           >
@@ -164,6 +193,9 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                 <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
                   <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Task
+                  </th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                    Tag
                   </th>
                   <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Assignee
@@ -219,6 +251,44 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                         </p>
                         <p className="text-[10px] text-[var(--text-disabled)] mt-0.5">{task.teamName}</p>
                       </td>
+                      <td
+                        className="px-3 py-2.5 align-top whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {editingTagFor === task._id ? (
+                          <input
+                            value={tagDraft}
+                            onChange={(e) => setTagDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") void saveTag(task._id);
+                              if (e.key === "Escape") setEditingTagFor(null);
+                            }}
+                            onBlur={() => void saveTag(task._id)}
+                            list={`brand-tags-${brandId}`}
+                            placeholder="Tag name"
+                            className="w-24 px-2 py-1 rounded-md border border-[var(--border)] text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                            autoFocus
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTagFor(task._id);
+                              setTagDraft(task.tag ?? "");
+                            }}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                              task.tag
+                                ? "text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-80"
+                                : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                            }`}
+                            title="Edit tag"
+                          >
+                            <TagIcon className="h-3 w-3" />
+                            {task.tag ?? "Add tag"}
+                          </button>
+                        )}
+                      </td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-primary)]">
                         {task.assigneeName}
                       </td>
@@ -253,6 +323,11 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
               </tbody>
             </table>
           </div>
+          <datalist id={`brand-tags-${brandId}`}>
+            {(brandTags ?? []).map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
         </div>
       )}
     </div>

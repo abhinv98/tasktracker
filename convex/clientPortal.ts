@@ -15,13 +15,14 @@ import {
 // JSR + intake token pages into a single sidebar dashboard.
 // ═══════════════════════════════════════════════════════════
 
-function generateToken(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let token = "";
-  for (let i = 0; i < 24; i++) {
-    token += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return token;
+/** Portal URLs use the brand name: /portal/vgos. Falls back to -2, -3 on collisions. */
+function slugifyBrandName(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return slug || "portal";
 }
 
 /** "YYYY-MM" bucket in the app's timezone (IST). */
@@ -193,23 +194,50 @@ async function notifyBrandTeam(
 // ADMIN — portal management (brand page "Client Portal" tab)
 // ═══════════════════════════════════════════════════════════
 
-/** Generate the brand's portal link. Only one active at a time — deactivates any existing. */
+/**
+ * Activate the brand's portal link. One row per brand with a stable
+ * brand-name URL (/portal/vgos) so requests/messages keep their references;
+ * re-generating after a deactivation simply reactivates it.
+ */
 export const generatePortalLink = mutation({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
     const user = await requireAdmin(ctx);
+    const brand = await ctx.db.get(brandId);
+    if (!brand) throw new Error("Brand not found");
 
-    const existing = await ctx.db
+    // Pick a slug not used by another brand's portal
+    const base = slugifyBrandName(brand.name);
+    let token = base;
+    for (let i = 2; ; i++) {
+      const taken = await ctx.db
+        .query("clientPortals")
+        .withIndex("by_token", (q) => q.eq("token", token))
+        .first();
+      if (!taken || taken.brandId === brandId) break;
+      token = `${base}-${i}`;
+    }
+
+    const rows = await ctx.db
       .query("clientPortals")
-      .withIndex("by_brand_active", (q) => q.eq("brandId", brandId).eq("isActive", true))
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
-    for (const portal of existing) {
-      await ctx.db.patch(portal._id, { isActive: false, deactivatedAt: Date.now() });
+    if (rows.length > 0) {
+      const [primary, ...rest] = rows;
+      await ctx.db.patch(primary._id, {
+        token,
+        isActive: true,
+        deactivatedAt: undefined,
+      });
+      for (const extra of rest) {
+        await ctx.db.patch(extra._id, { isActive: false, deactivatedAt: Date.now() });
+      }
+      return primary._id;
     }
 
     return await ctx.db.insert("clientPortals", {
       brandId,
-      token: generateToken(),
+      token,
       isActive: true,
       createdBy: user._id,
       createdAt: Date.now(),
@@ -345,7 +373,7 @@ export const deleteDeckItem = mutation({
   },
 });
 
-/** Admin/manager view of all deck items for a brand (incl. hidden). */
+/** Admin/manager view of all deck items for a brand (incl. hidden), with comment threads. */
 export const listDeckItems = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
@@ -354,16 +382,30 @@ export const listDeckItems = query({
       .query("clientDeckItems")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
-    const reviewerIds = [...new Set(items.map((i) => i.reviewedByClientId).filter(Boolean))];
-    const reviewers = await Promise.all(reviewerIds.map((id) => ctx.db.get(id!)));
+    const allRemarks = await ctx.db
+      .query("jsrRemarks")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .collect();
+    const userIds = [
+      ...new Set(
+        items.flatMap((i) => [i.reviewedByClientId, i.addedByClientId]).filter(Boolean)
+      ),
+    ];
+    const users = await Promise.all(userIds.map((id) => ctx.db.get(id!)));
     const nameById = new Map(
-      reviewers.filter(Boolean).map((u) => [u!._id, u!.name ?? u!.email ?? "Client"])
+      users.filter(Boolean).map((u) => [u!._id, u!.name ?? u!.email ?? "Client"])
     );
     return items
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       .map((i) => ({
         ...i,
+        resolvedUrl: i.fileKey ? `/api/r2-file?key=${encodeURIComponent(i.fileKey)}` : i.url,
         reviewedByName: i.reviewedByClientId ? nameById.get(i.reviewedByClientId) ?? null : null,
+        addedByClientName: i.addedByClientId ? nameById.get(i.addedByClientId) ?? null : null,
+        remarks: allRemarks
+          .filter((r) => r.deckItemId === i._id)
+          .sort((a, b) => a.createdAt - b.createdAt)
+          .map(remarkShape),
       }));
   },
 });
@@ -495,126 +537,114 @@ export const logPortalEvent = mutation({
 });
 
 /**
- * JSR Track — the classic Job Status Report, keyed by the client's brand.
- * Ported from jsr.getJsrByToken with month keys and task-level remark threads.
+ * JSR Track dashboard — shows ONLY the tasks this brand's clients submitted
+ * through the portal (or legacy intake), in a sheet-style table with the
+ * live status of the linked internal task, its tag, deliverables and
+ * comment threads. Plus the brand message thread.
  */
-export const getJsrTrack = query({
+export const getPortalDashboard = query({
   args: {},
   handler: async (ctx) => {
     const client = await requireClient(ctx);
     const brandId = client.clientBrandId;
-    const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, brandId);
 
-    const ccBriefIds = new Set(
-      brandBriefs.filter((b) => b.briefType === "content_calendar").map((b) => b._id)
-    );
-    const regularTasks = brandTasks.filter((t) => !ccBriefIds.has(t.briefId));
-
-    const taskDeadlines = brandTasks
-      .map((t) => t.deadline)
-      .filter((d): d is number => d !== undefined);
-    const internalDeadline = taskDeadlines.length > 0 ? Math.max(...taskDeadlines) : null;
-
-    const internalSummary = {
-      total: brandTasks.length,
-      pending: brandTasks.filter((t) => t.status === "pending").length,
-      inProgress: brandTasks.filter((t) => t.status === "in-progress").length,
-      review: brandTasks.filter((t) => t.status === "review").length,
-      done: brandTasks.filter((t) => t.status === "done").length,
-      internalDeadline,
-    };
-
-    const allDeliverables = await ctx.db.query("deliverables").collect();
+    const requests = await ctx.db
+      .query("jsrClientTasks")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .collect();
     const allRemarks = await ctx.db
       .query("jsrRemarks")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
+    const allDeliverables = await ctx.db.query("deliverables").collect();
 
-    const taskDeliverableMap: Record<string, unknown[]> = {};
-    for (const t of brandTasks) {
-      if (t.status !== "done") continue;
-      const dels = allDeliverables.filter((d) => d.taskId === t._id);
-      if (dels.length === 0) continue;
-      taskDeliverableMap[t._id] = await Promise.all(
-        dels.map(async (d) => ({
-          _id: d._id,
-          message: d.message,
-          link: d.link,
-          status: d.status,
-          submittedAt: d.submittedAt,
-          files: await deliverableFiles(ctx, d),
-          remarks: allRemarks
-            .filter((r) => r.deliverableId === d._id)
-            .sort((a, b) => a.createdAt - b.createdAt)
-            .map(remarkShape),
-        }))
-      );
-    }
+    const rows = await Promise.all(
+      requests
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (r) => {
+          let taskStatus: string | null = null;
+          let tag: string | undefined;
+          let deliverables: unknown[] = [];
+          let taskRemarks: ReturnType<typeof remarkShape>[] = [];
+          if (r.linkedTaskId) {
+            const task = await ctx.db.get(r.linkedTaskId);
+            if (task) {
+              taskStatus = task.status;
+              tag = task.tag;
+              taskRemarks = allRemarks
+                .filter((rem) => rem.taskId === task._id)
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .map(remarkShape);
+              const dels = allDeliverables.filter((d) => d.taskId === task._id);
+              deliverables = await Promise.all(
+                dels.map(async (d) => ({
+                  _id: d._id,
+                  message: d.message,
+                  link: d.link,
+                  status: d.status,
+                  submittedAt: d.submittedAt,
+                  files: await deliverableFiles(ctx, d),
+                  remarks: allRemarks
+                    .filter((rem) => rem.deliverableId === d._id)
+                    .sort((a, b) => a.createdAt - b.createdAt)
+                    .map(remarkShape),
+                }))
+              );
+            }
+          }
+          // One display status across request + linked task
+          const displayStatus =
+            r.status === "declined"
+              ? "declined"
+              : !r.linkedTaskId
+                ? "pending_review"
+                : taskStatus === "done"
+                  ? "completed"
+                  : taskStatus === "in-progress"
+                    ? "in_progress"
+                    : taskStatus === "review"
+                      ? "in_review"
+                      : "accepted";
+          return {
+            _id: r._id,
+            taskId: r.linkedTaskId ?? null,
+            title: r.title,
+            description: r.description,
+            tag: tag ?? null,
+            displayStatus,
+            clientName: r.clientName,
+            proposedDeadline: r.proposedDeadline,
+            finalDeadline: r.status === "pending_review" ? undefined : r.finalDeadline,
+            createdAt: r.createdAt,
+            monthKey: monthKeyFromTimestamp(r.createdAt),
+            remarks: taskRemarks,
+            deliverables,
+          };
+        })
+    );
 
-    // Tasks grouped by brief, each task carrying its month key + remark thread
-    const briefGroups: Record<
-      string,
-      { briefTitle: string; briefStatus: string; tasks: unknown[] }
-    > = {};
-    for (const t of regularTasks) {
-      const brief = brandBriefs.find((b) => b._id === t.briefId);
-      if (!briefGroups[t.briefId]) {
-        briefGroups[t.briefId] = {
-          briefTitle: brief?.title ?? "Untitled",
-          briefStatus: brief?.status ?? "active",
-          tasks: [],
-        };
-      }
-      briefGroups[t.briefId].tasks.push({
-        _id: t._id,
-        title: t.title,
-        status: t.status,
-        deadline: t.deadline,
-        monthKey: taskMonthKey(t),
-        remarks: allRemarks
-          .filter((r) => r.taskId === t._id)
-          .sort((a, b) => a.createdAt - b.createdAt)
-          .map(remarkShape),
-        ...(taskDeliverableMap[t._id] ? { deliverables: taskDeliverableMap[t._id] } : {}),
-      });
-    }
+    const summary = {
+      total: rows.length,
+      pendingReview: rows.filter((r) => r.displayStatus === "pending_review").length,
+      inProgress: rows.filter(
+        (r) => r.displayStatus === "in_progress" || r.displayStatus === "accepted" || r.displayStatus === "in_review"
+      ).length,
+      completed: rows.filter((r) => r.displayStatus === "completed").length,
+    };
 
-    // Recent activity (same label mapping as the legacy JSR page)
-    const briefIds = brandBriefs.map((b) => b._id);
-    const allActivity = await ctx.db.query("activityLog").collect();
-    const brandActivity = allActivity
-      .filter((a) => briefIds.includes(a.briefId))
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 6);
-    const recentActivity = brandActivity.map((a) => {
-      const brief = brandBriefs.find((b) => b._id === a.briefId);
-      let label = a.action;
-      if (a.action === "changed_status" && a.details) {
-        try { const d = JSON.parse(a.details); label = `Status → ${d.status}`; } catch {}
-      } else if (a.action === "created_task") {
-        try { const d = JSON.parse(a.details!); label = `Task created: ${d.title}`; } catch { label = "Task created"; }
-      } else if (a.action === "reassigned_task") {
-        label = "Task reassigned";
-      } else if (a.action === "updated_task") {
-        label = "Task updated";
-      } else if (a.action === "deleted_task") {
-        label = "Task removed";
-      }
-      return { label, briefTitle: brief?.title ?? "", timestamp: a.timestamp };
-    });
+    const tags = [...new Set(rows.map((r) => r.tag).filter((t): t is string => !!t))].sort();
+    const months = [...new Set(rows.map((r) => r.monthKey))].sort().reverse();
 
-    // Brand-level message thread (shared with legacy links)
     const messages = await ctx.db
       .query("jsrMessages")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
 
     return {
-      internalSummary,
-      tasksByBrief: Object.values(briefGroups),
-      recentActivity,
-      lastUpdated: brandActivity.length > 0 ? brandActivity[0].timestamp : null,
-      overallDeadline: internalDeadline,
+      summary,
+      rows,
+      tags,
+      months,
       messages: messages
         .sort((a, b) => a.createdAt - b.createdAt)
         .map((m) => ({
@@ -661,7 +691,7 @@ export const getContentCalendar = query({
   },
 });
 
-/** Client Deck — visible admin-shared links, with approval state. */
+/** Client Deck — shared links and files (from the team or the client), with approval state and comment threads. */
 export const getDeckItems = query({
   args: {},
   handler: async (ctx) => {
@@ -670,13 +700,19 @@ export const getDeckItems = query({
       .query("clientDeckItems")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
       .collect();
+    const allRemarks = await ctx.db
+      .query("jsrRemarks")
+      .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
+      .collect();
     return items
       .filter((i) => i.isVisible)
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
       .map((i) => ({
         _id: i._id,
         title: i.title,
-        url: i.url,
+        url: i.fileKey ? `/api/r2-file?key=${encodeURIComponent(i.fileKey)}` : i.url,
+        fileName: i.fileName,
+        addedByClient: !!i.addedByClientId,
         description: i.description,
         category: i.category,
         requiresApproval: i.requiresApproval,
@@ -684,7 +720,124 @@ export const getDeckItems = query({
         approvalNote: i.approvalNote,
         reviewedAt: i.reviewedAt,
         createdAt: i.createdAt,
+        remarks: allRemarks
+          .filter((r) => r.deckItemId === i._id)
+          .sort((a, b) => a.createdAt - b.createdAt)
+          .map(remarkShape),
       }));
+  },
+});
+
+/** Client adds their own document to the deck: an external link or an uploaded file, with an optional comment. */
+export const addClientDeckItem = mutation({
+  args: {
+    title: v.string(),
+    url: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    comment: v.optional(v.string()),
+  },
+  handler: async (ctx, { title, url, fileKey, fileName, comment }) => {
+    const client = await requireClient(ctx);
+    if (!url && !fileKey) throw new Error("Add a link or upload a file");
+
+    const existing = await ctx.db
+      .query("clientDeckItems")
+      .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
+      .collect();
+    const clientName = client.name ?? client.email ?? "Client";
+
+    const deckItemId = await ctx.db.insert("clientDeckItems", {
+      brandId: client.clientBrandId,
+      title: title.trim(),
+      url,
+      fileKey,
+      fileName,
+      addedByClientId: client._id,
+      requiresApproval: false,
+      isVisible: true,
+      sortOrder: existing.length,
+      createdBy: client._id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    if (comment?.trim()) {
+      await ctx.db.insert("jsrRemarks", {
+        deckItemId,
+        brandId: client.clientBrandId,
+        senderType: "client",
+        senderName: clientName,
+        senderId: client._id,
+        content: comment.trim(),
+        createdAt: Date.now(),
+      });
+    }
+
+    await logClientActivity(ctx, client, "add_deck_item", {
+      deckItemId,
+      details: { title: title.trim(), note: comment?.trim().slice(0, 200) },
+    });
+    await notifyBrandTeam(ctx, client.clientBrandId, {
+      type: "comment",
+      title: "Client shared a document",
+      message: `${clientName} added "${title.trim()}" to the Client Deck`,
+      triggeredBy: client._id,
+    });
+
+    return deckItemId;
+  },
+});
+
+/** Client comment on a deck item. */
+export const addDeckRemark = mutation({
+  args: { deckItemId: v.id("clientDeckItems"), content: v.string() },
+  handler: async (ctx, { deckItemId, content }) => {
+    const client = await requireClient(ctx);
+    const item = await ctx.db.get(deckItemId);
+    if (!item || item.brandId !== client.clientBrandId) throw new Error("Not authorized");
+    const clientName = client.name ?? client.email ?? "Client";
+
+    await ctx.db.insert("jsrRemarks", {
+      deckItemId,
+      brandId: client.clientBrandId,
+      senderType: "client",
+      senderName: clientName,
+      senderId: client._id,
+      content,
+      createdAt: Date.now(),
+    });
+
+    await logClientActivity(ctx, client, "add_remark", {
+      deckItemId,
+      details: { title: item.title, note: content.slice(0, 200) },
+    });
+    await notifyBrandTeam(ctx, client.clientBrandId, {
+      type: "comment",
+      title: "Client commented on a document",
+      message: `${clientName} on "${item.title}": ${content.slice(0, 140)}`,
+      triggeredBy: client._id,
+    });
+  },
+});
+
+/** Team reply on a deck item thread. */
+export const addManagerDeckRemark = mutation({
+  args: { deckItemId: v.id("clientDeckItems"), content: v.string() },
+  handler: async (ctx, { deckItemId, content }) => {
+    const user = await requireInternalUser(ctx);
+    const item = await ctx.db.get(deckItemId);
+    if (!item) throw new Error("Deck item not found");
+
+    await ctx.db.insert("jsrRemarks", {
+      deckItemId,
+      brandId: item.brandId,
+      senderType: "manager",
+      senderName: user.name ?? user.email ?? "Manager",
+      senderId: user._id,
+      content,
+      createdAt: Date.now(),
+    });
   },
 });
 

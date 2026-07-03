@@ -148,6 +148,8 @@ export default defineSchema({
     clientFacing: v.optional(v.boolean()),
     needsClientInput: v.optional(v.boolean()),
     clientInputMessage: v.optional(v.string()),
+    /** Freeform category tag (e.g. "Social", "Blog") — segregates tasks on the internal JSR and client portal. */
+    tag: v.optional(v.string()),
     deadlineExtended: v.optional(v.boolean()),
     originalDeadline: v.optional(v.number()),
     overdueAcknowledged: v.optional(v.boolean()),
@@ -678,6 +680,8 @@ export default defineSchema({
     deliverableId: v.optional(v.id("deliverables")),
     /** Set for task-level comment threads (portal). */
     taskId: v.optional(v.id("tasks")),
+    /** Set for Client Deck item comment threads (portal). */
+    deckItemId: v.optional(v.id("clientDeckItems")),
     brandId: v.id("brands"),
     senderType: v.union(v.literal("client"), v.literal("manager")),
     senderName: v.optional(v.string()),
@@ -687,6 +691,7 @@ export default defineSchema({
   })
     .index("by_deliverable", ["deliverableId"])
     .index("by_task", ["taskId"])
+    .index("by_deck_item", ["deckItemId"])
     .index("by_brand", ["brandId"]),
 
   // ─── CLIENT PORTALS (one active authenticated portal link per brand) ──
@@ -706,11 +711,17 @@ export default defineSchema({
     .index("by_brand", ["brandId"])
     .index("by_brand_active", ["brandId", "isActive"]),
 
-  // ─── CLIENT DECK ITEMS (admin-shared links, optional client approval) ──
+  // ─── CLIENT DECK ITEMS (shared links/files, optional client approval) ──
   clientDeckItems: defineTable({
     brandId: v.id("brands"),
     title: v.string(),
-    url: v.string(),
+    /** External link. Client-uploaded files use fileKey instead. */
+    url: v.optional(v.string()),
+    /** R2 file key for client-uploaded documents (served via /api/r2-file). */
+    fileKey: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    /** Set when a portal client added this item. */
+    addedByClientId: v.optional(v.id("users")),
     description: v.optional(v.string()),
     /** "deck" | "gantt" | "doc" | freeform */
     category: v.optional(v.string()),

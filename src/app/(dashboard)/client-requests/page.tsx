@@ -114,6 +114,7 @@ export default function ClientRequestsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [counterDate, setCounterDate] = useState<number | undefined>(undefined);
   const [assigneeId, setAssigneeId] = useState<string>("");
+  const [taskTag, setTaskTag] = useState<string>("");
   const [busyAction, setBusyAction] = useState<
     null | "date" | "action" | "assign" | "decline" | "delete"
   >(null);
@@ -123,11 +124,16 @@ export default function ClientRequestsPage() {
     () => (requests ?? []).find((r) => r._id === selectedId) ?? null,
     [requests, selectedId]
   );
+  const brandTagSuggestions = useQuery(
+    api.tasks.listBrandTags,
+    selected ? { brandId: selected.brandId as Id<"brands"> } : "skip"
+  );
 
   // Sync sidebar local state when selection changes / data refreshes.
   useEffect(() => {
     if (selected) {
       setCounterDate(selected.finalDeadline ?? selected.proposedDeadline);
+      setTaskTag("");
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -175,7 +181,11 @@ export default function ClientRequestsPage() {
     try {
       // Persist the committed date, then convert into a real brief task.
       await setDeadline({ taskId: selected._id as Id<"jsrClientTasks">, finalDeadline: counterDate });
-      await setStatus({ taskId: selected._id as Id<"jsrClientTasks">, status: "accepted" });
+      await setStatus({
+        taskId: selected._id as Id<"jsrClientTasks">,
+        status: "accepted",
+        tag: taskTag.trim() || undefined,
+      });
       toast("success", "Task added to briefs — now assign someone");
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed to take action");
@@ -424,6 +434,30 @@ export default function ClientRequestsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Category tag (applied to the created task on accept) */}
+              {selected.status === "pending_review" && (
+                <div className="border-t border-[var(--border-subtle)] pt-4">
+                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                    Category Tag
+                  </h4>
+                  <input
+                    value={taskTag}
+                    onChange={(e) => setTaskTag(e.target.value)}
+                    list="client-request-tags"
+                    placeholder="e.g. Social, Blog, Design (optional)"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  />
+                  <datalist id="client-request-tags">
+                    {(brandTagSuggestions ?? []).map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                    The tag is applied to the task when you accept, and lets the client filter their portal view by category.
+                  </p>
+                </div>
+              )}
 
               {/* Assignment (after acceptance) */}
               {selected.status !== "pending_review" && (

@@ -101,19 +101,15 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
   const addDeckItem = useMutation(api.clientPortal.addDeckItem);
   const updateDeckItem = useMutation(api.clientPortal.updateDeckItem);
   const deleteDeckItem = useMutation(api.clientPortal.deleteDeckItem);
-  const createClientUser = useAction(api.clientUsers.adminCreateClientUser);
   const resetClientPassword = useAction(api.clientUsers.adminResetClientPassword);
   const deleteClientUser = useMutation(api.clientUsers.deleteClientUser);
+  const addManagerDeckRemark = useMutation(api.clientPortal.addManagerDeckRemark);
 
   // Portal link state
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   // Client user state
-  const [showCreateUser, setShowCreateUser] = useState(false);
-  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
-  const [creatingUser, setCreatingUser] = useState(false);
   const [resetUserId, setResetUserId] = useState<Id<"users"> | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
@@ -124,6 +120,12 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
   const [newDeck, setNewDeck] = useState({ title: "", url: "", description: "", category: "deck", requiresApproval: false });
   const [savingDeck, setSavingDeck] = useState(false);
   const [deleteDeckId, setDeleteDeckId] = useState<Id<"clientDeckItems"> | null>(null);
+  const [editDeckId, setEditDeckId] = useState<Id<"clientDeckItems"> | null>(null);
+  const [editDeck, setEditDeck] = useState({ title: "", url: "", description: "", category: "deck" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deckReplyFor, setDeckReplyFor] = useState<Id<"clientDeckItems"> | null>(null);
+  const [deckReply, setDeckReply] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   // Legacy section
   const [showLegacy, setShowLegacy] = useState(false);
@@ -135,36 +137,16 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
     setGenerating(true);
     try {
       await generatePortalLink({ brandId });
-      toast("success", "Portal link generated");
+      toast("success", "Portal link is active");
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed to generate portal link");
+      toast("error", err instanceof Error ? err.message : "Failed to activate portal link");
     }
     setGenerating(false);
-    setConfirmRegenerate(false);
   }
 
   function copyPortalLink(token: string) {
     navigator.clipboard.writeText(`${window.location.origin}/portal/${token}`);
     toast("success", "Portal link copied to clipboard");
-  }
-
-  async function handleCreateUser() {
-    if (!newUser.email.trim() || !newUser.password || creatingUser) return;
-    setCreatingUser(true);
-    try {
-      await createClientUser({
-        brandId,
-        name: newUser.name.trim(),
-        email: newUser.email.trim(),
-        password: newUser.password,
-      });
-      toast("success", `Client login created for ${newUser.email.trim()}`);
-      setNewUser({ name: "", email: "", password: "" });
-      setShowCreateUser(false);
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed to create client user");
-    }
-    setCreatingUser(false);
   }
 
   async function handleResetPassword() {
@@ -232,11 +214,13 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
             ) : portal === null ? (
               <div className="text-center py-2">
                 <p className="text-[12px] text-[var(--text-secondary)] mb-3">
-                  One login link per brand. Clients sign in with the accounts you create below.
+                  One login link per brand, named after the brand (for example /portal/
+                  {brand?.name ? brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "brand"}).
+                  Clients sign in with the accounts created in Users &amp; Teams.
                 </p>
                 <Button onClick={() => void handleGenerate()} disabled={generating}>
                   {generating ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
-                  Generate Portal Link
+                  Activate Portal Link
                 </Button>
               </div>
             ) : (
@@ -264,10 +248,6 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="secondary" onClick={() => setConfirmRegenerate(true)}>
-                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                    Regenerate
-                  </Button>
                   <Button variant="secondary" onClick={() => setConfirmDeactivate(true)}>
                     <Ban className="h-3.5 w-3.5 mr-1.5" />
                     Deactivate
@@ -275,7 +255,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)]">
                   Active since {new Date(portal.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
-                  Regenerating invalidates the old URL; client accounts keep working.
+                  Deactivating blocks the portal until you activate it again; the URL stays the same.
                 </p>
               </div>
             )}
@@ -290,57 +270,21 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
               Client Logins {clientUsers ? `(${clientUsers.length})` : ""}
             </span>
             {canManageLinks && (
-              <button
-                onClick={() => setShowCreateUser(!showCreateUser)}
+              <a
+                href="/users?tab=clients"
                 className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
               >
-                {showCreateUser ? <X className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-                {showCreateUser ? "Cancel" : "Add"}
-              </button>
+                <UserPlus className="h-3.5 w-3.5" />
+                Manage in Users & Teams
+              </a>
             )}
           </div>
           <div className="p-4 space-y-3">
-            {showCreateUser && (
-              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
-                <input
-                  value={newUser.name}
-                  onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Name"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-                <input
-                  value={newUser.email}
-                  onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
-                  placeholder="Email"
-                  type="email"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-                <input
-                  value={newUser.password}
-                  onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
-                  placeholder="Password (min 8 characters)"
-                  type="text"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                />
-                <Button
-                  onClick={() => void handleCreateUser()}
-                  disabled={creatingUser || !newUser.email.trim() || newUser.password.length < 8}
-                  className="w-full"
-                >
-                  {creatingUser ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <UserPlus className="h-4 w-4 mr-1.5" />}
-                  Create Login
-                </Button>
-                <p className="text-[11px] text-[var(--text-muted)]">
-                  Share the email + password with the client along with the portal link.
-                </p>
-              </div>
-            )}
-
             {clientUsers === undefined && canManageLinks ? (
               <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
             ) : !clientUsers || clientUsers.length === 0 ? (
               <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
-                No client logins yet. Create one so the client can sign in to the portal.
+                No client logins yet. Create one from Users & Teams → Clients so the client can sign in.
               </p>
             ) : (
               clientUsers.map((u) => (
@@ -526,67 +470,205 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
             ) : (
               deckItems.map((item: any) => (
                 <div key={item._id} className="p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 min-w-0 text-[12px] font-medium text-[var(--text-primary)] truncate hover:underline"
-                    >
-                      {item.title}
-                    </a>
-                    {item.category && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
-                        {item.category}
-                      </span>
-                    )}
-                    {item.requiresApproval && (
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                          item.approvalStatus === "client_approved"
-                            ? "text-emerald-600 bg-emerald-50"
-                            : item.approvalStatus === "client_changes_requested"
-                              ? "text-amber-600 bg-amber-50"
-                              : "text-[var(--text-muted)] bg-[var(--bg-hover)]"
-                        }`}
-                      >
-                        {item.approvalStatus === "client_approved"
-                          ? `Approved${item.reviewedByName ? ` · ${item.reviewedByName}` : ""}`
-                          : item.approvalStatus === "client_changes_requested"
-                            ? "Changes requested"
-                            : "Awaiting approval"}
-                      </span>
-                    )}
-                    {canManageLinks && (
-                      <div className="flex items-center shrink-0">
-                        <button
-                          onClick={() => void updateDeckItem({ deckItemId: item._id, isVisible: !item.isVisible }).catch(() => {})}
-                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                          title={item.isVisible ? "Hide from client" : "Show to client"}
+                  {editDeckId === item._id ? (
+                    <div className="space-y-2">
+                      <input
+                        value={editDeck.title}
+                        onChange={(e) => setEditDeck((p) => ({ ...p, title: e.target.value }))}
+                        placeholder="Title"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      />
+                      {!item.fileKey && (
+                        <input
+                          value={editDeck.url}
+                          onChange={(e) => setEditDeck((p) => ({ ...p, url: e.target.value }))}
+                          placeholder="Link"
+                          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        />
+                      )}
+                      <input
+                        value={editDeck.description}
+                        onChange={(e) => setEditDeck((p) => ({ ...p, description: e.target.value }))}
+                        placeholder="Description (optional)"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      />
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={editDeck.category}
+                          onChange={(e) => setEditDeck((p) => ({ ...p, category: e.target.value }))}
+                          className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
                         >
-                          {item.isVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
-                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                          title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
+                          <option value="deck">Deck</option>
+                          <option value="gantt">Gantt</option>
+                          <option value="doc">Document</option>
+                        </select>
+                        <Button
+                          onClick={async () => {
+                            if (!editDeck.title.trim() || savingEdit) return;
+                            setSavingEdit(true);
+                            try {
+                              const url = editDeck.url.trim()
+                                ? /^https?:\/\//i.test(editDeck.url.trim())
+                                  ? editDeck.url.trim()
+                                  : `https://${editDeck.url.trim()}`
+                                : undefined;
+                              await updateDeckItem({
+                                deckItemId: item._id,
+                                title: editDeck.title.trim(),
+                                ...(url ? { url } : {}),
+                                description: editDeck.description.trim() || undefined,
+                                category: editDeck.category || undefined,
+                              });
+                              toast("success", "Deck item updated");
+                              setEditDeckId(null);
+                            } catch (err) {
+                              toast("error", err instanceof Error ? err.message : "Failed to update");
+                            }
+                            setSavingEdit(false);
+                          }}
+                          disabled={savingEdit || !editDeck.title.trim()}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteDeckId(item._id)}
-                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button variant="secondary" onClick={() => setEditDeckId(null)}>
+                          Cancel
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  {item.approvalNote && (
-                    <p className="text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1.5">
-                      Client note: {item.approvalNote}
-                    </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={item.resolvedUrl ?? item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 min-w-0 text-[12px] font-medium text-[var(--text-primary)] truncate hover:underline"
+                        >
+                          {item.title}
+                        </a>
+                        {item.addedByClientName && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] shrink-0">
+                            From {item.addedByClientName}
+                          </span>
+                        )}
+                        {item.category && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
+                            {item.category}
+                          </span>
+                        )}
+                        {item.requiresApproval && (
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                              item.approvalStatus === "client_approved"
+                                ? "text-emerald-600 bg-emerald-50"
+                                : item.approvalStatus === "client_changes_requested"
+                                  ? "text-amber-600 bg-amber-50"
+                                  : "text-[var(--text-muted)] bg-[var(--bg-hover)]"
+                            }`}
+                          >
+                            {item.approvalStatus === "client_approved"
+                              ? `Approved${item.reviewedByName ? ` · ${item.reviewedByName}` : ""}`
+                              : item.approvalStatus === "client_changes_requested"
+                                ? "Changes requested"
+                                : "Awaiting approval"}
+                          </span>
+                        )}
+                        {canManageLinks && (
+                          <div className="flex items-center shrink-0">
+                            <button
+                              onClick={() => void updateDeckItem({ deckItemId: item._id, isVisible: !item.isVisible }).catch(() => {})}
+                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                              title={item.isVisible ? "Hide from client" : "Show to client"}
+                            >
+                              {item.isVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
+                              className={`p-1.5 rounded hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)]"}`}
+                              title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditDeckId(item._id);
+                                setEditDeck({
+                                  title: item.title,
+                                  url: item.url ?? "",
+                                  description: item.description ?? "",
+                                  category: item.category ?? "deck",
+                                });
+                              }}
+                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                              title="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteDeckId(item._id)}
+                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {item.approvalNote && (
+                        <p className="text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1.5">
+                          Client note: {item.approvalNote}
+                        </p>
+                      )}
+                      {/* Comment thread */}
+                      {(item.remarks ?? []).length > 0 && (
+                        <div className="mt-2 space-y-1 border-t border-[var(--border-subtle)] pt-2">
+                          {item.remarks.map((r: any) => (
+                            <p key={r._id} className="text-[11px] text-[var(--text-secondary)]">
+                              <span className="font-semibold text-[var(--text-primary)]">
+                                {r.senderName ?? (r.senderType === "client" ? "Client" : "Team")}:
+                              </span>{" "}
+                              {r.content}
+                              <span className="text-[var(--text-disabled)]"> · {timeAgo(r.createdAt)}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {deckReplyFor === item._id ? (
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <input
+                            value={deckReply}
+                            onChange={(e) => setDeckReply(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === "Enter" && deckReply.trim() && !sendingReply) {
+                                setSendingReply(true);
+                                try {
+                                  await addManagerDeckRemark({ deckItemId: item._id, content: deckReply.trim() });
+                                  setDeckReply("");
+                                  setDeckReplyFor(null);
+                                } catch {}
+                                setSendingReply(false);
+                              }
+                            }}
+                            placeholder="Reply to the client"
+                            className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => { setDeckReplyFor(null); setDeckReply(""); }}
+                            className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeckReplyFor(item._id)}
+                          className="mt-1.5 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                        >
+                          Comment
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               ))
@@ -656,14 +738,6 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
           setConfirmDeactivate(false);
         }}
         onCancel={() => setConfirmDeactivate(false)}
-      />
-      <ConfirmModal
-        open={confirmRegenerate}
-        title="Regenerate portal link?"
-        message="The current URL stops working and a new one is created. Client accounts keep working — just share the new link."
-        confirmLabel="Regenerate"
-        onConfirm={() => void handleGenerate()}
-        onCancel={() => setConfirmRegenerate(false)}
       />
       <ConfirmModal
         open={deleteUserId !== null}

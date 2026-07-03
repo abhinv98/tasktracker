@@ -108,7 +108,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const bc = session.brand.color;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#f8f8f8" }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#f8f8f8" }}>
       <PortalSidebar
         brand={session.brand}
         userName={session.user.name ?? session.user.email ?? "Client"}

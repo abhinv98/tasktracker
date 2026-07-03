@@ -96,6 +96,33 @@ export const adminResetClientPassword = action({
   },
 });
 
+/** All portal client logins across brands, for the Users & Teams "Clients" tab. */
+export const listAllClientUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "client"))
+      .collect();
+    const brandIds = [...new Set(users.map((u) => u.clientBrandId).filter(Boolean))];
+    const brands = await Promise.all(brandIds.map((id) => ctx.db.get(id!)));
+    const brandById = new Map(brands.filter(Boolean).map((b) => [b!._id, b!]));
+    return users.map((u) => {
+      const brand = u.clientBrandId ? brandById.get(u.clientBrandId) : undefined;
+      return {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        _creationTime: u._creationTime,
+        brandId: u.clientBrandId ?? null,
+        brandName: brand?.name ?? "Unknown brand",
+        brandColor: brand?.color ?? "#171717",
+      };
+    });
+  },
+});
+
 export const listClientUsers = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {

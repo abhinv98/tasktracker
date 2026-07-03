@@ -64,7 +64,7 @@ export function PortalSidebar({
   const tabs = PORTAL_TABS.filter((t) => t.key === "jsr" || !hiddenTabs.includes(t.key));
 
   const content = (
-    <div className="flex flex-col h-full bg-white border-r border-[#e5e5e5]">
+    <div className="flex flex-col h-full bg-white border-r border-[#e5e5e5] overflow-hidden">
       {/* Brand header */}
       <div className="px-5 pt-6 pb-5 border-b border-[#f0f0f0]">
         <div className="flex items-center gap-3">
@@ -109,13 +109,13 @@ export function PortalSidebar({
               key={tab.key}
               href={tab.href}
               onClick={onClose}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors min-w-0 ${
                 active ? "text-white" : "text-[#525252] hover:bg-[#f5f5f5]"
               }`}
               style={active ? { backgroundColor: bc } : {}}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{tab.label}</span>
+              <span className="flex-1 min-w-0 truncate">{tab.label}</span>
               {badge !== null && (
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
