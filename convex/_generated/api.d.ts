@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as _verifyPortal from "../_verifyPortal.js";
 import type * as activityLog from "../activityLog.js";
 import type * as aiAction from "../aiAction.js";
 import type * as analytics from "../analytics.js";
@@ -92,7 +91,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  _verifyPortal: typeof _verifyPortal;
   activityLog: typeof activityLog;
   aiAction: typeof aiAction;
   analytics: typeof analytics;

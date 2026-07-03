@@ -112,7 +112,7 @@ export function DeliverableCard({
   const [showForm, setShowForm] = useState(false);
 
   return (
-    <div className="ml-7 mt-2 rounded-xl border border-[#e5e5e5] bg-[#fafafa] overflow-hidden">
+    <div className="ml-7 mt-2 rounded-lg border border-[#e5e5e5] bg-[#fafafa] overflow-hidden">
       <div className="px-4 py-3">
         {deliverable.message && <p className="text-[12px] text-[#525252] mb-2">{deliverable.message}</p>}
         {deliverable.link && (

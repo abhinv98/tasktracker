@@ -86,7 +86,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
         <div className="text-center max-w-sm mx-auto p-8">
-          <div className="w-16 h-16 rounded-2xl bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-xl bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
             <Inbox className="h-8 w-8 text-[#ef4444]" />
           </div>
           <h1 className="text-[20px] font-semibold text-[#171717] mb-2">Portal Deactivated</h1>
@@ -96,7 +96,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </p>
           <button
             onClick={() => void signOut()}
-            className="px-4 py-2 rounded-xl bg-[#171717] text-white text-[13px] font-semibold"
+            className="px-4 py-2 rounded-lg bg-[#171717] text-white text-[13px] font-semibold"
           >
             Sign Out
           </button>

@@ -619,13 +619,29 @@ function ClientsPanel() {
                   <TableCell className="w-[220px]">
                     {resetId === c._id ? (
                       <div className="flex items-center justify-end gap-1.5">
-                        <input
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="New password"
-                          className="w-36 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
-                          autoFocus
-                        />
+                        <div className="flex flex-col items-end">
+                          <input
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                if (newPassword.length < 8) {
+                                  toast("error", "Password needs at least 8 characters");
+                                } else {
+                                  void handleReset();
+                                }
+                              }
+                            }}
+                            placeholder="New password (min 8 chars)"
+                            className="w-44 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                            autoFocus
+                          />
+                          {newPassword.length > 0 && newPassword.length < 8 && (
+                            <span className="text-[10px] text-[var(--danger)] mt-0.5">
+                              At least 8 characters ({newPassword.length}/8)
+                            </span>
+                          )}
+                        </div>
                         <button
                           onClick={() => void handleReset()}
                           disabled={newPassword.length < 8 || resetting}

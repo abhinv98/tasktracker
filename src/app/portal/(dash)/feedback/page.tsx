@@ -66,7 +66,7 @@ export default function PortalFeedbackPage() {
       <PortalCard>
         <div className="p-5">
           {justSubmitted && (
-            <p className="text-[13px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 mb-3">
+            <p className="text-[13px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-3">
               Feedback sent. The team has been notified.
             </p>
           )}
@@ -76,13 +76,13 @@ export default function PortalFeedbackPage() {
               onChange={(e) => setContent(e.target.value)}
               placeholder="Share feedback with the Ecultify team..."
               rows={2}
-              className="flex-1 px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
+              className="flex-1 px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
               style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
             />
             <button
               onClick={() => void submit()}
               disabled={submitting || !content.trim()}
-              className="shrink-0 h-10 px-4 rounded-xl flex items-center gap-1.5 justify-center text-white text-[13px] font-semibold transition-all disabled:opacity-50"
+              className="shrink-0 h-10 px-4 rounded-lg flex items-center gap-1.5 justify-center text-white text-[13px] font-semibold transition-all disabled:opacity-50"
               style={{ backgroundColor: bc }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

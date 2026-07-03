@@ -79,7 +79,7 @@ export default function PortalLoginPage() {
     return (
       <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
         <div className="text-center max-w-sm mx-auto p-8">
-          <div className="w-16 h-16 rounded-2xl bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 rounded-xl bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
             <Inbox className="h-8 w-8 text-[#ef4444]" />
           </div>
           <h1 className="text-[20px] font-semibold text-[#171717] mb-2">Portal Unavailable</h1>
@@ -101,18 +101,18 @@ export default function PortalLoginPage() {
       />
       <div className="flex-1 flex items-start justify-center px-6">
         <div className="w-full max-w-md -mt-20">
-          <div className="bg-white rounded-2xl border border-[#e5e5e5] shadow-sm p-8">
+          <div className="bg-white rounded-xl border border-[#e5e5e5] shadow-sm p-8">
             <div className="flex items-center gap-4 mb-6">
               {info.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={info.logoUrl}
                   alt={info.brandName}
-                  className="w-14 h-14 rounded-2xl object-cover border border-[#e5e5e5]"
+                  className="w-14 h-14 rounded-xl object-cover border border-[#e5e5e5]"
                 />
               ) : (
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                  className="w-14 h-14 rounded-xl flex items-center justify-center"
                   style={{ backgroundColor: bc + "15" }}
                 >
                   <span className="font-bold text-[22px]" style={{ color: bc }}>
@@ -138,7 +138,7 @@ export default function PortalLoginPage() {
                   type="email"
                   placeholder="you@company.com"
                   required
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[14px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[14px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
                   style={{ "--tw-ring-color": bc + "40" } as React.CSSProperties}
                 />
               </div>
@@ -150,7 +150,7 @@ export default function PortalLoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="Your password"
                     required
-                    className="w-full px-3 py-2.5 pr-10 rounded-xl border border-[#e5e5e5] text-[14px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
+                    className="w-full px-3 py-2.5 pr-10 rounded-lg border border-[#e5e5e5] text-[14px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
                     style={{ "--tw-ring-color": bc + "40" } as React.CSSProperties}
                   />
                   <button
@@ -169,7 +169,7 @@ export default function PortalLoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[14px] font-semibold transition-all disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-white text-[14px] font-semibold transition-all disabled:opacity-60"
                 style={{ backgroundColor: bc }}
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}

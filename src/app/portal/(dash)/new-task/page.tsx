@@ -170,7 +170,7 @@ export default function PortalNewTaskPage() {
           </div>
           <div className="p-6 space-y-4">
             {justSubmitted && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                 <p className="text-[13px] text-emerald-700 font-medium">
                   Request submitted. The team will review it and confirm a timeline.
@@ -178,7 +178,7 @@ export default function PortalNewTaskPage() {
               </div>
             )}
             {error && (
-              <div className="p-3 rounded-xl bg-red-50 border border-red-100">
+              <div className="p-3 rounded-lg bg-red-50 border border-red-100">
                 <p className="text-[13px] text-red-600 font-medium">{error}</p>
               </div>
             )}
@@ -284,7 +284,7 @@ export default function PortalNewTaskPage() {
             <button
               onClick={() => void submit()}
               disabled={!title.trim() || submitting || uploading}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[14px] font-semibold transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-white text-[14px] font-semibold transition-all disabled:opacity-50"
               style={{ backgroundColor: bc }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -304,7 +304,7 @@ export default function PortalNewTaskPage() {
           </div>
           {tasks.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3">
                 <Inbox className="h-6 w-6 text-[#c4c4c4]" />
               </div>
               <p className="text-[13px] text-[#737373]">No requests yet.</p>

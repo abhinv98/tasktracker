@@ -301,8 +301,18 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                       <input
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
-                        placeholder="New password"
-                        className="w-32 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (resetPassword.length < 8) {
+                              toast("error", "Password needs at least 8 characters");
+                            } else {
+                              void handleResetPassword();
+                            }
+                          }
+                        }}
+                        placeholder="New password (min 8 chars)"
+                        title="At least 8 characters"
+                        className="w-40 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
                         autoFocus
                       />
                       <button

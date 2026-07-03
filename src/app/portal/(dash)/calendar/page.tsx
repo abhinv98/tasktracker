@@ -85,7 +85,7 @@ export default function PortalCalendarPage() {
 
       {/* Month navigation */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 bg-white rounded-xl border border-[#e5e5e5] p-1">
+        <div className="flex items-center gap-1 bg-white rounded-lg border border-[#e5e5e5] p-1">
           <button
             onClick={() => setSelectedMonth(shiftMonth(month, -1))}
             className="p-1.5 rounded-lg hover:bg-[#f5f5f5] text-[#525252]"
@@ -106,7 +106,7 @@ export default function PortalCalendarPage() {
           <select
             value={monthOptions.includes(month) ? month : ""}
             onChange={(e) => e.target.value && setSelectedMonth(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-[#e5e5e5] bg-white text-[12px] text-[#525252] focus:outline-none"
+            className="px-3 py-2 rounded-lg border border-[#e5e5e5] bg-white text-[12px] text-[#525252] focus:outline-none"
           >
             <option value="" disabled>
               Jump to month
@@ -136,7 +136,7 @@ export default function PortalCalendarPage() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px bg-[#f0f0f0] rounded-xl border border-[#f0f0f0] overflow-hidden">
+          <div className="grid grid-cols-7 gap-px bg-[#f0f0f0] rounded-lg border border-[#f0f0f0] overflow-hidden">
             {Array.from({ length: firstDay }).map((_, i) => (
               <div key={`e-${i}`} className="bg-[#fafafa] min-h-[96px] md:min-h-[116px] p-1.5 opacity-50" />
             ))}

@@ -244,7 +244,7 @@ export default function PortalPendingClientPage() {
                   onChange={(e) => setReviewNote(e.target.value)}
                   placeholder="Add a note (required for Request Changes and Deny)..."
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
                   style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
                 />
               </div>
@@ -253,21 +253,21 @@ export default function PortalPendingClientPage() {
               <button
                 onClick={() => void act("approve")}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-500 text-white text-[13px] font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 text-white text-[13px] font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50"
               >
                 <ThumbsUp className="h-3.5 w-3.5" /> Approve
               </button>
               <button
                 onClick={() => void act("changes")}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 text-white text-[13px] font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 text-white text-[13px] font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Request Changes
               </button>
               <button
                 onClick={() => void act("deny")}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
               >
                 <Ban className="h-3.5 w-3.5" /> Deny
               </button>

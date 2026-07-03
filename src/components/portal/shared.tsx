@@ -82,7 +82,7 @@ export function MonthChips({
     <div className="flex flex-wrap items-center gap-1.5">
       <button
         onClick={() => onSelect("")}
-        className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors ${
+        className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
           selected === "" ? "text-white border-transparent" : "text-[#525252] border-[#e5e5e5] bg-white hover:border-[#c4c4c4]"
         }`}
         style={selected === "" ? { backgroundColor: brandColor } : {}}
@@ -93,7 +93,7 @@ export function MonthChips({
         <button
           key={m}
           onClick={() => onSelect(m)}
-          className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
             selected === m ? "text-white border-transparent" : "text-[#525252] border-[#e5e5e5] bg-white hover:border-[#c4c4c4]"
           }`}
           style={selected === m ? { backgroundColor: brandColor } : {}}
@@ -114,7 +114,7 @@ export function PortalCard({
   className?: string;
 }) {
   return (
-    <section className={`bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm ${className}`}>
+    <section className={`bg-white rounded-xl border border-[#e5e5e5] overflow-hidden shadow-sm ${className}`}>
       {children}
     </section>
   );
@@ -148,7 +148,7 @@ export function PortalCardHeader({
 export function EmptyState({ icon, title, hint }: { icon: React.ReactNode; title: string; hint?: string }) {
   return (
     <div className="px-6 py-12 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3 text-[#c4c4c4]">
+      <div className="w-12 h-12 rounded-xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3 text-[#c4c4c4]">
         {icon}
       </div>
       <p className="text-[13px] text-[#737373]">{title}</p>

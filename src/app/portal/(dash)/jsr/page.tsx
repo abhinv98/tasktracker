@@ -89,7 +89,7 @@ export default function PortalJsrPage() {
           { label: "In Progress", value: dashboard.summary.inProgress, color: bc },
           { label: "Completed", value: dashboard.summary.completed, color: "#047857" },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl border border-[#e5e5e5] p-4">
+          <div key={stat.label} className="bg-white rounded-lg border border-[#e5e5e5] p-4">
             <p className="text-[11px] font-medium text-[#737373]">{stat.label}</p>
             <p className="text-[24px] font-bold tabular-nums mt-0.5" style={{ color: stat.color }}>
               {stat.value}
@@ -116,7 +116,7 @@ export default function PortalJsrPage() {
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => setTagFilter("")}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                 tagFilter === "" ? "text-white border-transparent" : "text-[#525252] border-[#e5e5e5] bg-white"
               }`}
               style={tagFilter === "" ? { backgroundColor: bc } : {}}
@@ -127,7 +127,7 @@ export default function PortalJsrPage() {
               <button
                 key={t}
                 onClick={() => setTagFilter(tagFilter === t ? "" : t)}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-medium border transition-colors ${
+                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                   tagFilter === t ? "text-white border-transparent" : "text-[#525252] border-[#e5e5e5] bg-white"
                 }`}
                 style={tagFilter === t ? { backgroundColor: bc } : {}}
@@ -155,7 +155,7 @@ export default function PortalJsrPage() {
             {dashboard.rows.length === 0 && (
               <Link
                 href="/portal/new-task"
-                className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-xl text-white text-[13px] font-semibold"
+                className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-white text-[13px] font-semibold"
                 style={{ backgroundColor: bc }}
               >
                 <Plus className="h-4 w-4" /> Request your first task
@@ -229,7 +229,7 @@ export default function PortalJsrPage() {
               {(dashboard.messages ?? []).map((msg: any) => (
                 <div key={msg._id} className={`flex ${msg.senderType === "client" ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                    className={`max-w-[80%] rounded-xl px-4 py-2.5 ${
                       msg.senderType === "client" ? "rounded-br-md text-white" : "rounded-bl-md bg-[#f0f0f0] text-[#171717]"
                     }`}
                     style={msg.senderType === "client" ? { backgroundColor: bc } : {}}
@@ -256,13 +256,13 @@ export default function PortalJsrPage() {
                   }
                 }}
                 placeholder="Type a message for the team"
-                className="flex-1 px-3 py-2 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
+                className="flex-1 px-3 py-2 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 focus:border-transparent bg-white"
                 style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
               />
               <button
                 onClick={() => void handleSend()}
                 disabled={sendingMsg || !msgContent.trim()}
-                className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-50"
+                className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-50"
                 style={{ backgroundColor: bc }}
               >
                 <Send className="h-4 w-4" />
@@ -363,7 +363,7 @@ function RowGroup({
               </div>
             )}
             {row.taskId ? (
-              <div className="rounded-xl border border-[#e5e5e5] bg-white overflow-hidden max-w-2xl">
+              <div className="rounded-lg border border-[#e5e5e5] bg-white overflow-hidden max-w-2xl">
                 {row.remarks.length > 0 && (
                   <div className="px-4 py-2 border-b border-[#f0f0f0]">
                     <RemarkThread remarks={row.remarks} brandColor={brandColor} />

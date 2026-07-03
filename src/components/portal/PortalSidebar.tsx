@@ -73,11 +73,11 @@ export function PortalSidebar({
             <img
               src={brand.logoUrl}
               alt={brand.name}
-              className="w-10 h-10 rounded-xl object-cover border border-[#e5e5e5]"
+              className="w-10 h-10 rounded-lg object-cover border border-[#e5e5e5]"
             />
           ) : (
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
               style={{ backgroundColor: bc + "15" }}
             >
               <span className="font-bold text-[16px]" style={{ color: bc }}>
@@ -109,7 +109,7 @@ export function PortalSidebar({
               key={tab.key}
               href={tab.href}
               onClick={onClose}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-colors min-w-0 ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors min-w-0 ${
                 active ? "text-white" : "text-[#525252] hover:bg-[#f5f5f5]"
               }`}
               style={active ? { backgroundColor: bc } : {}}

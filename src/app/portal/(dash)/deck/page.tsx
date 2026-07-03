@@ -140,7 +140,7 @@ export default function PortalDeckPage() {
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-[13px] font-semibold"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-white text-[13px] font-semibold"
           style={{ backgroundColor: bc }}
         >
           {showAdd ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -157,13 +157,13 @@ export default function PortalDeckPage() {
         <PortalCard>
           <div className="p-5 space-y-3">
             {addError && (
-              <p className="text-[13px] text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl px-3 py-2">{addError}</p>
+              <p className="text-[13px] text-red-600 font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2">{addError}</p>
             )}
             <input
               value={addTitle}
               onChange={(e) => setAddTitle(e.target.value)}
               placeholder="Title, for example Brand guidelines v2"
-              className="w-full px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white"
               style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
             />
             <div className="flex flex-col sm:flex-row gap-2">
@@ -172,10 +172,10 @@ export default function PortalDeckPage() {
                 onChange={(e) => setAddLink(e.target.value)}
                 placeholder="Paste a link (Drive, Docs, Figma)"
                 disabled={!!addFile}
-                className="flex-1 px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white disabled:opacity-50"
+                className="flex-1 px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white disabled:opacity-50"
                 style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
               />
-              <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] cursor-pointer transition-colors ${addLink.trim() ? "opacity-50 pointer-events-none" : ""}`}>
+              <label className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] cursor-pointer transition-colors ${addLink.trim() ? "opacity-50 pointer-events-none" : ""}`}>
                 {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
                 {addFile ? addFile.fileName : uploading ? "Uploading" : "Or upload a file"}
                 <input
@@ -199,13 +199,13 @@ export default function PortalDeckPage() {
               onChange={(e) => setAddComment(e.target.value)}
               placeholder="Add a comment for the team (optional)"
               rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
+              className="w-full px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
               style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
             />
             <button
               onClick={() => void handleAddItem()}
               disabled={!addTitle.trim() || (!addLink.trim() && !addFile) || uploading || addingItem}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-[13px] font-semibold disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-white text-[13px] font-semibold disabled:opacity-50"
               style={{ backgroundColor: bc }}
             >
               {addingItem ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -236,7 +236,7 @@ export default function PortalDeckPage() {
               return (
                 <div key={item._id} className={`px-6 py-4 ${i < items.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "10" }}>
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "10" }}>
                       <Icon className="h-4 w-4" style={{ color: bc }} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -296,21 +296,21 @@ export default function PortalDeckPage() {
                                 onChange={(e) => setNote(e.target.value)}
                                 placeholder="What should change?"
                                 rows={2}
-                                className="w-full px-3 py-2 rounded-xl border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
+                                className="w-full px-3 py-2 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
                                 style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
                               />
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => void handleRequestChanges(item._id)}
                                   disabled={!note.trim() || busy !== null}
-                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 text-white text-[12px] font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 text-white text-[12px] font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
                                 >
                                   {busy === item._id + ":changes" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
                                   Send request
                                 </button>
                                 <button
                                   onClick={() => { setNoteFor(null); setNote(""); }}
-                                  className="px-3 py-2 rounded-xl text-[12px] text-[#737373] hover:bg-[#f0f0f0]"
+                                  className="px-3 py-2 rounded-lg text-[12px] text-[#737373] hover:bg-[#f0f0f0]"
                                 >
                                   Cancel
                                 </button>
@@ -321,7 +321,7 @@ export default function PortalDeckPage() {
                               <button
                                 onClick={() => void handleApprove(item._id)}
                                 disabled={busy !== null}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-[12px] font-semibold hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-white text-[12px] font-semibold hover:bg-emerald-600 disabled:opacity-50 transition-colors"
                               >
                                 {busy === item._id + ":approve" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsUp className="h-3.5 w-3.5" />}
                                 Approve
@@ -329,7 +329,7 @@ export default function PortalDeckPage() {
                               <button
                                 onClick={() => { setNoteFor(item._id); setNote(""); }}
                                 disabled={busy !== null}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-[#e5e5e5] text-[12px] font-semibold text-[#525252] hover:border-[#c4c4c4] disabled:opacity-50 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-[#e5e5e5] text-[12px] font-semibold text-[#525252] hover:border-[#c4c4c4] disabled:opacity-50 transition-colors"
                               >
                                 <Ban className="h-3.5 w-3.5" />
                                 Request changes
@@ -341,7 +341,7 @@ export default function PortalDeckPage() {
 
                       {/* Comment thread */}
                       {(item.remarks.length > 0 || commentFor === item._id) && (
-                        <div className="mt-3 rounded-xl border border-[#f0f0f0] bg-[#fafafa] overflow-hidden">
+                        <div className="mt-3 rounded-lg border border-[#f0f0f0] bg-[#fafafa] overflow-hidden">
                           {item.remarks.length > 0 && (
                             <div className="px-3 py-2 border-b border-[#f0f0f0]">
                               <RemarkThread remarks={item.remarks} brandColor={bc} />
