@@ -13,7 +13,7 @@ export default function HomePage() {
     if (user === null) {
       router.replace("/sign-in");
     } else if (user) {
-      router.replace("/dashboard");
+      router.replace(user.role === "client" ? "/portal" : "/dashboard");
     }
   }, [user, router]);
 

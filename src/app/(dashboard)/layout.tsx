@@ -42,6 +42,12 @@ export default function DashboardLayout({
     if (!user) return;
     const role = user.role ?? "employee";
 
+    // Portal client accounts never see the internal dashboard
+    if (role === "client") {
+      router.replace("/portal");
+      return;
+    }
+
     if (
       role !== "admin" &&
       ADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r))
@@ -101,7 +107,7 @@ export default function DashboardLayout({
     );
   }
 
-  if (user === null) {
+  if (user === null || user.role === "client") {
     return null;
   }
 

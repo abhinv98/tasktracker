@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
 import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit } from "lucide-react";
-import ClientJsrTab from "@/components/brand/ClientJsrTab";
+import ClientPortalTab from "@/components/brand/ClientPortalTab";
 import InternalJsrTab from "@/components/brand/InternalJsrTab";
 import MomTab from "@/components/brand/MomTab";
 
@@ -451,7 +451,7 @@ export default function BrandDetailPage() {
       <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-8 px-8">
         {([
           { id: "overview" as BrandTab, label: "Overview", icon: Briefcase },
-          { id: "client-jsr" as BrandTab, label: "Client JSR", icon: ExternalLink },
+          { id: "client-jsr" as BrandTab, label: "Client Portal", icon: ExternalLink },
           { id: "internal-jsr" as BrandTab, label: "Internal JSR", icon: Users },
           { id: "mom" as BrandTab, label: "MOM", icon: FileEdit },
         ]).map((tab) => (
@@ -471,9 +471,9 @@ export default function BrandDetailPage() {
         ))}
       </div>
 
-      {/* ═══ TAB: CLIENT JSR ═══ */}
+      {/* ═══ TAB: CLIENT PORTAL (merged Client JSR + Intake) ═══ */}
       {activeTab === "client-jsr" && (
-        <ClientJsrTab brandId={brandId} brand={brand} canManageLinks={canManageLinks} />
+        <ClientPortalTab brandId={brandId} brand={brand} canManageLinks={canManageLinks} />
       )}
 
       {/* ═══ TAB: INTERNAL JSR ═══ */}

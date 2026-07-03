@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";

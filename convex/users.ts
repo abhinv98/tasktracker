@@ -1,11 +1,13 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId as getAnyAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "./lib/internalAuth";
+import { requireInternalUser } from "./lib/guards";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
-/** Shared user teardown (teams, notifications, auth sessions, user row). Used by deleteUser and internal migrations. */
-async function removeUserAndCleanup(
+/** Shared user teardown (teams, notifications, auth sessions, user row). Used by deleteUser, clientUsers and internal migrations. */
+export async function removeUserAndCleanup(
   ctx: MutationCtx,
   targetUserId: Id<"users">
 ): Promise<void> {
@@ -58,7 +60,10 @@ async function removeUserAndCleanup(
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    // Intentionally allows portal client accounts too — the portal layout
+    // and role-based routing rely on it. Everything else in this file uses
+    // the internal wrapper that rejects clients.
+    const userId = await getAnyAuthUserId(ctx);
     if (!userId) return null;
     const user = await ctx.db.get(userId);
     return user;
@@ -166,6 +171,7 @@ export const adminGetUserEmail = query({
 export const getUserWorkload = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
+    await requireInternalUser(ctx);
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))

@@ -22,6 +22,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       const user = await ctx.db.get(userId);
       if (!user) return;
 
+      // Portal client accounts are created fully-formed by adminCreateClientUser —
+      // skip first-admin promotion and invite matching.
+      if (user.role === "client") return;
+
       // First user becomes admin
       const count = await ctx.db.query("users").collect();
       if (count.length === 1) {

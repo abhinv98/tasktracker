@@ -46,6 +46,7 @@ type ClientRequest = {
   brandColor: string;
   assigneeName: string | null;
   assigned: boolean;
+  viaPortal?: boolean;
 };
 
 function formatDate(ts: number): string {
@@ -325,7 +326,12 @@ export default function ClientRequestsPage() {
               <div>
                 <h3 className="font-semibold text-[17px] text-[var(--text-primary)] leading-snug">{selected.title}</h3>
                 <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
-                  {selected.clientName && <span>From {selected.clientName}</span>}
+                  {selected.clientName && (
+                    <span>
+                      From {selected.clientName}
+                      {selected.viaPortal && <span className="text-[var(--accent-admin)] font-medium"> · via Portal</span>}
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1">
                     <Clock className="h-3 w-3" /> {timeAgo(selected.createdAt)}
                   </span>
@@ -534,7 +540,12 @@ function RequestCard({ r, onClick }: { r: ClientRequest; onClick: () => void }) 
       </div>
       {r.description && <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mb-2">{r.description}</p>}
       <div className="flex flex-wrap items-center gap-3 text-[10px] text-[var(--text-muted)]">
-        {r.clientName && <span>{r.clientName}</span>}
+        {r.clientName && (
+          <span>
+            {r.clientName}
+            {r.viaPortal && <span className="text-[var(--accent-admin)] font-medium"> · via Portal</span>}
+          </span>
+        )}
         {r.proposedDeadline && (
           <span className="inline-flex items-center gap-1">
             <Calendar className="h-3 w-3" /> {formatDate(r.proposedDeadline)}

@@ -17,7 +17,8 @@ export default defineSchema({
     role: v.optional(
       v.union(
         v.literal("admin"),
-        v.literal("employee")
+        v.literal("employee"),
+        v.literal("client")
       )
     ),
     avatarUrl: v.optional(v.string()),
@@ -27,10 +28,13 @@ export default defineSchema({
     isOversightAdmin: v.optional(v.boolean()),
     /** Freelancers keep role "employee" (same login & views) — this flag scopes them onto the admin Freelancers page */
     isFreelancer: v.optional(v.boolean()),
+    /** For role "client": the single brand this portal login belongs to. */
+    clientBrandId: v.optional(v.id("brands")),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_client_brand", ["clientBrandId"]),
 
   // ─── TEAMS ────────────────────────────────────
   teams: defineTable({
@@ -312,7 +316,10 @@ export default defineSchema({
       v.literal("overdue_contact"),
       v.literal("deadline_extended"),
       v.literal("note_reminder"),
-      v.literal("oversight_digest")
+      v.literal("oversight_digest"),
+      v.literal("deck_approved"),
+      v.literal("deck_changes_requested"),
+      v.literal("client_feedback")
     ),
     title: v.string(),
     message: v.string(),
@@ -564,7 +571,12 @@ export default defineSchema({
   // ─── JSR CLIENT TASKS ─────────────────
   jsrClientTasks: defineTable({
     brandId: v.id("brands"),
-    jsrLinkId: v.id("jsrLinks"),
+    /** Set for legacy intake-link submissions; portal submissions use portalId instead. */
+    jsrLinkId: v.optional(v.id("jsrLinks")),
+    /** Set when submitted through the authenticated client portal. */
+    portalId: v.optional(v.id("clientPortals")),
+    /** Real identity of the portal client who submitted the request. */
+    submittedByClientId: v.optional(v.id("users")),
     title: v.string(),
     description: v.optional(v.string()),
     proposedDeadline: v.optional(v.number()),
@@ -608,7 +620,10 @@ export default defineSchema({
   // ─── JSR MESSAGES (brand manager <-> client) ──
   jsrMessages: defineTable({
     brandId: v.id("brands"),
-    jsrLinkId: v.id("jsrLinks"),
+    /** Set for legacy JSR-link threads; portal messages set portalId instead. */
+    jsrLinkId: v.optional(v.id("jsrLinks")),
+    /** Set when sent through the authenticated client portal. */
+    portalId: v.optional(v.id("clientPortals")),
     senderType: v.union(v.literal("client"), v.literal("manager")),
     senderName: v.optional(v.string()),
     senderId: v.optional(v.id("users")),
@@ -657,9 +672,12 @@ export default defineSchema({
     .index("by_createdAt", ["createdAt"])
     .index("by_status", ["status"]),
 
-  // ─── JSR REMARKS (client comments on deliverables) ──
+  // ─── JSR REMARKS (client comments on deliverables or tasks) ──
   jsrRemarks: defineTable({
-    deliverableId: v.id("deliverables"),
+    /** Set for deliverable-level threads; task-level threads set taskId instead. */
+    deliverableId: v.optional(v.id("deliverables")),
+    /** Set for task-level comment threads (portal). */
+    taskId: v.optional(v.id("tasks")),
     brandId: v.id("brands"),
     senderType: v.union(v.literal("client"), v.literal("manager")),
     senderName: v.optional(v.string()),
@@ -668,7 +686,78 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_deliverable", ["deliverableId"])
+    .index("by_task", ["taskId"])
     .index("by_brand", ["brandId"]),
+
+  // ─── CLIENT PORTALS (one active authenticated portal link per brand) ──
+  clientPortals: defineTable({
+    brandId: v.id("brands"),
+    token: v.string(),
+    isActive: v.boolean(),
+    /** Portal tabs hidden from clients: "calendar" | "deck" | "new-task" | "monthly-log" | "pending-client" | "pending-agency" | "feedback" */
+    hiddenTabs: v.optional(v.array(v.string())),
+    /** Restrict Content Calendar to one month ("YYYY-MM"); unset = all months. */
+    calendarMonth: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    deactivatedAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_brand", ["brandId"])
+    .index("by_brand_active", ["brandId", "isActive"]),
+
+  // ─── CLIENT DECK ITEMS (admin-shared links, optional client approval) ──
+  clientDeckItems: defineTable({
+    brandId: v.id("brands"),
+    title: v.string(),
+    url: v.string(),
+    description: v.optional(v.string()),
+    /** "deck" | "gantt" | "doc" | freeform */
+    category: v.optional(v.string()),
+    requiresApproval: v.boolean(),
+    approvalStatus: v.optional(
+      v.union(
+        v.literal("pending_client"),
+        v.literal("client_approved"),
+        v.literal("client_changes_requested")
+      )
+    ),
+    approvalNote: v.optional(v.string()),
+    reviewedByClientId: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    isVisible: v.boolean(),
+    sortOrder: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_brand", ["brandId"]),
+
+  // ─── CLIENT ACTIVITY (portal "who did what" audit trail) ──
+  clientActivity: defineTable({
+    brandId: v.id("brands"),
+    clientUserId: v.id("users"),
+    /** "login" | "view_tab" | "approve_deliverable" | "request_changes" | "deny_deliverable" |
+     *  "add_remark" | "submit_request" | "approve_deck" | "request_deck_changes" | "submit_feedback" */
+    action: v.string(),
+    /** JSON payload: tab name, note excerpt, titles */
+    details: v.optional(v.string()),
+    taskId: v.optional(v.id("tasks")),
+    deliverableId: v.optional(v.id("deliverables")),
+    deckItemId: v.optional(v.id("clientDeckItems")),
+    clientTaskId: v.optional(v.id("jsrClientTasks")),
+    createdAt: v.number(),
+  })
+    .index("by_brand_time", ["brandId", "createdAt"])
+    .index("by_user", ["clientUserId"]),
+
+  // ─── CLIENT FEEDBACK (portal Feedback Log entries) ──
+  clientFeedback: defineTable({
+    brandId: v.id("brands"),
+    clientUserId: v.id("users"),
+    content: v.string(),
+    taskId: v.optional(v.id("tasks")),
+    createdAt: v.number(),
+  }).index("by_brand", ["brandId"]),
 
   // ─── PERSONAL NOTES (private notepad / task manager) ──
   // Strictly private: only the author (an admin/super-admin) can ever read/write.

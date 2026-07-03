@@ -1,4 +1,4 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthUserId } from "./lib/internalAuth";
 import { mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 

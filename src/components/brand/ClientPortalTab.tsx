@@ -1,0 +1,706 @@
+"use client";
+
+import { useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Button, ConfirmModal, useToast } from "@/components/ui";
+import ClientJsrTab from "@/components/brand/ClientJsrTab";
+import {
+  Activity,
+  Ban,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Link2,
+  Loader2,
+  Pencil,
+  Plus,
+  Presentation,
+  RotateCcw,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+
+interface ClientPortalTabProps {
+  brandId: Id<"brands">;
+  brand: any;
+  canManageLinks: boolean;
+}
+
+const PORTAL_TAB_OPTIONS: { key: string; label: string }[] = [
+  { key: "calendar", label: "Content Calendar" },
+  { key: "deck", label: "Client Deck" },
+  { key: "new-task", label: "New Task" },
+  { key: "monthly-log", label: "Monthly Log" },
+  { key: "pending-client", label: "Your Pending Work" },
+  { key: "pending-agency", label: "Ecultify Pending Work" },
+  { key: "feedback", label: "Feedback Log" },
+];
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  login: "logged in",
+  view_tab: "viewed a tab",
+  approve_deliverable: "approved a deliverable",
+  request_changes: "requested changes on a deliverable",
+  deny_deliverable: "denied a deliverable",
+  add_remark: "commented",
+  submit_request: "submitted a task request",
+  approve_deck: "approved a document",
+  request_deck_changes: "requested changes on a document",
+  submit_feedback: "sent feedback",
+};
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function activityLine(a: { action: string; details?: string }): string {
+  const base = ACTIVITY_LABELS[a.action] ?? a.action;
+  if (!a.details) return base;
+  if (a.action === "view_tab") {
+    const tab = PORTAL_TAB_OPTIONS.find((t) => t.key === a.details)?.label ?? (a.details === "jsr" ? "JSR Track" : a.details);
+    return `viewed ${tab}`;
+  }
+  try {
+    const d = JSON.parse(a.details);
+    if (d.title) return `${base} — "${d.title}"`;
+    if (d.taskTitle) return `${base} — "${d.taskTitle}"`;
+    if (d.note) return `${base}: "${String(d.note).slice(0, 80)}"`;
+  } catch {}
+  return base;
+}
+
+export default function ClientPortalTab({ brandId, brand, canManageLinks }: ClientPortalTabProps) {
+  const { toast } = useToast();
+
+  const portal = useQuery(api.clientPortal.getActivePortal, canManageLinks ? { brandId } : "skip");
+  const clientUsers = useQuery(api.clientUsers.listClientUsers, canManageLinks ? { brandId } : "skip");
+  const activity = useQuery(api.clientPortal.listClientActivity, { brandId, limit: 30 });
+  const deckItems = useQuery(api.clientPortal.listDeckItems, { brandId });
+
+  const generatePortalLink = useMutation(api.clientPortal.generatePortalLink);
+  const deactivatePortal = useMutation(api.clientPortal.deactivatePortal);
+  const updatePortalConfig = useMutation(api.clientPortal.updatePortalConfig);
+  const addDeckItem = useMutation(api.clientPortal.addDeckItem);
+  const updateDeckItem = useMutation(api.clientPortal.updateDeckItem);
+  const deleteDeckItem = useMutation(api.clientPortal.deleteDeckItem);
+  const createClientUser = useAction(api.clientUsers.adminCreateClientUser);
+  const resetClientPassword = useAction(api.clientUsers.adminResetClientPassword);
+  const deleteClientUser = useMutation(api.clientUsers.deleteClientUser);
+
+  // Portal link state
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  // Client user state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "" });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [resetUserId, setResetUserId] = useState<Id<"users"> | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<Id<"users"> | null>(null);
+
+  // Deck state
+  const [showAddDeck, setShowAddDeck] = useState(false);
+  const [newDeck, setNewDeck] = useState({ title: "", url: "", description: "", category: "deck", requiresApproval: false });
+  const [savingDeck, setSavingDeck] = useState(false);
+  const [deleteDeckId, setDeleteDeckId] = useState<Id<"clientDeckItems"> | null>(null);
+
+  // Legacy section
+  const [showLegacy, setShowLegacy] = useState(false);
+
+  const calendarMonth = portal?.calendarMonth ?? "";
+  const hiddenTabs = portal?.hiddenTabs ?? [];
+
+  async function handleGenerate() {
+    setGenerating(true);
+    try {
+      await generatePortalLink({ brandId });
+      toast("success", "Portal link generated");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to generate portal link");
+    }
+    setGenerating(false);
+    setConfirmRegenerate(false);
+  }
+
+  function copyPortalLink(token: string) {
+    navigator.clipboard.writeText(`${window.location.origin}/portal/${token}`);
+    toast("success", "Portal link copied to clipboard");
+  }
+
+  async function handleCreateUser() {
+    if (!newUser.email.trim() || !newUser.password || creatingUser) return;
+    setCreatingUser(true);
+    try {
+      await createClientUser({
+        brandId,
+        name: newUser.name.trim(),
+        email: newUser.email.trim(),
+        password: newUser.password,
+      });
+      toast("success", `Client login created for ${newUser.email.trim()}`);
+      setNewUser({ name: "", email: "", password: "" });
+      setShowCreateUser(false);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to create client user");
+    }
+    setCreatingUser(false);
+  }
+
+  async function handleResetPassword() {
+    if (!resetUserId || resetPassword.length < 8 || resettingPassword) return;
+    setResettingPassword(true);
+    try {
+      await resetClientPassword({ userId: resetUserId, newPassword: resetPassword });
+      toast("success", "Password updated");
+      setResetUserId(null);
+      setResetPassword("");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to reset password");
+    }
+    setResettingPassword(false);
+  }
+
+  async function toggleTab(key: string) {
+    const next = hiddenTabs.includes(key)
+      ? hiddenTabs.filter((t) => t !== key)
+      : [...hiddenTabs, key];
+    try {
+      await updatePortalConfig({ brandId, hiddenTabs: next });
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to update tabs");
+    }
+  }
+
+  async function handleAddDeck() {
+    if (!newDeck.title.trim() || !newDeck.url.trim() || savingDeck) return;
+    setSavingDeck(true);
+    try {
+      const url = /^https?:\/\//i.test(newDeck.url.trim()) ? newDeck.url.trim() : `https://${newDeck.url.trim()}`;
+      await addDeckItem({
+        brandId,
+        title: newDeck.title.trim(),
+        url,
+        description: newDeck.description.trim() || undefined,
+        category: newDeck.category || undefined,
+        requiresApproval: newDeck.requiresApproval,
+      });
+      toast("success", "Document added to Client Deck");
+      setNewDeck({ title: "", url: "", description: "", category: "deck", requiresApproval: false });
+      setShowAddDeck(false);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to add document");
+    }
+    setSavingDeck(false);
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      {/* ── LEFT COLUMN ── */}
+      <div className="space-y-4 min-w-0">
+        {/* Portal Link */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+            <Link2 className="h-4 w-4 text-[var(--text-muted)]" />
+            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Portal Link</span>
+          </div>
+          <div className="p-4">
+            {!canManageLinks ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Only admins can manage the portal link.</p>
+            ) : portal === undefined ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+            ) : portal === null ? (
+              <div className="text-center py-2">
+                <p className="text-[12px] text-[var(--text-secondary)] mb-3">
+                  One login link per brand. Clients sign in with the accounts you create below.
+                </p>
+                <Button onClick={() => void handleGenerate()} disabled={generating}>
+                  {generating ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+                  Generate Portal Link
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  <code className="flex-1 text-[11px] text-[var(--text-secondary)] truncate">
+                    /portal/{portal.token}
+                  </code>
+                  <button
+                    onClick={() => copyPortalLink(portal.token)}
+                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    title="Copy link"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                  <a
+                    href={`/portal/${portal.token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    title="Open portal"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" onClick={() => setConfirmRegenerate(true)}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Regenerate
+                  </Button>
+                  <Button variant="secondary" onClick={() => setConfirmDeactivate(true)}>
+                    <Ban className="h-3.5 w-3.5 mr-1.5" />
+                    Deactivate
+                  </Button>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Active since {new Date(portal.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
+                  Regenerating invalidates the old URL; client accounts keep working.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Client Users */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+            <Users className="h-4 w-4 text-[var(--text-muted)]" />
+            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">
+              Client Logins {clientUsers ? `(${clientUsers.length})` : ""}
+            </span>
+            {canManageLinks && (
+              <button
+                onClick={() => setShowCreateUser(!showCreateUser)}
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+              >
+                {showCreateUser ? <X className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+                {showCreateUser ? "Cancel" : "Add"}
+              </button>
+            )}
+          </div>
+          <div className="p-4 space-y-3">
+            {showCreateUser && (
+              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
+                <input
+                  value={newUser.name}
+                  onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Name"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <input
+                  value={newUser.email}
+                  onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
+                  placeholder="Email"
+                  type="email"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <input
+                  value={newUser.password}
+                  onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))}
+                  placeholder="Password (min 8 characters)"
+                  type="text"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <Button
+                  onClick={() => void handleCreateUser()}
+                  disabled={creatingUser || !newUser.email.trim() || newUser.password.length < 8}
+                  className="w-full"
+                >
+                  {creatingUser ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <UserPlus className="h-4 w-4 mr-1.5" />}
+                  Create Login
+                </Button>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Share the email + password with the client along with the portal link.
+                </p>
+              </div>
+            )}
+
+            {clientUsers === undefined && canManageLinks ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+            ) : !clientUsers || clientUsers.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+                No client logins yet. Create one so the client can sign in to the portal.
+              </p>
+            ) : (
+              clientUsers.map((u) => (
+                <div key={u._id} className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }}>
+                    {(u.name ?? u.email ?? "C")[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{u.name ?? "—"}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] truncate">{u.email}</p>
+                  </div>
+                  {resetUserId === u._id ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        placeholder="New password"
+                        className="w-32 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => void handleResetPassword()}
+                        disabled={resetPassword.length < 8 || resettingPassword}
+                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-emerald-600 disabled:opacity-40"
+                        title="Save new password"
+                      >
+                        {resettingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => { setResetUserId(null); setResetPassword(""); }}
+                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setResetUserId(u._id); setResetPassword(""); }}
+                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                        title="Reset password"
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteUserId(u._id)}
+                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
+                        title="Delete login"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Tab Visibility */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+            <Eye className="h-4 w-4 text-[var(--text-muted)]" />
+            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Portal Tabs</span>
+          </div>
+          <div className="p-4">
+            {!portal ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Generate a portal link first to configure tabs.</p>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between py-1.5">
+                  <span className="text-[12px] text-[var(--text-secondary)]">JSR Track</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">Always visible</span>
+                </div>
+                {PORTAL_TAB_OPTIONS.map((tab) => {
+                  const hidden = hiddenTabs.includes(tab.key);
+                  return (
+                    <div key={tab.key} className="flex items-center justify-between py-1.5">
+                      <span className="text-[12px] text-[var(--text-secondary)]">{tab.label}</span>
+                      <button
+                        onClick={() => void toggleTab(tab.key)}
+                        className={`p-1.5 rounded transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--accent-admin)]"} hover:bg-[var(--bg-hover)]`}
+                        title={hidden ? "Show tab" : "Hide tab"}
+                      >
+                        {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  );
+                })}
+                <div className="pt-2 mt-1 border-t border-[var(--border-subtle)]">
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
+                    Pin Content Calendar to a month (optional)
+                  </label>
+                  <input
+                    type="month"
+                    value={calendarMonth}
+                    onChange={(e) => void updatePortalConfig({ brandId, calendarMonth: e.target.value }).catch(() => {})}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── RIGHT COLUMN ── */}
+      <div className="space-y-4 min-w-0">
+        {/* Client Deck manager */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+            <Presentation className="h-4 w-4 text-[var(--text-muted)]" />
+            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">
+              Client Deck {deckItems ? `(${deckItems.length})` : ""}
+            </span>
+            {canManageLinks && (
+              <button
+                onClick={() => setShowAddDeck(!showAddDeck)}
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+              >
+                {showAddDeck ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                {showAddDeck ? "Cancel" : "Add"}
+              </button>
+            )}
+          </div>
+          <div className="p-4 space-y-3">
+            {showAddDeck && (
+              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
+                <input
+                  value={newDeck.title}
+                  onChange={(e) => setNewDeck((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="Title (e.g. Q3 Strategy Deck)"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <input
+                  value={newDeck.url}
+                  onChange={(e) => setNewDeck((p) => ({ ...p, url: e.target.value }))}
+                  placeholder="Link (Slides, Sheets, Figma, gantt…)"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <input
+                  value={newDeck.description}
+                  onChange={(e) => setNewDeck((p) => ({ ...p, description: e.target.value }))}
+                  placeholder="Description (optional)"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <div className="flex items-center gap-3">
+                  <select
+                    value={newDeck.category}
+                    onChange={(e) => setNewDeck((p) => ({ ...p, category: e.target.value }))}
+                    className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
+                  >
+                    <option value="deck">Deck</option>
+                    <option value="gantt">Gantt</option>
+                    <option value="doc">Document</option>
+                  </select>
+                  <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+                    <input
+                      type="checkbox"
+                      checked={newDeck.requiresApproval}
+                      onChange={(e) => setNewDeck((p) => ({ ...p, requiresApproval: e.target.checked }))}
+                    />
+                    Needs client approval
+                  </label>
+                </div>
+                <Button
+                  onClick={() => void handleAddDeck()}
+                  disabled={savingDeck || !newDeck.title.trim() || !newDeck.url.trim()}
+                  className="w-full"
+                >
+                  {savingDeck ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+                  Add to Deck
+                </Button>
+              </div>
+            )}
+
+            {deckItems === undefined ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+            ) : deckItems.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+                Share decks, gantt charts and documents with the client — optionally requiring their approval.
+              </p>
+            ) : (
+              deckItems.map((item: any) => (
+                <div key={item._id} className="p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 min-w-0 text-[12px] font-medium text-[var(--text-primary)] truncate hover:underline"
+                    >
+                      {item.title}
+                    </a>
+                    {item.category && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
+                        {item.category}
+                      </span>
+                    )}
+                    {item.requiresApproval && (
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                          item.approvalStatus === "client_approved"
+                            ? "text-emerald-600 bg-emerald-50"
+                            : item.approvalStatus === "client_changes_requested"
+                              ? "text-amber-600 bg-amber-50"
+                              : "text-[var(--text-muted)] bg-[var(--bg-hover)]"
+                        }`}
+                      >
+                        {item.approvalStatus === "client_approved"
+                          ? `Approved${item.reviewedByName ? ` · ${item.reviewedByName}` : ""}`
+                          : item.approvalStatus === "client_changes_requested"
+                            ? "Changes requested"
+                            : "Awaiting approval"}
+                      </span>
+                    )}
+                    {canManageLinks && (
+                      <div className="flex items-center shrink-0">
+                        <button
+                          onClick={() => void updateDeckItem({ deckItemId: item._id, isVisible: !item.isVisible }).catch(() => {})}
+                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                          title={item.isVisible ? "Hide from client" : "Show to client"}
+                        >
+                          {item.isVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
+                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                          title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteDeckId(item._id)}
+                          className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {item.approvalNote && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1.5">
+                      Client note: {item.approvalNote}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Client Activity */}
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+            <Activity className="h-4 w-4 text-[var(--text-muted)]" />
+            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Client Activity</span>
+          </div>
+          <div className="p-4">
+            {activity === undefined ? (
+              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+            ) : activity.length === 0 ? (
+              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+                No portal activity yet. Logins, approvals and comments will show up here.
+              </p>
+            ) : (
+              <div className="space-y-0.5 max-h-[420px] overflow-y-auto">
+                {activity.map((a: any) => (
+                  <div key={a._id} className="flex items-start gap-2.5 py-2 border-b border-[var(--border-subtle)] last:border-0">
+                    <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] text-[var(--text-primary)]">
+                        <span className="font-semibold">{a.clientName}</span> {activityLine(a)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">{timeAgo(a.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── LEGACY SECTION (full width) ── */}
+      <div className="lg:col-span-2">
+        <button
+          onClick={() => setShowLegacy(!showLegacy)}
+          className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mb-3"
+        >
+          {showLegacy ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Legacy JSR & intake links (replaced by the portal)
+        </button>
+        {showLegacy && <ClientJsrTab brandId={brandId} brand={brand} canManageLinks={canManageLinks} />}
+      </div>
+
+      {/* Confirm modals */}
+      <ConfirmModal
+        open={confirmDeactivate}
+        title="Deactivate portal?"
+        message="Clients will no longer be able to open the portal until a new link is generated. Client accounts, comments and requests are kept."
+        confirmLabel="Deactivate"
+        onConfirm={async () => {
+          if (portal) {
+            try {
+              await deactivatePortal({ portalId: portal._id });
+              toast("success", "Portal deactivated");
+            } catch (err) {
+              toast("error", err instanceof Error ? err.message : "Failed to deactivate");
+            }
+          }
+          setConfirmDeactivate(false);
+        }}
+        onCancel={() => setConfirmDeactivate(false)}
+      />
+      <ConfirmModal
+        open={confirmRegenerate}
+        title="Regenerate portal link?"
+        message="The current URL stops working and a new one is created. Client accounts keep working — just share the new link."
+        confirmLabel="Regenerate"
+        onConfirm={() => void handleGenerate()}
+        onCancel={() => setConfirmRegenerate(false)}
+      />
+      <ConfirmModal
+        open={deleteUserId !== null}
+        title="Delete client login?"
+        message="The client will be signed out immediately and can no longer access the portal. Their past comments and requests are kept."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteUserId) {
+            try {
+              await deleteClientUser({ userId: deleteUserId });
+              toast("success", "Client login deleted");
+            } catch (err) {
+              toast("error", err instanceof Error ? err.message : "Failed to delete");
+            }
+          }
+          setDeleteUserId(null);
+        }}
+        onCancel={() => setDeleteUserId(null)}
+      />
+      <ConfirmModal
+        open={deleteDeckId !== null}
+        title="Delete deck item?"
+        message="The document link is removed from the client portal."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteDeckId) {
+            try {
+              await deleteDeckItem({ deckItemId: deleteDeckId });
+              toast("success", "Deck item deleted");
+            } catch (err) {
+              toast("error", err instanceof Error ? err.message : "Failed to delete");
+            }
+          }
+          setDeleteDeckId(null);
+        }}
+        onCancel={() => setDeleteDeckId(null)}
+      />
+    </div>
+  );
+}
