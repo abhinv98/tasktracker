@@ -20,6 +20,10 @@ import {
   Inbox,
   ChevronDown,
   ChevronUp,
+  CheckSquare,
+  Check,
+  Copy,
+  CalendarRange,
 } from "lucide-react";
 import {
   DndContext,
@@ -113,20 +117,28 @@ export default function ContentCalendarPage() {
   const [popoverDate, setPopoverDate] = useState<string | null>(null);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 
-  // Holding Tray (sheets-like staging area). Tasks added here are hidden
-  // from the calendar grid until either dropped on a day cell (which patches
-  // postDate) or removed manually. IDs are persisted per-brand in
-  // localStorage so the tray survives month navigation AND page refreshes,
-  // and the actual task records are resolved via listEntriesByIds (so a
-  // task parked in April still shows when viewing May). We never mutate
-  // `postDate` just to park a task in the tray.
-  const [trayTaskIds, setTrayTaskIds] = useState<string[]>([]);
-  const [trayCollapsed, setTrayCollapsed] = useState(false);
+  // Staging shelf (sheets-like "set this section aside" area). Server-backed:
+  // staged tasks keep their postDate but carry stagedAt/stagedBy, are hidden
+  // from the grid server-side, and are visible to every admin on any device.
+  const [shelfCollapsed, setShelfCollapsed] = useState(false);
   const [trayContextMenu, setTrayContextMenu] = useState<{
     taskId: string;
     x: number;
     y: number;
   } | null>(null);
+
+  // Multi-select (bulk move / shelf / month) state.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastToggledId, setLastToggledId] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState<null | "shift" | "month">(null);
+  const [shiftDays, setShiftDays] = useState("7");
+  const [shiftStartDate, setShiftStartDate] = useState("");
+  const [targetMonth, setTargetMonth] = useState("");
+
+  // Duplicate-to-date modal.
+  const [duplicateTaskId, setDuplicateTaskId] = useState<string | null>(null);
+  const [duplicateDate, setDuplicateDate] = useState("");
 
   useEffect(() => {
     if (!trayContextMenu) return;
@@ -164,6 +176,11 @@ export default function ContentCalendarPage() {
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const deleteTask = useMutation(api.tasks.deleteTask);
   const toggleBreakDayMut = useMutation(api.contentCalendar.toggleBreakDay);
+  const stageEntriesMut = useMutation(api.contentCalendar.stageEntries);
+  const unstageEntryMut = useMutation(api.contentCalendar.unstageEntry);
+  const bulkShiftMut = useMutation(api.contentCalendar.bulkShiftDates);
+  const bulkMoveMonthMut = useMutation(api.contentCalendar.bulkMoveToMonth);
+  const duplicateEntryMut = useMutation(api.contentCalendar.duplicateEntry);
 
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const tasks = useQuery(
@@ -231,87 +248,96 @@ export default function ContentCalendarPage() {
     [brands, selectedBrandId]
   );
 
-  const trayTaskIdSet = useMemo(() => new Set(trayTaskIds), [trayTaskIds]);
-
   const tasksByDate = useMemo(() => {
     const map: Record<string, any[]> = {};
     for (const t of tasks ?? []) {
-      if (t.postDate && !trayTaskIdSet.has(t._id)) {
+      if (t.postDate) {
         if (!map[t.postDate]) map[t.postDate] = [];
         map[t.postDate].push(t);
       }
     }
     return map;
-  }, [tasks, trayTaskIdSet]);
+  }, [tasks]);
 
-  // Cross-month tray resolution: fetch tray tasks by id so April-parked
-  // tasks still render when viewing May.
-  const trayServerTasks = useQuery(
-    api.contentCalendar.listEntriesByIds,
-    trayTaskIds.length > 0
-      ? { ids: trayTaskIds as unknown as Id<"tasks">[] }
-      : "skip"
-  );
+  // Server-backed staging shelf, shared across all admins and devices.
+  const shelfTasks =
+    useQuery(
+      api.contentCalendar.listStagedEntries,
+      selectedBrandId ? { brandId: selectedBrandId as Id<"brands"> } : "skip"
+    ) ?? [];
 
-  // Tray view-models — preserve user-defined order. Drops any id that no
-  // longer resolves (e.g. the task was deleted).
-  const trayTasks = useMemo(() => {
-    if (trayTaskIds.length === 0) return [];
-    const list = (trayServerTasks ?? []) as any[];
-    const byId = new Map(list.map((t) => [t._id, t]));
-    return trayTaskIds
-      .map((id) => byId.get(id))
-      .filter((t): t is any => !!t);
-  }, [trayServerTasks, trayTaskIds]);
-
-  // Persistence: load tray ids on brand change, save on every change.
-  // Keyed per-brand so each brand has its own staging area.
+  // The old localStorage tray is gone; parked items were never date-cleared,
+  // so they simply reappear on their original days. Drop stale keys once.
   useEffect(() => {
-    if (!selectedBrandId) {
-      setTrayTaskIds([]);
-      return;
-    }
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !selectedBrandId) return;
     try {
-      const raw = localStorage.getItem(`cc:tray:${selectedBrandId}`);
-      setTrayTaskIds(raw ? (JSON.parse(raw) as string[]) : []);
+      localStorage.removeItem(`cc:tray:${selectedBrandId}`);
     } catch {
-      setTrayTaskIds([]);
+      /* ignore */
     }
   }, [selectedBrandId]);
 
+  // Reset selection when the brand or month changes.
   useEffect(() => {
-    if (!selectedBrandId) return;
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(
-        `cc:tray:${selectedBrandId}`,
-        JSON.stringify(trayTaskIds)
-      );
-    } catch {
-      /* quota / private-mode — ignore */
-    }
-  }, [selectedBrandId, trayTaskIds]);
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setBulkAction(null);
+  }, [selectedBrandId, monthStr]);
 
-  const handleAddToTray = useCallback(
-    (taskId: string) => {
-      setTrayTaskIds((prev) =>
-        prev.includes(taskId) ? prev : [...prev, taskId]
-      );
-      setTrayCollapsed(false);
+  const handleAddToShelf = useCallback(
+    async (taskId: string) => {
       setTrayContextMenu(null);
-      toast("info", "Moved to holding tray");
+      setShelfCollapsed(false);
+      try {
+        await stageEntriesMut({ taskIds: [taskId as Id<"tasks">] });
+        toast("info", "Moved to staging shelf");
+      } catch (err: any) {
+        toast("error", err.message ?? "Failed to move to shelf");
+      }
     },
-    [toast]
+    [stageEntriesMut, toast]
   );
 
-  const handleRemoveFromTray = useCallback((taskId: string) => {
-    setTrayTaskIds((prev) => prev.filter((id) => id !== taskId));
-  }, []);
+  const handleRemoveFromShelf = useCallback(
+    async (taskId: string) => {
+      try {
+        await unstageEntryMut({ taskId: taskId as Id<"tasks"> });
+      } catch (err: any) {
+        toast("error", err.message ?? "Failed to restore entry");
+      }
+    },
+    [unstageEntryMut, toast]
+  );
 
-  const handleClearTray = useCallback(() => {
-    setTrayTaskIds([]);
-  }, []);
+  // Ordered ids of the visible month grid (for shift-click range select).
+  const orderedVisibleIds = useMemo(() => {
+    const dates = Object.keys(tasksByDate).sort();
+    const ids: string[] = [];
+    for (const d of dates) for (const t of tasksByDate[d]) ids.push(t._id);
+    return ids;
+  }, [tasksByDate]);
+
+  const toggleSelected = useCallback(
+    (taskId: string, shiftKey: boolean) => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (shiftKey && lastToggledId) {
+          const a = orderedVisibleIds.indexOf(lastToggledId);
+          const b = orderedVisibleIds.indexOf(taskId);
+          if (a !== -1 && b !== -1) {
+            const [lo, hi] = a < b ? [a, b] : [b, a];
+            for (let i = lo; i <= hi; i++) next.add(orderedVisibleIds[i]);
+            return next;
+          }
+        }
+        if (next.has(taskId)) next.delete(taskId);
+        else next.add(taskId);
+        return next;
+      });
+      setLastToggledId(taskId);
+    },
+    [lastToggledId, orderedVisibleIds]
+  );
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
@@ -383,20 +409,121 @@ export default function ContentCalendarPage() {
       const { active, over } = event;
       if (!over) return;
       const task = (active.data.current as any)?.task;
-      const targetDate = over.id as string;
-      if (!task || targetDate === task.postDate) return;
+      if (!task) return;
+      const fromShelf = String(active.id).startsWith("shelf-");
+      const overId = over.id as string;
+
+      // Drop onto the staging shelf → park it (postDate untouched).
+      if (overId === "staging-shelf") {
+        if (fromShelf) return;
+        try {
+          await stageEntriesMut({ taskIds: [task._id as Id<"tasks">] });
+          toast("info", "Moved to staging shelf");
+        } catch (err: any) {
+          toast("error", err.message ?? "Failed to move to shelf");
+        }
+        return;
+      }
+
+      // Drop onto a day cell.
+      const targetDate = overId;
+      if (fromShelf) {
+        try {
+          await unstageEntryMut({
+            taskId: task._id as Id<"tasks">,
+            postDate: targetDate,
+          });
+          toast("success", "Entry placed");
+        } catch (err: any) {
+          toast("error", err.message ?? "Failed to place entry");
+        }
+        return;
+      }
+      if (targetDate === task.postDate) return;
       try {
         await updateTask({ taskId: task._id as Id<"tasks">, postDate: targetDate });
-        // If this drag started from the tray, drop also removes it from
-        // the tray so it shows up on the destination cell as expected.
-        setTrayTaskIds((prev) => prev.filter((id) => id !== task._id));
         toast("success", "Entry moved");
       } catch (err: any) {
         toast("error", err.message ?? "Failed to move entry");
       }
     },
-    [updateTask, toast]
+    [updateTask, stageEntriesMut, unstageEntryMut, toast]
   );
+
+  async function handleBulkToShelf() {
+    if (selectedIds.size === 0) return;
+    try {
+      await stageEntriesMut({
+        taskIds: [...selectedIds] as Id<"tasks">[],
+      });
+      toast("success", `${selectedIds.size} moved to shelf`);
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to move to shelf");
+    }
+  }
+
+  async function handleBulkShift() {
+    if (selectedIds.size === 0) return;
+    const delta = shiftStartDate ? undefined : parseInt(shiftDays, 10);
+    if (!shiftStartDate && (delta === undefined || Number.isNaN(delta) || delta === 0)) {
+      toast("error", "Enter days to shift, or pick a new start date");
+      return;
+    }
+    try {
+      await bulkShiftMut({
+        taskIds: [...selectedIds] as Id<"tasks">[],
+        ...(shiftStartDate ? { newStartDate: shiftStartDate } : { deltaDays: delta }),
+      });
+      toast("success", `${selectedIds.size} rescheduled`);
+      setSelectedIds(new Set());
+      setBulkAction(null);
+      setShiftStartDate("");
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to reschedule");
+    }
+  }
+
+  async function handleBulkMonth() {
+    if (selectedIds.size === 0 || !targetMonth) return;
+    try {
+      await bulkMoveMonthMut({
+        taskIds: [...selectedIds] as Id<"tasks">[],
+        month: targetMonth,
+      });
+      toast("success", `${selectedIds.size} moved to ${targetMonth}`);
+      setSelectedIds(new Set());
+      setBulkAction(null);
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to move");
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!duplicateTaskId || !duplicateDate) return;
+    try {
+      await duplicateEntryMut({
+        taskId: duplicateTaskId as Id<"tasks">,
+        postDate: duplicateDate,
+      });
+      toast("success", "Entry duplicated");
+      setDuplicateTaskId(null);
+      setDuplicateDate("");
+    } catch (err: any) {
+      toast("error", err.message ?? "Failed to duplicate");
+    }
+  }
+
+  // Next 12 months for the "move to month" picker.
+  const monthOptions = useMemo(() => {
+    const opts: string[] = [];
+    const base = new Date(year, month, 1);
+    for (let i = -1; i <= 12; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      opts.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return opts;
+  }, [year, month]);
 
   const selectedFromLocal = selectedTaskId && tasks
     ? tasks.find((t: any) => t._id === selectedTaskId)
@@ -493,10 +620,38 @@ export default function ContentCalendarPage() {
               {showBreakDayPicker ? "Done" : "Break days"}
             </button>
           )}
+          {isEditable && selectedBrandId && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectMode((v) => !v);
+                setSelectedIds(new Set());
+                setBulkAction(null);
+              }}
+              className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                selectMode
+                  ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                  : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              }`}
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              {selectMode ? "Done selecting" : "Select"}
+            </button>
+          )}
         </div>
 
         {/* Month Nav */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              const n = new Date();
+              setYear(n.getFullYear());
+              setMonth(n.getMonth());
+            }}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            Today
+          </button>
           <button
             onClick={prevMonth}
             className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
@@ -512,6 +667,16 @@ export default function ContentCalendarPage() {
           >
             <ChevronRight className="h-4 w-4" />
           </button>
+
+          {/* Status legend */}
+          <div className="hidden lg:flex items-center gap-3 pl-3 border-l border-[var(--border)]">
+            {Object.entries(STATUS_COLORS).map(([key, sc]) => (
+              <span key={key} className="inline-flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }} />
+                {sc.label}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -633,6 +798,18 @@ export default function ContentCalendarPage() {
                 })()}
               </div>
             )}
+            {/* Staging shelf — the "set aside" section of the sheet. */}
+            {(isEditable || shelfTasks.length > 0) && (
+              <StagingShelf
+                tasks={shelfTasks}
+                collapsed={shelfCollapsed}
+                onToggle={() => setShelfCollapsed((v) => !v)}
+                onRestore={handleRemoveFromShelf}
+                onSelectTask={(id) => setSelectedTaskId(id)}
+                isDragEnabled={!!isEditable && !selectMode}
+              />
+            )}
+
             {/* Weekday Headers — sticky relative to the scrolling parent.
                 Opaque bg + bottom border + shadow so cells scrolling under
                 the row are clipped cleanly instead of bleeding through. */}
@@ -680,8 +857,14 @@ export default function ContentCalendarPage() {
                           key={task._id}
                           task={task}
                           isSelected={selectedTaskId === task._id}
-                          isDragEnabled={!!isEditable}
-                          onClick={() => {
+                          isDragEnabled={!!isEditable && !selectMode}
+                          selectMode={selectMode}
+                          isChecked={selectedIds.has(task._id)}
+                          onClick={(e) => {
+                            if (selectMode) {
+                              toggleSelected(task._id, e?.shiftKey ?? false);
+                              return;
+                            }
                             setSelectedTaskId(task._id);
                             setPopoverDate(null);
                           }}
@@ -780,37 +963,187 @@ export default function ContentCalendarPage() {
         <DragOverlay dropAnimation={null}>
           {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
         </DragOverlay>
-        {trayTasks.length > 0 && (
-          <HoldingTray
-            tasks={trayTasks}
-            collapsed={trayCollapsed}
-            onToggle={() => setTrayCollapsed((v) => !v)}
-            onRemove={handleRemoveFromTray}
-            onClear={handleClearTray}
-            onSelectTask={(id) => setSelectedTaskId(id)}
-            isDragEnabled={!!isEditable}
-          />
-        )}
         </DndContext>
       )}
 
-      {/* Right-click → "Move to Holding Tray" popover for calendar cards. */}
+      {/* Bulk action bar (select mode) */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--text-primary)] text-white shadow-2xl">
+          <span className="text-[12px] font-semibold tabular-nums">
+            {selectedIds.size} selected
+          </span>
+          <div className="w-px h-5 bg-white/20" />
+          <button
+            type="button"
+            onClick={handleBulkToShelf}
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg hover:bg-white/15 transition-colors"
+          >
+            <Inbox className="h-3.5 w-3.5" /> To shelf
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkAction(bulkAction === "shift" ? null : "shift")}
+            className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+              bulkAction === "shift" ? "bg-white/20" : "hover:bg-white/15"
+            }`}
+          >
+            <CalendarRange className="h-3.5 w-3.5" /> Shift dates
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkAction(bulkAction === "month" ? null : "month")}
+            className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+              bulkAction === "month" ? "bg-white/20" : "hover:bg-white/15"
+            }`}
+          >
+            <Calendar className="h-3.5 w-3.5" /> Move to month
+          </button>
+          <div className="w-px h-5 bg-white/20" />
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-[12px] text-white/70 hover:text-white px-1.5 transition-colors"
+          >
+            Clear
+          </button>
+
+          {/* Shift-dates popover */}
+          {bulkAction === "shift" && (
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[280px] rounded-xl bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-xl p-3">
+              <p className="text-[12px] font-semibold mb-2">Shift selected entries</p>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="number"
+                  value={shiftDays}
+                  onChange={(e) => {
+                    setShiftDays(e.target.value);
+                    setShiftStartDate("");
+                  }}
+                  className="w-20 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+                <span className="text-[12px] text-[var(--text-secondary)]">
+                  days (negative = earlier)
+                </span>
+              </div>
+              <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+                …or move the earliest entry to a date (gaps preserved):
+              </p>
+              <input
+                type="date"
+                value={shiftStartDate}
+                onChange={(e) => setShiftStartDate(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] mb-2.5"
+              />
+              <button
+                type="button"
+                onClick={handleBulkShift}
+                className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold"
+              >
+                Apply
+              </button>
+            </div>
+          )}
+
+          {/* Move-to-month popover */}
+          {bulkAction === "month" && (
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[240px] rounded-xl bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-xl p-3">
+              <p className="text-[12px] font-semibold mb-2">Move to month</p>
+              <select
+                value={targetMonth}
+                onChange={(e) => setTargetMonth(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer mb-2.5"
+              >
+                <option value="">Choose month…</option>
+                {monthOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {new Date(m + "-01T00:00:00").toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[var(--text-muted)] mb-2">
+                Day-of-month is kept (clamped to the month&apos;s end).
+              </p>
+              <button
+                type="button"
+                onClick={handleBulkMonth}
+                disabled={!targetMonth}
+                className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-50"
+              >
+                Move
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Duplicate-to-date modal */}
+      {duplicateTaskId && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
+                Duplicate entry
+              </h3>
+              <button
+                onClick={() => setDuplicateTaskId(null)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-[12px] text-[var(--text-muted)] mb-2">
+              A copy (status reset to Planned) is created on the chosen date.
+            </p>
+            <input
+              type="date"
+              value={duplicateDate}
+              onChange={(e) => setDuplicateDate(e.target.value)}
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] mb-3"
+            />
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              disabled={!duplicateDate}
+              className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-50"
+            >
+              Duplicate
+            </button>
+          </Card>
+        </div>
+      )}
+
+      {/* Right-click context menu for calendar cards. */}
       {trayContextMenu && (
         <div
           className="fixed z-50 rounded-lg shadow-lg border border-[var(--border)] bg-white py-1 text-[12px]"
           style={{
             left: Math.min(trayContextMenu.x, window.innerWidth - 200),
-            top: Math.min(trayContextMenu.y, window.innerHeight - 60),
+            top: Math.min(trayContextMenu.y, window.innerHeight - 90),
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            onClick={() => handleAddToTray(trayContextMenu.taskId)}
+            onClick={() => handleAddToShelf(trayContextMenu.taskId)}
             className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
           >
             <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
-            Move to Holding Tray
+            Move to staging shelf
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDuplicateTaskId(trayContextMenu.taskId);
+              setDuplicateDate("");
+              setTrayContextMenu(null);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
+          >
+            <Copy className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            Duplicate to date…
           </button>
         </div>
       )}
@@ -1042,13 +1375,17 @@ function DraggableTaskCard({
   task,
   isSelected,
   isDragEnabled,
+  selectMode = false,
+  isChecked = false,
   onClick,
   onContextMenu,
 }: {
   task: any;
   isSelected: boolean;
   isDragEnabled: boolean;
-  onClick: () => void;
+  selectMode?: boolean;
+  isChecked?: boolean;
+  onClick: (e?: React.MouseEvent) => void;
   onContextMenu?: (clientX: number, clientY: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -1065,7 +1402,7 @@ function DraggableTaskCard({
       {...(isDragEnabled ? { ...listeners, ...attributes } : {})}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick(e);
       }}
       onContextMenu={
         onContextMenu
@@ -1077,15 +1414,29 @@ function DraggableTaskCard({
           : undefined
       }
       className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
-        isSelected ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
-      } ${isDragging ? "opacity-30" : ""} ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
+        isSelected && !selectMode ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
+      } ${selectMode && isChecked ? "outline outline-2 outline-[var(--accent-admin)]" : ""} ${
+        isDragging ? "opacity-30" : ""
+      } ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{ backgroundColor: sc.bg }}
     >
       <div className="flex items-center gap-1">
-        <div
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ backgroundColor: sc.dot }}
-        />
+        {selectMode ? (
+          <span
+            className={`w-3 h-3 rounded-[3px] border shrink-0 flex items-center justify-center ${
+              isChecked
+                ? "bg-[var(--accent-admin)] border-[var(--accent-admin)]"
+                : "border-[var(--border-strong)] bg-white"
+            }`}
+          >
+            {isChecked && <Check className="h-2.5 w-2.5 text-white" />}
+          </span>
+        ) : (
+          <div
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ backgroundColor: sc.dot }}
+          />
+        )}
         <span className="font-medium text-[var(--text-primary)] truncate">
           {task.title}
         </span>
@@ -1215,107 +1566,111 @@ function DayPopover({
   );
 }
 
-/* ────── Holding Tray ────── */
+/* ────── Staging Shelf ────── */
 
-function HoldingTray({
+function StagingShelf({
   tasks,
   collapsed,
   onToggle,
-  onRemove,
-  onClear,
+  onRestore,
   onSelectTask,
   isDragEnabled,
 }: {
   tasks: any[];
   collapsed: boolean;
   onToggle: () => void;
-  onRemove: (taskId: string) => void;
-  onClear: () => void;
+  onRestore: (taskId: string) => void;
   onSelectTask: (taskId: string) => void;
   isDragEnabled: boolean;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "staging-shelf" });
+
   return (
-    <div className="fixed bottom-4 right-4 z-30 w-[280px] rounded-xl shadow-xl border border-[var(--border)] bg-white">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2">
-          <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
-          <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-            Holding Tray
-          </span>
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
-            {tasks.length}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          {tasks.length > 0 && !collapsed && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] px-1.5 py-0.5 rounded"
-              title="Clear all"
-            >
-              Clear
-            </button>
+    <div
+      ref={setNodeRef}
+      className={`mb-3 rounded-xl border transition-colors ${
+        isOver
+          ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+          : "border-dashed border-[var(--border-strong)] bg-white"
+      }`}
+    >
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+          Staging shelf
+        </span>
+        <span className="text-[10px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
+          {tasks.length}
+        </span>
+        <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
+          — set entries aside here, then drag them back onto a day. Shared with the whole team.
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="ml-auto p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          aria-label={collapsed ? "Expand shelf" : "Collapse shelf"}
+        >
+          {collapsed ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronUp className="h-3.5 w-3.5" />
           )}
-          <button
-            type="button"
-            onClick={onToggle}
-            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-            aria-label={collapsed ? "Expand tray" : "Collapse tray"}
-          >
-            {collapsed ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </div>
+        </button>
       </div>
       {!collapsed && (
-        <div className="p-2 max-h-[260px] overflow-y-auto flex flex-col gap-1.5">
-          {tasks.map((task) => (
-            <TrayChip
-              key={task._id}
-              task={task}
-              onRemove={() => onRemove(task._id)}
-              onClick={() => onSelectTask(task._id)}
-              isDragEnabled={isDragEnabled}
-            />
-          ))}
-          <p className="text-[10px] text-[var(--text-muted)] px-1 mt-1">
-            Drag a chip onto any day to place it. Tasks here are hidden from
-            the grid until placed.
-          </p>
+        <div className="px-3 pb-2.5 flex flex-wrap gap-1.5 min-h-[34px]">
+          {tasks.length === 0 ? (
+            <p className="text-[11px] text-[var(--text-muted)] py-1">
+              Empty — drag an entry here (or right-click one → “Move to staging shelf”).
+            </p>
+          ) : (
+            tasks.map((task) => (
+              <ShelfChip
+                key={task._id}
+                task={task}
+                onRestore={() => onRestore(task._id)}
+                onClick={() => onSelectTask(task._id)}
+                isDragEnabled={isDragEnabled}
+              />
+            ))
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function TrayChip({
+function ShelfChip({
   task,
-  onRemove,
+  onRestore,
   onClick,
   isDragEnabled,
 }: {
   task: any;
-  onRemove: () => void;
+  onRestore: () => void;
   onClick: () => void;
   isDragEnabled: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `tray-${task._id}`,
+    id: `shelf-${task._id}`,
     data: { task },
     disabled: !isDragEnabled,
   });
 
   const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+  const origDate = task.postDate
+    ? new Date(task.postDate + "T00:00:00").toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      })
+    : null;
 
   return (
     <div
       ref={setNodeRef}
       {...(isDragEnabled ? { ...listeners, ...attributes } : {})}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded-md border border-[var(--border-subtle)] ${
+      className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg border border-[var(--border-subtle)] max-w-[240px] ${
         isDragging ? "opacity-30" : ""
       } ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{ backgroundColor: sc.bg }}
@@ -1330,24 +1685,28 @@ function TrayChip({
           e.stopPropagation();
           onClick();
         }}
-        className="flex-1 text-left text-[11px] font-medium text-[var(--text-primary)] truncate"
+        className="text-left text-[11px] font-medium text-[var(--text-primary)] truncate"
       >
         {task.title}
       </button>
-      <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[60px]">
-        {task.platform}
-      </span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/60"
-        title="Remove from tray (no date change)"
-      >
-        <X className="h-3 w-3" />
-      </button>
+      {origDate && (
+        <span className="text-[9px] font-medium text-[var(--text-muted)] bg-white/70 rounded px-1 py-px shrink-0">
+          was {origDate}
+        </span>
+      )}
+      {isDragEnabled && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRestore();
+          }}
+          className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/60 shrink-0"
+          title="Put back on its original day"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }

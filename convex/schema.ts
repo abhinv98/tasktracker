@@ -179,6 +179,10 @@ export default defineSchema({
     flowX: v.optional(v.number()),
     /** Flow canvas position (Y coordinate) */
     flowY: v.optional(v.number()),
+    /** Content-calendar staging shelf: set while the entry is parked off the
+     *  grid. postDate is preserved so un-staging restores the original day. */
+    stagedAt: v.optional(v.number()),
+    stagedBy: v.optional(v.id("users")),
   })
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
@@ -586,11 +590,22 @@ export default defineSchema({
     cumulativeDeadline: v.optional(v.number()),
     status: v.union(
       v.literal("pending_review"),
+      v.literal("on_hold"),
       v.literal("accepted"),
       v.literal("in_progress"),
       v.literal("completed"),
       v.literal("declined")
     ),
+    /** Where the request was routed when accepted. */
+    acceptedDestination: v.optional(
+      v.union(
+        v.literal("campaign_brief"),
+        v.literal("individual_task"),
+        v.literal("calendar")
+      )
+    ),
+    heldAt: v.optional(v.number()),
+    heldBy: v.optional(v.id("users")),
     internalNotes: v.optional(v.string()),
     clientName: v.optional(v.string()),
     /** Client-supplied references: uploaded files (fileKey) or external links (url). */
@@ -855,4 +870,120 @@ export default defineSchema({
     .index("by_digested", ["digestedAt"])
     .index("by_task", ["taskId"])
     .index("by_created", ["createdAt"]),
+
+  // ─── FINANCE (super-admin only) ────────────────
+  // Agency identity + document numbering. Singleton — first row wins.
+  agencyProfile: defineTable({
+    name: v.string(),
+    addressLines: v.array(v.string()),
+    gstin: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    bankName: v.optional(v.string()),
+    accountName: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+    ifsc: v.optional(v.string()),
+    upiId: v.optional(v.string()),
+    logoId: v.optional(v.id("_storage")),
+    invoicePrefix: v.string(),
+    nextInvoiceNumber: v.number(),
+    quotePrefix: v.string(),
+    nextQuoteNumber: v.number(),
+    defaultGstPercent: v.number(),
+    termsNote: v.optional(v.string()),
+    updatedBy: v.id("users"),
+    updatedAt: v.number(),
+  }),
+
+  // One quotation per project pitched to a brand (ongoing clients get many).
+  quotations: defineTable({
+    brandId: v.id("brands"),
+    projectName: v.string(),
+    quoteNumber: v.string(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("invoiced")
+    ),
+    lineItems: v.array(
+      v.object({
+        description: v.string(),
+        qty: v.number(),
+        rate: v.number(),
+        amount: v.number(),
+      })
+    ),
+    gstPercent: v.number(),
+    subtotal: v.number(),
+    taxAmount: v.number(),
+    total: v.number(),
+    notes: v.optional(v.string()),
+    validUntil: v.optional(v.number()),
+    sentAt: v.optional(v.number()),
+    approvedAt: v.optional(v.number()),
+    rejectedAt: v.optional(v.number()),
+    invoiceId: v.optional(v.id("invoices")),
+    /** Set when this quotation was cloned from another via "Revise". */
+    revisionOf: v.optional(v.id("quotations")),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_status", ["status"]),
+
+  // Generated in-app (line items + GST) or tracked external (PDF attach).
+  // "overdue" is DERIVED at read time from dueDate — never stored.
+  invoices: defineTable({
+    brandId: v.id("brands"),
+    quotationId: v.optional(v.id("quotations")),
+    briefIds: v.optional(v.array(v.id("briefs"))),
+    invoiceNumber: v.string(),
+    source: v.union(v.literal("generated"), v.literal("external")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("unpaid"),
+      v.literal("partially_paid"),
+      v.literal("paid")
+    ),
+    lineItems: v.optional(
+      v.array(
+        v.object({
+          description: v.string(),
+          qty: v.number(),
+          rate: v.number(),
+          amount: v.number(),
+        })
+      )
+    ),
+    gstPercent: v.optional(v.number()),
+    subtotal: v.optional(v.number()),
+    taxAmount: v.optional(v.number()),
+    total: v.number(),
+    /** Denormalized sum of invoicePayments — recomputed on every change. */
+    amountPaid: v.number(),
+    issueDate: v.number(),
+    dueDate: v.optional(v.number()),
+    pdfStorageId: v.optional(v.id("_storage")),
+    notes: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_brand", ["brandId"])
+    .index("by_status", ["status"])
+    .index("by_quotation", ["quotationId"]),
+
+  invoicePayments: defineTable({
+    invoiceId: v.id("invoices"),
+    amount: v.number(),
+    paidOn: v.number(),
+    method: v.optional(v.string()),
+    reference: v.optional(v.string()),
+    note: v.optional(v.string()),
+    recordedBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_invoice", ["invoiceId"]),
 });

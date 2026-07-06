@@ -615,7 +615,10 @@ export const getPortalDashboard = query({
             displayStatus,
             clientName: r.clientName,
             proposedDeadline: r.proposedDeadline,
-            finalDeadline: r.status === "pending_review" ? undefined : r.finalDeadline,
+            finalDeadline:
+              r.status === "pending_review" || r.status === "on_hold"
+                ? undefined
+                : r.finalDeadline,
             createdAt: r.createdAt,
             monthKey: monthKeyFromTimestamp(r.createdAt),
             remarks: taskRemarks,
@@ -983,7 +986,10 @@ export const listMyRequests = query({
         status: t.status,
         proposedDeadline: t.proposedDeadline,
         // Only reveal the committed date once we've accepted the request.
-        finalDeadline: t.status === "pending_review" ? undefined : t.finalDeadline,
+        finalDeadline:
+          t.status === "pending_review" || t.status === "on_hold"
+            ? undefined
+            : t.finalDeadline,
         referenceCount: (t.references ?? []).length,
         clientName: t.clientName,
         createdAt: t.createdAt,

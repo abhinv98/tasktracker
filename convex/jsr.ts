@@ -6,6 +6,11 @@ import {
   applyClientChangesRequested,
   applyClientDenial,
 } from "./lib/clientReview";
+import {
+  getOrCreateCalendarBrief,
+  ensureSheetForMonth,
+} from "./contentCalendar";
+import type { Id } from "./_generated/dataModel";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -598,6 +603,256 @@ export const updateClientTaskDeadline = mutation({
   },
 });
 
+/** Campaign briefs of a brand an accepted request can be routed into —
+ *  everything except calendar and single-task briefs. */
+export const listCampaignBriefsForBrand = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+
+    const allBriefs = await ctx.db.query("briefs").collect();
+    return allBriefs
+      .filter(
+        (b) =>
+          b.brandId === brandId &&
+          b.status !== "archived" &&
+          b.briefType !== "content_calendar" &&
+          b.briefType !== "single_task"
+      )
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .map((b) => ({
+        _id: b._id,
+        title: b.title,
+        briefType: b.briefType,
+        status: b.status,
+      }));
+  },
+});
+
+/**
+ * Accept a client request and route it to a destination:
+ *  - existing_brief:      add the task into an existing campaign brief
+ *  - new_campaign_brief:  create a campaign (flow-canvas) brief, task inside
+ *  - individual_task:     create a single_task brief around the task
+ *  - calendar:            create a calendar entry on the given postDate
+ */
+export const acceptClientRequest = mutation({
+  args: {
+    requestId: v.id("jsrClientTasks"),
+    tag: v.optional(v.string()),
+    assigneeId: v.optional(v.id("users")),
+    destination: v.union(
+      v.object({ kind: v.literal("existing_brief"), briefId: v.id("briefs") }),
+      v.object({
+        kind: v.literal("new_campaign_brief"),
+        title: v.string(),
+        description: v.optional(v.string()),
+      }),
+      v.object({ kind: v.literal("individual_task") }),
+      v.object({
+        kind: v.literal("calendar"),
+        postDate: v.string(),
+        platform: v.optional(v.string()),
+        contentType: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, { requestId, tag, assigneeId, destination }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const request = await ctx.db.get(requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.linkedTaskId) throw new Error("Already accepted");
+
+    // Client references → links the assignee can open (R2 files via /api/r2-file).
+    const referenceLinks = (request.references ?? [])
+      .map((r) =>
+        r.fileKey
+          ? `/api/r2-file?key=${encodeURIComponent(r.fileKey)}`
+          : r.url ?? null
+      )
+      .filter((u): u is string => !!u);
+
+    const assignee = assigneeId ?? userId;
+    let briefId: Id<"briefs">;
+    let taskId: Id<"tasks">;
+
+    if (destination.kind === "calendar") {
+      briefId = await getOrCreateCalendarBrief(ctx, request.brandId, userId);
+      await ensureSheetForMonth(
+        ctx,
+        briefId,
+        destination.postDate.substring(0, 7),
+        userId
+      );
+      const existingTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+        .collect();
+      const maxOrder = existingTasks.length
+        ? Math.max(...existingTasks.map((t) => t.sortOrder))
+        : 0;
+      taskId = await ctx.db.insert("tasks", {
+        briefId,
+        title: request.title,
+        description: request.description,
+        assigneeId: assignee,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: maxOrder + 1000,
+        duration: "1d",
+        durationMinutes: 480,
+        deadline: request.finalDeadline,
+        platform: destination.platform ?? "TBD",
+        contentType: destination.contentType ?? "Post",
+        postDate: destination.postDate,
+        ...(assigneeId ? { assignedAt: Date.now() } : {}),
+        ...(tag?.trim() ? { tag: tag.trim() } : {}),
+        ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+      });
+    } else {
+      // Resolve the target brief for the three non-calendar destinations.
+      if (destination.kind === "existing_brief") {
+        const brief = await ctx.db.get(destination.briefId);
+        if (!brief || brief.brandId !== request.brandId)
+          throw new Error("Brief not found for this brand");
+        if (brief.status === "archived") throw new Error("Brief is archived");
+        if (
+          brief.briefType === "content_calendar" ||
+          brief.briefType === "single_task"
+        )
+          throw new Error("Pick a campaign brief");
+        briefId = brief._id;
+      } else {
+        const allBriefs = await ctx.db.query("briefs").collect();
+        const maxPriority = allBriefs.length
+          ? Math.max(...allBriefs.map((b) => b.globalPriority))
+          : 0;
+        const isCampaign = destination.kind === "new_campaign_brief";
+        briefId = await ctx.db.insert("briefs", {
+          title: isCampaign ? destination.title : request.title,
+          description:
+            (isCampaign ? destination.description : request.description) ?? "",
+          status: "active",
+          briefType: isCampaign ? "developmental" : "single_task",
+          createdBy: userId,
+          assignedManagerId: userId,
+          globalPriority: maxPriority + 1,
+          deadline: request.finalDeadline,
+          brandId: request.brandId,
+        });
+        await ctx.db.insert("activityLog", {
+          briefId,
+          userId,
+          action: "created_brief",
+          details: `Created from client request: ${request.title}`,
+          timestamp: Date.now(),
+        });
+      }
+
+      const existingTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+        .collect();
+      taskId = await ctx.db.insert("tasks", {
+        briefId,
+        title: request.title,
+        description: request.description,
+        assigneeId: assignee,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder: existingTasks.length,
+        duration: "2 Hours",
+        durationMinutes: 120,
+        deadline: request.finalDeadline,
+        ...(assigneeId ? { assignedAt: Date.now() } : {}),
+        ...(tag?.trim() ? { tag: tag.trim() } : {}),
+        ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+      });
+    }
+
+    await ctx.db.patch(requestId, {
+      status: "accepted",
+      acceptedDestination:
+        destination.kind === "existing_brief" ||
+        destination.kind === "new_campaign_brief"
+          ? "campaign_brief"
+          : destination.kind,
+      linkedTaskId: taskId,
+      linkedBriefId: briefId,
+      heldAt: undefined,
+      heldBy: undefined,
+      ...(assigneeId ? { assignedTo: assigneeId } : {}),
+    });
+
+    if (assigneeId) {
+      const brand = await ctx.db.get(request.brandId);
+      await ctx.db.insert("notifications", {
+        recipientId: assigneeId,
+        type: "task_assigned",
+        title: "New task assigned",
+        message: `You've been assigned "${request.title}" from ${brand?.name ?? "Unknown"} client requests`,
+        briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    return { taskId, briefId };
+  },
+});
+
+/** Park a request in the visible On Hold bucket until a routing decision. */
+export const holdClientRequest = mutation({
+  args: { requestId: v.id("jsrClientTasks") },
+  handler: async (ctx, { requestId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const request = await ctx.db.get(requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.status !== "pending_review")
+      throw new Error("Only pending requests can be held");
+
+    await ctx.db.patch(requestId, {
+      status: "on_hold",
+      heldAt: Date.now(),
+      heldBy: userId,
+    });
+  },
+});
+
+/** Return a held request to the pending queue. */
+export const resumeClientRequest = mutation({
+  args: { requestId: v.id("jsrClientTasks") },
+  handler: async (ctx, { requestId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const request = await ctx.db.get(requestId);
+    if (!request) throw new Error("Request not found");
+    if (request.status !== "on_hold") throw new Error("Request is not on hold");
+
+    await ctx.db.patch(requestId, {
+      status: "pending_review",
+      heldAt: undefined,
+      heldBy: undefined,
+    });
+  },
+});
+
 export const updateClientTaskStatus = mutation({
   args: {
     taskId: v.id("jsrClientTasks"),
@@ -623,15 +878,18 @@ export const updateClientTaskStatus = mutation({
 
     await ctx.db.patch(taskId, { status });
 
-    // On accept: create a real task under a consolidated "Client Requests" brief
+    // LEGACY fallback: accepting without a routing destination lands in the
+    // consolidated "{Brand} - Client Requests" brief. The current UI accepts
+    // via acceptClientRequest instead; this branch only serves old clients
+    // still running the previous frontend. Safe to delete once all frontends
+    // are updated.
     if (status === "accepted" && !clientTask.linkedTaskId) {
       const brand = await ctx.db.get(clientTask.brandId);
       const brandName = brand?.name ?? "Unknown";
       const briefTitle = `${brandName} - Client Requests`;
 
-      // Find or create the consolidated brief
       const allBriefs = await ctx.db.query("briefs").collect();
-      let brief = allBriefs.find(
+      const brief = allBriefs.find(
         (b) => b.brandId === clientTask.brandId && b.title === briefTitle && b.status !== "archived"
       );
 
@@ -655,14 +913,11 @@ export const updateClientTaskStatus = mutation({
         });
       }
 
-      // Count existing tasks in this brief for sort order
       const existingTasks = await ctx.db
         .query("tasks")
         .withIndex("by_brief", (q) => q.eq("briefId", briefId))
         .collect();
 
-      // Carry the client's references onto the real task so the assignee sees
-      // them (external links + R2-uploaded files served via /api/r2-file).
       const referenceLinks = (clientTask.references ?? [])
         .map((r) =>
           r.fileKey
@@ -671,7 +926,6 @@ export const updateClientTaskStatus = mutation({
         )
         .filter((u): u is string => !!u);
 
-      // Create the real task (unassigned initially — assigneeId = current user as placeholder)
       const realTaskId = await ctx.db.insert("tasks", {
         briefId,
         title: clientTask.title,
@@ -687,7 +941,6 @@ export const updateClientTaskStatus = mutation({
         ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
       });
 
-      // Link back
       await ctx.db.patch(taskId, { linkedTaskId: realTaskId, linkedBriefId: briefId });
     }
 
@@ -1199,7 +1452,10 @@ export const getIntakeByToken = query({
           status: t.status,
           proposedDeadline: t.proposedDeadline,
           // Only reveal the committed date once we've accepted the request.
-          finalDeadline: t.status === "pending_review" ? undefined : t.finalDeadline,
+          finalDeadline:
+            t.status === "pending_review" || t.status === "on_hold"
+              ? undefined
+              : t.finalDeadline,
           referenceCount: (t.references ?? []).length,
           createdAt: t.createdAt,
         })),

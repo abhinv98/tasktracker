@@ -35,7 +35,15 @@ type ClientRequest = {
   brandId: string;
   title: string;
   description?: string;
-  status: "pending_review" | "accepted" | "in_progress" | "completed" | "declined";
+  status:
+    | "pending_review"
+    | "on_hold"
+    | "accepted"
+    | "in_progress"
+    | "completed"
+    | "declined";
+  acceptedDestination?: "campaign_brief" | "individual_task" | "calendar";
+  heldAt?: number;
   proposedDeadline?: number;
   finalDeadline?: number;
   clientName?: string;
@@ -48,6 +56,15 @@ type ClientRequest = {
   assigned: boolean;
   viaPortal?: boolean;
 };
+
+type DestKind = "campaign" | "individual" | "calendar";
+
+const PLATFORMS = [
+  "Instagram", "Facebook", "Twitter/X", "LinkedIn", "YouTube", "TikTok", "Pinterest", "Other",
+];
+const CONTENT_TYPES = [
+  "Post", "Reel", "Story", "Carousel", "Video", "Blog", "Newsletter", "Other",
+];
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -88,9 +105,16 @@ function refUrl(r: RefItem): string | undefined {
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending_review: { label: "Awaiting Review", color: "#b45309", bg: "#fffbeb" },
+  on_hold: { label: "On Hold", color: "#57534e", bg: "#f5f5f4" },
   accepted: { label: "Accepted", color: "#047857", bg: "#ecfdf5" },
   in_progress: { label: "In Progress", color: "#1d4ed8", bg: "#eff6ff" },
   completed: { label: "Completed", color: "#047857", bg: "#ecfdf5" },
+};
+
+const DEST_LABEL: Record<string, string> = {
+  campaign_brief: "Campaign brief",
+  individual_task: "Individual task",
+  calendar: "Calendar",
 };
 
 function RefIcon({ kind }: { kind: RefItem["kind"] }) {
@@ -110,15 +134,31 @@ export default function ClientRequestsPage() {
   const setStatus = useMutation(api.jsr.updateClientTaskStatus);
   const reassign = useMutation(api.jsr.reassignClientTask);
   const deleteTask = useMutation(api.jsr.deleteClientTask);
+  const acceptRequest = useMutation(api.jsr.acceptClientRequest);
+  const holdRequest = useMutation(api.jsr.holdClientRequest);
+  const resumeRequest = useMutation(api.jsr.resumeClientRequest);
 
+  const [tab, setTab] = useState<"pending" | "held">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [counterDate, setCounterDate] = useState<number | undefined>(undefined);
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [taskTag, setTaskTag] = useState<string>("");
   const [busyAction, setBusyAction] = useState<
-    null | "date" | "action" | "assign" | "decline" | "delete"
+    null | "date" | "action" | "assign" | "decline" | "delete" | "hold" | "resume"
   >(null);
   const busy = busyAction !== null;
+
+  // ── Accept destination picker state ──
+  const [acceptMode, setAcceptMode] = useState(false);
+  const [destKind, setDestKind] = useState<DestKind | null>(null);
+  const [campaignChoice, setCampaignChoice] = useState<"existing" | "new">("new");
+  const [existingBriefId, setExistingBriefId] = useState<string>("");
+  const [newBriefTitle, setNewBriefTitle] = useState<string>("");
+  const [newBriefDesc, setNewBriefDesc] = useState<string>("");
+  const [calDate, setCalDate] = useState<string>("");
+  const [calPlatform, setCalPlatform] = useState<string>(PLATFORMS[0]);
+  const [calContentType, setCalContentType] = useState<string>(CONTENT_TYPES[0]);
+  const [acceptAssigneeId, setAcceptAssigneeId] = useState<string>("");
 
   const selected = useMemo(
     () => (requests ?? []).find((r) => r._id === selectedId) ?? null,
@@ -128,12 +168,26 @@ export default function ClientRequestsPage() {
     api.tasks.listBrandTags,
     selected ? { brandId: selected.brandId as Id<"brands"> } : "skip"
   );
+  const campaignBriefs = useQuery(
+    api.jsr.listCampaignBriefsForBrand,
+    selected && acceptMode && destKind === "campaign"
+      ? { brandId: selected.brandId as Id<"brands"> }
+      : "skip"
+  );
 
   // Sync sidebar local state when selection changes / data refreshes.
   useEffect(() => {
     if (selected) {
       setCounterDate(selected.finalDeadline ?? selected.proposedDeadline);
       setTaskTag("");
+      setAcceptMode(false);
+      setDestKind(null);
+      setCampaignChoice("new");
+      setExistingBriefId("");
+      setNewBriefTitle(selected.title);
+      setNewBriefDesc("");
+      setCalDate("");
+      setAcceptAssigneeId("");
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -145,17 +199,21 @@ export default function ClientRequestsPage() {
   }, [selectedId, selected?.finalDeadline]);
 
   const pending = (requests ?? []).filter((r) => r.status === "pending_review");
-  const accepted = (requests ?? []).filter((r) => r.status !== "pending_review");
+  const held = (requests ?? []).filter((r) => r.status === "on_hold");
+  const accepted = (requests ?? []).filter(
+    (r) => r.status !== "pending_review" && r.status !== "on_hold"
+  );
+  const queue = tab === "pending" ? pending : held;
 
-  // Group pending by brand.
+  // Group the active queue by brand.
   const pendingByBrand = useMemo(() => {
     const map: Record<string, { brandName: string; brandColor: string; items: ClientRequest[] }> = {};
-    for (const r of pending) {
+    for (const r of queue) {
       if (!map[r.brandId]) map[r.brandId] = { brandName: r.brandName, brandColor: r.brandColor, items: [] };
       map[r.brandId].items.push(r);
     }
     return Object.values(map).sort((a, b) => a.brandName.localeCompare(b.brandName));
-  }, [pending]);
+  }, [queue]);
 
   const assignableUsers = (allUsers ?? []).filter((u: any) => u);
 
@@ -171,24 +229,95 @@ export default function ClientRequestsPage() {
     setBusyAction(null);
   }
 
-  async function handleTakeAction() {
-    if (!selected) return;
-    if (counterDate === undefined) {
+  const acceptReady =
+    destKind === "calendar"
+      ? !!calDate
+      : destKind === "campaign"
+        ? campaignChoice === "existing"
+          ? !!existingBriefId
+          : !!newBriefTitle.trim()
+        : destKind === "individual";
+
+  async function handleConfirmAccept() {
+    if (!selected || !destKind || !acceptReady) return;
+    if (destKind !== "calendar" && counterDate === undefined) {
       toast("error", "Set a counter completion date first");
       return;
     }
     setBusyAction("action");
     try {
-      // Persist the committed date, then convert into a real brief task.
-      await setDeadline({ taskId: selected._id as Id<"jsrClientTasks">, finalDeadline: counterDate });
-      await setStatus({
-        taskId: selected._id as Id<"jsrClientTasks">,
-        status: "accepted",
+      // Persist the committed date so the accepted task inherits it.
+      if (counterDate !== undefined) {
+        await setDeadline({
+          taskId: selected._id as Id<"jsrClientTasks">,
+          finalDeadline: counterDate,
+        });
+      }
+      const destination =
+        destKind === "calendar"
+          ? {
+              kind: "calendar" as const,
+              postDate: calDate,
+              platform: calPlatform,
+              contentType: calContentType,
+            }
+          : destKind === "individual"
+            ? { kind: "individual_task" as const }
+            : campaignChoice === "existing"
+              ? {
+                  kind: "existing_brief" as const,
+                  briefId: existingBriefId as Id<"briefs">,
+                }
+              : {
+                  kind: "new_campaign_brief" as const,
+                  title: newBriefTitle.trim(),
+                  description: newBriefDesc.trim() || undefined,
+                };
+      await acceptRequest({
+        requestId: selected._id as Id<"jsrClientTasks">,
         tag: taskTag.trim() || undefined,
+        assigneeId: acceptAssigneeId
+          ? (acceptAssigneeId as Id<"users">)
+          : undefined,
+        destination,
       });
-      toast("success", "Task added to briefs — now assign someone");
+      toast(
+        "success",
+        destKind === "calendar"
+          ? "Accepted — added to the content calendar"
+          : destKind === "individual"
+            ? "Accepted as an individual task"
+            : "Accepted into the campaign brief"
+      );
+      setAcceptMode(false);
     } catch (e) {
-      toast("error", e instanceof Error ? e.message : "Failed to take action");
+      toast("error", e instanceof Error ? e.message : "Failed to accept");
+    }
+    setBusyAction(null);
+  }
+
+  async function handleHold() {
+    if (!selected) return;
+    setBusyAction("hold");
+    try {
+      await holdRequest({ requestId: selected._id as Id<"jsrClientTasks"> });
+      toast("success", "Moved to On Hold");
+      setSelectedId(null);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Failed to hold");
+    }
+    setBusyAction(null);
+  }
+
+  async function handleResume() {
+    if (!selected) return;
+    setBusyAction("resume");
+    try {
+      await resumeRequest({ requestId: selected._id as Id<"jsrClientTasks"> });
+      toast("success", "Returned to pending");
+      setSelectedId(null);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Failed to resume");
     }
     setBusyAction(null);
   }
@@ -256,16 +385,52 @@ export default function ClientRequestsPage() {
         </div>
       ) : (
         <div className="space-y-8 pb-10">
-          {/* PENDING REVIEW */}
+          {/* PENDING / ON HOLD QUEUE */}
           <section>
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">Awaiting Review</h2>
-              <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5">
-                {pending.length}
-              </span>
+            <div className="flex items-center gap-1.5 mb-4">
+              <button
+                onClick={() => setTab("pending")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  tab === "pending"
+                    ? "bg-[var(--text-primary)] text-white"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                }`}
+              >
+                Awaiting Review
+                <span
+                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+                    tab === "pending" ? "bg-white/25 text-white" : "bg-amber-500 text-white"
+                  }`}
+                >
+                  {pending.length}
+                </span>
+              </button>
+              <button
+                onClick={() => setTab("held")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  tab === "held"
+                    ? "bg-[var(--text-primary)] text-white"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                }`}
+              >
+                On Hold
+                <span
+                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+                    tab === "held"
+                      ? "bg-white/25 text-white"
+                      : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {held.length}
+                </span>
+              </button>
             </div>
             {pendingByBrand.length === 0 ? (
-              <p className="text-[13px] text-[var(--text-muted)]">Nothing awaiting review. 🎉</p>
+              <p className="text-[13px] text-[var(--text-muted)]">
+                {tab === "pending"
+                  ? "Nothing awaiting review. 🎉"
+                  : "Nothing on hold. Requests you park with “Hold for later” appear here."}
+              </p>
             ) : (
               <div className="space-y-5">
                 {pendingByBrand.map((group) => (
@@ -422,7 +587,7 @@ export default function ClientRequestsPage() {
                     onChange={(e) => setCounterDate(fromDateInput(e.target.value))}
                     className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
-                  {selected.status === "pending_review" && (
+                  {(selected.status === "pending_review" || selected.status === "on_hold") && (
                     <button
                       onClick={handleSaveCounterDate}
                       disabled={busy || counterDate === undefined}
@@ -436,7 +601,7 @@ export default function ClientRequestsPage() {
               </div>
 
               {/* Category tag (applied to the created task on accept) */}
-              {selected.status === "pending_review" && (
+              {(selected.status === "pending_review" || selected.status === "on_hold") && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
                   <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
                     Category Tag
@@ -459,8 +624,175 @@ export default function ClientRequestsPage() {
                 </div>
               )}
 
+              {/* Destination picker (accept flow) */}
+              {acceptMode &&
+                (selected.status === "pending_review" || selected.status === "on_hold") && (
+                  <div className="border-t border-[var(--border-subtle)] pt-4">
+                    <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                      Where should this task go?
+                    </h4>
+                    <div className="space-y-2">
+                      {(
+                        [
+                          {
+                            kind: "campaign" as const,
+                            title: "Campaign Brief",
+                            hint: "Part of a bigger campaign — new brief or an existing one",
+                          },
+                          {
+                            kind: "individual" as const,
+                            title: "Individual Task",
+                            hint: "A standalone one-off task with its own brief",
+                          },
+                          {
+                            kind: "calendar" as const,
+                            title: "Calendar Task",
+                            hint: "A content-calendar entry on a specific date",
+                          },
+                        ]
+                      ).map((opt) => (
+                        <button
+                          key={opt.kind}
+                          onClick={() => setDestKind(opt.kind)}
+                          className={`w-full text-left px-3.5 py-2.5 rounded-lg border transition-colors ${
+                            destKind === opt.kind
+                              ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                              : "border-[var(--border)] hover:border-[var(--border-strong)]"
+                          }`}
+                        >
+                          <span className="block text-[13px] font-semibold text-[var(--text-primary)]">
+                            {opt.title}
+                          </span>
+                          <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
+                            {opt.hint}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {destKind === "campaign" && (
+                      <div className="mt-3 space-y-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setCampaignChoice("new")}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
+                              campaignChoice === "new"
+                                ? "border-[var(--accent-admin)] text-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                                : "border-[var(--border)] text-[var(--text-secondary)]"
+                            }`}
+                          >
+                            Create new brief
+                          </button>
+                          <button
+                            onClick={() => setCampaignChoice("existing")}
+                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
+                              campaignChoice === "existing"
+                                ? "border-[var(--accent-admin)] text-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                                : "border-[var(--border)] text-[var(--text-secondary)]"
+                            }`}
+                          >
+                            Add to existing
+                          </button>
+                        </div>
+                        {campaignChoice === "new" ? (
+                          <>
+                            <input
+                              value={newBriefTitle}
+                              onChange={(e) => setNewBriefTitle(e.target.value)}
+                              placeholder="Campaign brief title"
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            />
+                            <textarea
+                              value={newBriefDesc}
+                              onChange={(e) => setNewBriefDesc(e.target.value)}
+                              placeholder="Brief description (optional)"
+                              rows={2}
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                            />
+                          </>
+                        ) : (
+                          <select
+                            value={existingBriefId}
+                            onChange={(e) => setExistingBriefId(e.target.value)}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                          >
+                            <option value="">
+                              {campaignBriefs === undefined
+                                ? "Loading briefs…"
+                                : campaignBriefs.length === 0
+                                  ? "No campaign briefs for this brand yet"
+                                  : "Choose a campaign brief…"}
+                            </option>
+                            {(campaignBriefs ?? []).map((b: any) => (
+                              <option key={b._id} value={b._id}>
+                                {b.title}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+
+                    {destKind === "calendar" && (
+                      <div className="mt-3 space-y-2.5">
+                        <input
+                          type="date"
+                          value={calDate}
+                          onChange={(e) => setCalDate(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <select
+                            value={calPlatform}
+                            onChange={(e) => setCalPlatform(e.target.value)}
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                          >
+                            {PLATFORMS.map((p) => (
+                              <option key={p} value={p}>{p}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={calContentType}
+                            onChange={(e) => setCalContentType(e.target.value)}
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                          >
+                            {CONTENT_TYPES.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {!calDate && (
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            Pick the post date — the entry lands on that day of the calendar.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {destKind && (
+                      <div className="mt-3">
+                        <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                          Assign to (optional)
+                        </h4>
+                        <select
+                          value={acceptAssigneeId}
+                          onChange={(e) => setAcceptAssigneeId(e.target.value)}
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                        >
+                          <option value="">Decide later</option>
+                          {assignableUsers.map((u: any) => (
+                            <option key={u._id} value={u._id}>
+                              {u.name ?? u.email} {u.role === "admin" ? "(admin)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               {/* Assignment (after acceptance) */}
-              {selected.status !== "pending_review" && (
+              {selected.status !== "pending_review" && selected.status !== "on_hold" && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
                   <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
                     Assignment
@@ -505,34 +837,89 @@ export default function ClientRequestsPage() {
 
             {/* Footer actions */}
             <div className="border-t border-[var(--border)] px-6 py-4 flex items-center gap-2">
-              {selected.status === "pending_review" ? (
-                <>
-                  <button
-                    onClick={handleTakeAction}
-                    disabled={busy || counterDate === undefined}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
-                    style={{ backgroundColor: "var(--accent-admin)" }}
-                  >
-                    {busyAction === "action" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
+              {selected.status === "pending_review" || selected.status === "on_hold" ? (
+                acceptMode ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setAcceptMode(false);
+                        setDestKind(null);
+                      }}
+                      disabled={busy}
+                      className="flex items-center justify-center px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleConfirmAccept}
+                      disabled={busy || !destKind || !acceptReady}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
+                      style={{ backgroundColor: "var(--accent-admin)" }}
+                    >
+                      {busyAction === "action" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
+                      {busyAction === "action"
+                        ? "Accepting…"
+                        : !destKind
+                          ? "Choose a destination"
+                          : "Confirm Accept"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setAcceptMode(true)}
+                      disabled={busy}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
+                      style={{ backgroundColor: "var(--accent-admin)" }}
+                    >
                       <CheckCircle2 className="h-4 w-4" />
-                    )}
-                    {busyAction === "action" ? "Adding to Briefs…" : "Take Action — Add to Briefs"}
-                  </button>
-                  <button
-                    onClick={handleDecline}
-                    disabled={busy}
-                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors"
-                  >
-                    {busyAction === "decline" ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Accept…
+                    </button>
+                    {selected.status === "pending_review" ? (
+                      <button
+                        onClick={handleHold}
+                        disabled={busy}
+                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                      >
+                        {busyAction === "hold" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Clock className="h-4 w-4" />
+                        )}
+                        Hold
+                      </button>
                     ) : (
-                      <Ban className="h-4 w-4" />
+                      <button
+                        onClick={handleResume}
+                        disabled={busy}
+                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                      >
+                        {busyAction === "resume" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Inbox className="h-4 w-4" />
+                        )}
+                        To Pending
+                      </button>
                     )}
-                    Decline
-                  </button>
-                </>
+                    <button
+                      onClick={handleDecline}
+                      disabled={busy}
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors"
+                    >
+                      {busyAction === "decline" ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Ban className="h-4 w-4" />
+                      )}
+                      Decline
+                    </button>
+                  </>
+                )
               ) : (
                 <button
                   onClick={handleDelete}
@@ -591,7 +978,12 @@ function RequestCard({ r, onClick }: { r: ClientRequest; onClick: () => void }) 
           </span>
         )}
         {r.assigned && <span className="text-emerald-600 font-medium">→ {r.assigneeName}</span>}
-        <span className="ml-auto">{timeAgo(r.createdAt)}</span>
+        {r.acceptedDestination && (
+          <span className="font-medium">{DEST_LABEL[r.acceptedDestination]}</span>
+        )}
+        <span className="ml-auto">
+          {r.status === "on_hold" && r.heldAt ? `Held ${timeAgo(r.heldAt)}` : timeAgo(r.createdAt)}
+        </span>
       </div>
     </button>
   );

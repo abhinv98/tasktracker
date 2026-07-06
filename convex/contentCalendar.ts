@@ -112,7 +112,7 @@ async function buildRoleByUserMap(ctx: any): Promise<Map<any, "copy" | "design" 
 
 // ─── BRAND-BASED CONTENT CALENDAR ──────────────
 
-async function getOrCreateCalendarBrief(
+export async function getOrCreateCalendarBrief(
   ctx: any,
   brandId: any,
   userId: string
@@ -390,8 +390,10 @@ export const listTasksByBrandMonth = query({
       .withIndex("by_brief", (q) => q.eq("briefId", ccBrief._id))
       .collect();
 
+    // Staged entries live on the staging shelf, not the grid.
     const monthTasks = tasks.filter(
-      (t) => t.postDate && t.postDate.startsWith(month) && !t.parentTaskId
+      (t) =>
+        t.postDate && t.postDate.startsWith(month) && !t.parentTaskId && !t.stagedAt
     );
 
     const users = await ctx.db.query("users").collect();
@@ -496,6 +498,211 @@ export const listEntriesByIds = query({
             assignee?.name ?? assignee?.email ?? "Unknown",
         };
       });
+  },
+});
+
+// ─── STAGING SHELF ─────────────────────────────
+// Server-backed replacement for the old localStorage holding tray. Staged
+// entries keep their postDate (so un-staging restores the original day) and
+// are simply excluded from the month grid while stagedAt is set.
+
+/** Shift a "YYYY-MM-DD" string by N days. UTC-noon anchor avoids TZ drift. */
+function shiftDateString(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** Days in a "YYYY-MM" month. */
+function daysInMonth(month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+async function requireCalendarAdmin(ctx: any) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+  const user = await ctx.db.get(userId);
+  if (!user || user.role !== "admin")
+    throw new Error("Only admins can modify the calendar");
+  return userId;
+}
+
+/** All staged entries of a brand's content calendar, newest-staged first. */
+export const listStagedEntries = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    if (!(await canViewBrandCalendar(ctx, userId, brandId))) return [];
+
+    const allBriefs = await ctx.db.query("briefs").collect();
+    const ccBrief = allBriefs.find(
+      (b: any) =>
+        b.brandId === brandId &&
+        b.briefType === "content_calendar" &&
+        b.status !== "archived"
+    );
+    if (!ccBrief) return [];
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", ccBrief._id))
+      .collect();
+    const staged = tasks.filter((t) => t.stagedAt && !t.parentTaskId);
+    if (staged.length === 0) return [];
+
+    const users = await ctx.db.query("users").collect();
+    return staged
+      .sort((a, b) => (b.stagedAt ?? 0) - (a.stagedAt ?? 0))
+      .map((t) => {
+        const assignee = users.find((u) => u._id === t.assigneeId);
+        return {
+          ...t,
+          assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
+        };
+      });
+  },
+});
+
+/** Park one or more grid entries on the staging shelf. */
+export const stageEntries = mutation({
+  args: { taskIds: v.array(v.id("tasks")) },
+  handler: async (ctx, { taskIds }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    const now = Date.now();
+    for (const taskId of taskIds) {
+      const task = await ctx.db.get(taskId);
+      if (!task || task.stagedAt) continue;
+      await ctx.db.patch(taskId, { stagedAt: now, stagedBy: userId });
+    }
+  },
+});
+
+/** Take an entry off the shelf. With postDate: place it on that day; without:
+ *  restore it to its original day (postDate was never cleared). */
+export const unstageEntry = mutation({
+  args: { taskId: v.id("tasks"), postDate: v.optional(v.string()) },
+  handler: async (ctx, { taskId, postDate }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Entry not found");
+    if (postDate) {
+      await ensureSheetForMonth(ctx, task.briefId, postDate.substring(0, 7), userId);
+    }
+    await ctx.db.patch(taskId, {
+      stagedAt: undefined,
+      stagedBy: undefined,
+      ...(postDate ? { postDate } : {}),
+    });
+  },
+});
+
+/** Bulk reschedule: shift by ±N days, or anchor the earliest entry on
+ *  newStartDate and preserve the gaps between entries. */
+export const bulkShiftDates = mutation({
+  args: {
+    taskIds: v.array(v.id("tasks")),
+    deltaDays: v.optional(v.number()),
+    newStartDate: v.optional(v.string()),
+  },
+  handler: async (ctx, { taskIds, deltaDays, newStartDate }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    const tasks = (
+      await Promise.all(taskIds.map((id) => ctx.db.get(id)))
+    ).filter((t): t is NonNullable<typeof t> => !!t && !!t.postDate);
+    if (tasks.length === 0) return;
+
+    let delta: number;
+    if (deltaDays !== undefined) {
+      delta = Math.trunc(deltaDays);
+    } else if (newStartDate) {
+      const earliest = tasks
+        .map((t) => t.postDate!)
+        .sort((a, b) => a.localeCompare(b))[0];
+      const [y1, m1, d1] = earliest.split("-").map(Number);
+      const [y2, m2, d2] = newStartDate.split("-").map(Number);
+      delta = Math.round(
+        (Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000
+      );
+    } else {
+      throw new Error("Provide deltaDays or newStartDate");
+    }
+    if (delta === 0) return;
+
+    const monthsTouched = new Set<string>();
+    for (const task of tasks) {
+      const next = shiftDateString(task.postDate!, delta);
+      await ctx.db.patch(task._id, { postDate: next });
+      monthsTouched.add(next.substring(0, 7));
+    }
+    for (const month of monthsTouched) {
+      await ensureSheetForMonth(ctx, tasks[0].briefId, month, userId);
+    }
+  },
+});
+
+/** Move entries to another month, keeping day-of-month (clamped to its end). */
+export const bulkMoveToMonth = mutation({
+  args: { taskIds: v.array(v.id("tasks")), month: v.string() },
+  handler: async (ctx, { taskIds, month }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    const maxDay = daysInMonth(month);
+    let briefId: any = null;
+    for (const taskId of taskIds) {
+      const task = await ctx.db.get(taskId);
+      if (!task || !task.postDate) continue;
+      const day = Math.min(Number(task.postDate.slice(8, 10)), maxDay);
+      await ctx.db.patch(taskId, {
+        postDate: `${month}-${String(day).padStart(2, "0")}`,
+      });
+      briefId = task.briefId;
+    }
+    if (briefId) await ensureSheetForMonth(ctx, briefId, month, userId);
+  },
+});
+
+/** Copy a calendar entry to another date (sheets-style copy-paste). Children
+ *  and deliverable/progress state are intentionally not copied. */
+export const duplicateEntry = mutation({
+  args: { taskId: v.id("tasks"), postDate: v.string() },
+  handler: async (ctx, { taskId, postDate }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Entry not found");
+
+    await ensureSheetForMonth(ctx, task.briefId, postDate.substring(0, 7), userId);
+
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", task.briefId))
+      .collect();
+    const maxOrder = existingTasks.length
+      ? Math.max(...existingTasks.map((t) => t.sortOrder))
+      : 0;
+
+    return await ctx.db.insert("tasks", {
+      briefId: task.briefId,
+      title: task.title,
+      description: task.description,
+      assigneeId: task.assigneeId,
+      assignedBy: userId,
+      status: "pending",
+      sortOrder: maxOrder + 1000,
+      duration: task.duration,
+      durationMinutes: task.durationMinutes,
+      platform: task.platform,
+      contentType: task.contentType,
+      postDate,
+      ...(task.tag ? { tag: task.tag } : {}),
+      ...(task.creativesRequired !== undefined
+        ? { creativesRequired: task.creativesRequired }
+        : {}),
+      ...(task.handoffTargetTeamId
+        ? { handoffTargetTeamId: task.handoffTargetTeamId }
+        : {}),
+    });
   },
 });
 

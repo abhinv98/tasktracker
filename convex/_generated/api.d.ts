@@ -9,6 +9,7 @@
  */
 
 import type * as activityLog from "../activityLog.js";
+import type * as agencyProfile from "../agencyProfile.js";
 import type * as aiAction from "../aiAction.js";
 import type * as analytics from "../analytics.js";
 import type * as approvals from "../approvals.js";
@@ -30,6 +31,7 @@ import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
 import type * as freelancers from "../freelancers.js";
 import type * as http from "../http.js";
+import type * as invoices from "../invoices.js";
 import type * as jsr from "../jsr.js";
 import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverables.js";
 import type * as lib_cascadeDeleteTask from "../lib/cascadeDeleteTask.js";
@@ -70,6 +72,7 @@ import type * as notifications from "../notifications.js";
 import type * as oversight from "../oversight.js";
 import type * as passwordChange from "../passwordChange.js";
 import type * as personalNotes from "../personalNotes.js";
+import type * as quotations from "../quotations.js";
 import type * as reminders from "../reminders.js";
 import type * as reports from "../reports.js";
 import type * as schedule from "../schedule.js";
@@ -92,6 +95,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activityLog: typeof activityLog;
+  agencyProfile: typeof agencyProfile;
   aiAction: typeof aiAction;
   analytics: typeof analytics;
   approvals: typeof approvals;
@@ -113,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   dm: typeof dm;
   freelancers: typeof freelancers;
   http: typeof http;
+  invoices: typeof invoices;
   jsr: typeof jsr;
   "lib/autoApproveDeliverables": typeof lib_autoApproveDeliverables;
   "lib/cascadeDeleteTask": typeof lib_cascadeDeleteTask;
@@ -153,6 +158,7 @@ declare const fullApi: ApiFromModules<{
   oversight: typeof oversight;
   passwordChange: typeof passwordChange;
   personalNotes: typeof personalNotes;
+  quotations: typeof quotations;
   reminders: typeof reminders;
   reports: typeof reports;
   schedule: typeof schedule;
