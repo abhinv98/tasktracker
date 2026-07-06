@@ -2,11 +2,12 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, PageHeader, TaskDetailModal, DatePicker } from "@/components/ui";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon } from "lucide-react";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -445,6 +446,7 @@ export default function DashboardPage() {
 
     const overdueTasksForManager = useQuery(api.tasks.listOverdueTasksForManager);
     const actionNeededTasks = useQuery(api.tasks.listActionNeededTasks);
+    const pendingClientRequests = useQuery(api.jsr.listPendingClientRequests, {});
     const adminOverdueHalt = useQuery(api.tasks.getOverdueHaltStatus);
     const myWork = useQuery(api.tasks.listMyWork);
     const resumeOverdueTask = useMutation(api.tasks.resumeOverdueTask);
@@ -479,6 +481,92 @@ export default function DashboardPage() {
 
     const adminActiveTasks = (tasks ?? []).filter((t) => t.status !== "done");
 
+    // ── Hero digest + attention strip (derived from queries above only) ──
+    const firstName = displayName.split(" ")[0];
+    const todayLine = new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    });
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = dayStart.getTime() + 24 * 60 * 60 * 1000;
+    const dueTodayCount = adminActiveTasks.filter(
+      (t) => t.deadline && t.deadline >= dayStart.getTime() && t.deadline < dayEnd
+    ).length;
+    const overdueCount = (overdueTasksForManager ?? []).length;
+    const pendingRequests = (pendingClientRequests ?? []).filter(
+      (r) => r.status === "pending_review"
+    );
+    const heroLoaded =
+      tasks !== undefined &&
+      overdueTasksForManager !== undefined &&
+      pendingClientRequests !== undefined;
+    const digestSegments: { label: string; href: string }[] = [];
+    if (dueTodayCount > 0)
+      digestSegments.push({
+        label: `${dueTodayCount} task${dueTodayCount !== 1 ? "s" : ""} due today`,
+        href: "/my-tasks",
+      });
+    if (overdueCount > 0)
+      digestSegments.push({ label: `${overdueCount} overdue`, href: "/worklog" });
+    if (pendingRequests.length > 0)
+      digestSegments.push({
+        label: `${pendingRequests.length} client request${pendingRequests.length !== 1 ? "s" : ""} waiting`,
+        href: "/client-requests",
+      });
+
+    type AttentionRow = {
+      key: string;
+      icon: LucideIcon;
+      iconClass: string;
+      title: string;
+      context: string;
+      href: string;
+    };
+    const attentionLoaded =
+      overdueTasksForManager !== undefined &&
+      actionNeededTasks !== undefined &&
+      pendingClientRequests !== undefined;
+    const attentionRows: AttentionRow[] = [
+      // Prioritized: overdue first, then action-needed, then pending client requests
+      ...(overdueTasksForManager ?? []).map((ot: any): AttentionRow => ({
+        key: `overdue-${ot._id}`,
+        icon: AlertTriangle,
+        iconClass: "text-red-500",
+        title: ot.title,
+        context:
+          ot.alertType === "unassigned"
+            ? "No one assigned · Overdue"
+            : `${ot.briefTitle} · ${ot.assigneeName} · Overdue`,
+        href:
+          ot.briefType === "content_calendar" && ot.brandId
+            ? `/content-calendar?brand=${ot.brandId}`
+            : `/brief/${ot.briefId}`,
+      })),
+      ...(actionNeededTasks ?? []).map((t: any): AttentionRow => ({
+        key: `action-${t._id}`,
+        icon: t.category === "no_deadline" ? CalendarOff : UserX,
+        iconClass: "text-amber-500",
+        title: t.title,
+        context: `${t.briefTitle} · ${t.brandName}`,
+        href:
+          t.briefType === "content_calendar" && t.brandId
+            ? `/content-calendar?brand=${t.brandId}`
+            : `/brief/${t.briefId}`,
+      })),
+      ...pendingRequests.map((r): AttentionRow => ({
+        key: `request-${r._id}`,
+        icon: Inbox,
+        iconClass: "text-[var(--accent-admin)]",
+        title: r.title,
+        context: `${r.brandName} · Client request`,
+        href: "/client-requests",
+      })),
+    ];
+    const attentionTotal = attentionRows.length;
+    const attentionVisible = attentionRows.slice(0, 6);
+
     function toggleTeam(teamId: string) {
       setExpandedTeams((prev) => {
         const next = new Set(prev);
@@ -489,60 +577,165 @@ export default function DashboardPage() {
 
     return (
       <div className="p-4 sm:p-6 lg:p-8 relative">
-        <PageHeader
-          title={`${greeting}, ${displayName}`}
-          subtitle="Here's your operational overview"
-          actions={
-            (myBrandIds ?? []).length > 0 && (
-              <button
-                onClick={() => router.push("/brands-overview?filter=mine")}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
-              >
-                <Briefcase className="h-4 w-4" />
-                My Brands
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            )
-          }
-        />
+        {/* Hero header: greeting, date, and a linked digest of what needs doing */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-5 mb-6 border-b border-[var(--border-subtle)]">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+              {todayLine}
+            </p>
+            <h1 className="font-semibold text-[22px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
+              {greeting}, {firstName}
+            </h1>
+            <p className="mt-1.5 text-[13px] text-[var(--text-secondary)]">
+              {!heroLoaded ? (
+                <span className="text-[var(--text-muted)]">Pulling up your day…</span>
+              ) : digestSegments.length === 0 ? (
+                <span>All caught up — nothing urgent on your plate.</span>
+              ) : (
+                digestSegments.map((seg, i) => (
+                  <span key={seg.href}>
+                    {i > 0 && <span className="mx-1.5 text-[var(--text-muted)]">·</span>}
+                    <Link
+                      href={seg.href}
+                      className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-admin)] hover:underline underline-offset-2 transition-colors"
+                    >
+                      {seg.label}
+                    </Link>
+                  </span>
+                ))
+              )}
+            </p>
+          </div>
+          {(myBrandIds ?? []).length > 0 && (
+            <button
+              onClick={() => router.push("/brands-overview?filter=mine")}
+              className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+            >
+              <Briefcase className="h-4 w-4" />
+              My Brands
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Needs attention: consolidated overdue → action-needed → client requests */}
+        <div className="mb-6 sm:mb-8">
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
+            Needs attention
+            {attentionLoaded && attentionTotal > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 tabular-nums">
+                {attentionTotal}
+              </span>
+            )}
+          </h2>
+          {!attentionLoaded ? (
+            <Card>
+              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+            </Card>
+          ) : attentionTotal === 0 ? (
+            <Card>
+              <p className="text-[13px] text-[var(--text-secondary)] flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                All clear — nothing needs your attention.
+              </p>
+            </Card>
+          ) : (
+            <Card className="p-0 overflow-hidden">
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {attentionVisible.map((row) => {
+                  const RowIcon = row.icon;
+                  return (
+                    <div
+                      key={row.key}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+                    >
+                      <RowIcon className={`h-4 w-4 shrink-0 ${row.iconClass}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                          {row.title}
+                        </p>
+                        <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                          {row.context}
+                        </p>
+                      </div>
+                      <Link
+                        href={row.href}
+                        className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+                      >
+                        View <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
+                  );
+                })}
+                {attentionTotal > attentionVisible.length && (
+                  <p className="px-4 py-2 text-[11px] text-[var(--text-muted)]">
+                    +{attentionTotal - attentionVisible.length} more in the sections below
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <Card accent="admin" hover onClick={() => router.push("/briefs")} className="cursor-pointer">
-            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
-              Active Briefs
-            </p>
-            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {scopedActiveBriefs}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                  Active Briefs
+                </p>
+                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                  {scopedActiveBriefs}
+                </p>
+              </div>
+              <Briefcase className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+            </div>
           </Card>
           <Card accent="manager" hover onClick={() => router.push("/worklog")} className="cursor-pointer">
-            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
-              Open Tasks
-            </p>
-            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {scopedOpenTasks}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                  Open Tasks
+                </p>
+                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                  {scopedOpenTasks}
+                </p>
+              </div>
+              <ListChecks className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+            </div>
           </Card>
           <Card accent="employee" hover onClick={() => router.push(isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine")} className="cursor-pointer">
-            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
-              {isSuperAdmin ? "Teams" : "My Brands"}
-            </p>
-            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                  {isSuperAdmin ? "Teams" : "My Brands"}
+                </p>
+                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                  {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
+                </p>
+              </div>
+              <Layers className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+            </div>
           </Card>
           <Card hover onClick={() => router.push("/users")} className="cursor-pointer">
-            <p className="text-[11px] sm:text-[12px] font-medium text-[var(--text-secondary)]">
-              Employees
-            </p>
-            <p className="font-bold text-[24px] sm:text-[32px] text-[var(--text-primary)] mt-1 tabular-nums">
-              {employeeCount}
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+                  Employees
+                </p>
+                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                  {employeeCount}
+                </p>
+              </div>
+              <Users className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
+            </div>
           </Card>
         </div>
 
         {/* Brand Overview & Briefs Overview Shortcuts */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 sm:mb-8">
+        <div className="mb-6 sm:mb-8">
+        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Quick links</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Card
             hover
             accent="admin"
@@ -586,11 +779,25 @@ export default function DashboardPage() {
             </div>
           </Card>
         </div>
+        </div>
 
         {/* Client Approval Status */}
         {clientApprovalCounts && (clientApprovalCounts.approved > 0 || clientApprovalCounts.pendingClient > 0 || clientApprovalCounts.changesRequested > 0 || clientApprovalCounts.denied > 0) && (
           <div className="mb-6 sm:mb-8">
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Client Approvals</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
+                Client Approvals{" "}
+                <span className="font-normal text-[var(--text-muted)] tabular-nums">
+                  ({clientApprovalCounts.pendingClient + clientApprovalCounts.approved + clientApprovalCounts.changesRequested + clientApprovalCounts.denied})
+                </span>
+              </h2>
+              <Link
+                href="/deliverables"
+                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+              >
+                View all →
+              </Link>
+            </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {clientApprovalCounts.pendingClient > 0 && (
                 <Card>
@@ -625,7 +832,10 @@ export default function DashboardPage() {
           <div className="mb-6 sm:mb-8">
             <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-500" />
-              Reminders ({adminOverdueHalt!.length})
+              Reminders{" "}
+              <span className="font-normal text-[var(--text-muted)] tabular-nums">
+                ({adminOverdueHalt!.length})
+              </span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {adminOverdueHalt!.map((ot) => {
@@ -674,10 +884,21 @@ export default function DashboardPage() {
         {/* Overdue Tasks Section */}
         {(overdueTasksForManager ?? []).length > 0 && (
           <div className="mb-6 sm:mb-8">
-            <h2 className="font-semibold text-[15px] text-red-700 mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Overdue Alerts ({overdueTasksForManager!.length})
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                Overdue Alerts{" "}
+                <span className="font-normal text-[var(--text-muted)] tabular-nums">
+                  ({overdueTasksForManager!.length})
+                </span>
+              </h2>
+              <Link
+                href="/worklog"
+                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+              >
+                View all →
+              </Link>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {overdueTasksForManager!.map((ot: any) => (
                 <Card key={ot._id} className={`p-4 border-l-4 ${ot.alertType === "unassigned" ? "border-l-amber-500" : "border-l-red-500"}`}>
@@ -879,7 +1100,10 @@ export default function DashboardPage() {
           <div className="mb-6 sm:mb-8">
             <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
               <Info className="h-4 w-4 text-blue-500" />
-              Action Needed ({actionNeededTasks!.length})
+              Action Needed{" "}
+              <span className="font-normal text-[var(--text-muted)] tabular-nums">
+                ({actionNeededTasks!.length})
+              </span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {actionNeededTasks!.map((t: any) => {
@@ -1004,7 +1228,7 @@ export default function DashboardPage() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                  <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
                     My Tasks
                   </h2>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -1039,22 +1263,33 @@ export default function DashboardPage() {
         {/* Team Lead Overview */}
         {((teamLeadOverview ?? []).length > 0 || (pendingApprovalCount ?? 0) > 0) && (
           <div className="mb-6 sm:mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-[14px] text-[var(--text-secondary)]">
-                My Teams
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
+                My Teams{" "}
+                <span className="font-normal text-[var(--text-muted)] tabular-nums">
+                  ({(teamLeadOverview ?? []).length})
+                </span>
               </h2>
-              {(pendingApprovalCount ?? 0) > 0 && (
-                <button
-                  onClick={() => router.push("/deliverables")}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
+              <div className="flex items-center gap-3">
+                {(pendingApprovalCount ?? 0) > 0 && (
+                  <button
+                    onClick={() => router.push("/deliverables")}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="text-[12px] font-semibold text-amber-700">
+                      {pendingApprovalCount} Approval{pendingApprovalCount !== 1 ? "s" : ""} Pending
+                    </span>
+                    <ArrowRight className="h-3 w-3 text-amber-500" />
+                  </button>
+                )}
+                <Link
+                  href="/teams"
+                  className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
                 >
-                  <ClipboardCheck className="h-3.5 w-3.5 text-amber-600" />
-                  <span className="text-[12px] font-semibold text-amber-700">
-                    {pendingApprovalCount} Approval{pendingApprovalCount !== 1 ? "s" : ""} Pending
-                  </span>
-                  <ArrowRight className="h-3 w-3 text-amber-500" />
-                </button>
-              )}
+                  View all →
+                </Link>
+              </div>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
               {(teamLeadOverview ?? []).map((teamData: any) => {

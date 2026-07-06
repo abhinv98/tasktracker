@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter } from "lucide-react";
+import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2 } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
@@ -532,6 +532,11 @@ export default function BriefPage() {
 
   const { toast } = useToast();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const setFlowPositions = useMutation(api.tasks.updateTaskFlowPositions);
+
+  // Canvas ↔ List toggle for the flow-canvas brief types.
+  const [briefView, setBriefView] = useState<"canvas" | "list">("canvas");
+  const [showAddPillPicker, setShowAddPillPicker] = useState(false);
 
   const briefTeamsList = graphData?.teams ?? [];
 
@@ -557,6 +562,63 @@ export default function BriefPage() {
   const totalTasks = filteredTasks.length;
   const doneTasks = tasksByStatus.done.length;
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  /** Auto-layout: topological layering (Kahn) of the connection graph into
+   *  columns; unconnected tasks fill the first column. Persists positions. */
+  async function handleAutoLayout() {
+    const conns = taskConnections ?? [];
+    const ids = filteredTasks.map((t) => t._id as string);
+    const idSet = new Set(ids);
+    const indegree = new Map<string, number>(ids.map((id) => [id, 0]));
+    const outgoing = new Map<string, string[]>();
+    for (const c of conns) {
+      const s = c.sourceTaskId as string;
+      const t = c.targetTaskId as string;
+      if (!idSet.has(s) || !idSet.has(t)) continue;
+      indegree.set(t, (indegree.get(t) ?? 0) + 1);
+      outgoing.set(s, [...(outgoing.get(s) ?? []), t]);
+    }
+    // Layer assignment
+    const layer = new Map<string, number>();
+    let queue = ids.filter((id) => (indegree.get(id) ?? 0) === 0);
+    queue.forEach((id) => layer.set(id, 0));
+    const indeg = new Map(indegree);
+    while (queue.length > 0) {
+      const next: string[] = [];
+      for (const id of queue) {
+        for (const t of outgoing.get(id) ?? []) {
+          layer.set(t, Math.max(layer.get(t) ?? 0, (layer.get(id) ?? 0) + 1));
+          indeg.set(t, (indeg.get(t) ?? 1) - 1);
+          if ((indeg.get(t) ?? 0) === 0) next.push(t);
+        }
+      }
+      queue = next;
+    }
+    // Cycle leftovers → last layer + 1
+    const maxLayer = Math.max(0, ...[...layer.values()]);
+    for (const id of ids) if (!layer.has(id)) layer.set(id, maxLayer + 1);
+
+    const rows = new Map<number, number>();
+    const positions = ids
+      .sort((a, b) => (layer.get(a) ?? 0) - (layer.get(b) ?? 0))
+      .map((id) => {
+        const col = layer.get(id) ?? 0;
+        const row = rows.get(col) ?? 0;
+        rows.set(col, row + 1);
+        return {
+          taskId: id as Id<"tasks">,
+          flowX: 80 + col * 320,
+          flowY: 80 + row * 170,
+        };
+      });
+    if (positions.length === 0) return;
+    try {
+      await setFlowPositions({ positions });
+      toast("success", "Canvas re-arranged by task flow");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Auto-layout failed");
+    }
+  }
 
   async function handleArchive() {
     try {
@@ -812,6 +874,34 @@ export default function BriefPage() {
               <span className="text-[10px] text-[var(--text-muted)]">({doneTasks}/{totalTasks})</span>
             </div>
 
+            {/* Canvas | List toggle */}
+            <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden">
+              {(["canvas", "list"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setBriefView(v)}
+                  className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    briefView === v
+                      ? "bg-[var(--text-primary)] text-white"
+                      : "bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  }`}
+                >
+                  {v === "canvas" ? "Canvas" : "List"}
+                </button>
+              ))}
+            </div>
+            {isAdmin && briefView === "canvas" && totalTasks > 1 && (
+              <button
+                type="button"
+                onClick={handleAutoLayout}
+                title="Re-arrange nodes into columns following the task flow"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <Wand2 className="h-3 w-3" /> Auto-layout
+              </button>
+            )}
+
             {/* Team filter dropdown */}
             {(teamsForBrief ?? []).filter(Boolean).length > 0 && (
               <div className="relative">
@@ -968,15 +1058,106 @@ export default function BriefPage() {
             )}
           </div>
 
-          {/* React Flow canvas */}
-          <div className="flex-1" style={{ height: "calc(100% - 42px)" }}>
+          {/* React Flow canvas / List view */}
+          <div className="flex-1 relative" style={{ height: "calc(100% - 42px)" }}>
             {(teamsForBrief?.length ?? 0) === 0 ? (
               <div className="flex items-center justify-center h-full text-center">
                 <div>
                   <ClipboardList className="h-10 w-10 text-[var(--text-disabled)] mx-auto mb-3" />
                   <p className="text-[14px] font-medium text-[var(--text-secondary)]">No teams assigned</p>
-                  <p className="text-[12px] text-[var(--text-muted)] mt-1">Add teams above to build the task flow.</p>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">
+                    A brief runs as a flow between teams — add the first team to get started.
+                  </p>
+                  {isAdmin && brief.status !== "archived" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTeamPicker(true)}
+                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold"
+                    >
+                      <Plus className="h-4 w-4" /> Add a team
+                    </button>
+                  )}
                 </div>
+              </div>
+            ) : briefView === "list" ? (
+              <div className="h-full overflow-y-auto p-4">
+                {filteredTasks.length === 0 ? (
+                  <p className="text-[13px] text-[var(--text-muted)] text-center py-12">No tasks yet.</p>
+                ) : (
+                  <table className="w-full border-collapse bg-white rounded-xl overflow-hidden border border-[var(--border-subtle)]">
+                    <thead>
+                      <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)] text-left text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)]">
+                        <th className="px-4 py-2 font-semibold">Task</th>
+                        <th className="px-4 py-2 font-semibold">Assignee</th>
+                        <th className="px-4 py-2 font-semibold">Status</th>
+                        <th className="px-4 py-2 font-semibold">Deadline</th>
+                        {isAdmin && <th className="px-4 py-2" />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...filteredTasks]
+                        .sort((a, b) => {
+                          const order: Record<string, number> = { pending: 0, "in-progress": 1, review: 2, "on-hold": 3, done: 4 };
+                          const d = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+                          if (d !== 0) return d;
+                          return (a.deadline ?? Infinity) - (b.deadline ?? Infinity);
+                        })
+                        .map((t) => {
+                          const assignee = briefTeamsList
+                            .flatMap((g) => g.members)
+                            .find((m) => m.user._id === t.assigneeId)?.user;
+                          const statusMeta: Record<string, { label: string; dot: string }> = {
+                            pending: { label: "Planned", dot: "#6b7280" },
+                            "in-progress": { label: "In Progress", dot: "#f59e0b" },
+                            review: { label: "In Review", dot: "#8b5cf6" },
+                            done: { label: "Completed", dot: "#10b981" },
+                            "on-hold": { label: "On Hold", dot: "#78716c" },
+                          };
+                          const sm = statusMeta[t.status] ?? statusMeta.pending;
+                          const overdue = t.deadline && t.deadline < Date.now() && t.status !== "done";
+                          return (
+                            <tr
+                              key={t._id}
+                              onClick={() => setSelectedTaskId(t._id)}
+                              className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer transition-colors"
+                            >
+                              <td className="px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)]">{t.title}</td>
+                              <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">
+                                {assignee?.name ?? assignee?.email ?? "—"}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sm.dot }} />
+                                  {sm.label}
+                                </span>
+                              </td>
+                              <td className={`px-4 py-2.5 text-[12px] ${overdue ? "text-[var(--danger)] font-semibold" : "text-[var(--text-muted)]"}`}>
+                                {t.deadline
+                                  ? new Date(t.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                                  : "—"}
+                              </td>
+                              {isAdmin && (
+                                <td className="px-4 py-2.5 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAutoEditTask(true);
+                                      setSelectedTaskId(t._id);
+                                    }}
+                                    className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white"
+                                    title="Edit task"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             ) : (
               <BriefFlowCanvas
@@ -1037,6 +1218,82 @@ export default function BriefPage() {
                 onRequestAddTeam={() => setShowTeamPicker(true)}
               />
             )}
+
+            {/* Guided empty state — teams exist, no tasks yet */}
+            {briefView === "canvas" &&
+              (teamsForBrief?.length ?? 0) > 0 &&
+              totalTasks === 0 &&
+              panelMode === "hidden" && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                  <div className="pointer-events-auto bg-white rounded-xl border border-[var(--border)] shadow-lg px-8 py-6 text-center max-w-sm">
+                    <ClipboardList className="h-8 w-8 text-[var(--text-disabled)] mx-auto mb-2.5" />
+                    <p className="text-[14px] font-semibold text-[var(--text-primary)]">No tasks yet</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-1 leading-relaxed">
+                      Each task is a step in the flow. Connect them by dragging
+                      between node handles — the next step starts when the
+                      previous one is approved.
+                    </p>
+                    {isAdmin && brief.status !== "archived" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const first = (teamsForBrief ?? []).filter(Boolean)[0];
+                          if (first) openCreateTaskPanel(first._id);
+                        }}
+                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold"
+                      >
+                        <Plus className="h-4 w-4" /> Add the first task
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            {/* Floating add-task pill */}
+            {briefView === "canvas" &&
+              isAdmin &&
+              brief.status !== "archived" &&
+              (teamsForBrief?.length ?? 0) > 0 &&
+              totalTasks > 0 &&
+              panelMode === "hidden" && (
+                <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
+                  {showAddPillPicker && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowAddPillPicker(false)} />
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[180px]">
+                        <p className="px-3 py-1 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+                          Add task for
+                        </p>
+                        {(teamsForBrief ?? []).filter(Boolean).map((team: any) => (
+                          <button
+                            key={team._id}
+                            type="button"
+                            onClick={() => {
+                              setShowAddPillPicker(false);
+                              openCreateTaskPanel(team._id);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                            {team.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const teams = (teamsForBrief ?? []).filter(Boolean);
+                      if (teams.length === 1) openCreateTaskPanel(teams[0]._id);
+                      else setShowAddPillPicker((v) => !v);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--text-primary)] text-white text-[12px] font-semibold shadow-lg hover:opacity-90 transition-opacity"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add task
+                  </button>
+                </div>
+              )}
           </div>
         </div>
 
