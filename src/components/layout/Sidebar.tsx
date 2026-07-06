@@ -31,6 +31,7 @@ import {
   Eye,
   ListTodo,
   UserCog,
+  Receipt,
   Inbox,
   type LucideIcon,
 } from "lucide-react";
@@ -68,11 +69,12 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/oversight": Eye,
   "/freelancers": UserCog,
   "/client-requests": Inbox,
+  "/invoices": Receipt,
 };
 
 interface NavCategory {
   category: string;
-  items: { href: string; label: string }[];
+  items: { href: string; label: string; superAdminOnly?: boolean }[];
 }
 
 const ADMIN_NAV: NavCategory[] = [
@@ -105,6 +107,7 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/client-requests", label: "Client Requests" },
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
+      { href: "/invoices", label: "Invoices", superAdminOnly: true },
       { href: "/users", label: "Users & Teams" },
       { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
@@ -162,7 +165,15 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
 
   // Oversight lives as a tab inside Work Log (no standalone nav item).
-  const nav: NavCategory[] = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+  const baseNav: NavCategory[] = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+  const nav: NavCategory[] = baseNav
+    .map((cat) => ({
+      ...cat,
+      items: cat.items.filter(
+        (i) => !i.superAdminOnly || user.isSuperAdmin === true
+      ),
+    }))
+    .filter((cat) => cat.items.length > 0);
 
   // All categories open by default
   const [openCategories, setOpenCategories] = useState<Set<string>>(

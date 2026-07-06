@@ -19,6 +19,13 @@ export async function requireAdmin(ctx: Ctx): Promise<Doc<"users">> {
   return user;
 }
 
+/** Super admins only — the finance (quotations/invoices) surface. */
+export async function requireSuperAdmin(ctx: Ctx): Promise<Doc<"users">> {
+  const user = await requireAdmin(ctx);
+  if (user.isSuperAdmin !== true) throw new Error("Not authorized");
+  return user;
+}
+
 export type ClientUser = Doc<"users"> & { clientBrandId: Id<"brands"> };
 
 /** A logged-in portal client account, with its brand binding guaranteed. */

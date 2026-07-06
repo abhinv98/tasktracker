@@ -13,6 +13,7 @@ import { CommandPalette } from "@/components/layout/CommandPalette";
 // employee team leads get bounced.
 const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks", "/freelancers"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
+const SUPERADMIN_ONLY_ROUTES = ["/invoices"];
 
 export default function DashboardLayout({
   children,
@@ -57,6 +58,12 @@ export default function DashboardLayout({
     if (
       role === "employee" &&
       MANAGER_OR_ADMIN_ROUTES.some((r) => pathname.startsWith(r))
+    ) {
+      router.replace("/dashboard");
+    }
+    if (
+      user.isSuperAdmin !== true &&
+      SUPERADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r))
     ) {
       router.replace("/dashboard");
     }
