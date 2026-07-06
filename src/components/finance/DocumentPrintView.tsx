@@ -41,7 +41,7 @@ function inr(n: number): string {
 }
 
 function fmtDate(ts?: number | null): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   return new Date(ts).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",

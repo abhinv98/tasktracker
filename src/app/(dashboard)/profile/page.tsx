@@ -331,7 +331,7 @@ export default function ProfilePage() {
                   Email
                 </label>
                 <p className="text-[var(--text-primary)]">
-                  {user.email ?? "—"}
+                  {user.email ?? "-"}
                 </p>
               </div>
               <div>
@@ -974,7 +974,7 @@ function AdminSuggestionItem({
                 <StatusPill status={suggestion.status} />
               </div>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                {suggestion.authorEmail ?? "—"} ·{" "}
+                {suggestion.authorEmail ?? "-"} ·{" "}
                 {formatWhen(suggestion.createdAt)}
                 {suggestion.updatedAt !== suggestion.createdAt &&
                   ` · edited ${formatWhen(suggestion.updatedAt)}`}

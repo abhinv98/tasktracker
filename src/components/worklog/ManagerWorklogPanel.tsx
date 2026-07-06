@@ -212,7 +212,7 @@ export default function ManagerWorklogPanel() {
                           {!e.done && (e.carryOverDays ?? 0) > 0 && (
                             <span
                               className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
-                              title="Not completed by its original deadline — rolled forward each day"
+                              title="Not completed by its original deadline, rolled forward each day"
                             >
                               Carried over · {e.carryOverDays}d
                             </span>
@@ -241,7 +241,7 @@ export default function ManagerWorklogPanel() {
 
               <div className="mb-6">
                 <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-1">
-                  Supervising — open delegated tasks
+                  Supervising: open delegated tasks
                 </h3>
                 <p className="text-[12px] text-[var(--text-muted)] mb-2">
                   Pending, in-progress and review tasks this manager
@@ -304,7 +304,7 @@ export default function ManagerWorklogPanel() {
                                       "en-US",
                                       { month: "short", day: "numeric" }
                                     )
-                                  : "—"}
+                                  : "-"}
                               </td>
                             </tr>
                           );
@@ -509,7 +509,7 @@ export default function ManagerWorklogPanel() {
                               >
                                 {t.title}
                                 <span className="text-[var(--text-muted)]">
-                                  · {t.date ?? "—"}
+                                  · {t.date ?? "-"}
                                 </span>
                               </span>
                             ))}

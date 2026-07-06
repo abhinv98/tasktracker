@@ -209,11 +209,11 @@ export default function ReportsPage() {
                                   <span className={`text-[11px] ${isOverdue ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                                     {new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                   </span>
-                                ) : "—"}
+                                ) : "-"}
                               </td>
                               <td className="px-3 py-2">
                                 <span className="text-[11px] text-[var(--text-muted)]">
-                                  {task.timeSpentMinutes > 0 ? `${Math.round(task.timeSpentMinutes)}m` : "—"}
+                                  {task.timeSpentMinutes > 0 ? `${Math.round(task.timeSpentMinutes)}m` : "-"}
                                 </span>
                               </td>
                             </tr>

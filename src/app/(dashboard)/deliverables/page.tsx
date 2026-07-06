@@ -215,7 +215,7 @@ export default function DeliverablesPage() {
     }
     try {
       await rejectDeliverable({ deliverableId: deliverableId as any, note: note.trim() });
-      toast("success", "Changes requested — sent back to the submitter");
+      toast("success", "Changes requested. Sent back to the submitter");
       setShowRejectForm(null);
       setRejectNote({});
     } catch (err) {
@@ -805,7 +805,7 @@ export default function DeliverablesPage() {
                   <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
                     {hctx?.inMasterBrief && !hctx?.hasDownstreamConnection && (
                       <div className="mb-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
-                        This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor — you can hand off manually below for now.
+                        This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor. You can hand off manually below for now.
                       </div>
                     )}
                     <button
@@ -898,7 +898,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person — a new task will be created on their team.</p>
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -908,7 +908,7 @@ export default function DeliverablesPage() {
                                     onChange={(e) =>
                                       setHandoffNewTitle((prev) => ({ ...prev, [d._id]: e.target.value }))
                                     }
-                                    placeholder={`New task title (optional — defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
+                                    placeholder={`New task title (optional, defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
                                     className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <textarea
@@ -935,7 +935,7 @@ export default function DeliverablesPage() {
                               <textarea
                                 value={handoffNote[d._id] ?? ""}
                                 onChange={(e) => setHandoffNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
-                                placeholder="Extra instructions (optional) — appended to the handoff"
+                                placeholder="Extra instructions (optional), appended to the handoff"
                                 className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                               />
                               <div className="flex gap-2">
@@ -1343,11 +1343,11 @@ export default function DeliverablesPage() {
                   </span>
                 ) : allApproved ? (
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-green-50 text-green-700 shrink-0">
-                    All Approved{d.taskHasHandoffTarget ? " — awaiting handoff" : ""}
+                    All Approved{d.taskHasHandoffTarget ? ", awaiting handoff" : ""}
                   </span>
                 ) : d.awaitingHandoff ? (
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-800 shrink-0">
-                    TL approved — handoff pending
+                    TL approved, handoff pending
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 shrink-0">
@@ -1499,7 +1499,7 @@ export default function DeliverablesPage() {
                       ) : (
                         <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
                           <Loader2 className="h-3 w-3 animate-spin" />
-                          Chain tasks in progress — final approval pending
+                          Chain tasks in progress, final approval pending
                         </span>
                       )}
 
@@ -1547,7 +1547,7 @@ export default function DeliverablesPage() {
                       if (!hctx?.inMasterBrief || hctx?.hasDownstreamConnection) return null;
                       return (
                         <div className="mt-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
-                          This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor — you can hand off manually below for now.
+                          This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor. You can hand off manually below for now.
                         </div>
                       );
                     })()}
@@ -1632,7 +1632,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person — a new task will be created on their team.</p>
+                                <p className="text-[10px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -1642,7 +1642,7 @@ export default function DeliverablesPage() {
                                     onChange={(e) =>
                                       setHandoffNewTitle((prev) => ({ ...prev, [tk]: e.target.value }))
                                     }
-                                    placeholder={`New task title (optional — defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
+                                    placeholder={`New task title (optional, defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
                                     className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <textarea
@@ -1669,7 +1669,7 @@ export default function DeliverablesPage() {
                               <textarea
                                 value={handoffNote[tk] ?? ""}
                                 onChange={(e) => setHandoffNote((prev) => ({ ...prev, [tk]: e.target.value }))}
-                                placeholder="Extra instructions (optional) — appended to the handoff"
+                                placeholder="Extra instructions (optional), appended to the handoff"
                                 className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                               />
                               <div className="flex gap-2">

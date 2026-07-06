@@ -311,7 +311,7 @@ function ResetPasswordModal({
               </div>
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-3.5">
                 <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                  New Password — share it securely
+                  New Password. Share it securely
                 </p>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center flex-1 min-w-0 bg-white border border-[var(--border)] rounded-lg px-3 py-2">
@@ -600,8 +600,8 @@ function ClientsPanel() {
             <TableBody>
               {clients.map((c) => (
                 <TableRow key={c._id}>
-                  <TableCell>{c.name ?? "—"}</TableCell>
-                  <TableCell>{c.email ?? "—"}</TableCell>
+                  <TableCell>{c.name ?? "-"}</TableCell>
+                  <TableCell>{c.email ?? "-"}</TableCell>
                   <TableCell>
                     <span
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
@@ -835,15 +835,15 @@ export default function UsersPage() {
           <TableBody>
             {users.map((user) => (
               <TableRow key={user._id}>
-                <TableCell>{user.name ?? user.email ?? "—"}</TableCell>
-                <TableCell>{user.email ?? "—"}</TableCell>
+                <TableCell>{user.name ?? user.email ?? "-"}</TableCell>
+                <TableCell>{user.email ?? "-"}</TableCell>
                 <TableCell>
                   <span className={
                     (user as { designation?: string }).designation
                       ? "text-[var(--text-primary)]"
                       : "text-[var(--text-disabled)]"
                   }>
-                    {(user as { designation?: string }).designation ?? "—"}
+                    {(user as { designation?: string }).designation ?? "-"}
                   </span>
                 </TableCell>
                 <TableCell>
@@ -880,7 +880,7 @@ export default function UsersPage() {
                           {t.name}
                         </Badge>
                       )
-                    ) ?? "—"}
+                    ) ?? "-"}
                   </div>
                 </TableCell>
                 <TableCell className="w-[88px]">

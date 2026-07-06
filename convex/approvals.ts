@@ -206,7 +206,7 @@ export const listDeliverables = query({
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
           reviewerName: reviewer?.name ?? reviewer?.email,
           taskTitle: task?.title ?? "Unknown",
-          taskDuration: task?.duration ?? "—",
+          taskDuration: task?.duration ?? "-",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
           briefType: brief?.briefType ?? null,
@@ -323,7 +323,7 @@ export const listTeamLeadPendingApprovals = query({
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
           taskTitle: task?.title ?? "Unknown",
-          taskDuration: task?.duration ?? "—",
+          taskDuration: task?.duration ?? "-",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
           brandName: brand?.name ?? "No Brand",
@@ -477,7 +477,7 @@ export const listManagerDeliverables = query({
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
           taskTitle: task?.title ?? "Unknown",
-          taskDuration: task?.duration ?? "—",
+          taskDuration: task?.duration ?? "-",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
           briefType: brief?.briefType ?? null,
@@ -586,7 +586,7 @@ export const listManagerDeliverables = query({
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
           taskTitle: task?.title ?? "Unknown",
-          taskDuration: task?.duration ?? "—",
+          taskDuration: task?.duration ?? "-",
           briefTitle: brief?.title ?? "Unknown",
           briefId: brief?._id,
           brandName: brand?.name ?? "No Brand",
@@ -1085,14 +1085,14 @@ export const editDeliverable = mutation({
         deliverable.mainAssigneeStatus !== "pending" ||
         deliverable.mainAssigneeReviewedAt != null
       ) {
-        throw new Error("Cannot edit — main assignee has already acted");
+        throw new Error("Cannot edit. The main assignee has already acted.");
       }
     } else {
       if (
         deliverable.teamLeadStatus !== "pending" ||
         deliverable.teamLeadReviewedAt != null
       ) {
-        throw new Error("Cannot edit — team lead has already acted");
+        throw new Error("Cannot edit. The team lead has already acted.");
       }
     }
 
@@ -1138,7 +1138,7 @@ export const teamLeadApprove = mutation({
     // deliverable straight through instead and stop here.
     if (task && task.status === "done") {
       const closedNote =
-        note ?? "Task already completed — auto-closed on team lead approval";
+        note ?? "Task already completed, auto-closed on team lead approval";
       await ctx.db.patch(deliverableId, {
         teamLeadStatus: "approved",
         teamLeadReviewedBy: userId,
@@ -1432,7 +1432,7 @@ export const submitDeliverableDirectToAssignor = mutation({
       throw new Error("This task has no assignor on record");
     }
     if (task.assignedBy === userId) {
-      throw new Error("You are the assignor of this task — submit through the normal flow");
+      throw new Error("You are the assignor of this task. Submit through the normal flow.");
     }
 
     const deliverableId = await ctx.db.insert("deliverables", {
@@ -1503,7 +1503,7 @@ export const teamLeadAndManagerApprove = mutation({
     const brief = task ? await ctx.db.get(task.briefId) : null;
 
     if (!brief?.brandId) {
-      throw new Error("Brief has no brand assigned — cannot do brand manager approval");
+      throw new Error("Brief has no brand assigned, so brand manager approval is not possible");
     }
 
     const isManager = await isBrandManager(ctx, userId, brief.brandId);

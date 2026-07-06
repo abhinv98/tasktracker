@@ -66,7 +66,7 @@ export default function HistoryPage() {
   function generateTextExport(): string {
     if (!history || !user) return "";
     const lines: string[] = [];
-    lines.push(`WORK HISTORY — ${user.name ?? user.email}`);
+    lines.push(`WORK HISTORY - ${user.name ?? user.email}`);
     lines.push(`Generated: ${new Date().toLocaleDateString()}`);
     lines.push("=".repeat(60));
     lines.push("");
@@ -80,10 +80,10 @@ export default function HistoryPage() {
 
         for (const task of brief.tasks) {
           const sl = STATUS_CONFIG[task.status]?.label ?? task.status;
-          lines.push(`    Task: ${task.title} — ${sl} (${task.duration})`);
+          lines.push(`    Task: ${task.title} - ${sl} (${task.duration})`);
 
           for (const del of task.deliverables) {
-            lines.push(`      Deliverable: ${del.message ?? "—"} [${del.status ?? "pending"}]`);
+            lines.push(`      Deliverable: ${del.message ?? "-"} [${del.status ?? "pending"}]`);
             if (del.fileNames?.length) {
               lines.push(`        Files: ${del.fileNames.join(", ")}`);
             }

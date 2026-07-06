@@ -109,9 +109,9 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   }, [task, tasksData]);
 
   const assignerName = useMemo(() => {
-    if (!task?.assignedBy || !tasksData?.users) return "—";
+    if (!task?.assignedBy || !tasksData?.users) return "-";
     const u = tasksData.users.find((u: any) => u._id === task.assignedBy);
-    return u?.name ?? u?.email ?? "—";
+    return u?.name ?? u?.email ?? "-";
   }, [task, tasksData]);
 
   if (!task) {
@@ -201,7 +201,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
             <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Duration</p>
             <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-              {task.duration ?? "—"}
+              {task.duration ?? "-"}
             </p>
           </div>
           {task.deadline && (
@@ -347,7 +347,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               {dailySummaries.map((s: any, idx: number) => (
                 <div key={s._id} className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
                   <p className="text-[11px] font-medium text-[var(--accent-admin)]">
-                    Day {idx + 1} — {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    Day {idx + 1} - {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                   <p className="text-[13px] text-[var(--text-primary)] mt-1 whitespace-pre-wrap">{s.summary}</p>
                 </div>
@@ -1066,7 +1066,7 @@ export default function BriefPage() {
                   <ClipboardList className="h-10 w-10 text-[var(--text-disabled)] mx-auto mb-3" />
                   <p className="text-[14px] font-medium text-[var(--text-secondary)]">No teams assigned</p>
                   <p className="text-[12px] text-[var(--text-muted)] mt-1">
-                    A brief runs as a flow between teams — add the first team to get started.
+                    A brief runs as a flow between teams. Add the first team to get started.
                   </p>
                   {isAdmin && brief.status !== "archived" && (
                     <button
@@ -1123,7 +1123,7 @@ export default function BriefPage() {
                             >
                               <td className="px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)]">{t.title}</td>
                               <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">
-                                {assignee?.name ?? assignee?.email ?? "—"}
+                                {assignee?.name ?? assignee?.email ?? "-"}
                               </td>
                               <td className="px-4 py-2.5">
                                 <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
@@ -1134,7 +1134,7 @@ export default function BriefPage() {
                               <td className={`px-4 py-2.5 text-[12px] ${overdue ? "text-[var(--danger)] font-semibold" : "text-[var(--text-muted)]"}`}>
                                 {t.deadline
                                   ? new Date(t.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
-                                  : "—"}
+                                  : "-"}
                               </td>
                               {isAdmin && (
                                 <td className="px-4 py-2.5 text-right">
@@ -1230,7 +1230,7 @@ export default function BriefPage() {
                     <p className="text-[14px] font-semibold text-[var(--text-primary)]">No tasks yet</p>
                     <p className="text-[12px] text-[var(--text-muted)] mt-1 leading-relaxed">
                       Each task is a step in the flow. Connect them by dragging
-                      between node handles — the next step starts when the
+                      between node handles. The next step starts when the
                       previous one is approved.
                     </p>
                     {isAdmin && brief.status !== "archived" && (

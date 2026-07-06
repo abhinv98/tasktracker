@@ -142,7 +142,7 @@ export default function PortalDeckPage() {
       <PortalPageHeader
         title="Client deck"
         count={items.length}
-        description="Documents shared between you and the team — add your own, comment, and approve items sent for sign off."
+        description="Documents shared between you and the team. Add your own, comment, and approve items sent for sign off."
         action={
           <PortalButton variant={showAdd ? "secondary" : "primary"} onClick={() => setShowAdd(!showAdd)}>
             {showAdd ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}

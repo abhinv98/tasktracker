@@ -247,7 +247,7 @@ function EmptyDraftNode({
           <div className="rounded-lg bg-amber-50 border border-amber-200/90 px-2 py-1.5 flex items-start gap-1.5 text-left">
             <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
             <p className="text-[10px] text-amber-950 leading-snug">
-              Finish in the panel on the right — select team, assignee, title, and deadline.
+              Finish in the panel on the right. Select team, assignee, title, and deadline.
             </p>
           </div>
         </div>
@@ -584,7 +584,7 @@ function BriefFlowCanvasInner({
                     className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--border)] hover:bg-[var(--accent-admin)] hover:text-white hover:border-[var(--accent-admin)] transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5 shrink-0" />
-                    Add task — {team.teamName}
+                    Add task - {team.teamName}
                   </button>
                 ))}
               </div>

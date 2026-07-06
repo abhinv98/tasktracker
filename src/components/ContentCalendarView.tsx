@@ -382,7 +382,7 @@ export function ContentCalendarView({
           assignorName:
             externalTaskDetail.assignedBy?.name ??
             externalTaskDetail.assignedBy?.email ??
-            "—",
+            "-",
         }
       : null);
 
@@ -485,7 +485,7 @@ export function ContentCalendarView({
       {currentSheetMonth && (
         <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-primary)] shrink-0">
           <p className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5">
-            {monthLabel(currentSheetMonth)} — break days (red)
+            {monthLabel(currentSheetMonth)} - break days (red)
           </p>
           <div className="flex flex-wrap gap-1 max-w-full">
             {Array.from(
@@ -613,18 +613,18 @@ export function ContentCalendarView({
                         </div>
                       ) : (
                         <span className="text-[12px] text-[var(--text-muted)]">
-                          —
+                          -
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="text-[12px] text-[var(--text-primary)]">
-                        {task.platform ?? "—"}
+                        {task.platform ?? "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="text-[12px] text-[var(--text-primary)]">
-                        {task.contentType ?? "—"}
+                        {task.contentType ?? "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
@@ -684,7 +684,7 @@ export function ContentCalendarView({
                           )}
                         </div>
                       ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                        <span className="text-[11px] text-[var(--text-muted)]">-</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
@@ -906,7 +906,7 @@ export function ContentCalendarView({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   required
-                  placeholder="e.g. Instagram Post — Product Launch"
+                  placeholder="e.g. Instagram Post - Product Launch"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 />
               </div>
@@ -1004,7 +1004,7 @@ export function ContentCalendarView({
                   ).map((emp: any) => (
                     <option key={emp._id} value={emp._id}>
                       {emp.name ?? emp.email}
-                      {emp.designation ? ` — ${emp.designation}` : ""}
+                      {emp.designation ? ` - ${emp.designation}` : ""}
                     </option>
                   ))}
                 </select>
@@ -1868,7 +1868,7 @@ export function ContentCalendarEntrySidebar({
                 {(oTeam && oTeamMembers ? oTeamMembers : employees).map((emp: any) => (
                   <option key={emp._id} value={emp._id}>
                     {emp.name ?? emp.email}
-                    {emp.designation ? ` — ${emp.designation}` : ""}
+                    {emp.designation ? ` - ${emp.designation}` : ""}
                   </option>
                 ))}
               </select>
@@ -2141,7 +2141,7 @@ export function ContentCalendarEntrySidebar({
                 onChange={(e) => setEditPlatform(e.target.value)}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
-                <option value="">—</option>
+                <option value="">-</option>
                 {PLATFORMS.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -2150,7 +2150,7 @@ export function ContentCalendarEntrySidebar({
               </select>
             ) : (
               <p className="text-[13px] text-[var(--text-primary)]">
-                {task.platform ?? "—"}
+                {task.platform ?? "-"}
               </p>
             )}
           </div>
@@ -2164,7 +2164,7 @@ export function ContentCalendarEntrySidebar({
                 onChange={(e) => setEditContentType(e.target.value)}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
-                <option value="">—</option>
+                <option value="">-</option>
                 {CONTENT_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -2173,7 +2173,7 @@ export function ContentCalendarEntrySidebar({
               </select>
             ) : (
               <p className="text-[13px] text-[var(--text-primary)]">
-                {task.contentType ?? "—"}
+                {task.contentType ?? "-"}
               </p>
             )}
           </div>
@@ -2198,7 +2198,7 @@ export function ContentCalendarEntrySidebar({
                 <p className="text-[13px] text-[var(--text-primary)]">
                   {task.postDate
                     ? formatPostDate(task.postDate).display
-                    : "—"}
+                    : "-"}
                 </p>
               )}
             </div>
@@ -2270,7 +2270,7 @@ export function ContentCalendarEntrySidebar({
               </>
             ) : (
               <p className="text-[13px] text-[var(--text-primary)]">
-                {(task as any).designCreativesRequired ?? "—"}
+                {(task as any).designCreativesRequired ?? "-"}
               </p>
             )}
           </div>
@@ -2326,7 +2326,7 @@ export function ContentCalendarEntrySidebar({
                 ).map((emp: any) => (
                   <option key={emp._id} value={emp._id}>
                     {emp.name ?? emp.email}
-                    {emp.designation ? ` — ${emp.designation}` : ""}
+                    {emp.designation ? ` - ${emp.designation}` : ""}
                   </option>
                 ))}
               </select>
@@ -2384,7 +2384,7 @@ export function ContentCalendarEntrySidebar({
                         {lt.assigneeName && (
                           <p className="text-[10px] text-[var(--text-muted)] ml-2.5">
                             Assigned to: <span className="font-medium text-[var(--text-secondary)]">{lt.assigneeName}</span>
-                            {lt.assigneeDesignation ? ` — ${lt.assigneeDesignation}` : ""}
+                            {lt.assigneeDesignation ? ` - ${lt.assigneeDesignation}` : ""}
                           </p>
                         )}
                       </button>
@@ -2481,7 +2481,7 @@ export function ContentCalendarEntrySidebar({
                     ).map((emp: any) => (
                       <option key={emp._id} value={emp._id}>
                         {emp.name ?? emp.email}
-                        {emp.designation ? ` — ${emp.designation}` : ""}
+                        {emp.designation ? ` - ${emp.designation}` : ""}
                       </option>
                     ))}
                   </select>
@@ -2806,7 +2806,7 @@ export function ContentCalendarEntrySidebar({
                   <p className="text-[10px] text-[var(--text-muted)]">
                     {att.uploaderName}
                     {att.uploaderDesignation
-                      ? ` — ${att.uploaderDesignation}`
+                      ? ` - ${att.uploaderDesignation}`
                       : ""}
                   </p>
                 </div>
@@ -2919,7 +2919,7 @@ function RequestChangesControl({
       <div>
         <label className="text-[11px] font-medium text-amber-800 block mb-1">
           New deadline
-          {deadlinePast ? " (required — old deadline has passed)" : " (optional)"}
+          {deadlinePast ? " (required, old deadline has passed)" : " (optional)"}
         </label>
         <input
           type="date"
@@ -2929,7 +2929,7 @@ function RequestChangesControl({
         />
         {deadlinePast && !newDeadline && (
           <p className="text-[10px] text-amber-700 mt-1">
-            The old deadline already passed — set a new one so the assignee
+            The old deadline already passed. Set a new one so the assignee
             isn't flagged overdue immediately.
           </p>
         )}
@@ -2945,7 +2945,7 @@ function RequestChangesControl({
           onClick={async () => {
             if (!note.trim()) return;
             if (deadlinePast && !newDeadline) {
-              toast("error", "Set a new deadline — the old one has passed.");
+              toast("error", "Set a new deadline. The old one has passed.");
               return;
             }
             setSubmitting(true);

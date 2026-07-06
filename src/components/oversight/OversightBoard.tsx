@@ -25,7 +25,7 @@ const STATUS = TASK_STATUS_CONFIG as Record<
 >;
 
 function fmt(ts: number | null): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   return new Date(ts).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -272,7 +272,7 @@ export default function OversightBoard() {
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
           className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
-          title="Filter by team — shows tasks owned by anyone on that team"
+          title="Filter by team. Shows tasks owned by anyone on that team"
         >
           <option value="">All teams</option>
           {board.filterOptions.teams.map((t) => (
@@ -298,7 +298,7 @@ export default function OversightBoard() {
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate || undefined}
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
-            title="From — start of range (inclusive)"
+            title="From: start of range (inclusive)"
           />
           <span className="text-[12px] text-[var(--text-muted)]">to</span>
           <input
@@ -307,7 +307,7 @@ export default function OversightBoard() {
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate || undefined}
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
-            title="To — end of range (inclusive)"
+            title="To: end of range (inclusive)"
           />
           <button
             onClick={() => {
@@ -496,7 +496,7 @@ function FragmentRow({
             {r.carryOverDays > 0 && (
               <span
                 className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
-                title="Worklog task rolled forward — not completed by its original deadline"
+                title="Worklog task rolled forward, not completed by its original deadline"
               >
                 Carried over · {r.carryOverDays}d
               </span>
@@ -538,7 +538,7 @@ function FragmentRow({
               </span>
             )}
             {!r.deadlineExtended && !r.isOverdue && (
-              <span className="text-[11px] text-[var(--text-muted)]">—</span>
+              <span className="text-[11px] text-[var(--text-muted)]">-</span>
             )}
           </div>
         </td>

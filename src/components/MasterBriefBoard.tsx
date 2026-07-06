@@ -264,7 +264,7 @@ export function MasterBriefBoard({
           }}
         >
           <LinkIcon className="h-3.5 w-3.5" />
-          Click another task to connect — or
+          Click another task to connect, or
           <button
             onClick={cancelConnect}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 hover:bg-white/30 transition-colors text-[11px] font-semibold"

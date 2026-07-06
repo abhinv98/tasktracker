@@ -411,7 +411,7 @@ export default function PlannerPage() {
       });
       if (ok) toast("success", `Scheduled "${task.title}" at ${formatMin(startMin)} - ${formatMin(endMin)}`);
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Time conflict — try manually");
+      toast("error", err instanceof Error ? err.message : "Time conflict. Try manually");
     }
   }
 
@@ -758,7 +758,7 @@ export default function PlannerPage() {
             {/* Weekend notice */}
             {isWeekend(selectedDate) && (
               <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-                <span className="text-[11px] font-medium">{dayName(selectedDate)} — Emergency / overtime work only.</span>
+                <span className="text-[11px] font-medium">{dayName(selectedDate)} - Emergency / overtime work only.</span>
                 <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
               </div>
             )}

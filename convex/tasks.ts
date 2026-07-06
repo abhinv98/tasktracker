@@ -201,7 +201,7 @@ export const getTaskLocation = query({
     if (!task)
       return {
         ok: false as const,
-        reason: "This task no longer exists — it was deleted.",
+        reason: "This task no longer exists. It was deleted.",
       };
 
     const brief = await ctx.db.get(task.briefId);
@@ -214,7 +214,7 @@ export const getTaskLocation = query({
     if (brief.status === "archived")
       return {
         ok: false as const,
-        reason: `This task's brief "${brief.title}" is archived. Archived briefs are hidden from Briefs and the Content Calendar — restore it from Archive to open the task there.`,
+        reason: `This task's brief "${brief.title}" is archived. Archived briefs are hidden from Briefs and the Content Calendar. Restore it from Archive to open the task there.`,
       };
 
     if (brief.briefType === "content_calendar") {
@@ -977,7 +977,7 @@ export const createSubTask = mutation({
     const subDeadline = args.deadline ? normalizeDeadlineToEndOfDay(args.deadline) : undefined;
     const taskId = await ctx.db.insert("tasks", {
       briefId: parentTask.briefId,
-      title: `${parentTask.title} — Sub-task`,
+      title: `${parentTask.title} - Sub-task`,
       description: args.description,
       assigneeId: args.assigneeId,
       assignedBy: userId,

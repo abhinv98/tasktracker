@@ -31,7 +31,7 @@ export default function PrintInvoicePage() {
   if (invoice.source !== "generated" || !invoice.lineItems) {
     return (
       <div className="min-h-screen flex items-center justify-center text-[13px] text-[#57534e]">
-        External invoices don&apos;t have a printable version — open the attached PDF instead.
+        External invoices don&apos;t have a printable version. Open the attached PDF instead.
       </div>
     );
   }

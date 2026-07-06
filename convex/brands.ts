@@ -283,10 +283,10 @@ export const getBrandTeamOverview = query({
         briefId: task.briefId,
         assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
         assigneeId: task.assigneeId,
-        managerName: manager?.name ?? manager?.email ?? "—",
+        managerName: manager?.name ?? manager?.email ?? "-",
         managerId: brief?.assignedManagerId,
-        teamLeadName: teamLead?.name ?? teamLead?.email ?? "—",
-        teamName: assigneeTeams[0]?.name ?? "—",
+        teamLeadName: teamLead?.name ?? teamLead?.email ?? "-",
+        teamName: assigneeTeams[0]?.name ?? "-",
       };
     });
   },

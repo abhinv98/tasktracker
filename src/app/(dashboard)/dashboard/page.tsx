@@ -590,7 +590,7 @@ export default function DashboardPage() {
               {!heroLoaded ? (
                 <span className="text-[var(--text-muted)]">Pulling up your day…</span>
               ) : digestSegments.length === 0 ? (
-                <span>All caught up — nothing urgent on your plate.</span>
+                <span>All caught up. Nothing urgent on your plate.</span>
               ) : (
                 digestSegments.map((seg, i) => (
                   <span key={seg.href}>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
             <Card>
               <p className="text-[13px] text-[var(--text-secondary)] flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                All clear — nothing needs your attention.
+                All clear. Nothing needs your attention.
               </p>
             </Card>
           ) : (
@@ -1441,7 +1441,7 @@ export default function DashboardPage() {
     <div className="p-4 sm:p-6 lg:p-8 relative">
       <PageHeader
         title={`${greeting}, ${displayName}`}
-        subtitle="Here are your active tasks — click a task for details"
+        subtitle="Here are your active tasks. Click a task for details"
       />
 
       {/* Reminders Section */}

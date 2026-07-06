@@ -512,7 +512,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               </p>
               <p className="text-[11px] text-red-700 mt-0.5">
                 The task still appears in Worklog / My Tasks / Oversight
-                because the task record itself still exists — but it is
+                because the task record itself still exists, but it is
                 gone from the Briefs page because its brief no longer
                 exists.
               </p>
@@ -752,7 +752,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   return (
                     <div>
                       <label className="text-[11px] font-medium text-amber-800 block mb-1">
-                        New deadline{deadlinePast ? " (required — old deadline has passed)" : " (optional)"}
+                        New deadline{deadlinePast ? " (required, old deadline has passed)" : " (optional)"}
                       </label>
                       <input
                         type="date"
@@ -762,7 +762,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       />
                       {deadlinePast && !redoDeadline && (
                         <p className="text-[10px] text-amber-700 mt-1">
-                          This task's deadline already passed — set a new one so the assignee isn't flagged overdue immediately.
+                          This task's deadline already passed. Set a new one so the assignee isn't flagged overdue immediately.
                         </p>
                       )}
                     </div>
@@ -785,7 +785,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       if (deadlinePast && !redoDeadline) {
                         toast(
                           "error",
-                          "Set a new deadline — the old one has passed."
+                          "Set a new deadline. The old one has passed."
                         );
                         return;
                       }
@@ -998,7 +998,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <div key={s._id} className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-[11px] font-medium text-[var(--accent-admin)]">
-                        Day {idx + 1} — {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        Day {idx + 1} - {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p>
                       {isAssignee && (
                         <div className="flex items-center gap-1.5">
@@ -1042,7 +1042,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     ) : (
                       <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">{s.summary}</p>
                     )}
-                    <p className="text-[10px] text-[var(--text-muted)] mt-1">— {s.authorName}</p>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1">- {s.authorName}</p>
                   </div>
                 ))}
               </div>
@@ -1254,7 +1254,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <input
                     value={deliverableLink}
                     onChange={(e) => setDeliverableLink(e.target.value)}
-                    placeholder="Link (optional) — Figma, Drive, etc."
+                    placeholder="Link (optional): Figma, Drive, etc."
                     className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
                   />
                 </div>

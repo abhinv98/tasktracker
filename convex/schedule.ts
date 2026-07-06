@@ -557,7 +557,7 @@ export const reorderTaskPriority = mutation({
 
     // Notify the employee
     const managerName = authUser.name ?? authUser.email ?? "A manager";
-    const reasonText = reason ? ` — "${reason}"` : "";
+    const reasonText = reason ? `: "${reason}"` : "";
     await ctx.db.insert("notifications", {
       recipientId: task.assigneeId,
       type: "priority_changed",

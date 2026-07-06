@@ -722,7 +722,7 @@ export default function BriefsPage() {
                                     {(brief as { managerName?: string }).managerName}
                                   </Badge>
                                 ) : (
-                                  "—"
+                                  "-"
                                 )}
                               </TableCell>
                               <TableCell className="hidden lg:table-cell">
@@ -736,7 +736,7 @@ export default function BriefsPage() {
                                       {name}
                                     </Badge>
                                   ))}
-                                  {!((brief as { teamNames?: string[] }).teamNames?.length) && "—"}
+                                  {!((brief as { teamNames?: string[] }).teamNames?.length) && "-"}
                                 </div>
                               </TableCell>
                               <TableCell className="hidden xl:table-cell">
@@ -747,7 +747,7 @@ export default function BriefsPage() {
                                      (brief as any).briefType === "developmental" ? "Developmental" :
                                      (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
                                   </Badge>
-                                ) : "—"}
+                                ) : "-"}
                               </TableCell>
                               <TableCell>
                                 {dl ? (
@@ -763,7 +763,7 @@ export default function BriefsPage() {
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-[var(--text-disabled)] text-[12px]">—</span>
+                                  <span className="text-[var(--text-disabled)] text-[12px]">-</span>
                                 )}
                               </TableCell>
                               <TableCell>
@@ -921,7 +921,7 @@ export default function BriefsPage() {
                                 <Badge variant="manager">
                                   {(brief as { managerName?: string }).managerName}
                                 </Badge>
-                              ) : "—"}
+                              ) : "-"}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               <div className="flex gap-1 flex-wrap">
@@ -932,7 +932,7 @@ export default function BriefsPage() {
                                 ).map((name) => (
                                   <Badge key={name} variant="neutral">{name}</Badge>
                                 ))}
-                                {!((brief as { teamNames?: string[] }).teamNames?.length) && "—"}
+                                {!((brief as { teamNames?: string[] }).teamNames?.length) && "-"}
                               </div>
                             </TableCell>
                             <TableCell className="hidden xl:table-cell">
@@ -943,7 +943,7 @@ export default function BriefsPage() {
                                    (brief as any).briefType === "developmental" ? "Developmental" :
                                    (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
                                 </Badge>
-                              ) : "—"}
+                              ) : "-"}
                             </TableCell>
                             <TableCell>
                               {dl ? (
@@ -959,7 +959,7 @@ export default function BriefsPage() {
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-[var(--text-disabled)] text-[12px]">—</span>
+                                <span className="text-[var(--text-disabled)] text-[12px]">-</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -1137,7 +1137,7 @@ export default function BriefsPage() {
               )}
               {/* Shared fields: deadline (master-only), brand, manager.
                   Content calendar briefs are evergreen (rolling month sheets)
-                  and do not carry a top-level deadline — every entry inside
+                  and do not carry a top-level deadline. Every entry inside
                   has its own. */}
               {briefMode === "master" && briefType !== "content_calendar" && (
                 <div>
@@ -1434,7 +1434,7 @@ function BriefSubRowsPanel({
                           month: "short",
                           day: "numeric",
                         })
-                      : "—"}
+                      : "-"}
                   </span>
                 </div>
               );

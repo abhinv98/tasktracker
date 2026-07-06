@@ -284,7 +284,7 @@ export default function ClientRequestsPage() {
       toast(
         "success",
         destKind === "calendar"
-          ? "Accepted — added to the content calendar"
+          ? "Accepted. Added to the content calendar"
           : destKind === "individual"
             ? "Accepted as an individual task"
             : "Accepted into the campaign brief"
@@ -637,7 +637,7 @@ export default function ClientRequestsPage() {
                           {
                             kind: "campaign" as const,
                             title: "Campaign Brief",
-                            hint: "Part of a bigger campaign — new brief or an existing one",
+                            hint: "Part of a bigger campaign: new brief or an existing one",
                           },
                           {
                             kind: "individual" as const,
@@ -763,7 +763,7 @@ export default function ClientRequestsPage() {
                         </div>
                         {!calDate && (
                           <p className="text-[11px] text-[var(--text-muted)]">
-                            Pick the post date — the entry lands on that day of the calendar.
+                            Pick the post date. The entry lands on that day of the calendar.
                           </p>
                         )}
                       </div>

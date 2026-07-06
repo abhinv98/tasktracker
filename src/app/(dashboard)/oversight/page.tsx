@@ -10,7 +10,7 @@ export default function OversightPage() {
       <PageHeader
         title="Oversight"
         icon={Eye}
-        subtitle="Every task — employee, brand, status, assigning brand manager. Open a done task to see its approved work."
+        subtitle="Every task: employee, brand, status, assigning brand manager. Open a done task to see its approved work."
       />
       <OversightBoard />
     </div>

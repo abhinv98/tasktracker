@@ -20,7 +20,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 };
 
 function fmtDate(ts: number | undefined): string {
-  if (ts === undefined) return "—";
+  if (ts === undefined) return "-";
   return new Date(ts).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -31,7 +31,7 @@ function fmtDate(ts: number | undefined): string {
 }
 
 function fmtDateShort(ts: number | undefined): string {
-  if (ts === undefined) return "—";
+  if (ts === undefined) return "-";
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -300,7 +300,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
-                        {task.deadline ? fmtDateShort(task.deadline) : "—"}
+                        {task.deadline ? fmtDateShort(task.deadline) : "-"}
                       </td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
                         {fmtDate(task.assignedAt)}

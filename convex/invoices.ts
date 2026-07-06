@@ -403,7 +403,7 @@ export const financeOverview = query({
         const inv = invoiceMap.get(p.invoiceId);
         return {
           ...p,
-          invoiceNumber: inv?.invoiceNumber ?? "—",
+          invoiceNumber: inv?.invoiceNumber ?? "-",
           brandName: inv ? brandMap.get(inv.brandId) ?? "Unknown" : "Unknown",
         };
       });

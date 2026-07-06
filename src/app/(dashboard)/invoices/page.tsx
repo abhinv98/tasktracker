@@ -39,7 +39,7 @@ function fmtINR(n: number): string {
 }
 
 function fmtDate(ts?: number | null): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   return new Date(ts).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -258,7 +258,7 @@ export default function InvoicesPage() {
       <div className="flex items-start justify-between gap-3">
         <PageHeader
           title="Invoices & Quotations"
-          subtitle="Quote projects, raise or track invoices, and record payments — end to end."
+          subtitle="Quote projects, raise or track invoices, and record payments, end to end."
         />
         <button
           onClick={() => setShowSettings(true)}
@@ -364,7 +364,7 @@ export default function InvoicesPage() {
                     <Upload className="h-4 w-4 text-[var(--accent-admin)] shrink-0 mt-0.5" />
                     <span>
                       <span className="block font-semibold text-[var(--text-primary)]">Track external invoice</span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">Made elsewhere — attach the PDF</span>
+                      <span className="block text-[11px] text-[var(--text-muted)]">Made elsewhere. Attach the PDF</span>
                     </span>
                   </button>
                 </div>
@@ -512,7 +512,7 @@ function OverviewTab({ overview }: { overview: any }) {
                   <TableCell>{fmtDate(p.paidOn)}</TableCell>
                   <TableCell>{p.invoiceNumber}</TableCell>
                   <TableCell>{p.brandName}</TableCell>
-                  <TableCell>{p.method ?? "—"}</TableCell>
+                  <TableCell>{p.method ?? "-"}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
                     {fmtINR(p.amount)}
                   </TableCell>
@@ -564,7 +564,7 @@ function QuotationsTab({
         <FileText className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
         <p className="text-[14px] font-medium text-[var(--text-secondary)]">No quotations yet</p>
         <p className="text-[12px] text-[var(--text-muted)] mt-1">
-          Create one per project you pitch — approve it, then convert it to an invoice.
+          Create one per project you pitch. Approve it, then convert it to an invoice.
         </p>
       </div>
     );
@@ -705,7 +705,7 @@ function QuotationsTab({
                         issueDate: Date.now(),
                         dueDate: fromDateInput(convertDue),
                       }),
-                    "Invoice draft created — finalize it from the Invoices tab"
+                    "Invoice draft created. Finalize it from the Invoices tab"
                   );
                   setConvertId(null);
                 }}
@@ -1050,7 +1050,7 @@ function NewInvoiceModal({
       toast(
         "success",
         source === "generated"
-          ? "Invoice created as draft — finalize to start tracking payment"
+          ? "Invoice created as draft. Finalize to start tracking payment"
           : "External invoice tracked"
       );
       onClose();
@@ -1297,7 +1297,7 @@ function InvoiceDetailModal({
         <div className="flex items-center gap-2 mb-5">
           {invoice.status === "draft" && (
             <button
-              onClick={() => act(() => finalize({ invoiceId: invoice._id }), "Invoice finalized — now unpaid")}
+              onClick={() => act(() => finalize({ invoiceId: invoice._id }), "Invoice finalized. Now unpaid")}
               disabled={busy}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-40"
             >
@@ -1616,7 +1616,7 @@ function AgencyProfileModal({
           </div>
           {profile && (
             <p className="col-span-2 text-[11px] text-amber-700">
-              Changing counters can create duplicate document numbers — only lower them if you know why.
+              Changing counters can create duplicate document numbers. Only lower them if you know why.
             </p>
           )}
 

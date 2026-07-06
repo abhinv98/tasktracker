@@ -168,7 +168,7 @@ export default function PortalNewTaskPage() {
             </div>
             <h2 className="p-section mb-1">Request sent</h2>
             <p className="p-secondary max-w-sm mx-auto">
-              The {session.brand.name} team will review and schedule this — track it under JSR.
+              The {session.brand.name} team will review and schedule this. Track it under JSR.
             </p>
             <div className="flex items-center justify-center gap-2 mt-5">
               <PortalButton variant="secondary" onClick={() => setJustSubmitted(false)}>
@@ -307,7 +307,7 @@ export default function PortalNewTaskPage() {
                 className="p-input"
               />
               <p className="text-[11px] text-[var(--p-text-3)] mt-1">
-                Optional — the team confirms the final delivery date on review.
+                Optional. The team confirms the final delivery date on review.
               </p>
             </div>
 

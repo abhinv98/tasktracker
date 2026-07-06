@@ -81,8 +81,8 @@ function activityLine(a: { action: string; details?: string }): string {
   }
   try {
     const d = JSON.parse(a.details);
-    if (d.title) return `${base} — "${d.title}"`;
-    if (d.taskTitle) return `${base} — "${d.taskTitle}"`;
+    if (d.title) return `${base} - "${d.title}"`;
+    if (d.taskTitle) return `${base} - "${d.taskTitle}"`;
     if (d.note) return `${base}: "${String(d.note).slice(0, 80)}"`;
   } catch {}
   return base;
@@ -294,7 +294,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                     {(u.name ?? u.email ?? "C")[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{u.name ?? "—"}</p>
+                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{u.name ?? "-"}</p>
                     <p className="text-[11px] text-[var(--text-muted)] truncate">{u.email}</p>
                   </div>
                   {resetUserId === u._id ? (
@@ -476,7 +476,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
               <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
             ) : deckItems.length === 0 ? (
               <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
-                Share decks, gantt charts and documents with the client — optionally requiring their approval.
+                Share decks, gantt charts and documents with the client, optionally requiring their approval.
               </p>
             ) : (
               deckItems.map((item: any) => (

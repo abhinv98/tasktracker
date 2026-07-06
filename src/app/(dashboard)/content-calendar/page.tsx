@@ -553,7 +553,7 @@ export default function ContentCalendarPage() {
           assignorName:
             externalTaskDetail.assignedBy?.name ??
             externalTaskDetail.assignedBy?.email ??
-            "—",
+            "-",
         }
       : null);
 
@@ -742,7 +742,7 @@ export default function ContentCalendarPage() {
                   <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-[12px] font-semibold text-amber-900">
-                      Break days — {MONTHS[month]} {year}
+                      Break days - {MONTHS[month]} {year}
                     </p>
                     <p className="text-[11px] text-amber-800 mt-0.5">
                       Tap dates below to mark or clear breaks (same as the brand&apos;s Content Calendar brief). Red cells in the grid are full-day breaks.
@@ -1154,7 +1154,7 @@ export default function ContentCalendarPage() {
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
-                Add Entry — Go Live: {new Date(addingDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                Add Entry - Go Live: {new Date(addingDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </h3>
               <button
                 onClick={() => setAddingDate(null)}
@@ -1170,7 +1170,7 @@ export default function ContentCalendarPage() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   required
-                  placeholder="e.g. Instagram Post — Product Launch"
+                  placeholder="e.g. Instagram Post - Product Launch"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 />
               </div>
@@ -1216,7 +1216,7 @@ export default function ContentCalendarPage() {
                   <option value="">Select assignor</option>
                   {admins.map((u: any) => (
                     <option key={u._id} value={u._id}>
-                      {u.name ?? u.email}{u.designation ? ` — ${u.designation}` : ""}
+                      {u.name ?? u.email}{u.designation ? ` - ${u.designation}` : ""}
                     </option>
                   ))}
                 </select>
@@ -1231,7 +1231,7 @@ export default function ContentCalendarPage() {
                   <option value="">Unassigned</option>
                   {employees.map((emp: any) => (
                     <option key={emp._id} value={emp._id}>
-                      {emp.name ?? emp.email}{emp.isFreelancer ? " (Freelancer)" : ""}{emp.designation ? ` — ${emp.designation}` : ""}
+                      {emp.name ?? emp.email}{emp.isFreelancer ? " (Freelancer)" : ""}{emp.designation ? ` - ${emp.designation}` : ""}
                     </option>
                   ))}
                 </select>
@@ -1603,7 +1603,7 @@ function StagingShelf({
           {tasks.length}
         </span>
         <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
-          — set entries aside here, then drag them back onto a day. Shared with the whole team.
+          Set entries aside here, then drag them back onto a day. Shared with the whole team.
         </span>
         <button
           type="button"
@@ -1622,7 +1622,7 @@ function StagingShelf({
         <div className="px-3 pb-2.5 flex flex-wrap gap-1.5 min-h-[34px]">
           {tasks.length === 0 ? (
             <p className="text-[11px] text-[var(--text-muted)] py-1">
-              Empty — drag an entry here (or right-click one → “Move to staging shelf”).
+              Empty. Drag an entry here (or right-click one → “Move to staging shelf”).
             </p>
           ) : (
             tasks.map((task) => (

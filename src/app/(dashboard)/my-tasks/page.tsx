@@ -23,7 +23,7 @@ const STATUS = TASK_STATUS_CONFIG as Record<
 >;
 
 function fmt(ts: number | null): string {
-  if (!ts) return "—";
+  if (!ts) return "-";
   return new Date(ts).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -82,7 +82,7 @@ export default function MyTasksPage() {
   // Build brand filter options from whatever brands appear in either list.
   const brandMap = new Map<string, string>();
   for (const t of [...assignedToMe, ...supervising] as any[]) {
-    if (t.brandId) brandMap.set(t.brandId, t.brandName ?? "—");
+    if (t.brandId) brandMap.set(t.brandId, t.brandName ?? "-");
   }
   const brandOptions = [...brandMap.entries()]
     .map(([id, name]) => ({ id, name }))
@@ -298,7 +298,7 @@ export default function MyTasksPage() {
       <section>
         <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-[var(--text-muted)]" />
-          Supervising — tasks I delegated ({filteredSup.length}
+          Supervising: tasks I delegated ({filteredSup.length}
           {filteredSup.length !== supervising.length ? ` of ${supervising.length}` : ""})
         </h2>
         <p className="text-[12px] text-[var(--text-muted)] mb-3">

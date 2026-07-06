@@ -17,7 +17,7 @@ import {
 import { TASK_STATUS_CONFIG, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
 function formatDate(ts?: number) {
-  if (!ts) return "—";
+  if (!ts) return "-";
   return new Date(ts).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -74,7 +74,7 @@ export default function FreelancersPage() {
         <Card>
           <p className="text-[14px] text-[var(--text-secondary)]">
             {data.isSuperAdmin
-              ? "No freelancers yet — invite one from Users & Teams with the Freelancer role."
+              ? "No freelancers yet. Invite one from Users & Teams with the Freelancer role."
               : "No freelancers are working on your brands yet."}
           </p>
         </Card>
@@ -100,7 +100,7 @@ export default function FreelancersPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-[15px] text-[var(--text-primary)]">
-                        {f.name ?? f.email ?? "—"}
+                        {f.name ?? f.email ?? "-"}
                       </span>
                       <Badge variant="manager">Freelancer</Badge>
                       {f.designation && (

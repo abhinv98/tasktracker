@@ -136,7 +136,7 @@ export const updateQuotation = mutation({
     const q = await ctx.db.get(quotationId);
     if (!q) throw new Error("Quotation not found");
     if (q.status !== "draft")
-      throw new Error("Only draft quotations can be edited — use Revise");
+      throw new Error("Only draft quotations can be edited. Use Revise instead.");
 
     const lineItems = updates.lineItems ?? q.lineItems;
     const gstPercent = updates.gstPercent ?? q.gstPercent;
@@ -281,7 +281,7 @@ export const deleteQuotation = mutation({
     const q = await ctx.db.get(quotationId);
     if (!q) throw new Error("Quotation not found");
     if (q.invoiceId)
-      throw new Error("This quotation has an invoice — delete the invoice first");
+      throw new Error("This quotation has an invoice. Delete the invoice first.");
     await ctx.db.delete(quotationId);
   },
 });

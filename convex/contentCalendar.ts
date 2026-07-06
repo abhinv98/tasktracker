@@ -149,7 +149,7 @@ export async function getOrCreateCalendarBrief(
     : 0;
 
   return await ctx.db.insert("briefs", {
-    title: `${brand.name} — Content Calendar`,
+    title: `${brand.name} - Content Calendar`,
     description: `Content calendar for ${brand.name}`,
     status: "active",
     briefType: "content_calendar",
@@ -430,7 +430,7 @@ export const listTasksByBrandMonth = query({
           ...task,
           assigneeName: assignee?.name ?? assignee?.email ?? "Unknown",
           assigneeDesignation: assignee?.designation ?? "",
-          assignorName: assignor?.name ?? assignor?.email ?? "—",
+          assignorName: assignor?.name ?? assignor?.email ?? "-",
           linkedAssigneeName: linkedAssignee ? (linkedAssignee.name ?? linkedAssignee.email ?? "Unknown") : "",
           linkedAssigneeDesignation: linkedAssignee?.designation ?? "",
           entrySchema: classification.schema,

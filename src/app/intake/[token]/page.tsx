@@ -308,7 +308,7 @@ export default function IntakePublicPage() {
                       )}
                       <span className="flex-1 text-[12px] text-[#525252] truncate">
                         {r.name || r.url}
-                        {r._uploading && <span className="text-[#a3a3a3]"> — uploading…</span>}
+                        {r._uploading && <span className="text-[#a3a3a3]"> - uploading…</span>}
                       </span>
                       <button
                         onClick={() => removeRef(idx)}

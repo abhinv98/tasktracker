@@ -1067,7 +1067,7 @@ function ConvertModal({
           <span className="font-medium text-[var(--text-primary)]">
             {note.title || "Untitled note"}
           </span>
-          {note.content ? ` — ${note.content.slice(0, 120)}` : ""}
+          {note.content ? ` - ${note.content.slice(0, 120)}` : ""}
         </div>
 
         <div className="flex gap-2 pt-1">
@@ -1363,7 +1363,7 @@ function WorklogTab() {
                   {!isDone && e.carryOverDays > 0 && (
                     <span
                       className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700"
-                      title="Not completed by its original deadline — rolled forward each day"
+                      title="Not completed by its original deadline, rolled forward each day"
                     >
                       Carried over · {e.carryOverDays}d
                     </span>

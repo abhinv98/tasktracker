@@ -373,7 +373,7 @@ export default function TeamsPanel() {
                               {member.name ?? "Unnamed"}
                             </p>
                             <p className="text-[12px] text-[var(--text-secondary)] truncate">
-                              {member.email ?? "—"}
+                              {member.email ?? "-"}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">

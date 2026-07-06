@@ -648,7 +648,7 @@ export const createIndividualTaskBrief = mutation({
           briefId,
           title:
             normalizedTeams.length > 1
-              ? `${args.title} — Step ${i + 1}`
+              ? `${args.title} - Step ${i + 1}`
               : args.title,
           description: args.description,
           assigneeId: t.assigneeId,
@@ -722,7 +722,7 @@ export const createIndividualTaskBrief = mutation({
           ? Math.max(...allBriefs.map((b) => b.globalPriority))
           : 0;
       ccBriefId = await ctx.db.insert("briefs", {
-        title: `${brand.name} — Content Calendar`,
+        title: `${brand.name} - Content Calendar`,
         description: `Content calendar for ${brand.name}`,
         status: "active",
         briefType: "content_calendar",
@@ -735,7 +735,7 @@ export const createIndividualTaskBrief = mutation({
         briefId: ccBriefId,
         userId,
         action: "created_brief",
-        details: JSON.stringify({ title: `${brand.name} — Content Calendar`, auto: true }),
+        details: JSON.stringify({ title: `${brand.name} - Content Calendar`, auto: true }),
         timestamp: now,
       });
     }

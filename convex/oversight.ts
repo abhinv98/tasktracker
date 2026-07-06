@@ -476,7 +476,7 @@ export const sendOversightDigest = internalMutation({
     const message =
       `${pending.length} new task${pending.length === 1 ? "" : "s"} created ` +
       `across ${brandCounts.size} brand${brandCounts.size === 1 ? "" : "s"}` +
-      (topBrands ? ` — ${topBrands}` : "") +
+      (topBrands ? `: ${topBrands}` : "") +
       `. Open Oversight for the full breakdown.`;
 
     let sent = 0;

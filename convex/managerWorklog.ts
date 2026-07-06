@@ -154,7 +154,7 @@ export const listMine = query({
         }
         return {
           ...e,
-          brandName: brands.find((b) => b._id === e.brandId)?.name ?? "—",
+          brandName: brands.find((b) => b._id === e.brandId)?.name ?? "-",
           brandColor:
             brands.find((b) => b._id === e.brandId)?.color ?? "#6b7280",
           taskDeadline,
@@ -531,7 +531,7 @@ export const getManagerWorklogDay = query({
       .map((m) => ({
         _id: m._id,
         title: m.title,
-        brandName: brandMap.get(m.brandId)?.name ?? "—",
+        brandName: brandMap.get(m.brandId)?.name ?? "-",
       }));
 
     // Open tasks this manager delegated to others (their supervising
@@ -592,7 +592,7 @@ export const getManagerWorklogDay = query({
           }
           return {
             ...e,
-            brandName: brandMap.get(e.brandId)?.name ?? "—",
+            brandName: brandMap.get(e.brandId)?.name ?? "-",
             brandColor: brandMap.get(e.brandId)?.color ?? "#6b7280",
             taskDeadline,
             carryOverDays,

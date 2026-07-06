@@ -551,7 +551,7 @@ export default function WorkLogPage() {
                             .map((task: any, idx: number) => {
                               const config = MEMBER_STATUS_CONFIG[task.status] ?? { color: "var(--text-muted)", label: task.status, order: 99 };
                               const fmtDate = (ts: number | null | undefined) => {
-                                if (!ts) return "—";
+                                if (!ts) return "-";
                                 return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                               };
                               const isOverdue = task.deadline && task.deadline < Date.now() && task.status !== "done" && task.status !== "review";
@@ -571,7 +571,7 @@ export default function WorkLogPage() {
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span className="text-[11px] text-[var(--text-secondary)] truncate block max-w-[100px]">
-                                      {task.brandName ?? "—"}
+                                      {task.brandName ?? "-"}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
@@ -594,7 +594,7 @@ export default function WorkLogPage() {
                                         {fmtDate(task.deadline)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                   <td className="px-3 py-2.5">
@@ -603,7 +603,7 @@ export default function WorkLogPage() {
                                         {fmtDate(task.submittedForReviewAt)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                   <td className="px-3 py-2.5">
@@ -612,7 +612,7 @@ export default function WorkLogPage() {
                                         {fmtDate(task.completedAt)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                 </tr>
@@ -676,7 +676,7 @@ export default function WorkLogPage() {
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
-                                      {t.deadline ? new Date(t.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                                      {t.deadline ? new Date(t.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-"}
                                     </span>
                                   </td>
                                 </tr>
