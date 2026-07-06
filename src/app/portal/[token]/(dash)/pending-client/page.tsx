@@ -8,16 +8,17 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
   AlertCircle,
-  Ban,
   CheckCircle2,
   FileDown,
-  Inbox,
   Presentation,
-  RotateCcw,
-  ThumbsUp,
   X,
 } from "lucide-react";
 import { PortalCard, PortalCardHeader, EmptyState, timeAgo } from "@/components/portal/shared";
+import {
+  PortalButton,
+  PortalPageHeader,
+  PortalSkeleton,
+} from "@/components/portal/ui";
 
 export default function PortalPendingClientPage() {
   const params = useParams();
@@ -42,14 +43,14 @@ export default function PortalPendingClientPage() {
 
   if (!session || pending === undefined) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="w-7 h-7 border-[3px] border-[#e5e5e5] border-t-[#171717] rounded-full animate-spin" />
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+        <div className="p-shimmer h-6 w-56" />
+        <PortalSkeleton rows={4} />
       </div>
     );
   }
   if (!pending) return null;
 
-  const bc = session.brand.color;
   const isEmpty =
     pending.pendingDeliverables.length === 0 &&
     pending.inputRequests.length === 0 &&
@@ -79,12 +80,11 @@ export default function PortalPendingClientPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <div className="flex items-center gap-2.5">
-        <Inbox className="h-5 w-5" style={{ color: bc }} />
-        <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">Your Pending Work</h1>
-      </div>
-      <p className="text-[13px] text-[#737373] -mt-2">Everything waiting on you: approvals, input requests and documents.</p>
+    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-5">
+      <PortalPageHeader
+        title="Your pending work"
+        description="Everything waiting on you: approvals, input requests and documents."
+      />
 
       {isEmpty && (
         <PortalCard>
@@ -101,32 +101,38 @@ export default function PortalPendingClientPage() {
         <PortalCard>
           <PortalCardHeader
             icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-            title="Ready for Review"
+            title="Ready for review"
             count={pending.pendingDeliverables.length}
-            brandColor={bc}
           />
           <div>
-            {pending.pendingDeliverables.map((item: any, i: number) => (
-              <button
+            {pending.pendingDeliverables.map((item: any) => (
+              <div
                 key={item.deliverableId}
-                onClick={() => {
-                  setReviewItem(item);
-                  setReviewNote("");
-                  setNeedsNote(null);
-                }}
-                className={`flex items-center gap-3 w-full text-left px-6 py-3.5 hover:bg-[#fafafa] transition-colors ${i < pending.pendingDeliverables.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}
+                className="flex items-center gap-3 px-5 py-3 border-b border-[var(--p-border)] last:border-b-0 hover:bg-[var(--p-surface-2)]"
               >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "12" }}>
-                  <FileDown className="h-4 w-4" style={{ color: bc }} />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--p-surface-2)]">
+                  <FileDown className="h-4 w-4 text-[var(--p-text-2)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[13px] text-[#171717] truncate">{item.taskTitle}</p>
-                  <p className="text-[10px] text-[#a3a3a3]">{item.briefTitle}</p>
+                  <p className="p-body font-medium truncate">{item.taskTitle}</p>
+                  <p className="text-[11px] text-[var(--p-text-3)] truncate mt-0.5">
+                    {item.briefTitle}
+                    {item.sentToClientAt ? ` · Sent ${timeAgo(item.sentToClientAt)}` : ""}
+                  </p>
                 </div>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
-                  Review
-                </span>
-              </button>
+                <PortalButton
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={() => {
+                    setReviewItem(item);
+                    setReviewNote("");
+                    setNeedsNote(null);
+                  }}
+                >
+                  Review &amp; respond
+                </PortalButton>
+              </div>
             ))}
           </div>
         </PortalCard>
@@ -137,24 +143,28 @@ export default function PortalPendingClientPage() {
         <PortalCard>
           <PortalCardHeader
             icon={<AlertCircle className="h-3.5 w-3.5" />}
-            title="Ecultify Needs Your Input"
+            title="The team needs your input"
             count={pending.inputRequests.length}
-            brandColor={bc}
           />
           <div>
-            {pending.inputRequests.map((req: any, i: number) => (
-              <div key={req._id} className={`px-6 py-4 ${i < pending.inputRequests.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <p className="font-medium text-[13px] text-[#171717]">{req.title}</p>
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">{req.briefTitle}</span>
+            {pending.inputRequests.map((req: any) => (
+              <div key={req._id} className="px-5 py-4 border-b border-[var(--p-border)] last:border-b-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="p-body font-medium truncate">{req.title}</p>
+                    <p className="text-[11px] text-[var(--p-text-3)] truncate mt-0.5">{req.briefTitle}</p>
+                  </div>
+                  <Link
+                    href={`/portal/${token}/messages`}
+                    className="shrink-0 inline-flex items-center h-8 px-3 rounded-[var(--p-radius-sm)] border border-[var(--p-border-strong)] bg-[var(--p-surface)] text-[12px] font-semibold text-[var(--p-text)] hover:bg-[var(--p-surface-2)]"
+                  >
+                    Reply in messages
+                  </Link>
                 </div>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50/60 border border-orange-100">
-                  <AlertCircle className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-[#525252] leading-relaxed">{req.clientInputMessage}</p>
+                <div className="flex items-start gap-2 p-3 rounded-[var(--p-radius-sm)] bg-[var(--p-surface-2)] mt-2">
+                  <AlertCircle className="h-3.5 w-3.5 text-[var(--p-warning)] shrink-0 mt-0.5" />
+                  <p className="p-secondary">{req.clientInputMessage}</p>
                 </div>
-                <p className="text-[11px] text-[#a3a3a3] mt-2">
-                  Reply from the <Link href={`/portal/${token}/messages`} className="underline" style={{ color: bc }}>Messages</Link> tab.
-                </p>
               </div>
             ))}
           </div>
@@ -166,28 +176,32 @@ export default function PortalPendingClientPage() {
         <PortalCard>
           <PortalCardHeader
             icon={<Presentation className="h-3.5 w-3.5" />}
-            title="Documents Awaiting Approval"
+            title="Documents awaiting approval"
             count={pending.pendingDeck.length}
-            brandColor={bc}
           />
           <div>
-            {pending.pendingDeck.map((item: any, i: number) => (
-              <Link
+            {pending.pendingDeck.map((item: any) => (
+              <div
                 key={item._id}
-                href={`/portal/${token}/deck`}
-                className={`flex items-center gap-3 px-6 py-3.5 hover:bg-[#fafafa] transition-colors ${i < pending.pendingDeck.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}
+                className="flex items-center gap-3 px-5 py-3 border-b border-[var(--p-border)] last:border-b-0 hover:bg-[var(--p-surface-2)]"
               >
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bc + "12" }}>
-                  <Presentation className="h-4 w-4" style={{ color: bc }} />
+                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--p-surface-2)]">
+                  <Presentation className="h-4 w-4 text-[var(--p-text-2)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[13px] text-[#171717] truncate">{item.title}</p>
-                  {item.category && <p className="text-[10px] text-[#a3a3a3] capitalize">{item.category}</p>}
+                  <p className="p-body font-medium truncate">{item.title}</p>
+                  {item.category && (
+                    <p className="text-[11px] text-[var(--p-text-3)] capitalize mt-0.5">{item.category}</p>
+                  )}
                 </div>
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 text-white" style={{ backgroundColor: bc }}>
-                  Approve
-                </span>
-              </Link>
+                <Link
+                  href={`/portal/${token}/deck`}
+                  className="shrink-0 inline-flex items-center h-8 px-3 rounded-[var(--p-radius-sm)] text-[12px] font-semibold text-white hover:opacity-90"
+                  style={{ backgroundColor: "var(--p-brand)" }}
+                >
+                  Review &amp; approve
+                </Link>
+              </div>
             ))}
           </div>
         </PortalCard>
@@ -197,26 +211,37 @@ export default function PortalPendingClientPage() {
       {reviewItem && (
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setReviewItem(null)} />
-          <div className="fixed top-0 right-0 h-full w-[520px] max-w-[90vw] bg-white border-l border-[#e5e5e5] shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e5]">
-              <h3 className="font-semibold text-[16px] text-[#171717]">Review Deliverable</h3>
-              <button onClick={() => setReviewItem(null)} className="p-1.5 rounded-lg hover:bg-[#f0f0f0] text-[#a3a3a3]">
+          <div
+            className="fixed top-0 right-0 h-full w-[520px] max-w-[90vw] bg-[var(--p-surface)] border-l border-[var(--p-border)] z-50 flex flex-col"
+            style={{ boxShadow: "var(--p-shadow)" }}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--p-border)]">
+              <h3 className="p-section">Review deliverable</h3>
+              <button
+                onClick={() => setReviewItem(null)}
+                className="p-1.5 rounded-[var(--p-radius-sm)] hover:bg-[var(--p-surface-2)] text-[var(--p-text-3)]"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ overscrollBehavior: "contain" }}>
               <div>
-                <h4 className="font-semibold text-[14px] text-[#171717] mb-1">{reviewItem.taskTitle}</h4>
-                <p className="text-[12px] text-[#a3a3a3] mb-2">{reviewItem.briefTitle}</p>
+                <h4 className="p-body font-semibold mb-1">{reviewItem.taskTitle}</h4>
+                <p className="text-[12px] text-[var(--p-text-3)] mb-2">{reviewItem.briefTitle}</p>
                 {reviewItem.taskDescription && (
-                  <p className="text-[13px] text-[#525252] leading-relaxed">{reviewItem.taskDescription}</p>
+                  <p className="p-secondary leading-relaxed">{reviewItem.taskDescription}</p>
                 )}
               </div>
-              <div className="border-t border-[#f0f0f0] pt-4">
-                <h5 className="font-medium text-[13px] text-[#171717] mb-3">Deliverable</h5>
-                {reviewItem.message && <p className="text-[13px] text-[#525252] mb-3 leading-relaxed">{reviewItem.message}</p>}
+              <div className="border-t border-[var(--p-border)] pt-4">
+                <h5 className="p-overline mb-3">Deliverable</h5>
+                {reviewItem.message && <p className="p-body text-[var(--p-text-2)] mb-3">{reviewItem.message}</p>}
                 {reviewItem.link && (
-                  <a href={reviewItem.link} target="_blank" rel="noopener noreferrer" className="text-[13px] font-medium underline block mb-3 break-all" style={{ color: bc }}>
+                  <a
+                    href={reviewItem.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[13px] font-medium text-[var(--p-text)] underline decoration-[var(--p-border-strong)] hover:decoration-[var(--p-text)] block mb-3 break-all"
+                  >
                     {reviewItem.link}
                   </a>
                 )}
@@ -228,60 +253,61 @@ export default function PortalPendingClientPage() {
                         href={f.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#fafafa] border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-[var(--p-radius-sm)] bg-[var(--p-surface-2)] border border-[var(--p-border)] text-[12px] font-medium text-[var(--p-text-2)] hover:border-[var(--p-border-strong)]"
                       >
-                        <FileDown className="h-3.5 w-3.5 text-[#a3a3a3]" />
+                        <FileDown className="h-3.5 w-3.5 text-[var(--p-text-3)]" />
                         {f.name}
                       </a>
                     ))}
                   </div>
                 )}
                 {reviewItem.sentToClientAt && (
-                  <p className="text-[10px] text-[#a3a3a3] mt-3">Sent {timeAgo(reviewItem.sentToClientAt)}</p>
+                  <p className="text-[11px] text-[var(--p-text-3)] mt-3">
+                    Sent {timeAgo(reviewItem.sentToClientAt)}
+                  </p>
                 )}
               </div>
-              <div className="border-t border-[#f0f0f0] pt-4">
-                <h5 className="font-medium text-[13px] text-[#171717] mb-3">Your Response</h5>
+              <div className="border-t border-[var(--p-border)] pt-4">
+                <h5 className="p-overline mb-3">Your response</h5>
                 <textarea
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
-                  placeholder="Add a note (required for Request Changes and Deny)..."
+                  placeholder="Add a note (required to request changes or deny)"
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-lg border border-[#e5e5e5] text-[13px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-2 bg-white resize-none"
-                  style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
+                  className="p-input resize-none"
                 />
+                {needsNote && !reviewNote.trim() && (
+                  <p className="text-[12px] font-medium text-[var(--p-danger)] mt-2">
+                    Add a note before {needsNote === "changes" ? "requesting changes" : "denying"}.
+                  </p>
+                )}
               </div>
             </div>
-            <div className="border-t border-[#e5e5e5] px-6 py-4 flex items-center gap-2">
-              <button
+            <div className="border-t border-[var(--p-border)] px-6 py-4 flex items-center gap-2">
+              <PortalButton
+                className="flex-1"
+                loading={submitting}
                 onClick={() => void act("approve")}
-                disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-emerald-500 text-white text-[13px] font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50"
               >
-                <ThumbsUp className="h-3.5 w-3.5" /> Approve
-              </button>
-              <button
+                Approve
+              </PortalButton>
+              <PortalButton
+                variant="secondary"
+                className="flex-1"
+                disabled={submitting}
                 onClick={() => void act("changes")}
-                disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-amber-500 text-white text-[13px] font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
               >
-                <RotateCcw className="h-3.5 w-3.5" /> Request Changes
-              </button>
-              <button
+                Request changes
+              </PortalButton>
+              <PortalButton
+                variant="danger"
+                className="flex-1"
+                disabled={submitting}
                 onClick={() => void act("deny")}
-                disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
               >
-                <Ban className="h-3.5 w-3.5" /> Deny
-              </button>
+                Deny
+              </PortalButton>
             </div>
-            {needsNote && !reviewNote.trim() && (
-              <div className="px-6 pb-3">
-                <p className="text-[12px] text-red-500 font-medium">
-                  Please add a note before {needsNote === "changes" ? "requesting changes" : "denying"}.
-                </p>
-              </div>
-            )}
           </div>
         </>
       )}

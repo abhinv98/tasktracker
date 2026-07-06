@@ -4,7 +4,9 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { FileDown } from "lucide-react";
 import { timeAgo } from "./shared";
+import { PortalButton, PortalStatusChip } from "./ui";
 
 type Remark = {
   _id: string;
@@ -22,7 +24,7 @@ export function RemarkThread({ remarks, brandColor }: { remarks: Remark[]; brand
         <div key={r._id} className="flex gap-2">
           <div
             className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5 ${
-              r.senderType === "client" ? "text-white" : "bg-[#e5e5e5] text-[#525252]"
+              r.senderType === "client" ? "text-white" : "bg-[var(--p-surface-2)] text-[var(--p-text-2)]"
             }`}
             style={r.senderType === "client" ? { backgroundColor: brandColor } : {}}
           >
@@ -30,12 +32,12 @@ export function RemarkThread({ remarks, brandColor }: { remarks: Remark[]; brand
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-[#171717]">
+              <span className="text-[11px] font-semibold text-[var(--p-text)]">
                 {r.senderName || (r.senderType === "client" ? "Client" : "Manager")}
               </span>
-              <span className="text-[9px] text-[#a3a3a3]">{timeAgo(r.createdAt)}</span>
+              <span className="text-[10px] text-[var(--p-text-3)]">{timeAgo(r.createdAt)}</span>
             </div>
-            <p className="text-[12px] text-[#525252] leading-relaxed">{r.content}</p>
+            <p className="p-secondary">{r.content}</p>
           </div>
         </div>
       ))}
@@ -44,11 +46,11 @@ export function RemarkThread({ remarks, brandColor }: { remarks: Remark[]; brand
 }
 
 export function RemarkComposer({
-  brandColor,
   placeholder,
   onSubmit,
 }: {
-  brandColor: string;
+  /** Kept for call-site compatibility; the composer is token-styled. */
+  brandColor?: string;
   placeholder: string;
   onSubmit: (content: string) => Promise<void>;
 }) {
@@ -77,20 +79,20 @@ export function RemarkComposer({
           }
         }}
         placeholder={placeholder}
-        className="flex-1 px-3 py-1.5 rounded-lg border border-[#e5e5e5] text-[12px] text-[#171717] placeholder-[#c4c4c4] focus:outline-none focus:ring-1 bg-white"
-        style={{ "--tw-ring-color": brandColor + "40" } as React.CSSProperties}
+        className="p-input flex-1 !h-8 text-[12px]"
       />
-      <button
-        onClick={() => void submit()}
-        disabled={submitting || !content.trim()}
-        className="px-3 py-1.5 rounded-lg text-white text-[11px] font-medium disabled:opacity-50"
-        style={{ backgroundColor: brandColor }}
-      >
-        {submitting ? "..." : "Send"}
-      </button>
+      <PortalButton size="sm" loading={submitting} disabled={!content.trim()} onClick={() => void submit()}>
+        Send
+      </PortalButton>
     </div>
   );
 }
+
+const DELIVERABLE_STATUS: Record<string, { label: string; dot: string }> = {
+  approved: { label: "Approved", dot: "var(--p-success)" },
+  rejected: { label: "Revision requested", dot: "var(--p-danger)" },
+  pending: { label: "Pending review", dot: "var(--p-warning)" },
+};
 
 /** Deliverable inside the JSR Track — files, links and its comment thread. */
 export function DeliverableCard({
@@ -110,18 +112,20 @@ export function DeliverableCard({
 }) {
   const addRemark = useMutation(api.clientPortal.addDeliverableRemark);
   const [showForm, setShowForm] = useState(false);
+  const statusMeta = deliverable.status
+    ? (DELIVERABLE_STATUS[deliverable.status] ?? DELIVERABLE_STATUS.pending)
+    : null;
 
   return (
-    <div className="ml-7 mt-2 rounded-lg border border-[#e5e5e5] bg-[#fafafa] overflow-hidden">
+    <div className="mt-2 rounded-[var(--p-radius-md)] border border-[var(--p-border)] bg-[var(--p-surface-2)] overflow-hidden">
       <div className="px-4 py-3">
-        {deliverable.message && <p className="text-[12px] text-[#525252] mb-2">{deliverable.message}</p>}
+        {deliverable.message && <p className="p-secondary mb-2">{deliverable.message}</p>}
         {deliverable.link && (
           <a
             href={deliverable.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[12px] font-medium underline mb-2 block break-all"
-            style={{ color: brandColor }}
+            className="text-[12px] font-medium text-[var(--p-text)] underline decoration-[var(--p-border-strong)] hover:decoration-[var(--p-text)] mb-2 block break-all"
           >
             {deliverable.link}
           </a>
@@ -134,49 +138,31 @@ export function DeliverableCard({
                 href={f.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#e5e5e5] text-[11px] font-medium text-[#525252] hover:border-[#c4c4c4] transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--p-radius-sm)] bg-[var(--p-surface)] border border-[var(--p-border)] text-[11px] font-medium text-[var(--p-text-2)] hover:border-[var(--p-border-strong)]"
               >
-                <svg className="h-3 w-3 text-[#a3a3a3]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <FileDown className="h-3 w-3 text-[var(--p-text-3)]" />
                 {f.name}
               </a>
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2 text-[10px] text-[#a3a3a3]">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--p-text-3)]">
           <span>{timeAgo(deliverable.submittedAt)}</span>
-          {deliverable.status && (
-            <span
-              className={`font-medium px-1.5 py-0.5 rounded ${
-                deliverable.status === "approved"
-                  ? "text-[#10b981] bg-[#10b98112]"
-                  : deliverable.status === "rejected"
-                    ? "text-[#ef4444] bg-[#ef444412]"
-                    : "text-[#f59e0b] bg-[#f59e0b12]"
-              }`}
-            >
-              {deliverable.status === "approved"
-                ? "Approved"
-                : deliverable.status === "rejected"
-                  ? "Revision Requested"
-                  : "Pending Review"}
-            </span>
-          )}
+          {statusMeta && <PortalStatusChip label={statusMeta.label} dotColor={statusMeta.dot} />}
         </div>
       </div>
 
       {deliverable.remarks && deliverable.remarks.length > 0 && (
-        <div className="border-t border-[#e5e5e5] px-4 py-2">
+        <div className="border-t border-[var(--p-border)] px-4 py-2 bg-[var(--p-surface)]">
           <RemarkThread remarks={deliverable.remarks} brandColor={brandColor} />
         </div>
       )}
 
-      <div className="border-t border-[#e5e5e5] px-4 py-2">
+      <div className="border-t border-[var(--p-border)] px-4 py-2 bg-[var(--p-surface)]">
         {showForm ? (
           <RemarkComposer
             brandColor={brandColor}
-            placeholder="Leave feedback..."
+            placeholder="Leave feedback"
             onSubmit={async (content) => {
               await addRemark({
                 deliverableId: deliverable._id as Id<"deliverables">,
@@ -186,13 +172,9 @@ export function DeliverableCard({
             }}
           />
         ) : (
-          <button
-            onClick={() => setShowForm(true)}
-            className="text-[11px] font-medium transition-colors"
-            style={{ color: brandColor }}
-          >
+          <PortalButton variant="ghost" size="sm" onClick={() => setShowForm(true)}>
             Leave feedback
-          </button>
+          </PortalButton>
         )}
       </div>
     </div>

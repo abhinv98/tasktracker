@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "@/convex/_generated/api";
+import "./portal-theme.css";
 
 /** Resolves /portal to the signed-in client's own brand portal. */
 export default function PortalIndexPage() {
@@ -33,8 +34,12 @@ export default function PortalIndexPage() {
   }, [user, session, router]);
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
-      <div className="w-8 h-8 border-[3px] border-[#e5e5e5] border-t-[#171717] rounded-full animate-spin" />
+    <div className="portal-root min-h-screen flex items-center justify-center">
+      <div className="w-full max-w-md px-6 space-y-3">
+        <div className="p-shimmer h-4 w-40 mx-auto" />
+        <div className="p-shimmer h-9 w-full" />
+        <div className="p-shimmer h-9 w-full" />
+      </div>
     </div>
   );
 }

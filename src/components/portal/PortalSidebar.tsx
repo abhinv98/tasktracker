@@ -74,22 +74,26 @@ export function PortalSidebar({
 
   const tabs = PORTAL_TABS.filter((t) => t.key === "jsr" || !hiddenTabs.includes(t.key));
 
+  // Visible label only — keys and routes stay unchanged.
+  const tabLabel = (key: PortalTabKey, label: string) =>
+    key === "pending-agency" ? `With the ${brand.name} team` : label;
+
   const content = (
-    <div className="flex flex-col h-full bg-white border-r border-[#e5e5e5] overflow-hidden">
+    <div className="flex flex-col h-full bg-[var(--p-surface)] border-r border-[var(--p-border)] overflow-hidden">
       {/* Brand header */}
-      <div className="px-5 pt-6 pb-5 border-b border-[#f0f0f0]">
+      <div className="px-5 pt-6 pb-5 border-b border-[var(--p-border)]">
         <div className="flex items-center gap-3">
           {brand.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={brand.logoUrl}
               alt={brand.name}
-              className="w-10 h-10 rounded-lg object-cover border border-[#e5e5e5]"
+              className="w-10 h-10 rounded-[var(--p-radius-md)] object-cover border border-[var(--p-border)]"
             />
           ) : (
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: bc + "15" }}
+              className="w-10 h-10 rounded-[var(--p-radius-md)] flex items-center justify-center"
+              style={{ backgroundColor: "var(--p-brand-soft)" }}
             >
               <span className="font-bold text-[16px]" style={{ color: bc }}>
                 {brand.name[0]}
@@ -97,12 +101,12 @@ export function PortalSidebar({
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-[15px] text-[#171717] truncate">{brand.name}</p>
-            <p className="text-[11px] text-[#a3a3a3] font-medium">Client Portal</p>
+            <p className="p-section truncate">{brand.name}</p>
+            <p className="p-overline">Client portal</p>
           </div>
           <button
             onClick={onClose}
-            className="md:hidden p-1.5 rounded-lg hover:bg-[#f0f0f0] text-[#a3a3a3]"
+            className="md:hidden p-1.5 rounded-[var(--p-radius-sm)] hover:bg-[var(--p-surface-2)] text-[var(--p-text-3)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -120,13 +124,13 @@ export function PortalSidebar({
               key={tab.key}
               href={`/portal/${token}/${tab.key}`}
               onClick={onClose}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors min-w-0 ${
-                active ? "text-white" : "text-[#525252] hover:bg-[#f5f5f5]"
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--p-radius-sm)] text-[13px] font-medium min-w-0 ${
+                active ? "text-white" : "text-[var(--p-text-2)] hover:bg-[var(--p-surface-2)]"
               }`}
               style={active ? { backgroundColor: bc } : {}}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              <span className="flex-1 min-w-0 truncate">{tab.label}</span>
+              <span className="flex-1 min-w-0 truncate">{tabLabel(tab.key, tab.label)}</span>
               {badge !== null && (
                 <span
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
@@ -143,7 +147,7 @@ export function PortalSidebar({
       </nav>
 
       {/* User footer */}
-      <div className="px-5 py-4 border-t border-[#f0f0f0]">
+      <div className="px-5 py-4 border-t border-[var(--p-border)]">
         <div className="flex items-center gap-2.5">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold text-white shrink-0"
@@ -152,12 +156,12 @@ export function PortalSidebar({
             {userName[0]?.toUpperCase() ?? "C"}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-semibold text-[#171717] truncate">{userName}</p>
+            <p className="text-[12px] font-semibold text-[var(--p-text)] truncate">{userName}</p>
           </div>
           <button
             onClick={() => void signOut()}
             title="Sign out"
-            className="p-2 rounded-lg hover:bg-[#f5f5f5] text-[#a3a3a3] hover:text-[#171717] transition-colors"
+            className="p-2 rounded-[var(--p-radius-sm)] hover:bg-[var(--p-surface-2)] text-[var(--p-text-3)] hover:text-[var(--p-text)]"
           >
             <LogOut className="h-4 w-4" />
           </button>

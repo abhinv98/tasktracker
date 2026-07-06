@@ -2,23 +2,29 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import {
   Calendar,
   CheckCircle2,
-  Clock,
   FileText,
   Image as ImageIcon,
   Inbox,
   Link2,
   Loader2,
   Paperclip,
-  Plus,
-  Send,
   Trash2,
+  UploadCloud,
   Video,
 } from "lucide-react";
-import { PortalCard, formatDate } from "@/components/portal/shared";
+import { PortalCard, REQUEST_STATUS, formatDate } from "@/components/portal/shared";
+import {
+  PortalButton,
+  PortalPageHeader,
+  PortalSkeleton,
+  PortalStatusChip,
+} from "@/components/portal/ui";
 
 type RefKind = "image" | "document" | "video" | "link";
 type PendingRef = {
@@ -31,29 +37,23 @@ type PendingRef = {
   _uploading?: boolean;
 };
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending_review: { label: "Awaiting Review", color: "#b45309", bg: "#fffbeb" },
-  accepted: { label: "Accepted", color: "#047857", bg: "#ecfdf5" },
-  in_progress: { label: "In Progress", color: "#1d4ed8", bg: "#eff6ff" },
-  completed: { label: "Completed", color: "#047857", bg: "#ecfdf5" },
-  declined: { label: "Declined", color: "#b91c1c", bg: "#fef2f2" },
-};
-
 function kindFromFile(file: File): RefKind {
   if (file.type.startsWith("image/")) return "image";
   if (file.type.startsWith("video/")) return "video";
   return "document";
 }
 
-function RefIcon({ kind, color }: { kind: RefKind; color: string }) {
-  const cls = "h-3.5 w-3.5 shrink-0";
-  if (kind === "image") return <ImageIcon className={cls} style={{ color }} />;
-  if (kind === "video") return <Video className={cls} style={{ color }} />;
-  if (kind === "link") return <Link2 className={cls} style={{ color }} />;
-  return <FileText className={cls} style={{ color }} />;
+function RefIcon({ kind }: { kind: RefKind }) {
+  const cls = "h-3.5 w-3.5 shrink-0 text-[var(--p-text-2)]";
+  if (kind === "image") return <ImageIcon className={cls} />;
+  if (kind === "video") return <Video className={cls} />;
+  if (kind === "link") return <Link2 className={cls} />;
+  return <FileText className={cls} />;
 }
 
 export default function PortalNewTaskPage() {
+  const params = useParams();
+  const token = params.token as string;
   const session = useQuery(api.clientPortal.getPortalSession);
   const requests = useQuery(api.clientPortal.listMyRequests);
   const submitRequest = useMutation(api.clientPortal.submitTaskRequest);
@@ -65,6 +65,7 @@ export default function PortalNewTaskPage() {
   const [linkInput, setLinkInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFiles(files: FileList | null) {
@@ -134,7 +135,6 @@ export default function PortalNewTaskPage() {
       setRefs([]);
       setLinkInput("");
       setJustSubmitted(true);
-      setTimeout(() => setJustSubmitted(false), 4000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to submit request.");
     }
@@ -143,119 +143,140 @@ export default function PortalNewTaskPage() {
 
   if (!session || requests === undefined) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="w-7 h-7 border-[3px] border-[#e5e5e5] border-t-[#171717] rounded-full animate-spin" />
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+        <div className="p-shimmer h-6 w-48" />
+        <PortalSkeleton rows={4} />
       </div>
     );
   }
 
-  const bc = session.brand.color;
   const tasks = requests ?? [];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <div className="flex items-center gap-2.5">
-        <Plus className="h-5 w-5" style={{ color: bc }} />
-        <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">New Task</h1>
-      </div>
+    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-5">
+      <PortalPageHeader
+        title="New task"
+        description="Tell the team what you need. They review every request and confirm a timeline."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        {/* Request form */}
-        <PortalCard>
-          <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: bc + "12" }}>
-              <Plus className="h-3.5 w-3.5" style={{ color: bc }} />
+      {/* Single-column form, or the post-submit success state */}
+      <PortalCard className="max-w-2xl">
+        {justSubmitted ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-12 h-12 rounded-[var(--p-radius-md)] bg-[var(--p-surface-2)] flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="h-6 w-6 text-[var(--p-success)]" />
             </div>
-            <h2 className="font-semibold text-[15px] text-[#171717]">New Request</h2>
+            <h2 className="p-section mb-1">Request sent</h2>
+            <p className="p-secondary max-w-sm mx-auto">
+              The {session.brand.name} team will review and schedule this — track it under JSR.
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-5">
+              <PortalButton variant="secondary" onClick={() => setJustSubmitted(false)}>
+                Send another request
+              </PortalButton>
+              <Link
+                href={`/portal/${token}/jsr`}
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-[var(--p-radius-sm)] text-[12.5px] font-semibold text-white hover:opacity-90"
+                style={{ backgroundColor: "var(--p-brand)" }}
+              >
+                Track it under JSR
+              </Link>
+            </div>
           </div>
-          <div className="p-6 space-y-4">
-            {justSubmitted && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <p className="text-[13px] text-emerald-700 font-medium">
-                  Request submitted. The team will review it and confirm a timeline.
-                </p>
-              </div>
-            )}
+        ) : (
+          <div className="p-6 space-y-6">
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-100">
-                <p className="text-[13px] text-red-600 font-medium">{error}</p>
-              </div>
+              <p className="text-[12.5px] font-medium text-[var(--p-danger)] bg-[var(--p-danger-soft)] rounded-[var(--p-radius-sm)] px-3 py-2">
+                {error}
+              </p>
             )}
 
-            <Field label="Task title" required>
+            {/* What do you need */}
+            <div>
+              <p className="p-overline mb-1.5">What do you need</p>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Instagram carousel for product launch"
-                className="portal-input"
-                style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
+                className="p-input"
               />
-            </Field>
+            </div>
 
-            <Field label="Details">
+            {/* Details */}
+            <div>
+              <p className="p-overline mb-1.5">Details</p>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe what you need, tone, key messages, dimensions, anything relevant..."
+                placeholder="Describe what you need: tone, key messages, dimensions, anything relevant"
                 rows={4}
-                className="portal-input resize-none"
-                style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
+                className="p-input resize-none"
               />
-            </Field>
-
-            <Field label="Proposed deadline">
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="portal-input"
-                style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
-              />
-            </Field>
+            </div>
 
             {/* References */}
             <div>
-              <label className="block text-[12px] font-semibold text-[#525252] mb-1.5">
-                References <span className="font-normal text-[#a3a3a3]">(images, documents, videos, links)</span>
+              <p className="p-overline mb-1.5">References</p>
+
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  void handleFiles(e.dataTransfer.files);
+                }}
+                className={`flex flex-col items-center justify-center gap-1.5 px-4 py-7 rounded-[var(--p-radius-md)] border border-dashed cursor-pointer text-center ${
+                  dragging
+                    ? "border-[var(--p-brand)] bg-[var(--p-brand-soft)]"
+                    : "border-[var(--p-border-strong)] bg-[var(--p-surface-2)] hover:border-[var(--p-brand-border)]"
+                }`}
+              >
+                <UploadCloud className="h-5 w-5 text-[var(--p-text-3)]" />
+                <span className="p-secondary">
+                  Drop files here, or <span className="font-semibold text-[var(--p-text)]">browse</span>
+                </span>
+                <span className="text-[11px] text-[var(--p-text-3)]">Images, documents and videos</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
               </label>
 
               {refs.length > 0 && (
-                <div className="flex flex-col gap-1.5 mb-2">
+                <div className="flex flex-col gap-1.5 mt-2">
                   {refs.map((r, idx) => (
-                    <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#fafafa] border border-[#e5e5e5]">
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 px-3 py-2 rounded-[var(--p-radius-sm)] bg-[var(--p-surface-2)] border border-[var(--p-border)]"
+                    >
                       {r._uploading ? (
-                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#a3a3a3]" />
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--p-text-3)]" />
                       ) : (
-                        <RefIcon kind={r.kind} color={bc} />
+                        <RefIcon kind={r.kind} />
                       )}
-                      <span className="flex-1 text-[12px] text-[#525252] truncate">
+                      <span className="flex-1 text-[12px] text-[var(--p-text-2)] truncate">
                         {r.name || r.url}
-                        {r._uploading && <span className="text-[#a3a3a3]"> (uploading...)</span>}
+                        {r._uploading && <span className="text-[var(--p-text-3)]"> (uploading)</span>}
                       </span>
-                      <button onClick={() => setRefs((prev) => prev.filter((_, i) => i !== idx))} className="p-1 rounded hover:bg-[#f0f0f0] text-[#a3a3a3]">
+                      <button
+                        onClick={() => setRefs((prev) => prev.filter((_, i) => i !== idx))}
+                        className="p-1 rounded-[var(--p-radius-sm)] hover:bg-[var(--p-border)] text-[var(--p-text-3)]"
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-
-              <div className="flex items-center gap-2">
-                <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] cursor-pointer transition-colors">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  Attach files
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      void handleFiles(e.target.files);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-              </div>
 
               <div className="flex items-center gap-2 mt-2">
                 <input
@@ -267,122 +288,100 @@ export default function PortalNewTaskPage() {
                       addLink();
                     }
                   }}
-                  placeholder="Paste a link (Drive, YouTube, Figma…)"
-                  className="portal-input flex-1"
-                  style={{ "--tw-ring-color": bc + "30" } as React.CSSProperties}
+                  placeholder="Paste a link (Drive, YouTube, Figma)"
+                  className="p-input flex-1"
                 />
-                <button
-                  onClick={addLink}
-                  disabled={!linkInput.trim()}
-                  className="shrink-0 px-3 py-2 rounded-lg border border-[#e5e5e5] text-[12px] font-medium text-[#525252] hover:border-[#c4c4c4] disabled:opacity-40 transition-colors"
-                >
-                  Add
-                </button>
+                <PortalButton variant="secondary" disabled={!linkInput.trim()} onClick={addLink}>
+                  Add link
+                </PortalButton>
               </div>
             </div>
 
-            <button
+            {/* Deadline */}
+            <div>
+              <p className="p-overline mb-1.5">Deadline</p>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="p-input"
+              />
+              <p className="text-[11px] text-[var(--p-text-3)] mt-1">
+                Optional — the team confirms the final delivery date on review.
+              </p>
+            </div>
+
+            <PortalButton
+              className="w-full"
+              loading={submitting}
+              disabled={!title.trim() || uploading}
               onClick={() => void submit()}
-              disabled={!title.trim() || submitting || uploading}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-white text-[14px] font-semibold transition-all disabled:opacity-50"
-              style={{ backgroundColor: bc }}
             >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {uploading ? "Uploading references…" : submitting ? "Submitting…" : "Submit Request"}
-            </button>
+              {uploading ? "Uploading references" : "Send request"}
+            </PortalButton>
           </div>
-        </PortalCard>
+        )}
+      </PortalCard>
 
-        {/* Requests list */}
-        <PortalCard className="lg:sticky lg:top-6">
-          <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#f0f0f0]">
-            <div className="w-7 h-7 rounded-lg bg-[#f0f0f0] flex items-center justify-center">
-              <Clock className="h-3.5 w-3.5 text-[#525252]" />
+      {/* Requests list */}
+      <PortalCard className="max-w-2xl">
+        <div className="px-5 py-3.5 border-b border-[var(--p-border)]">
+          <h2 className="p-section">
+            Your requests
+            <span className="font-normal text-[var(--p-text-3)]"> · {tasks.length}</span>
+          </h2>
+        </div>
+        {tasks.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-12 h-12 rounded-[var(--p-radius-md)] bg-[var(--p-surface-2)] flex items-center justify-center mx-auto mb-3">
+              <Inbox className="h-6 w-6 text-[var(--p-text-3)]" />
             </div>
-            <h2 className="font-semibold text-[15px] text-[#171717]">Your Requests</h2>
-            <span className="text-[12px] text-[#a3a3a3] ml-1">{tasks.length}</span>
+            <p className="p-body text-[var(--p-text-2)]">No requests yet.</p>
+            <p className="p-secondary text-[var(--p-text-3)] mt-0.5">
+              Submitted tasks and their status will appear here.
+            </p>
           </div>
-          {tasks.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <div className="w-12 h-12 rounded-xl bg-[#f5f5f5] flex items-center justify-center mx-auto mb-3">
-                <Inbox className="h-6 w-6 text-[#c4c4c4]" />
-              </div>
-              <p className="text-[13px] text-[#737373]">No requests yet.</p>
-              <p className="text-[12px] text-[#a3a3a3] mt-0.5">Submitted tasks and their status will appear here.</p>
-            </div>
-          ) : (
-            <div className="max-h-[600px] overflow-y-auto">
-              {tasks.map((t: any, i: number) => {
-                const meta = STATUS_META[t.status] ?? STATUS_META.pending_review;
-                return (
-                  <div key={t._id} className={`px-6 py-4 ${i < tasks.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[14px] text-[#171717]">{t.title}</p>
-                        {t.description && <p className="text-[12px] text-[#737373] mt-0.5 line-clamp-2">{t.description}</p>}
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[#a3a3a3]">
-                          {t.clientName && <span>By {t.clientName}</span>}
-                          {t.proposedDeadline && (
-                            <span className="inline-flex items-center gap-1">
-                              <Calendar className="h-3 w-3" /> Requested {formatDate(t.proposedDeadline)}
-                            </span>
-                          )}
-                          {t.referenceCount > 0 && (
-                            <span className="inline-flex items-center gap-1">
-                              <Paperclip className="h-3 w-3" /> {t.referenceCount} reference{t.referenceCount > 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </div>
+        ) : (
+          <div className="max-h-[600px] overflow-y-auto">
+            {tasks.map((t: any) => {
+              const meta = REQUEST_STATUS[t.status] ?? REQUEST_STATUS.pending_review;
+              return (
+                <div key={t._id} className="px-5 py-4 border-b border-[var(--p-border)] last:border-b-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="p-body font-medium">{t.title}</p>
+                      {t.description && (
+                        <p className="p-secondary text-[var(--p-text-3)] mt-0.5 line-clamp-2">{t.description}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[var(--p-text-3)]">
+                        {t.clientName && <span>By {t.clientName}</span>}
+                        {t.proposedDeadline && (
+                          <span className="inline-flex items-center gap-1">
+                            <Calendar className="h-3 w-3" /> Requested {formatDate(t.proposedDeadline)}
+                          </span>
+                        )}
+                        {t.referenceCount > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <Paperclip className="h-3 w-3" /> {t.referenceCount} reference
+                            {t.referenceCount > 1 ? "s" : ""}
+                          </span>
+                        )}
                       </div>
-                      <span className="shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ color: meta.color, backgroundColor: meta.bg }}>
-                        {meta.label}
-                      </span>
                     </div>
-                    {t.status !== "pending_review" && t.finalDeadline && (
-                      <div className="mt-2.5 flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-lg" style={{ color: bc, backgroundColor: bc + "0d" }}>
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Confirmed completion date: {formatDate(t.finalDeadline)}
-                      </div>
-                    )}
+                    <PortalStatusChip label={meta.label} dotColor={meta.dot} className="shrink-0" />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </PortalCard>
-      </div>
-
-      <style jsx global>{`
-        .portal-input {
-          width: 100%;
-          padding: 0.6rem 0.75rem;
-          border-radius: 0.75rem;
-          border: 1px solid #e5e5e5;
-          font-size: 13px;
-          color: #171717;
-          background: white;
-          outline: none;
-        }
-        .portal-input::placeholder {
-          color: #c4c4c4;
-        }
-        .portal-input:focus {
-          box-shadow: 0 0 0 2px var(--tw-ring-color);
-          border-color: transparent;
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-[12px] font-semibold text-[#525252] mb-1.5">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      {children}
+                  {t.status !== "pending_review" && t.finalDeadline && (
+                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--p-text-2)] bg-[var(--p-surface-2)] rounded-[var(--p-radius-sm)] px-3 py-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[var(--p-success)]" />
+                      Confirmed completion date: {formatDate(t.finalDeadline)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </PortalCard>
     </div>
   );
 }

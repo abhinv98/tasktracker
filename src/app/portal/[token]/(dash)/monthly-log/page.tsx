@@ -3,15 +3,15 @@
 import { useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { CheckCircle2, ClipboardList, Package } from "lucide-react";
+import { ClipboardList, Package } from "lucide-react";
 import {
   MonthChips,
   PortalCard,
-  PortalCardHeader,
   EmptyState,
   formatDate,
   monthLabel,
 } from "@/components/portal/shared";
+import { PortalPageHeader, PortalSkeleton, PortalStatusChip } from "@/components/portal/ui";
 
 export default function PortalMonthlyLogPage() {
   const session = useQuery(api.clientPortal.getPortalSession);
@@ -31,8 +31,9 @@ export default function PortalMonthlyLogPage() {
 
   if (!session || log === undefined) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="w-7 h-7 border-[3px] border-[#e5e5e5] border-t-[#171717] rounded-full animate-spin" />
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+        <div className="p-shimmer h-6 w-48" />
+        <PortalSkeleton rows={5} />
       </div>
     );
   }
@@ -42,14 +43,11 @@ export default function PortalMonthlyLogPage() {
   const months = Object.keys(byMonth).sort().reverse();
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-5">
-      <div className="flex items-center gap-2.5">
-        <ClipboardList className="h-5 w-5" style={{ color: bc }} />
-        <h1 className="font-bold text-[20px] text-[#171717] tracking-tight">Monthly Log</h1>
-      </div>
-      <p className="text-[13px] text-[#737373] -mt-2">
-        Completed tasks that were requested through this portal, month by month.
-      </p>
+    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-5">
+      <PortalPageHeader
+        title="Monthly log"
+        description="Completed tasks that were requested through this portal, month by month."
+      />
 
       {log.months.length > 1 && (
         <MonthChips months={log.months} selected={selectedMonth} onSelect={setSelectedMonth} brandColor={bc} />
@@ -64,41 +62,49 @@ export default function PortalMonthlyLogPage() {
           />
         </PortalCard>
       ) : (
-        months.map((month) => (
-          <PortalCard key={month}>
-            <PortalCardHeader
-              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-              title={monthLabel(month)}
-              count={byMonth[month].length}
-              brandColor={bc}
-            />
-            <div>
-              {byMonth[month].map((e: any, i: number) => (
-                <div key={e._id} className={`flex items-center gap-3 px-6 py-3 ${i < byMonth[month].length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#10b981]" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-[#171717]">{e.title}</p>
-                    {e.requestedBy && <p className="text-[10px] text-[#a3a3a3]">Requested by {e.requestedBy}</p>}
+        /* Month timeline — day markers on a left rule */
+        <div className="space-y-6">
+          {months.map((month) => (
+            <div key={month}>
+              <h2 className="p-section mb-3">
+                {monthLabel(month)}
+                <span className="font-normal text-[var(--p-text-3)]"> · {byMonth[month].length}</span>
+              </h2>
+              <div className="relative pl-5 border-l border-[var(--p-border)] ml-1.5 space-y-3">
+                {byMonth[month].map((e: any) => (
+                  <div key={e._id} className="relative">
+                    {/* Day marker on the rule */}
+                    <span
+                      className="absolute -left-[26px] top-4 w-2.5 h-2.5 rounded-full border-2 border-[var(--p-bg)]"
+                      style={{ backgroundColor: "var(--p-success)" }}
+                    />
+                    <PortalCard>
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="p-body font-medium truncate">{e.title}</p>
+                          <p className="text-[11px] text-[var(--p-text-3)] mt-0.5">
+                            {formatDate(e.completedAt)}
+                            {e.requestedBy ? ` · Requested by ${e.requestedBy}` : ""}
+                            {e.tag ? ` · ${e.tag}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {e.deliverableCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--p-text-2)]">
+                              <Package className="h-3 w-3 text-[var(--p-text-3)]" />
+                              {e.deliverableCount}
+                            </span>
+                          )}
+                          <PortalStatusChip label="Completed" dotColor="var(--p-success)" />
+                        </div>
+                      </div>
+                    </PortalCard>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {e.tag && (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: bc, backgroundColor: bc + "10" }}>
-                        {e.tag}
-                      </span>
-                    )}
-                    {e.deliverableCount > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: bc, backgroundColor: bc + "10" }}>
-                        <Package className="h-3 w-3" />
-                        {e.deliverableCount}
-                      </span>
-                    )}
-                    <span className="text-[11px] text-[#737373]">{formatDate(e.completedAt)}</span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </PortalCard>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );

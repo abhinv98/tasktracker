@@ -7,6 +7,8 @@ import { api } from "@/convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Inbox, Menu } from "lucide-react";
 import { PortalSidebar, currentPortalTab } from "@/components/portal/PortalSidebar";
+import { PortalButton } from "@/components/portal/ui";
+import "../../portal-theme.css";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -71,10 +73,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   if (user === undefined || (user?.role === "client" && session === undefined)) {
     return (
-      <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-[3px] border-[#e5e5e5] border-t-[#171717] rounded-full animate-spin" />
-          <p className="text-[13px] text-[#a3a3a3] font-medium">Loading portal...</p>
+      <div className="portal-root min-h-screen flex items-center justify-center">
+        <div className="w-full max-w-md px-6 space-y-3">
+          <div className="p-shimmer h-4 w-40 mx-auto" />
+          <div className="p-shimmer h-9 w-full" />
+          <div className="p-shimmer h-9 w-full" />
         </div>
       </div>
     );
@@ -87,22 +90,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   // Portal deactivated by the team: block access without deleting the account
   if (!session.portalActive) {
     return (
-      <div className="min-h-screen bg-[#f8f8f8] flex items-center justify-center">
+      <div className="portal-root min-h-screen flex items-center justify-center">
         <div className="text-center max-w-sm mx-auto p-8">
-          <div className="w-16 h-16 rounded-xl bg-[#fef2f2] flex items-center justify-center mx-auto mb-4">
-            <Inbox className="h-8 w-8 text-[#ef4444]" />
+          <div className="w-14 h-14 rounded-[var(--p-radius-md)] bg-[var(--p-danger-soft)] flex items-center justify-center mx-auto mb-4">
+            <Inbox className="h-7 w-7 text-[var(--p-danger)]" />
           </div>
-          <h1 className="text-[20px] font-semibold text-[#171717] mb-2">Portal Deactivated</h1>
-          <p className="text-[14px] text-[#737373] leading-relaxed mb-5">
-            The {session.brand.name} portal is currently deactivated. Please contact your account
+          <h1 className="p-title mb-2">Portal deactivated</h1>
+          <p className="p-body text-[var(--p-text-2)] mb-5">
+            The {session.brand.name} portal is currently deactivated. Contact your account
             manager for access.
           </p>
-          <button
-            onClick={() => void signOut()}
-            className="px-4 py-2 rounded-lg bg-[#171717] text-white text-[13px] font-semibold"
-          >
-            Sign Out
-          </button>
+          <PortalButton onClick={() => void signOut()}>Sign out</PortalButton>
         </div>
       </div>
     );
@@ -111,7 +109,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const bc = session.brand.color;
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#f8f8f8" }}>
+    <div
+      className="portal-root min-h-screen overflow-x-hidden"
+      style={{ "--p-brand": bc } as React.CSSProperties}
+    >
       <PortalSidebar
         token={session.portalToken ?? urlToken}
         brand={session.brand}
@@ -123,28 +124,28 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       />
       <div className="md:ml-64 flex flex-col min-h-screen">
         {/* Mobile top bar */}
-        <header className="md:hidden sticky top-0 z-20 bg-white border-b border-[#e5e5e5]">
+        <header className="md:hidden sticky top-0 z-20 bg-[var(--p-surface)] border-b border-[var(--p-border)]">
           <div className="flex items-center gap-3 px-4 py-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-[#f0f0f0] text-[#525252]"
+              className="p-1.5 rounded-[var(--p-radius-sm)] hover:bg-[var(--p-surface-2)] text-[var(--p-text-2)]"
             >
               <Menu className="h-5 w-5" />
             </button>
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: bc + "15" }}
+              className="w-7 h-7 rounded-[var(--p-radius-sm)] flex items-center justify-center"
+              style={{ backgroundColor: "var(--p-brand-soft)" }}
             >
               <span className="font-bold text-[12px]" style={{ color: bc }}>
                 {session.brand.name[0]}
               </span>
             </div>
-            <p className="font-semibold text-[14px] text-[#171717]">{session.brand.name}</p>
+            <p className="font-semibold text-[14px] text-[var(--p-text)]">{session.brand.name}</p>
           </div>
         </header>
         <main className="flex-1 min-h-0">{children}</main>
         <footer className="text-center py-6">
-          <p className="text-[11px] text-[#d4d4d4]">Powered by Ecultify</p>
+          <p className="text-[11px] text-[var(--p-text-3)]">Powered by Ecultify</p>
         </footer>
       </div>
     </div>

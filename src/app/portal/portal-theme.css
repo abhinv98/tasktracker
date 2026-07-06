@@ -1,0 +1,130 @@
+/* Portal DS — tokens + primitives. Scoped under .portal-root.
+   Anti-slop rules: no gradients, no backdrop-blur, one shadow level,
+   radius <= 14px, 150ms ease-out motion, brand color only in sanctioned slots. */
+
+.portal-root {
+  /* neutrals — warm stone ramp (matches internal identity family, cleaner white base) */
+  --p-bg: #fafaf9; /* page */
+  --p-surface: #ffffff; /* cards, sidebar */
+  --p-surface-2: #f5f5f4; /* input bg, hover, empty-state icon well */
+  --p-border: #e7e5e4;
+  --p-border-strong: #d6d3d1;
+  --p-text: #1c1917;
+  --p-text-2: #57534e;
+  --p-text-3: #a8a29e;
+  /* brand — set inline per portal: style={{ "--p-brand": brand.color }} */
+  --p-brand: #1c1917;
+  --p-brand-soft: color-mix(in srgb, var(--p-brand) 10%, white);
+  --p-brand-border: color-mix(in srgb, var(--p-brand) 25%, white);
+  /* semantic (fixed, not brand-derived) */
+  --p-success: #15803d;
+  --p-warning: #b45309;
+  --p-danger: #b91c1c;
+  --p-info: #6d28d9;
+  --p-danger-soft: color-mix(in srgb, var(--p-danger) 8%, white);
+  /* shape + elevation — ONE shadow, THREE radii */
+  --p-radius-sm: 6px;
+  --p-radius-md: 10px;
+  --p-radius-lg: 14px;
+  --p-shadow: 0 1px 2px rgba(28, 25, 23, 0.05);
+
+  background-color: var(--p-bg);
+  color: var(--p-text);
+}
+
+/* Motion: 150ms ease-out on interactive elements, color/opacity only. */
+.portal-root :is(a, button, label, select) {
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    opacity 150ms ease-out;
+}
+
+/* Keyboard focus ring — brand, the sanctioned accent slot. */
+.portal-root :is(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--p-brand);
+  outline-offset: 2px;
+}
+
+/* Type scale — exactly five steps. */
+.p-title {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--p-text);
+}
+.p-section {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--p-text);
+}
+.p-body {
+  font-size: 13.5px;
+  font-weight: 450;
+  line-height: 1.55;
+  color: var(--p-text);
+}
+.p-secondary {
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.5;
+  color: var(--p-text-2);
+}
+.p-overline {
+  font-size: 11px;
+  font-weight: 550;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--p-text-3);
+}
+
+/* Form fields — 36px inputs, surface-2 bg, brand focus ring. */
+.p-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--p-radius-md);
+  border: 1px solid var(--p-border);
+  background: var(--p-surface-2);
+  font-size: 13.5px;
+  color: var(--p-text);
+  outline: none;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out,
+    background-color 150ms ease-out;
+}
+.p-input::placeholder {
+  color: var(--p-text-3);
+}
+.p-input:focus,
+.p-input:focus-visible {
+  outline: none;
+  background: var(--p-surface);
+  border-color: var(--p-brand);
+  box-shadow: 0 0 0 3px var(--p-brand-soft);
+}
+textarea.p-input {
+  height: auto;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+/* Skeleton shimmer — opacity only. */
+@keyframes p-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.p-shimmer {
+  background: var(--p-surface-2);
+  border-radius: var(--p-radius-sm);
+  animation: p-pulse 1.6s ease-in-out infinite;
+}
