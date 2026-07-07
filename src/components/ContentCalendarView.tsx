@@ -1134,6 +1134,7 @@ export function ContentCalendarEntrySidebar({
   const [editCaption, setEditCaption] = useState(task.caption ?? "");
   const [saving, setSaving] = useState(false);
   const [sidebarTeamFilter, setSidebarTeamFilter] = useState<string>("");
+  const teamFilterTouched = useRef(false);
   const [submittingTo, setSubmittingTo] = useState<"tl" | "bm" | "as" | null>(null);
 
   // Sidebar navigation: null → Main entry overview is shown; otherwise the
@@ -1161,6 +1162,24 @@ export function ContentCalendarEntrySidebar({
   const linkedTasks = useQuery(api.contentCalendar.listLinkedTasksForEntry, {
     parentTaskId: calendarEntryTaskId,
   });
+  const removeLinkedTask = useMutation(api.contentCalendar.removeLinkedCalendarTask);
+
+  // When the sidebar is mounted on a linked child, its own enriched row
+  // (teamId / teamName / role) from the linked-tasks query.
+  const selfLinked = useMemo(
+    () =>
+      task.parentTaskId
+        ? ((linkedTasks ?? []) as any[]).find((lt) => lt._id === task._id) ?? null
+        : null,
+    [task.parentTaskId, task._id, linkedTasks]
+  );
+
+  // Pre-select the child task's own team in the Team dropdown (it used to
+  // sit on "All Teams" even though the task clearly belongs to one).
+  useEffect(() => {
+    if (teamFilterTouched.current) return;
+    if (selfLinked?.teamId) setSidebarTeamFilter(selfLinked.teamId as string);
+  }, [selfLinked?.teamId]);
 
   // Surface brief-level metadata (brand, brief type, manager) on the Main
   // view so multi-team briefs routed through `/briefs` → "Add to Calendar"
@@ -1174,16 +1193,6 @@ export function ContentCalendarEntrySidebar({
     task.parentTaskId ? { taskId: calendarEntryTaskId } : "skip"
   );
 
-  const [showAssignTask, setShowAssignTask] = useState(false);
-  const [assignTaskTitle, setAssignTaskTitle] = useState("");
-  const [assignTaskTeam, setAssignTaskTeam] = useState("");
-  const [assignTaskAssignee, setAssignTaskAssignee] = useState("");
-  const [assignTaskDeadline, setAssignTaskDeadline] = useState("");
-  const assignTaskMembers = useQuery(
-    api.teams.getTeamMembers,
-    assignTaskTeam ? { teamId: assignTaskTeam as Id<"teams"> } : "skip"
-  );
-  const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [deletingLinkedId, setDeletingLinkedId] = useState<string | null>(null);
 
   // ── Open team-task editor state ───────────────────────────────
@@ -1377,6 +1386,7 @@ export function ContentCalendarEntrySidebar({
           parentTaskId: calendarEntryTaskId,
           assigneeId: oAssignee as Id<"users">,
           title: `[${label}] ${task.title}`,
+          ...(oTeam ? { teamId: oTeam as Id<"teams"> } : {}),
           ...(deadlineMs !== undefined ? { deadline: deadlineMs } : {}),
         });
         toast("success", "Team task created");
@@ -1575,7 +1585,14 @@ export function ContentCalendarEntrySidebar({
           )}
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: si.color }} />
           <h3 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
-            {isViewingLinkedChild ? "Linked Task" : "Entry Details"}
+            {isViewingLinkedChild
+              ? selfLinked?.teamName ??
+                (selfLinked?.role === "copy"
+                  ? "Copy Team"
+                  : selfLinked?.role === "design"
+                    ? "Design Team"
+                    : "Team Task")
+              : "Entry Details"}
           </h3>
         </div>
         <div className="flex items-center gap-1">
@@ -1908,7 +1925,7 @@ export function ContentCalendarEntrySidebar({
             {isEditable && (
               <button
                 type="button"
-                disabled={oSaving || !oAssignee}
+                disabled={oSaving || !oAssignee || (creatingNew && !oTeam)}
                 onClick={() => {
                   const teamLabel = (teams.find((t: any) => t._id === oTeam)?.name as string | undefined) ?? "Team";
                   handleSaveOpenTask(teamLabel);
@@ -2290,6 +2307,7 @@ export function ContentCalendarEntrySidebar({
             <select
               value={sidebarTeamFilter}
               onChange={(e) => {
+                teamFilterTouched.current = true;
                 setSidebarTeamFilter(e.target.value);
                 setEditAssignee(""); // Reset assignee when team changes
               }}
@@ -2314,22 +2332,39 @@ export function ContentCalendarEntrySidebar({
                     : "Copy Assignee")}
             </label>
             {isEditable ? (
-              <select
-                value={editAssignee}
-                onChange={(e) => setEditAssignee(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-              >
-                <option value="">Unassigned</option>
-                {(sidebarTeamFilter && sidebarTeamMembers
-                  ? sidebarTeamMembers
-                  : employees
-                ).map((emp: any) => (
-                  <option key={emp._id} value={emp._id}>
-                    {emp.name ?? emp.email}
-                    {emp.designation ? ` - ${emp.designation}` : ""}
-                  </option>
-                ))}
-              </select>
+              (() => {
+                const options: any[] =
+                  sidebarTeamFilter && sidebarTeamMembers
+                    ? sidebarTeamMembers
+                    : employees;
+                // The task's current assignee must always be a visible option
+                // — otherwise an assignee outside this list (e.g. an admin
+                // like a Content Head) silently renders as "Unassigned".
+                const hasCurrent =
+                  !task.assigneeId ||
+                  options.some((o: any) => o._id === task.assigneeId);
+                return (
+                  <select
+                    value={editAssignee}
+                    onChange={(e) => setEditAssignee(e.target.value)}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  >
+                    <option value="">Unassigned</option>
+                    {!hasCurrent && (
+                      <option value={task.assigneeId}>
+                        {task.assigneeName ?? "Current assignee"}
+                        {task.assigneeDesignation ? ` - ${task.assigneeDesignation}` : ""}
+                      </option>
+                    )}
+                    {options.map((emp: any) => (
+                      <option key={emp._id} value={emp._id}>
+                        {emp.name ?? emp.email}
+                        {emp.designation ? ` - ${emp.designation}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()
             ) : (
               <div>
                 <p className="text-[13px] text-[var(--text-primary)]">
@@ -2345,21 +2380,15 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Assign another task (Copy → Design) — superseded by the Design
-            tab on the main entry. Still shown when drilled into a linked
-            child so the legacy in-place flow keeps working for sub-children. */}
+        {/* Sibling team tasks on the same entry. Creating new team tasks
+            happens on the entry's Main view ("+ Add team task"), which
+            wires the sequential handoff chain for any team. */}
         {isViewingLinkedChild && isEditable && (
           <div className="pt-3 border-t border-[var(--border)]">
-            <button
-              type="button"
-              onClick={() => setShowAssignTask((v) => !v)}
-              className="flex items-center gap-2 text-[12px] font-semibold text-[var(--accent-admin)] hover:underline"
-            >
-              <Users className="h-3.5 w-3.5" />
-              {showAssignTask ? "Hide" : "Assign task"}
-            </button>
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">
-              Assign a linked task to the <strong>Design team</strong>. The main entry assignee handles copy.
+            <p className="text-[10px] text-[var(--text-muted)]">
+              Teams work this entry in sequence — an approved deliverable is
+              passed to the next team&apos;s task automatically. Add teams from
+              the entry view.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
@@ -2401,7 +2430,7 @@ export function ContentCalendarEntrySidebar({
                             return;
                           setDeletingLinkedId(lt._id);
                           try {
-                            await deleteTask({ taskId: lt._id });
+                            await removeLinkedTask({ taskId: lt._id });
                             toast("success", "Linked task removed");
                           } catch (err) {
                             toast(
@@ -2426,110 +2455,6 @@ export function ContentCalendarEntrySidebar({
                   ))}
               </div>
             )}
-            {showAssignTask && (() => {
-              // Only show design-related teams — linked tasks now target the Design team
-              // (the parent entry's main assignee is the Copy team).
-              const designTeams = teams.filter((t: any) => {
-                const tName = (t.name || "").toLowerCase();
-                return tName.includes("design") || tName.includes("creative") || tName.includes("graphic");
-              });
-              const hasDesignTask = linkedTasks?.some((lt: any) => lt._id !== task._id);
-              return (
-              <div className="mt-3 space-y-2 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                {/* Workflow hint */}
-                <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pb-2 border-b border-[var(--border-subtle)]">
-                  <span className={`px-1.5 py-0.5 rounded font-semibold ${hasDesignTask ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
-                    Design Team {hasDesignTask ? "✓ Assigned" : "← Assign now"}
-                  </span>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Task title</label>
-                  <input
-                    value={assignTaskTitle}
-                    onChange={(e) => setAssignTaskTitle(e.target.value)}
-                    placeholder="e.g. Design creative for post"
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Team</label>
-                  <select
-                    value={assignTaskTeam}
-                    onChange={(e) => {
-                      setAssignTaskTeam(e.target.value);
-                      setAssignTaskAssignee("");
-                    }}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
-                  >
-                    <option value="">Select design team</option>
-                    {designTeams.map((team: any) => (
-                      <option key={team._id} value={team._id}>{team.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Assignee</label>
-                  <select
-                    value={assignTaskAssignee}
-                    onChange={(e) => setAssignTaskAssignee(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
-                  >
-                    <option value="">Select member</option>
-                    {(assignTaskTeam && assignTaskMembers
-                      ? assignTaskMembers
-                      : employees
-                    ).map((emp: any) => (
-                      <option key={emp._id} value={emp._id}>
-                        {emp.name ?? emp.email}
-                        {emp.designation ? ` - ${emp.designation}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-[var(--text-muted)] block mb-0.5">Deadline (optional)</label>
-                  <input
-                    type="date"
-                    value={assignTaskDeadline}
-                    onChange={(e) => setAssignTaskDeadline(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled={assignSubmitting || !assignTaskTitle.trim() || !assignTaskAssignee}
-                  onClick={async () => {
-                    if (!assignTaskTitle.trim() || !assignTaskAssignee) return;
-                    setAssignSubmitting(true);
-                    try {
-                      await createLinkedCalendarTask({
-                        briefId,
-                        parentTaskId: calendarEntryTaskId,
-                        assigneeId: assignTaskAssignee as Id<"users">,
-                        title: assignTaskTitle.trim(),
-                        ...(assignTaskDeadline
-                          ? { deadline: new Date(assignTaskDeadline + "T23:59:59").getTime() }
-                          : {}),
-                      });
-                      toast("success", "Linked task created");
-                      setAssignTaskTitle("");
-                      setAssignTaskTeam("");
-                      setAssignTaskAssignee("");
-                      setAssignTaskDeadline("");
-                      setShowAssignTask(false);
-                    } catch (err) {
-                      toast("error", err instanceof Error ? err.message : "Failed");
-                    } finally {
-                      setAssignSubmitting(false);
-                    }
-                  }}
-                  className="w-full py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium disabled:opacity-50"
-                >
-                  {assignSubmitting ? "Creating…" : "Create linked task"}
-                </button>
-              </div>
-              );
-            })()}
           </div>
         )}
 

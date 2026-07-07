@@ -5,6 +5,7 @@ import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFro
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
+import { resolveCalendarTaskTeam } from "./contentCalendar";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -1639,8 +1640,11 @@ export const managerApproveFromTeamLead = mutation({
 
       // ── Auto-handoff for content calendar tasks ──────────
       // When a content calendar task's deliverable is approved and the task
-      // has handoffTargetTeamId set, automatically create a handoff task
-      // carrying the creative copy + caption to the design team.
+      // has handoffTargetTeamId set, the approved work flows to the NEXT
+      // team in the entry's sequential chain. If that team already has a
+      // linked task on the same entry (created via "+ Add team task"), the
+      // deliverable is attached to it as an upstream resource; only when no
+      // such task exists is a new handoff task created.
       if (
         brief?.briefType === "content_calendar" &&
         task.handoffTargetTeamId &&
@@ -1660,8 +1664,6 @@ export const managerApproveFromTeamLead = mutation({
           );
 
           if (!alreadyHandedOff) {
-            const targetAssigneeId = targetTeam.leadId;
-
             // Build note with creative copy + caption
             const handoffNote = [
               task.creativeCopy ? `Creative Copy:\n${task.creativeCopy}` : "",
@@ -1680,34 +1682,90 @@ export const managerApproveFromTeamLead = mutation({
               }
             }
 
-            // Create handoff task in the same brief
-            const existingTasks = await ctx.db
+            // Look for the next team's EXISTING task on this entry: a
+            // sibling (or child, when the source is the parent entry) that
+            // belongs to the target team.
+            const entryRootId = task.parentTaskId ?? task._id;
+            const siblings = await ctx.db
               .query("tasks")
-              .withIndex("by_assignee_sort", (q) =>
-                q.eq("assigneeId", targetAssigneeId)
+              .withIndex("by_parent", (q: any) =>
+                q.eq("parentTaskId", entryRootId)
               )
               .collect();
-            const maxOrder = existingTasks.length
-              ? Math.max(...existingTasks.map((t) => t.sortOrder))
-              : 0;
+            const allTeams = await ctx.db.query("teams").collect();
+            let existingTarget: any = null;
+            for (const sib of siblings.sort(
+              (a: any, b: any) => a._creationTime - b._creationTime
+            )) {
+              if (sib._id === task._id) continue;
+              const sibTeam = await resolveCalendarTaskTeam(ctx, sib, allTeams);
+              if (sibTeam === task.handoffTargetTeamId) {
+                existingTarget = sib;
+                break;
+              }
+            }
 
-            const handoffTaskId = await ctx.db.insert("tasks", {
-              briefId: task.briefId,
-              title: `[Design] ${task.title}`,
-              description: handoffNote || `Design handoff for: ${task.title}`,
-              assigneeId: targetAssigneeId,
-              assignedBy: userId,
-              status: "pending",
-              sortOrder: maxOrder + 1000,
-              creativeCopy: task.creativeCopy,
-              caption: task.caption,
-              handoffSourceTaskId: task._id,
-              ...(task.platform ? { platform: task.platform } : {}),
-              ...(task.contentType ? { contentType: task.contentType } : {}),
-              ...(task.postDate ? { postDate: task.postDate } : {}),
-              ...(task.deadline ? { deadline: task.deadline } : {}),
-              ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
-            });
+            let handoffTaskId: Id<"tasks">;
+            let notifyUserId: Id<"users">;
+
+            if (existingTarget) {
+              // Feed the existing next-in-line task: merge the approved
+              // deliverable's links + upstream copy/caption onto it.
+              const mergedLinks = Array.from(
+                new Set([
+                  ...(existingTarget.referenceLinks ?? []),
+                  ...referenceLinks,
+                ])
+              );
+              await ctx.db.patch(existingTarget._id, {
+                handoffSourceTaskId: task._id,
+                ...(mergedLinks.length > 0
+                  ? { referenceLinks: mergedLinks }
+                  : {}),
+                ...(!existingTarget.creativeCopy && task.creativeCopy
+                  ? { creativeCopy: task.creativeCopy }
+                  : {}),
+                ...(!existingTarget.caption && task.caption
+                  ? { caption: task.caption }
+                  : {}),
+              });
+              handoffTaskId = existingTarget._id;
+              notifyUserId = existingTarget.assigneeId;
+            } else {
+              // No task for that team yet — create one, linked to the entry
+              // so it shows up as a team card on the calendar sidebar.
+              const targetAssigneeId = targetTeam.leadId;
+              const existingTasks = await ctx.db
+                .query("tasks")
+                .withIndex("by_assignee_sort", (q) =>
+                  q.eq("assigneeId", targetAssigneeId)
+                )
+                .collect();
+              const maxOrder = existingTasks.length
+                ? Math.max(...existingTasks.map((t) => t.sortOrder))
+                : 0;
+
+              handoffTaskId = await ctx.db.insert("tasks", {
+                briefId: task.briefId,
+                title: `[${targetTeam.name}] ${task.title.replace(/^\[[^\]]+\]\s*/, "")}`,
+                description:
+                  handoffNote || `${targetTeam.name} handoff for: ${task.title}`,
+                assigneeId: targetAssigneeId,
+                assignedBy: userId,
+                status: "pending",
+                sortOrder: maxOrder + 1000,
+                parentTaskId: entryRootId,
+                creativeCopy: task.creativeCopy,
+                caption: task.caption,
+                handoffSourceTaskId: task._id,
+                ...(task.platform ? { platform: task.platform } : {}),
+                ...(task.contentType ? { contentType: task.contentType } : {}),
+                ...(task.postDate ? { postDate: task.postDate } : {}),
+                ...(task.deadline ? { deadline: task.deadline } : {}),
+                ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+              });
+              notifyUserId = targetAssigneeId;
+            }
 
             // Record the handoff
             await ctx.db.insert("deliverableHandoffs", {
@@ -1740,12 +1798,12 @@ export const managerApproveFromTeamLead = mutation({
               });
             }
 
-            // Notify the design team member
+            // Notify the next team's assignee
             await ctx.db.insert("notifications", {
-              recipientId: targetAssigneeId,
+              recipientId: notifyUserId,
               type: "task_assigned",
-              title: "Design handoff received",
-              message: `Creative copy for "${task.title}" has been approved and assigned to you for design.`,
+              title: `${targetTeam.name} handoff received`,
+              message: `Approved work for "${task.title}" has been passed to your task with its deliverable attached.`,
               briefId: task.briefId,
               taskId: handoffTaskId,
               triggeredBy: userId,

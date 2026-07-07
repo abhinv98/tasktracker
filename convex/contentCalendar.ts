@@ -1306,6 +1306,49 @@ export const createCalendarEntry = mutation({
  * Create a child task linked to a content calendar entry (e.g. Copy team work).
  * Title is prefixed with Content Calendar + brand tags; inherits post date / platform from parent when omitted.
  */
+/** Resolve which team a calendar task belongs to: the `[Team Name]` title
+ *  prefix (set on creation) wins; fall back to the assignee's first
+ *  userTeams membership. Mirrors the logic in listLinkedTasksForEntry. */
+export async function resolveCalendarTaskTeam(
+  ctx: any,
+  task: { title: string; assigneeId?: any },
+  teams: Array<{ _id: any; name: string }>
+): Promise<any | null> {
+  const prefixMatch = task.title.match(/^\[([^\]]+)\]/);
+  if (prefixMatch) {
+    const raw = prefixMatch[1].trim();
+    if (!/content calendar/i.test(raw)) {
+      const hit = teams.find((t) => t.name.toLowerCase() === raw.toLowerCase());
+      if (hit) return hit._id;
+    }
+  }
+  if (task.assigneeId) {
+    const userTeams = await ctx.db
+      .query("userTeams")
+      .withIndex("by_user", (q: any) => q.eq("userId", task.assigneeId))
+      .collect();
+    if (userTeams.length > 0) return userTeams[0].teamId;
+  }
+  return null;
+}
+
+/** The sequential chain of work on a calendar entry, in creation order:
+ *  the parent entry first (when it carries a real assignee), then every
+ *  linked child. Task N hands off to task N+1's team on approval. */
+async function calendarEntryChain(ctx: any, entryTaskId: any) {
+  const parent = await ctx.db.get(entryTaskId);
+  if (!parent) return [];
+  const children = await ctx.db
+    .query("tasks")
+    .withIndex("by_parent", (q: any) => q.eq("parentTaskId", entryTaskId))
+    .collect();
+  children.sort((a: any, b: any) => a._creationTime - b._creationTime);
+  const parentHasRealAssignee =
+    !!parent.assigneeId && parent.assigneeId !== parent.assignedBy;
+  if (parentHasRealAssignee) return [parent, ...children];
+  return children.length > 0 ? children : [parent];
+}
+
 export const createLinkedCalendarTask = mutation({
   args: {
     briefId: v.id("briefs"),
@@ -1317,6 +1360,9 @@ export const createLinkedCalendarTask = mutation({
     platform: v.optional(v.string()),
     contentType: v.optional(v.string()),
     postDate: v.optional(v.string()),
+    /** Team this task belongs to — wires it into the entry's sequential
+     *  handoff chain (previous task hands off to this team on approval). */
+    teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -1369,6 +1415,10 @@ export const createLinkedCalendarTask = mutation({
     // the caller when the brief has no manager set.
     const assignor = brief.assignedManagerId ?? userId;
 
+    // Sequential chain: whoever is currently last in line hands off to the
+    // new task's team once their deliverable is approved.
+    const chainBefore = await calendarEntryChain(ctx, args.parentTaskId);
+
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,
       title: fullTitle,
@@ -1388,6 +1438,13 @@ export const createLinkedCalendarTask = mutation({
       ...(args.deadline !== undefined ? { deadline: args.deadline } : {}),
       assignedAt: Date.now(),
     });
+
+    if (args.teamId) {
+      const prev = chainBefore[chainBefore.length - 1];
+      if (prev && prev._id !== taskId && prev.handoffTargetTeamId !== args.teamId) {
+        await ctx.db.patch(prev._id, { handoffTargetTeamId: args.teamId });
+      }
+    }
 
     await tagForOversight(ctx, {
       taskId,
@@ -1423,6 +1480,38 @@ export const createLinkedCalendarTask = mutation({
     });
 
     return taskId;
+  },
+});
+
+/** Delete a linked team task and re-link the sequential chain around it:
+ *  the task that handed off to the deleted task's team now hands off to
+ *  whatever the deleted task pointed at. */
+export const removeLinkedCalendarTask = mutation({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await requireCalendarAdmin(ctx);
+    void userId;
+    const task = await ctx.db.get(taskId);
+    if (!task) throw new Error("Task not found");
+    if (!task.parentTaskId) throw new Error("Not a linked calendar task");
+
+    const teams = await ctx.db.query("teams").collect();
+    const myTeam = await resolveCalendarTaskTeam(ctx, task, teams);
+
+    if (myTeam) {
+      // Whoever pointed at my team should now point past me.
+      const chain = await calendarEntryChain(ctx, task.parentTaskId);
+      for (const member of chain) {
+        if (member._id === taskId) continue;
+        if (member.handoffTargetTeamId === myTeam) {
+          await ctx.db.patch(member._id, {
+            handoffTargetTeamId: task.handoffTargetTeamId ?? undefined,
+          });
+        }
+      }
+    }
+
+    await cascadeDeleteTask(ctx, taskId);
   },
 });
 
