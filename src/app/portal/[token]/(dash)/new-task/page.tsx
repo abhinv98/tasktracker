@@ -58,6 +58,7 @@ export default function PortalNewTaskPage() {
   const requests = useQuery(api.clientPortal.listMyRequests);
   const submitRequest = useMutation(api.clientPortal.submitTaskRequest);
 
+  const [tab, setTab] = useState<"form" | "requests">("form");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -143,7 +144,7 @@ export default function PortalNewTaskPage() {
 
   if (!session || requests === undefined) {
     return (
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-4">
         <div className="p-shimmer h-6 w-48" />
         <PortalSkeleton rows={4} />
       </div>
@@ -153,14 +154,37 @@ export default function PortalNewTaskPage() {
   const tasks = requests ?? [];
 
   return (
-    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-5">
+    <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-5">
       <PortalPageHeader
         title="New task"
         description="Tell the team what you need. They review every request and confirm a timeline."
       />
 
-      {/* Single-column form, or the post-submit success state */}
-      <PortalCard className="max-w-2xl">
+      {/* Tabs: the request form / everything already submitted */}
+      <div className="flex items-center gap-1.5">
+        {(
+          [
+            { key: "form" as const, label: "New task" },
+            { key: "requests" as const, label: `Your requests · ${tasks.length}` },
+          ]
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-3.5 h-9 rounded-[var(--p-radius-sm)] text-[12.5px] font-semibold transition-colors ${
+              tab === t.key
+                ? "text-white"
+                : "text-[var(--p-text-2)] bg-[var(--p-surface)] border border-[var(--p-border)] hover:bg-[var(--p-surface-2)]"
+            }`}
+            style={tab === t.key ? { backgroundColor: "var(--p-brand)" } : {}}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "form" && (
+      <PortalCard>
         {justSubmitted ? (
           <div className="px-6 py-12 text-center">
             <div className="w-12 h-12 rounded-[var(--p-radius-md)] bg-[var(--p-surface-2)] flex items-center justify-center mx-auto mb-3">
@@ -191,6 +215,9 @@ export default function PortalNewTaskPage() {
               </p>
             )}
 
+            {/* Two-column layout: the brief on the left, references right */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+            <div className="space-y-6">
             {/* What do you need */}
             <div>
               <p className="p-overline mb-1.5">What do you need</p>
@@ -209,9 +236,24 @@ export default function PortalNewTaskPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe what you need: tone, key messages, dimensions, anything relevant"
-                rows={4}
+                rows={6}
                 className="p-input resize-none"
               />
+            </div>
+
+            {/* Deadline */}
+            <div>
+              <p className="p-overline mb-1.5">Deadline</p>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="p-input"
+              />
+              <p className="text-[11px] text-[var(--p-text-3)] mt-1">
+                Optional. The team confirms the final delivery date on review.
+              </p>
+            </div>
             </div>
 
             {/* References */}
@@ -296,23 +338,10 @@ export default function PortalNewTaskPage() {
                 </PortalButton>
               </div>
             </div>
-
-            {/* Deadline */}
-            <div>
-              <p className="p-overline mb-1.5">Deadline</p>
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="p-input"
-              />
-              <p className="text-[11px] text-[var(--p-text-3)] mt-1">
-                Optional. The team confirms the final delivery date on review.
-              </p>
             </div>
 
             <PortalButton
-              className="w-full"
+              className="w-full lg:w-auto lg:min-w-[240px]"
               loading={submitting}
               disabled={!title.trim() || uploading}
               onClick={() => void submit()}
@@ -322,66 +351,63 @@ export default function PortalNewTaskPage() {
           </div>
         )}
       </PortalCard>
+      )}
 
-      {/* Requests list */}
-      <PortalCard className="max-w-2xl">
-        <div className="px-5 py-3.5 border-b border-[var(--p-border)]">
-          <h2 className="p-section">
-            Your requests
-            <span className="font-normal text-[var(--p-text-3)]"> · {tasks.length}</span>
-          </h2>
-        </div>
-        {tasks.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <div className="w-12 h-12 rounded-[var(--p-radius-md)] bg-[var(--p-surface-2)] flex items-center justify-center mx-auto mb-3">
-              <Inbox className="h-6 w-6 text-[var(--p-text-3)]" />
+      {/* Your requests — grid view */}
+      {tab === "requests" &&
+        (tasks.length === 0 ? (
+          <PortalCard>
+            <div className="px-6 py-12 text-center">
+              <div className="w-12 h-12 rounded-[var(--p-radius-md)] bg-[var(--p-surface-2)] flex items-center justify-center mx-auto mb-3">
+                <Inbox className="h-6 w-6 text-[var(--p-text-3)]" />
+              </div>
+              <p className="p-body text-[var(--p-text-2)]">No requests yet.</p>
+              <p className="p-secondary text-[var(--p-text-3)] mt-0.5">
+                Submitted tasks and their status will appear here.
+              </p>
             </div>
-            <p className="p-body text-[var(--p-text-2)]">No requests yet.</p>
-            <p className="p-secondary text-[var(--p-text-3)] mt-0.5">
-              Submitted tasks and their status will appear here.
-            </p>
-          </div>
+          </PortalCard>
         ) : (
-          <div className="max-h-[600px] overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {tasks.map((t: any) => {
               const meta = REQUEST_STATUS[t.status] ?? REQUEST_STATUS.pending_review;
               return (
-                <div key={t._id} className="px-5 py-4 border-b border-[var(--p-border)] last:border-b-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="p-body font-medium">{t.title}</p>
-                      {t.description && (
-                        <p className="p-secondary text-[var(--p-text-3)] mt-0.5 line-clamp-2">{t.description}</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[var(--p-text-3)]">
-                        {t.clientName && <span>By {t.clientName}</span>}
-                        {t.proposedDeadline && (
-                          <span className="inline-flex items-center gap-1">
-                            <Calendar className="h-3 w-3" /> Requested {formatDate(t.proposedDeadline)}
-                          </span>
-                        )}
-                        {t.referenceCount > 0 && (
-                          <span className="inline-flex items-center gap-1">
-                            <Paperclip className="h-3 w-3" /> {t.referenceCount} reference
-                            {t.referenceCount > 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                <div
+                  key={t._id}
+                  className="flex flex-col rounded-[var(--p-radius-lg)] border border-[var(--p-border)] bg-[var(--p-surface)] p-4"
+                  style={{ boxShadow: "var(--p-shadow)" }}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="p-body font-medium leading-snug">{t.title}</p>
                     <PortalStatusChip label={meta.label} dotColor={meta.dot} className="shrink-0" />
                   </div>
+                  {t.description && (
+                    <p className="p-secondary text-[var(--p-text-3)] line-clamp-3">{t.description}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-auto pt-3 text-[11px] text-[var(--p-text-3)]">
+                    {t.clientName && <span>By {t.clientName}</span>}
+                    {t.proposedDeadline && (
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> Requested {formatDate(t.proposedDeadline)}
+                      </span>
+                    )}
+                    {t.referenceCount > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <Paperclip className="h-3 w-3" /> {t.referenceCount}
+                      </span>
+                    )}
+                  </div>
                   {t.status !== "pending_review" && t.finalDeadline && (
-                    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--p-text-2)] bg-[var(--p-surface-2)] rounded-[var(--p-radius-sm)] px-3 py-1.5">
+                    <p className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--p-text-2)] bg-[var(--p-surface-2)] rounded-[var(--p-radius-sm)] px-2.5 py-1">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[var(--p-success)]" />
-                      Confirmed completion date: {formatDate(t.finalDeadline)}
+                      Confirmed: {formatDate(t.finalDeadline)}
                     </p>
                   )}
                 </div>
               );
             })}
           </div>
-        )}
-      </PortalCard>
+        ))}
     </div>
   );
 }

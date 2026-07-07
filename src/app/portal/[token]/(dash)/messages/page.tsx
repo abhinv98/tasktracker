@@ -75,7 +75,7 @@ export default function PortalMessagesPage() {
 
   if (!session || messages === undefined) {
     return (
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-4">
         <div className="p-shimmer h-6 w-40" />
         <PortalSkeleton rows={4} />
       </div>
@@ -97,7 +97,7 @@ export default function PortalMessagesPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 flex flex-col" style={{ height: "calc(100vh - 48px)" }}>
+    <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 flex flex-col" style={{ height: "calc(100vh - 48px)" }}>
       <h1 className="p-title mb-1">Messages</h1>
       <p className="p-secondary mb-4">
         A direct line to your Ecultify team. They see your messages right away.

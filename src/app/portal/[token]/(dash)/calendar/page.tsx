@@ -62,7 +62,7 @@ export default function PortalCalendarPage() {
 
   if (!session || calendar === undefined) {
     return (
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-4">
         <div className="p-shimmer h-6 w-56" />
         <PortalSkeleton rows={5} />
       </div>
@@ -83,7 +83,7 @@ export default function PortalCalendarPage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+    <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-4">
       <PortalPageHeader
         title="Content calendar"
         description="What's planned and published for your channels, month by month."

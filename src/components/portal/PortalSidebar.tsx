@@ -76,7 +76,7 @@ export function PortalSidebar({
 
   // Visible label only — keys and routes stay unchanged.
   const tabLabel = (key: PortalTabKey, label: string) =>
-    key === "pending-agency" ? `With the ${brand.name} team` : label;
+    key === "pending-agency" ? "With the Ecultify team" : label;
 
   const content = (
     <div className="flex flex-col h-full bg-[var(--p-surface)] border-r border-[var(--p-border)] overflow-hidden">

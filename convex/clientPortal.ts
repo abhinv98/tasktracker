@@ -267,15 +267,38 @@ export const updatePortalConfig = mutation({
     brandId: v.id("brands"),
     hiddenTabs: v.optional(v.array(v.string())),
     calendarMonth: v.optional(v.string()),
+    /** Months the client may see on the calendar. null = show every month. */
+    visibleCalendarMonths: v.optional(v.union(v.array(v.string()), v.null())),
   },
-  handler: async (ctx, { brandId, hiddenTabs, calendarMonth }) => {
+  handler: async (ctx, { brandId, hiddenTabs, calendarMonth, visibleCalendarMonths }) => {
     await requireAdmin(ctx);
     const portal = await getActivePortalForBrand(ctx, brandId);
     if (!portal) throw new Error("No active portal for this brand");
     await ctx.db.patch(portal._id, {
       ...(hiddenTabs !== undefined ? { hiddenTabs } : {}),
       ...(calendarMonth !== undefined ? { calendarMonth: calendarMonth || undefined } : {}),
+      ...(visibleCalendarMonths !== undefined
+        ? { visibleCalendarMonths: visibleCalendarMonths ?? undefined }
+        : {}),
     });
+  },
+});
+
+/** Months that exist on a brand's content calendar — for the portal
+ *  month-visibility picker. */
+export const listBrandCalendarMonths = query({
+  args: { brandId: v.id("brands") },
+  handler: async (ctx, { brandId }) => {
+    await requireAdmin(ctx);
+    const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, brandId);
+    const ccBriefIds = new Set(
+      brandBriefs.filter((b) => b.briefType === "content_calendar").map((b) => b._id)
+    );
+    const months = new Set<string>();
+    for (const t of brandTasks) {
+      if (ccBriefIds.has(t.briefId) && t.postDate) months.add(t.postDate.substring(0, 7));
+    }
+    return [...months].sort().reverse();
   },
 });
 
@@ -677,7 +700,7 @@ export const getContentCalendar = query({
     );
     const calendarTasks = brandTasks.filter((t) => ccBriefIds.has(t.briefId));
 
-    const entries = calendarTasks.map((t) => ({
+    let entries = calendarTasks.map((t) => ({
       _id: t._id,
       title: t.title,
       platform: t.platform ?? "",
@@ -687,6 +710,14 @@ export const getContentCalendar = query({
       tag: t.tag ?? null,
       monthKey: t.postDate ? t.postDate.substring(0, 7) : "unscheduled",
     }));
+
+    // Month visibility: when the portal restricts months, the client only
+    // receives entries from the allowed months.
+    const allowed = portal?.visibleCalendarMonths;
+    if (allowed !== undefined) {
+      const allowedSet = new Set(allowed);
+      entries = entries.filter((e) => allowedSet.has(e.monthKey));
+    }
 
     const months = [...new Set(entries.map((e) => e.monthKey))].sort();
 

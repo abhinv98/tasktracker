@@ -133,6 +133,12 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
 
   const calendarMonth = portal?.calendarMonth ?? "";
   const hiddenTabs = portal?.hiddenTabs ?? [];
+  /** undefined = all months visible; array = restricted allowlist. */
+  const visibleMonths: string[] | undefined = portal?.visibleCalendarMonths;
+  const calendarMonths = useQuery(
+    api.clientPortal.listBrandCalendarMonths,
+    canManageLinks ? { brandId } : "skip"
+  );
 
   async function handleGenerate() {
     setGenerating(true);
@@ -395,6 +401,74 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                     onChange={(e) => void updatePortalConfig({ brandId, calendarMonth: e.target.value }).catch(() => {})}
                     className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
                   />
+                </div>
+
+                {/* Calendar month visibility */}
+                <div className="pt-2 mt-1 border-t border-[var(--border-subtle)]">
+                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
+                    Calendar months visible to the client
+                  </label>
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-[12px] text-[var(--text-secondary)]">Show all months</span>
+                    <button
+                      onClick={() =>
+                        void updatePortalConfig({
+                          brandId,
+                          visibleCalendarMonths:
+                            visibleMonths === undefined ? (calendarMonths ?? []) : null,
+                        }).catch(() => {})
+                      }
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                        visibleMonths === undefined
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {visibleMonths === undefined ? "All visible" : "Restricted"}
+                    </button>
+                  </div>
+                  {visibleMonths !== undefined && (
+                    <>
+                      <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+                        Only ticked months appear on the client&apos;s calendar.
+                      </p>
+                      {(calendarMonths ?? []).length === 0 ? (
+                        <p className="text-[11px] text-[var(--text-muted)] italic">
+                          No calendar months exist for this brand yet.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(calendarMonths ?? []).map((m) => {
+                            const on = visibleMonths.includes(m);
+                            const label = new Date(m + "-01T00:00:00").toLocaleDateString("en-US", {
+                              month: "short",
+                              year: "numeric",
+                            });
+                            return (
+                              <button
+                                key={m}
+                                onClick={() =>
+                                  void updatePortalConfig({
+                                    brandId,
+                                    visibleCalendarMonths: on
+                                      ? visibleMonths.filter((x) => x !== m)
+                                      : [...visibleMonths, m],
+                                  }).catch(() => {})
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                                  on
+                                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                                    : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}

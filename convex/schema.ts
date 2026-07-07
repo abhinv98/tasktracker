@@ -718,6 +718,9 @@ export default defineSchema({
     hiddenTabs: v.optional(v.array(v.string())),
     /** Restrict Content Calendar to one month ("YYYY-MM"); unset = all months. */
     calendarMonth: v.optional(v.string()),
+    /** Months ("YYYY-MM") the client may see on the Content Calendar.
+     *  Unset = every month; empty array = none. */
+    visibleCalendarMonths: v.optional(v.array(v.string())),
     createdBy: v.id("users"),
     createdAt: v.number(),
     deactivatedAt: v.optional(v.number()),

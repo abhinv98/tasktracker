@@ -31,7 +31,7 @@ export default function PortalMonthlyLogPage() {
 
   if (!session || log === undefined) {
     return (
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-4">
+      <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-4">
         <div className="p-shimmer h-6 w-48" />
         <PortalSkeleton rows={5} />
       </div>
@@ -43,7 +43,7 @@ export default function PortalMonthlyLogPage() {
   const months = Object.keys(byMonth).sort().reverse();
 
   return (
-    <div className="max-w-5xl mx-auto px-6 md:px-10 py-8 space-y-5">
+    <div className="max-w-7xl mx-auto px-6 md:px-10 py-8 space-y-5">
       <PortalPageHeader
         title="Monthly log"
         description="Completed tasks that were requested through this portal, month by month."
