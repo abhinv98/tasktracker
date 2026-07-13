@@ -222,7 +222,7 @@ export const listDeliverables = query({
         };
       })
     );
-    return results;
+    return results.sort((a, b) => b.submittedAt - a.submittedAt);
   },
 });
 
@@ -342,7 +342,7 @@ export const listTeamLeadPendingApprovals = query({
         };
       })
     );
-    return results;
+    return results.sort((a, b) => b.submittedAt - a.submittedAt);
   },
 });
 
@@ -599,7 +599,11 @@ export const listManagerDeliverables = query({
       })
     );
 
-    return [...results, ...sendToClientResults, ...clientFeedbackResults];
+    return [
+      ...results.sort((a, b) => b.submittedAt - a.submittedAt),
+      ...sendToClientResults,
+      ...clientFeedbackResults,
+    ];
   },
 });
 

@@ -243,6 +243,21 @@ export const getTeamMemberTasks = query({
         return rank(a.status) - rank(b.status);
       });
 
+    // Content-calendar entries live on a month sheet. Clicking one from here
+    // must land on that month, so ship its postDate — a sub-task (Copy/Design
+    // child) inherits the date from its parent entry.
+    const parentIds = [
+      ...new Set(
+        activeTasks
+          .map((t) => t.parentTaskId)
+          .filter((id): id is Id<"tasks"> => id !== undefined)
+      ),
+    ];
+    const parents = await Promise.all(parentIds.map((id) => ctx.db.get(id)));
+    const parentPostDate = new Map(
+      parents.filter((p) => p !== null).map((p) => [p!._id, p!.postDate ?? null])
+    );
+
     return {
       user: {
         _id: targetUser._id,
@@ -263,9 +278,14 @@ export const getTeamMemberTasks = query({
           duration: t.duration,
           briefTitle: brief?.title ?? "Unknown",
           briefId: t.briefId,
+          briefType: brief?.briefType ?? null,
+          postDate:
+            t.postDate ??
+            (t.parentTaskId ? (parentPostDate.get(t.parentTaskId) ?? null) : null),
           brandName: brand?.name ?? "-",
           assignedByName: assignedByUser?.name ?? assignedByUser?.email ?? "Unknown",
           deadline: t.deadline,
+          createdAt: t._creationTime,
           assignedAt: t.assignedAt ?? (t as any)._creationTime ?? null,
           submittedForReviewAt: t.submittedForReviewAt ?? null,
           completedAt: t.completedAt ?? null,

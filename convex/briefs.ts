@@ -141,23 +141,13 @@ export const getBrief = query({
         : tasks;
     const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
-    // Mirror listBriefs: the brief's "ultimate" deadline rolls up to the
-    // latest top-level task deadline. Single-task briefs trivially mirror
-    // the lone task's deadline. Content-calendar briefs are excluded.
-    let effectiveDeadline = brief.deadline;
-    if (brief.briefType !== "content_calendar") {
-      const topLevel = tasks.filter((t) => t.parentTaskId === undefined);
-      const dls = topLevel
-        .map((t) => t.deadline)
-        .filter((d): d is number => d !== undefined);
-      if (dls.length > 0) {
-        effectiveDeadline = Math.max(...dls);
-      }
-    }
+    // brief.deadline is authoritative: recomputeBriefDeadline keeps it rolled
+    // up from the tasks on every task write, and a deadline set by hand on the
+    // brief (deadlineIsManual) is left alone. Do not re-derive it here — that
+    // read-time override used to mask manual edits and snap the picker back.
 
     return {
       ...brief,
-      deadline: effectiveDeadline,
       manager,
       brand,
       assignedTeams,
@@ -955,10 +945,17 @@ export const updateBrief = mutation({
     if (willBeContentCalendar) {
       if (fields.briefType === "content_calendar" && brief.deadline !== undefined) {
         updates.deadline = undefined;
+        updates.deadlineIsManual = undefined;
       }
       // drop any incoming deadline edit for content calendar briefs
     } else if (fields.deadline !== undefined) {
       updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
+      // A hand-set brief deadline outranks the task rollup from here on.
+      // single_task briefs are exempt: their deadline mirrors the lone task
+      // both ways, so the rollup must stay live for them.
+      if (brief.briefType !== "single_task") {
+        updates.deadlineIsManual = true;
+      }
     }
     if (fields.briefType !== undefined) updates.briefType = fields.briefType;
     if (fields.creativesRequired !== undefined) {
@@ -970,21 +967,29 @@ export const updateBrief = mutation({
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(briefId, updates);
 
-      // Symmetric sync for single_task briefs: if the brief's deadline was
-      // edited directly, mirror it onto the lone task so task-level views
-      // (task modal, task cards) don't go stale.
-      if (
-        "deadline" in updates &&
-        brief.briefType === "single_task"
-      ) {
+      if ("deadline" in updates) {
+        const newDeadline = updates.deadline as number | undefined;
         const tasksInBrief = await ctx.db
           .query("tasks")
           .withIndex("by_brief", (q) => q.eq("briefId", briefId))
           .collect();
-        if (tasksInBrief.length > 0) {
-          const newDeadline = updates.deadline as number | undefined;
+
+        if (brief.briefType === "single_task") {
+          // Symmetric sync for single_task briefs: mirror the brief's deadline
+          // onto the lone task so task-level views (task modal, task cards)
+          // don't go stale.
           for (const t of tasksInBrief) {
             if (t.deadline !== newDeadline) {
+              await ctx.db.patch(t._id, { deadline: newDeadline });
+            }
+          }
+        } else if (newDeadline !== undefined) {
+          // Multi-task briefs: the brief deadline is a ceiling. Nothing inside
+          // may land after the brief itself, so pull late tasks back to it.
+          // Tasks due earlier keep their own dates — the internal sequence is
+          // the whole point of a multi-task brief.
+          for (const t of tasksInBrief) {
+            if (t.deadline !== undefined && t.deadline > newDeadline) {
               await ctx.db.patch(t._id, { deadline: newDeadline });
             }
           }

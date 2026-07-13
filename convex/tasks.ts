@@ -1,6 +1,7 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
@@ -71,16 +72,46 @@ export const listTasksForUser = query({
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
       .collect();
     const briefs = await ctx.db.query("briefs").collect();
-    return tasks
+    const briefMap = new Map(briefs.map((b) => [b._id, b]));
+    const brands = await ctx.db.query("brands").collect();
+    const brandMap = new Map(brands.map((b) => [b._id, b]));
+
+    const visible = tasks
       .filter((t) => {
-        const brief = briefs.find((b) => b._id === t.briefId);
+        const brief = briefMap.get(t.briefId);
         return brief && brief.status !== "archived";
       })
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((t) => {
-        const brief = briefs.find((b) => b._id === t.briefId);
-        return { ...t, briefName: brief?.title, briefStatus: brief?.status, briefDescription: brief?.description };
-      });
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    // Subtask cards show their master task's name, so resolve every distinct
+    // parent in one batch rather than per-card.
+    const parentIds = [
+      ...new Set(
+        visible
+          .map((t) => t.parentTaskId)
+          .filter((id): id is Id<"tasks"> => id !== undefined)
+      ),
+    ];
+    const parents = await Promise.all(parentIds.map((id) => ctx.db.get(id)));
+    const parentTitleMap = new Map(
+      parents.filter((p) => p !== null).map((p) => [p!._id, p!.title])
+    );
+
+    return visible.map((t) => {
+      const brief = briefMap.get(t.briefId);
+      const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
+      return {
+        ...t,
+        briefName: brief?.title,
+        briefStatus: brief?.status,
+        briefDescription: brief?.description,
+        parentTaskTitle: t.parentTaskId
+          ? (parentTitleMap.get(t.parentTaskId) ?? null)
+          : null,
+        brandName: brand?.name ?? null,
+        brandColor: brand?.color ?? null,
+      };
+    });
   },
 });
 
@@ -144,7 +175,7 @@ export const listMyWork = query({
       .collect();
     const assignedToMe = mine
       .filter((t) => liveBrief(t.briefId))
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .sort((a, b) => b._creationTime - a._creationTime)
       .map(decorate);
 
     const delegated = await ctx.db
@@ -526,6 +557,14 @@ export const updateTaskStatus = mutation({
 
     if (newStatus === "done" && user?.role !== "admin") {
       throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
+    }
+
+    // A brief on hold freezes its tasks for employees. Admins can still move
+    // them (e.g. to wrap up work that was already in flight when it paused).
+    if (brief?.status === "on_hold" && user?.role !== "admin") {
+      throw new Error(
+        "This brief is on hold. You cannot work on its tasks until it is resumed."
+      );
     }
 
     await ctx.db.patch(taskId, {

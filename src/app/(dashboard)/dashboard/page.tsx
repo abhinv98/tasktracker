@@ -89,10 +89,15 @@ function EmployeeTaskCard({
   const sc = statusColors[task.status] ?? statusColors.pending;
   const t = task as EmployeeTask & {
     parentTaskId?: string;
+    parentTaskTitle?: string | null;
+    brandName?: string | null;
+    brandColor?: string | null;
     deadlineExtended?: boolean;
     briefStatus?: string;
     briefDescription?: string;
   };
+  // A task inside an on-hold brief is frozen — the server rejects starting it.
+  const isOnHold = t.briefStatus === "on_hold";
 
   return (
     <Card
@@ -130,11 +135,29 @@ function EmployeeTaskCard({
               {task.title}
             </h3>
           </div>
-          <p className="text-[12px] text-[var(--text-secondary)] mt-1">
-            {task.briefName}
-            {task.deadline
-              ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}`
-              : ""}
+          {/* Sub-tasks are meaningless without their master task — name it. */}
+          {t.parentTaskTitle && (
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">
+              ↳ {t.parentTaskTitle}
+            </p>
+          )}
+          <p className="text-[12px] text-[var(--text-secondary)] mt-1 flex items-center gap-1.5 flex-wrap">
+            {t.brandName && (
+              <span className="inline-flex items-center gap-1 font-medium text-[var(--text-primary)]">
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: t.brandColor ?? "#9CA3AF" }}
+                />
+                {t.brandName}
+              </span>
+            )}
+            <span>
+              {t.brandName && task.briefName ? "· " : ""}
+              {task.briefName}
+              {task.deadline
+                ? ` · Due ${new Date(task.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}`
+                : ""}
+            </span>
           </p>
           {(task.description || t.briefDescription) && (
             <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
@@ -142,7 +165,7 @@ function EmployeeTaskCard({
             </p>
           )}
         </div>
-        {task.status === "pending" ? (
+        {task.status === "pending" && !isOnHold ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -221,6 +244,17 @@ function EmployeeTaskViews({
   };
   void hydrated; // hydrated is reserved for future SSR flicker suppression if needed
 
+  const [showOnHold, setShowOnHold] = useState(false);
+
+  // Tasks whose brief is on hold are parked: they must not sit in the working
+  // columns inviting someone to start them (the server rejects it anyway).
+  const onHoldTasks = tasks.filter(
+    (t) => (t as EmployeeTask & { briefStatus?: string }).briefStatus === "on_hold"
+  );
+  const activeTasks = tasks.filter(
+    (t) => (t as EmployeeTask & { briefStatus?: string }).briefStatus !== "on_hold"
+  );
+
   // Group tasks by status
   const grouped: Record<string, EmployeeTask[]> = {
     pending: [],
@@ -228,7 +262,7 @@ function EmployeeTaskViews({
     review: [],
     done: [],
   };
-  for (const task of tasks) {
+  for (const task of activeTasks) {
     if (grouped[task.status]) grouped[task.status].push(task);
     else grouped.pending.push(task);
   }
@@ -265,12 +299,54 @@ function EmployeeTaskViews({
     );
   }
 
+  const onHoldSection =
+    onHoldTasks.length === 0 ? null : (
+      <div className="rounded-xl border border-amber-200 bg-amber-50/40 overflow-hidden">
+        <button
+          onClick={() => setShowOnHold((v) => !v)}
+          aria-expanded={showOnHold}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-amber-50 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            {showOnHold ? (
+              <ChevronDown className="h-3.5 w-3.5 text-amber-700" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-amber-700" />
+            )}
+            <span className="font-semibold text-[12px] text-amber-800 uppercase tracking-wide">
+              ⏸ On Hold
+            </span>
+            <span className="text-[11px] text-amber-700">
+              Brief paused — no action needed
+            </span>
+          </span>
+          <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-white border border-amber-200 text-[11px] font-semibold text-amber-800 tabular-nums">
+            {onHoldTasks.length}
+          </span>
+        </button>
+        {showOnHold && (
+          <div className="flex flex-col gap-2 p-2 border-t border-amber-200">
+            {onHoldTasks.map((task) => (
+              <EmployeeTaskCard
+                key={task._id}
+                task={task}
+                onSelect={onSelectTask}
+                onStart={onStartTask}
+                isStarting={startingTaskId === task._id}
+                statusColors={statusColors}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+
   return (
     <div className="flex flex-col gap-4">
       {/* View Toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="text-[12px] text-[var(--text-muted)] tabular-nums">
-          {tasks.length} task{tasks.length !== 1 ? "s" : ""}
+          {activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}
         </div>
         <div className="inline-flex items-center rounded-lg border border-[var(--border)] bg-white p-0.5 shadow-sm">
           <button
@@ -405,6 +481,8 @@ function EmployeeTaskViews({
           </div>
         </div>
       )}
+
+      {onHoldSection}
     </div>
   );
 }

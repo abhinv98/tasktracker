@@ -227,7 +227,11 @@ export default function BriefsPage() {
 
   function buildFolders(briefsList: typeof briefs) {
     if (!briefsList || briefsList.length === 0) return [];
-    const sorted = [...briefsList].sort((a, b) => a.globalPriority - b.globalPriority);
+    // Newest brief first inside each brand folder — the latest work is what
+    // people come here for, and it shouldn't be at the bottom of the scroll.
+    const sorted = [...briefsList].sort(
+      (a, b) => b._creationTime - a._creationTime
+    );
     const grouped = new Map<string, typeof sorted>();
 
     for (const brief of sorted) {

@@ -12,6 +12,7 @@ import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriang
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
+import { useSmartBack } from "@/lib/useSmartBack";
 import { BriefFlowCanvas } from "@/components/BriefFlowCanvas";
 
 function parseDuration(str: string): number {
@@ -459,6 +460,10 @@ export default function BriefPage() {
   const returnTo = safeReturnPath(searchParams.get("returnTo"));
   const backHref = returnTo ?? "/briefs";
   const backLabel = returnTo?.includes("/brands/") ? "Brand" : "Briefs";
+  const goBack = useSmartBack(backHref);
+  // Deep link from Team Load / task navigation: open the calendar on the month
+  // that actually holds the task, not the first sheet ever created.
+  const initialMonth = searchParams.get("month");
 
   const brief = useQuery(api.briefs.getBrief, { briefId });
   const tasksData = useQuery(api.tasks.listTasksForBrief, { briefId });
@@ -657,7 +662,7 @@ export default function BriefPage() {
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             type="button"
-            onClick={() => router.push(backHref)}
+            onClick={goBack}
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin)] hover:text-white transition-all shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
@@ -720,7 +725,7 @@ export default function BriefPage() {
               <DatePicker
                 value={brief.deadline}
                 onChange={(deadline) => {
-                  const tasks = (tasksData ?? []) as Array<{ _id: Id<"tasks"> }>;
+                  const tasks = tasksData?.tasks ?? [];
                   if (
                     deadline !== undefined &&
                     brief.briefType !== "content_calendar" &&
@@ -840,7 +845,12 @@ export default function BriefPage() {
       {/* Content Calendar briefs get a full-width spreadsheet layout */}
       {brief.briefType === "content_calendar" ? (
         <div className="flex-1 overflow-hidden">
-          <ContentCalendarView briefId={briefId} isEditable={!!isAdmin} brandId={brief?.brandId} />
+          <ContentCalendarView
+            briefId={briefId}
+            isEditable={!!isAdmin}
+            brandId={brief?.brandId}
+            initialMonth={initialMonth}
+          />
         </div>
       ) : brief.briefType === "single_task" ? (
         <SingleTaskBriefView

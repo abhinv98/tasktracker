@@ -10,6 +10,7 @@ import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, Eye
 import ClientPortalTab from "@/components/brand/ClientPortalTab";
 import InternalJsrTab from "@/components/brand/InternalJsrTab";
 import MomTab from "@/components/brand/MomTab";
+import { useSmartBack } from "@/lib/useSmartBack";
 
 type BrandTab = "overview" | "client-jsr" | "internal-jsr" | "mom";
 
@@ -35,6 +36,7 @@ export default function BrandDetailPage() {
   // Back navigation returns the user to wherever they came from.
   const returnTo = safeReturnPath(searchParams.get("returnTo"));
   const backHref = returnTo ?? "/brands-overview";
+  const goBack = useSmartBack(backHref);
 
   const tabParam = searchParams.get("tab");
   const activeTab: BrandTab =
@@ -63,6 +65,12 @@ export default function BrandDetailPage() {
   const { toast } = useToast();
 
   const isAdmin = user?.role === "admin";
+
+  // This page is the brand management surface. Employees get the read-only
+  // view of the brands they work on instead (getBrand also refuses them).
+  useEffect(() => {
+    if (user && user.role !== "admin") router.replace("/my-brands");
+  }, [user, router]);
 
   // Documents
   const brandDocs = useQuery(api.brandDocuments.listDocuments, { brandId });
@@ -363,7 +371,7 @@ export default function BrandDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <button
-          onClick={() => router.push(backHref)}
+          onClick={goBack}
           className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           title="Back"
         >

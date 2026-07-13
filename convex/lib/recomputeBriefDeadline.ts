@@ -10,6 +10,8 @@ import { Id } from "../_generated/dataModel";
  *  - If multiple tasks have deadlines → use the latest one ("last node in
  *    sequence" — work on the brief isn't done until that final date passes).
  *  - If no task has a deadline → clear brief.deadline.
+ *  - A deadline set by hand on the brief (deadlineIsManual) wins outright and
+ *    is never recomputed from tasks.
  *
  * Called after task create / update (deadline change) / delete so the
  * brief-level deadline shown across dashboards, listings, and reports stays
@@ -22,6 +24,7 @@ export async function recomputeBriefDeadline(
   const brief = await ctx.db.get(briefId);
   if (!brief) return;
   if (brief.briefType === "content_calendar") return;
+  if (brief.deadlineIsManual === true) return;
 
   const tasks = await ctx.db
     .query("tasks")

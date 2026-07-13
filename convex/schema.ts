@@ -84,6 +84,9 @@ export default defineSchema({
     assignedManagerId: v.optional(v.id("users")),
     globalPriority: v.number(),
     deadline: v.optional(v.number()),
+    /** Set when a manager edits the brief deadline directly. While true, the
+     *  task-deadline rollup (recomputeBriefDeadline) leaves it alone. */
+    deadlineIsManual: v.optional(v.boolean()),
     archivedAt: v.optional(v.number()),
     archivedBy: v.optional(v.id("users")),
     brandId: v.optional(v.id("brands")),

@@ -50,6 +50,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/briefs": Briefcase,
   "/brands-overview": BarChart3,
   "/brands": Tag,
+  "/my-brands": Tag,
   "/overview": BarChart3,
   "/analytics": TrendingUp,
   "/discussions": MessageCircle,
@@ -141,6 +142,10 @@ const EMPLOYEE_NAV: NavCategory[] = [
   {
     category: "Planning",
     items: [{ href: "/content-calendar", label: "Content Calendar" }],
+  },
+  {
+    category: "Organization",
+    items: [{ href: "/my-brands", label: "Brands" }],
   },
   {
     category: "Management",

@@ -1,6 +1,7 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 export const getManagersForBrand = query({
   args: { brandId: v.id("brands") },
@@ -69,12 +70,60 @@ export const listBrands = query({
   },
 });
 
+/**
+ * The brands an employee actually works on, derived from their assigned tasks:
+ * tasks → briefs → distinct brands. Powers the read-only /my-brands view, so it
+ * deliberately carries no manager, credential, or client-portal data.
+ */
+export const listMyInvolvedBrands = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const myTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+      .collect();
+    if (myTasks.length === 0) return [];
+
+    const briefIds = [...new Set(myTasks.map((t) => t.briefId))];
+    const briefs = await Promise.all(briefIds.map((id) => ctx.db.get(id)));
+
+    const brandIds = [
+      ...new Set(
+        briefs
+          .filter((b) => b !== null && b.status !== "archived")
+          .map((b) => b!.brandId)
+          .filter((id): id is Id<"brands"> => id !== undefined)
+      ),
+    ];
+
+    const brands = await Promise.all(brandIds.map((id) => ctx.db.get(id)));
+    return Promise.all(
+      brands
+        .filter((b) => b !== null)
+        .map(async (brand) => ({
+          _id: brand!._id,
+          name: brand!.name,
+          color: brand!.color ?? null,
+          logoUrl: brand!.logoId ? await ctx.storage.getUrl(brand!.logoId) : null,
+        }))
+    );
+  },
+});
+
 // Get single brand with details
 export const getBrand = query({
   args: { brandId: v.id("brands") },
   handler: async (ctx, { brandId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
+
+    // This returns the full management surface (managers, employees, brief
+    // rollups). Employees get the read-only /my-brands view instead.
+    const viewer = await ctx.db.get(userId);
+    if (!viewer || viewer.role !== "admin") return null;
 
     const brand = await ctx.db.get(brandId);
     if (!brand) return null;

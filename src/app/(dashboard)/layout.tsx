@@ -2,11 +2,12 @@
 
 import { useQuery } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
+import { bumpNavDepth, resetNavDepth } from "@/lib/useSmartBack";
 
 // Note: /oversight is gated server-side by oversight access (super-admins,
 // oversight admins, brand managers, and team leads). Don't list it here or
@@ -29,6 +30,19 @@ export default function DashboardLayout({
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
+  }, [pathname]);
+
+  // Track in-app navigation so back buttons know whether history holds one of
+  // our pages. A full page load remounts this layout and resets the count, so a
+  // cold deep link correctly reports "no way back".
+  const isFirstRoute = useRef(true);
+  useEffect(() => {
+    if (isFirstRoute.current) {
+      isFirstRoute.current = false;
+      resetNavDepth();
+      return;
+    }
+    bumpNavDepth();
   }, [pathname]);
 
   // Redirect unauthenticated users to sign-in

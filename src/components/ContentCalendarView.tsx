@@ -146,12 +146,15 @@ interface ContentCalendarViewProps {
   briefId: Id<"briefs">;
   isEditable: boolean;
   brandId?: Id<"brands">;
+  /** "YYYY-MM" — open on this month's sheet (deep link from a task). */
+  initialMonth?: string | null;
 }
 
 export function ContentCalendarView({
   briefId,
   isEditable,
   brandId,
+  initialMonth,
 }: ContentCalendarViewProps) {
   const sheets = useQuery(api.contentCalendar.listSheets, { briefId });
   const allUsers = useQuery(api.users.listAllUsers, {});
@@ -193,8 +196,15 @@ export function ContentCalendarView({
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 
+  // Once a tab is clicked, activeSheet wins. Until then, honour a deep link's
+  // month when a sheet for it exists; otherwise fall back to the first sheet.
+  const deepLinkedMonth =
+    initialMonth && sheets?.some((s) => s.month === initialMonth)
+      ? initialMonth
+      : null;
   const currentSheetMonth =
     activeSheet ??
+    deepLinkedMonth ??
     (sheets && sheets.length > 0 ? sheets[0].month : null);
 
   const tasks = useQuery(

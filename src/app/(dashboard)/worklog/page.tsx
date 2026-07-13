@@ -546,8 +546,15 @@ export default function WorkLogPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {memberTasks.tasks
-                            .sort((a: any, b: any) => (MEMBER_STATUS_CONFIG[a.status]?.order ?? 99) - (MEMBER_STATUS_CONFIG[b.status]?.order ?? 99))
+                          {[...memberTasks.tasks]
+                            .sort((a: any, b: any) => {
+                              const byStatus =
+                                (MEMBER_STATUS_CONFIG[a.status]?.order ?? 99) -
+                                (MEMBER_STATUS_CONFIG[b.status]?.order ?? 99);
+                              if (byStatus !== 0) return byStatus;
+                              // Newest first within a status.
+                              return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+                            })
                             .map((task: any, idx: number) => {
                               const config = MEMBER_STATUS_CONFIG[task.status] ?? { color: "var(--text-muted)", label: task.status, order: 99 };
                               const fmtDate = (ts: number | null | undefined) => {
@@ -559,7 +566,20 @@ export default function WorkLogPage() {
                                 <tr
                                   key={task._id}
                                   className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer`}
-                                  onClick={() => router.push(`/brief/${task.briefId}`)}
+                                  onClick={() => {
+                                    // Content-calendar entries: carry the month
+                                    // so the calendar opens on the right sheet
+                                    // instead of the first one ever created.
+                                    const month =
+                                      typeof task.postDate === "string"
+                                        ? task.postDate.slice(0, 7)
+                                        : null;
+                                    router.push(
+                                      month
+                                        ? `/brief/${task.briefId}?month=${month}`
+                                        : `/brief/${task.briefId}`
+                                    );
+                                  }}
                                 >
                                   <td className="px-3 py-2.5">
                                     <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
