@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
+import { PaginationFooter } from "@/components/ui/PaginationFooter";
 
 const STATUS = TASK_STATUS_CONFIG as Record<
   string,
@@ -144,6 +145,20 @@ export default function OversightBoard() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
+  // Pagination: the board can hold 1000+ rows; render 50 at a time. Any
+  // filter change starts back at page 1 (state adjusted during render — the
+  // filters live in the query args, so there's no single onChange to hook).
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+  const filterKey = JSON.stringify([
+    status, brandId, managerId, teamId, assigneeId, search, startDate, endDate,
+  ]);
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (prevFilterKey !== filterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(0);
+  }
+
   const rangeInvalid = Boolean(
     startDate && endDate && startDate > endDate
   );
@@ -192,6 +207,13 @@ export default function OversightBoard() {
           }
           return `Scoped to ${parts.join(" + ")}.`;
         })();
+
+  const pageCount = Math.max(1, Math.ceil(board.rows.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, pageCount - 1);
+  const pageRows = board.rows.slice(
+    clampedPage * PAGE_SIZE,
+    (clampedPage + 1) * PAGE_SIZE
+  );
 
   return (
     <div>
@@ -356,7 +378,8 @@ export default function OversightBoard() {
         </span>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-white overflow-x-auto">
+      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
@@ -386,7 +409,7 @@ export default function OversightBoard() {
                 </td>
               </tr>
             ) : (
-              board.rows.map((r) => {
+              pageRows.map((r) => {
                 const cfg = STATUS[r.status] ?? {
                   color: "#6b7280",
                   label: r.status,
@@ -410,6 +433,14 @@ export default function OversightBoard() {
             )}
           </tbody>
         </table>
+        </div>
+        <PaginationFooter
+          page={clampedPage}
+          pageCount={pageCount}
+          totalRows={board.rows.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       </div>
 
       <TaskNavigator

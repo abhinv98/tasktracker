@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Card, PageHeader } from "@/components/ui";
@@ -54,10 +54,34 @@ const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order
   done: { color: "#10b981", label: "Done", order: 4 },
 };
 
+type WorklogTab = "worklog" | "teamload" | "managerlog" | "oversight";
+const WORKLOG_TABS: WorklogTab[] = ["worklog", "teamload", "managerlog", "oversight"];
+
+// useSearchParams needs a Suspense boundary on statically prerendered pages.
 export default function WorkLogPage() {
+  return (
+    <Suspense fallback={null}>
+      <WorkLogPageInner />
+    </Suspense>
+  );
+}
+
+function WorkLogPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useQuery(api.users.getCurrentUser);
-  const [activeTab, setActiveTab] = useState<"worklog" | "teamload" | "managerlog" | "oversight">("worklog");
+  // The active tab lives in the URL so that navigating away (e.g. into a task's
+  // brief from Team Load) and coming back via the back button lands on the same
+  // tab, not the default one. replace() keeps tab switches out of history.
+  const tabParam = searchParams.get("tab");
+  const activeTab: WorklogTab = WORKLOG_TABS.includes(tabParam as WorklogTab)
+    ? (tabParam as WorklogTab)
+    : "worklog";
+  const setActiveTab = (tab: WorklogTab) => {
+    router.replace(tab === "worklog" ? "/worklog" : `/worklog?tab=${tab}`, {
+      scroll: false,
+    });
+  };
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [filterStatus, setFilterStatus] = useState<string>("");

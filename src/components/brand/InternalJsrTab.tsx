@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Filter, Inbox, Tag as TagIcon } from "lucide-react";
+import { PaginationFooter } from "@/components/ui/PaginationFooter";
 
 interface InternalJsrTabProps {
   brandId: Id<"brands">;
@@ -83,13 +84,26 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   }, [overview, filterStatus, filterMember, filterTag]);
 
   const sortedRows = useMemo(() => {
+    // Newest work first — with hundreds of rows, the latest tasks must not
+    // live at the bottom of the scroll.
     return [...filtered].sort((a, b) => {
-      const da = a.deadline ?? Number.MAX_SAFE_INTEGER;
-      const db = b.deadline ?? Number.MAX_SAFE_INTEGER;
-      if (da !== db) return da - db;
+      const da = a.assignedAt ?? a.createdAt ?? 0;
+      const db = b.assignedAt ?? b.createdAt ?? 0;
+      if (da !== db) return db - da;
       return a.taskTitle.localeCompare(b.taskTitle);
     });
   }, [filtered]);
+
+  // Client-side pagination: the query already returned everything, but
+  // rendering 400+ rows at once makes the tab crawl.
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(
+    () => sortedRows.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE),
+    [sortedRows, clampedPage]
+  );
 
   if (overview === undefined) {
     return <p className="text-[14px] text-[var(--text-secondary)] py-8">Loading...</p>;
@@ -112,7 +126,10 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
             <button
               key={status}
               type="button"
-              onClick={() => setFilterStatus(filterStatus === status ? "" : status)}
+              onClick={() => {
+                setFilterStatus(filterStatus === status ? "" : status);
+                setPage(0);
+              }}
               className={`p-4 rounded-xl border transition-all text-left ${
                 filterStatus === status
                   ? "border-[var(--accent-admin)] ring-2 ring-[var(--accent-admin)]/20"
@@ -136,7 +153,10 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
         </div>
         <select
           value={filterMember}
-          onChange={(e) => setFilterMember(e.target.value)}
+          onChange={(e) => {
+            setFilterMember(e.target.value);
+            setPage(0);
+          }}
           className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
         >
           <option value="">All assignees</option>
@@ -149,7 +169,10 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
         {(brandTags ?? []).length > 0 && (
           <select
             value={filterTag}
-            onChange={(e) => setFilterTag(e.target.value)}
+            onChange={(e) => {
+              setFilterTag(e.target.value);
+              setPage(0);
+            }}
             className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           >
             <option value="">All tags</option>
@@ -167,6 +190,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
               setFilterStatus("");
               setFilterMember("");
               setFilterTag("");
+              setPage(0);
             }}
             className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
           >
@@ -224,7 +248,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRows.map((task) => {
+                {pageRows.map((task) => {
                   const cfg =
                     STATUS_CONFIG[task.taskStatus] ?? STATUS_CONFIG.pending;
                   return (
@@ -323,6 +347,13 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
               </tbody>
             </table>
           </div>
+          <PaginationFooter
+            page={clampedPage}
+            pageCount={pageCount}
+            totalRows={sortedRows.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
           <datalist id={`brand-tags-${brandId}`}>
             {(brandTags ?? []).map((t) => (
               <option key={t} value={t} />

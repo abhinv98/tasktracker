@@ -79,25 +79,13 @@ export const listBriefs = query({
           : tasksInBrief;
       const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
-      // Effective deadline: the brief's "ultimate" deadline rolls up to the
-      // latest top-level task deadline ("last node in sequence"). For a brief
-      // with a single task, that simplifies to mirroring the lone task's
-      // deadline. Content-calendar briefs use per-entry postDates, so they
-      // skip the rollup entirely.
-      let effectiveDeadline = b.deadline;
-      if (b.briefType !== "content_calendar") {
-        const topLevel = tasksInBrief.filter((t) => t.parentTaskId === undefined);
-        const dls = topLevel
-          .map((t) => t.deadline)
-          .filter((d): d is number => d !== undefined);
-        if (dls.length > 0) {
-          effectiveDeadline = Math.max(...dls);
-        }
-      }
+      // b.deadline is authoritative: recomputeBriefDeadline keeps it rolled up
+      // from tasks on every task write, and a hand-set deadline
+      // (deadlineIsManual) must win. No read-time re-derivation — that's what
+      // made manual deadlines appear not to stick.
 
       return {
         ...b,
-        deadline: effectiveDeadline,
         managerName: manager?.name ?? manager?.email,
         teamIds,
         teamNames,

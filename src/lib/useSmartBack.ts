@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 const NAV_DEPTH_KEY = "tt:navDepth";
 
@@ -11,9 +11,11 @@ const NAV_DEPTH_KEY = "tt:navDepth";
  * router.back() is only safe when there IS an in-app page behind us — on a cold
  * deep link it would eject the user out of the app entirely.
  *
- * The layout counts client-side route changes for the current tab session;
- * a depth above zero means at least one in-app navigation happened, so browser
- * history holds one of our own pages.
+ * The layout tracks how many in-app pages sit behind the current one via
+ * useNavDepthTracker: forward navigations increment the count, history
+ * traversals (back/forward, detected via popstate) decrement it, and a full
+ * page load resets it. A depth above zero means browser history holds one of
+ * our own pages.
  */
 export function readNavDepth(): number {
   try {
@@ -23,20 +25,47 @@ export function readNavDepth(): number {
   }
 }
 
-export function resetNavDepth() {
+function writeNavDepth(depth: number) {
   try {
-    sessionStorage.setItem(NAV_DEPTH_KEY, "0");
+    sessionStorage.setItem(NAV_DEPTH_KEY, String(Math.max(0, depth)));
   } catch {
     /* sessionStorage unavailable (private mode) — back falls back to the href */
   }
 }
 
-export function bumpNavDepth() {
-  try {
-    sessionStorage.setItem(NAV_DEPTH_KEY, String(readNavDepth() + 1));
-  } catch {
-    /* ignore */
-  }
+/**
+ * Mount once in the dashboard layout with the current pathname. Counts in-app
+ * route changes so useSmartBack knows whether history holds one of our pages.
+ */
+export function useNavDepthTracker(pathname: string) {
+  const isFirstRoute = useRef(true);
+  // Set by popstate (which fires on back/forward BEFORE React re-renders), so
+  // the pathname effect below can tell a traversal from a forward navigation.
+  const traversed = useRef(false);
+
+  useEffect(() => {
+    const onPop = () => {
+      traversed.current = true;
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    if (isFirstRoute.current) {
+      // Full page load: whatever history exists belongs to before the app.
+      isFirstRoute.current = false;
+      writeNavDepth(0);
+      return;
+    }
+    if (traversed.current) {
+      // Back (or forward) consumed a history entry rather than adding one.
+      traversed.current = false;
+      writeNavDepth(readNavDepth() - 1);
+      return;
+    }
+    writeNavDepth(readNavDepth() + 1);
+  }, [pathname]);
 }
 
 /**

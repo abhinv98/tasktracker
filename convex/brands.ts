@@ -326,6 +326,7 @@ export const getBrandTeamOverview = query({
         tag: task.tag,
         deadline: task.deadline,
         assignedAt: task.assignedAt,
+        createdAt: task._creationTime,
         latestSubmittedAt,
         latestApprovedAt,
         briefTitle: brief?.title ?? "Unknown",
