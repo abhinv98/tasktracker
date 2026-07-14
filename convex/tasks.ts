@@ -391,6 +391,8 @@ export const updateTask = mutation({
     clientFacing: v.optional(v.boolean()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    postTitle: v.optional(v.string()),
+    postDescription: v.optional(v.string()),
     handoffTargetTeamId: v.optional(v.id("teams")),
     clearHandoffTarget: v.optional(v.boolean()),
     /** Per-task creatives override. Surfaces "X / N creatives" on the
@@ -423,6 +425,8 @@ export const updateTask = mutation({
     if (fields.clientFacing !== undefined) updates.clientFacing = fields.clientFacing;
     if (fields.creativeCopy !== undefined) updates.creativeCopy = fields.creativeCopy;
     if (fields.caption !== undefined) updates.caption = fields.caption;
+    if (fields.postTitle !== undefined) updates.postTitle = fields.postTitle;
+    if (fields.postDescription !== undefined) updates.postDescription = fields.postDescription;
     if (fields.handoffTargetTeamId !== undefined) updates.handoffTargetTeamId = fields.handoffTargetTeamId;
     if (clearHandoffTarget) updates.handoffTargetTeamId = undefined;
     if (clearCreativesRequired) {

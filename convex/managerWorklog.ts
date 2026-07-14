@@ -142,11 +142,13 @@ export const listMine = query({
     const enriched = await Promise.all(
       entries.map(async (e) => {
         let taskDeadline: number | null = null;
-        let carryOverDays = 0;
+        let carryOverDays = e.carriedOverDays ?? 0;
         let taskStatus: string = e.done ? "done" : "pending";
+        let isTask = false;
         if (e.linkedTaskId) {
           const t = await ctx.db.get(e.linkedTaskId);
           if (t) {
+            isTask = true;
             taskDeadline = t.deadline ?? null;
             carryOverDays = t.carryOverDays ?? 0;
             taskStatus = t.status;
@@ -160,6 +162,7 @@ export const listMine = query({
           taskDeadline,
           carryOverDays,
           taskStatus,
+          isTask,
         };
       })
     );
@@ -183,10 +186,43 @@ export const addEntry = mutation({
     const { userId } = await requireAdmin(ctx);
     const now = Date.now();
 
-    // Auto-create a mirror task so the worklog entry shows up in My Tasks
-    // and counts wherever a regular task counts. Self-assigned (assignee =
-    // assignedBy = the manager) so it never enters anyone else's queue.
-    const briefId = await getOrCreateWorklogBrief(ctx, args.brandId, userId);
+    // A worklog line item is just a line item — no mirror task. Managers tick
+    // it off with the checkbox, and unticked items carry forward each day.
+    // Escalating one into a real task is an explicit choice via
+    // convertEntryToTask (the "Convert to self task" button).
+    return await ctx.db.insert("managerWorklog", {
+      ...args,
+      userId,
+      done: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/** Explicitly turn a plain worklog line item into a self-assigned task
+ *  (assignee = assignedBy = the manager). This is what addEntry used to do
+ *  automatically on every line; now it only happens on request. */
+export const convertEntryToTask = mutation({
+  args: {
+    entryId: v.id("managerWorklog"),
+    title: v.optional(v.string()),
+    /** End-of-day epoch ms. Optional. */
+    deadline: v.optional(v.number()),
+    duration: v.optional(v.string()),
+  },
+  handler: async (ctx, { entryId, title, deadline, duration }) => {
+    const { userId } = await requireAdmin(ctx);
+    const entry = await ctx.db.get(entryId);
+    if (!entry || entry.userId !== userId)
+      throw new Error("Worklog entry not found");
+    if (entry.linkedTaskId) {
+      const existing = await ctx.db.get(entry.linkedTaskId);
+      if (existing) throw new Error("This line item is already a task");
+    }
+    const now = Date.now();
+
+    const briefId = await getOrCreateWorklogBrief(ctx, entry.brandId, userId);
     const sibTasks = await ctx.db
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
@@ -196,21 +232,21 @@ export const addEntry = mutation({
       : 0;
     const linkedTaskId = await ctx.db.insert("tasks", {
       briefId,
-      title: worklogTaskTitle(args.content),
-      description: args.content,
+      title: title?.trim() || worklogTaskTitle(entry.content),
+      description: entry.content,
       assigneeId: userId,
       assignedBy: userId,
-      status: "pending" as const,
+      status: entry.done ? ("done" as const) : ("pending" as const),
       sortOrder: maxOrder + 1000,
       assignedAt: now,
-      ...(args.deadline !== undefined
-        ? { deadline: args.deadline, originalDeadline: args.deadline }
+      ...(entry.done ? { completedAt: now } : {}),
+      ...(duration ? { duration } : {}),
+      ...(deadline !== undefined
+        ? { deadline, originalDeadline: deadline }
         : {}),
     });
 
-    // Silent super-admin oversight tag (Mayur/Vivek/Abhinav) — keep the
-    // worklog auto-tasks visible in the oversight digest like every other
-    // task-creation path.
+    // Same silent super-admin oversight tag as every other task-creation path.
     await tagForOversight(ctx, {
       taskId: linkedTaskId,
       briefId,
@@ -219,14 +255,12 @@ export const addEntry = mutation({
       source: "individual_task",
     });
 
-    return await ctx.db.insert("managerWorklog", {
-      ...args,
-      userId,
-      done: false,
+    await ctx.db.patch(entryId, {
       linkedTaskId,
-      createdAt: now,
+      ...(deadline !== undefined ? { deadline } : {}),
       updatedAt: now,
     });
+    return linkedTaskId;
   },
 });
 
@@ -364,11 +398,25 @@ export const rollWorklogDeadlines = internalMutation({
     const todayStart = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
     const todayEnd = todayStart + 24 * 60 * 60 * 1000 - 1;
 
+    const todayIso = new Date().toISOString().slice(0, 10);
+
     const entries = await ctx.db.query("managerWorklog").collect();
     let rolled = 0;
     for (const e of entries) {
       if (e.done) continue;
-      if (!e.linkedTaskId) continue;
+      if (!e.linkedTaskId) {
+        // Plain line item: unticked items follow the manager to today's list
+        // instead of being forgotten on yesterday's page.
+        if (e.date < todayIso) {
+          await ctx.db.patch(e._id, {
+            date: todayIso,
+            carriedOverDays: (e.carriedOverDays ?? 0) + 1,
+            updatedAt: now,
+          });
+          rolled++;
+        }
+        continue;
+      }
       const task = await ctx.db.get(e.linkedTaskId);
       if (!task) continue;
       if (task.status === "done") continue;

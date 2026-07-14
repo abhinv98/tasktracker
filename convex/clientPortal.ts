@@ -62,6 +62,27 @@ async function brandBriefsAndTasks(ctx: QueryCtx | MutationCtx, brandId: Id<"bra
   return { brandBriefs, brandTasks };
 }
 
+/** Map of linked task id → published (client-visible) status for the brand's
+ *  client-originated requests. Tasks in this map show the published snapshot
+ *  on portal surfaces instead of their live internal status; admins push
+ *  updates via jsr.publishClientTaskStatus. */
+async function publishedStatusMap(
+  ctx: QueryCtx | MutationCtx,
+  brandId: Id<"brands">
+): Promise<Map<Id<"tasks">, string>> {
+  const requests = await ctx.db
+    .query("jsrClientTasks")
+    .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+    .collect();
+  const map = new Map<Id<"tasks">, string>();
+  for (const r of requests) {
+    if (r.linkedTaskId && r.publishedTaskStatus) {
+      map.set(r.linkedTaskId, r.publishedTaskStatus);
+    }
+  }
+  return map;
+}
+
 /** Walk deliverable → task → brief and assert it belongs to the client's brand. */
 async function getDeliverableInBrand(
   ctx: MutationCtx | QueryCtx,
@@ -593,7 +614,10 @@ export const getPortalDashboard = query({
           if (r.linkedTaskId) {
             const task = await ctx.db.get(r.linkedTaskId);
             if (task) {
-              taskStatus = task.status;
+              // Held reflection: the client sees the published snapshot, not
+              // the live internal status. Legacy rows (no snapshot) fall back
+              // to live so their behavior is unchanged.
+              taskStatus = r.publishedTaskStatus ?? task.status;
               tag = task.tag;
               taskRemarks = allRemarks
                 .filter((rem) => rem.taskId === task._id)
@@ -700,13 +724,19 @@ export const getContentCalendar = query({
     );
     const calendarTasks = brandTasks.filter((t) => ccBriefIds.has(t.briefId));
 
+    // Client-originated entries whose status is held: show the published
+    // snapshot, not the live internal status.
+    const heldStatusByTask = await publishedStatusMap(ctx, client.clientBrandId);
+
     let entries = calendarTasks.map((t) => ({
       _id: t._id,
-      title: t.title,
+      // Curated client-facing title wins over the raw internal one.
+      title: t.postTitle?.trim() ? t.postTitle : t.title,
+      postDescription: t.postDescription ?? null,
       platform: t.platform ?? "",
       contentType: t.contentType ?? "",
       postDate: t.postDate ?? "",
-      status: t.status,
+      status: heldStatusByTask.get(t._id) ?? t.status,
       tag: t.tag ?? null,
       monthKey: t.postDate ? t.postDate.substring(0, 7) : "unscheduled",
     }));
@@ -1048,7 +1078,10 @@ export const getMonthlyLog = query({
     for (const r of requests) {
       if (!r.linkedTaskId) continue;
       const task = await ctx.db.get(r.linkedTaskId);
-      if (!task || task.status !== "done") continue;
+      // Held reflection: a task only counts as completed for the client once
+      // the done status has been published (legacy rows fall back to live).
+      const clientStatus = r.publishedTaskStatus ?? task?.status;
+      if (!task || clientStatus !== "done") continue;
       const completedAt = task.completedAt ?? task.deadline ?? task._creationTime;
       entries.push({
         _id: r._id,
@@ -1142,11 +1175,13 @@ export const getEcultifyPendingWork = query({
       if (r.status === "declined" || r.status === "completed") continue;
       if (!r.linkedTaskId) continue; // not accepted yet: shown as Awaiting Review on the dashboard
       const task = await ctx.db.get(r.linkedTaskId);
-      if (!task || task.status === "done") continue;
+      // Held reflection: judge by the published snapshot (legacy → live).
+      const clientStatus = r.publishedTaskStatus ?? task?.status;
+      if (!task || clientStatus === "done") continue;
       openRequests.push({
         _id: r._id,
         title: r.title,
-        status: task.status,
+        status: clientStatus as string,
         tag: task.tag ?? null,
         finalDeadline: r.finalDeadline,
         monthKey: monthKeyFromTimestamp(r.finalDeadline ?? r.createdAt),

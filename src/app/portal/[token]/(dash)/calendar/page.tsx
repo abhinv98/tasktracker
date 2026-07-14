@@ -340,6 +340,11 @@ function EntryRow({ entry, month, hideDate = false }: { entry: any; month: strin
       )}
       <div className="flex-1 min-w-0">
         <p className={`p-body truncate ${entry.status === "done" ? "line-through" : ""}`}>{entry.title}</p>
+        {entry.postDescription && (
+          <p className="text-[11px] text-[var(--p-text-3)] truncate mt-0.5">
+            {entry.postDescription}
+          </p>
+        )}
       </div>
       {entry.platform && (
         <span className="p-overline shrink-0 hidden sm:inline">{entry.platform}</span>

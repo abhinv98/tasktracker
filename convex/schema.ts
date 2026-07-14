@@ -161,6 +161,10 @@ export default defineSchema({
     haltLocked: v.optional(v.boolean()),
     creativeCopy: v.optional(v.string()),
     caption: v.optional(v.string()),
+    /** Client-facing display title/description for content-calendar entries.
+     *  The portal shows these instead of the raw internal title when set. */
+    postTitle: v.optional(v.string()),
+    postDescription: v.optional(v.string()),
     /** Pre-configured: which team should receive handoff when this task's deliverable is approved */
     handoffTargetTeamId: v.optional(v.id("teams")),
     /** If this task was created via handoff, the source deliverable */
@@ -632,6 +636,11 @@ export default defineSchema({
     linkedBriefId: v.optional(v.id("briefs")),
     /** The user the accepted task has been assigned to (via Client Requests). */
     assignedTo: v.optional(v.id("users")),
+    /** Snapshot of the linked task's status that the CLIENT sees. Internal
+     *  status changes stay invisible on the portal until an admin publishes
+     *  them (jsr.publishClientTaskStatus copies live status into this).
+     *  Unset = legacy row → portal falls back to live status. */
+    publishedTaskStatus: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_brand", ["brandId"])
@@ -840,9 +849,13 @@ export default defineSchema({
     taskRefs: v.optional(v.array(v.id("tasks"))),
     /** Whether the manager has checked this worklog item off as done. */
     done: v.optional(v.boolean()),
-    /** The auto-created task that mirrors this worklog entry so it shows in
-     *  the manager's My Tasks and counts everywhere a task counts. */
+    /** Set when a plain line item was explicitly converted to a self task
+     *  (convertEntryToTask). Legacy rows have it from the old auto-create. */
     linkedTaskId: v.optional(v.id("tasks")),
+    /** Days this unticked line item has rolled forward to the next day.
+     *  Only used for plain (non-task) items; task-backed items track
+     *  carry-over on the task itself. */
+    carriedOverDays: v.optional(v.number()),
     /** Deadline picked by the manager when adding the worklog item. The
      *  mirror task uses this as its deadline; if it's not completed by
      *  end-of-day, a daily cron rolls it forward and increments

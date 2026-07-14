@@ -302,10 +302,12 @@ export const getJsrByToken = query({
       return { _id: t._id, title: t.title, status: t.status, briefTitle: brief?.title ?? "" };
     });
 
-    // Content calendar entries — title, platform, postDate, status
+    // Content calendar entries — title, platform, postDate, status.
+    // This token page is client-facing: curated post title wins over raw.
     const calendarList = calendarTasks.map((t) => ({
       _id: t._id,
-      title: t.title,
+      title: t.postTitle?.trim() ? t.postTitle : t.title,
+      postDescription: t.postDescription ?? null,
       platform: t.platform ?? "",
       contentType: t.contentType ?? "",
       postDate: t.postDate ?? "",
@@ -788,6 +790,9 @@ export const acceptClientRequest = mutation({
       linkedBriefId: briefId,
       heldAt: undefined,
       heldBy: undefined,
+      // Client-visible status snapshot: from here on, internal status changes
+      // stay hidden from the portal until explicitly published.
+      publishedTaskStatus: "pending",
       ...(assigneeId ? { assignedTo: assigneeId } : {}),
     });
 
@@ -962,8 +967,41 @@ export const updateClientTaskStatus = mutation({
           status: mappedStatus as "pending" | "in-progress" | "review" | "done",
           ...(status === "completed" ? { completedAt: Date.now() } : {}),
         });
+        // An explicit request-level status change IS a publish: the admin is
+        // deliberately setting what the client should see.
+        await ctx.db.patch(taskId, { publishedTaskStatus: mappedStatus });
       }
     }
+  },
+});
+
+/** Push the linked task's CURRENT internal status to the client portal.
+ *  Client-originated tasks hold a published snapshot (set at accept time);
+ *  internal status changes stay invisible to the client until an admin
+ *  reflects them with this. */
+export const publishClientTaskStatus = mutation({
+  args: { clientTaskId: v.id("jsrClientTasks") },
+  handler: async (ctx, { clientTaskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") throw new Error("Not authorized");
+
+    const clientTask = await ctx.db.get(clientTaskId);
+    if (!clientTask) throw new Error("Client request not found");
+    if (!clientTask.linkedTaskId) throw new Error("Request has no linked task yet");
+    const task = await ctx.db.get(clientTask.linkedTaskId);
+    if (!task) throw new Error("Linked task no longer exists");
+
+    await ctx.db.patch(clientTaskId, {
+      publishedTaskStatus: task.status,
+      // Keep the request-level status coherent with what we just published.
+      ...(task.status === "done" ? { status: "completed" as const } : {}),
+      ...(task.status === "in-progress" && clientTask.status === "accepted"
+        ? { status: "in_progress" as const }
+        : {}),
+    });
+    return task.status;
   },
 });
 
@@ -1507,6 +1545,13 @@ export const listPendingClientRequests = query({
         const a = users.find((u) => u._id === t.assignedTo);
         assigneeName = a?.name ?? a?.email ?? null;
       }
+      // Live internal status of the linked task, so the panel can show when
+      // it has drifted from what the client currently sees (publishedTaskStatus).
+      let liveTaskStatus: string | null = null;
+      if (t.linkedTaskId) {
+        const task = await ctx.db.get(t.linkedTaskId);
+        liveTaskStatus = task?.status ?? null;
+      }
       result.push({
         ...t,
         brandName: brand?.name ?? "Unknown",
@@ -1514,6 +1559,7 @@ export const listPendingClientRequests = query({
         assigneeName,
         assigned: !!t.assignedTo,
         viaPortal: !!t.submittedByClientId,
+        liveTaskStatus,
       });
     }
     return result.sort((a, b) => b.createdAt - a.createdAt);

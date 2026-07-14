@@ -55,6 +55,8 @@ type ClientRequest = {
   assigneeName: string | null;
   assigned: boolean;
   viaPortal?: boolean;
+  liveTaskStatus?: string | null;
+  publishedTaskStatus?: string;
 };
 
 type DestKind = "campaign" | "individual" | "calendar";
@@ -137,6 +139,7 @@ export default function ClientRequestsPage() {
   const acceptRequest = useMutation(api.jsr.acceptClientRequest);
   const holdRequest = useMutation(api.jsr.holdClientRequest);
   const resumeRequest = useMutation(api.jsr.resumeClientRequest);
+  const publishStatus = useMutation(api.jsr.publishClientTaskStatus);
 
   const [tab, setTab] = useState<"pending" | "held">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -522,6 +525,56 @@ export default function ClientRequestsPage() {
                   </p>
                 )}
               </div>
+
+              {/* Portal status reflection — client-originated tasks hold a
+                  published status snapshot; internal changes stay invisible
+                  to the client until reflected from here. */}
+              {selected.linkedTaskId && selected.liveTaskStatus && (
+                <div className="border-t border-[var(--border-subtle)] pt-4">
+                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                    Portal Status
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-[12px] text-[var(--text-muted)]">
+                      Client sees:{" "}
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {selected.publishedTaskStatus ?? selected.liveTaskStatus}
+                      </span>
+                    </span>
+                    <span className="text-[12px] text-[var(--text-muted)]">
+                      Internal:{" "}
+                      <span className="font-semibold text-[var(--text-primary)]">
+                        {selected.liveTaskStatus}
+                      </span>
+                    </span>
+                    {(selected.publishedTaskStatus ?? selected.liveTaskStatus) !==
+                      selected.liveTaskStatus && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await publishStatus({
+                              clientTaskId: selected._id as Id<"jsrClientTasks">,
+                            });
+                            toast("success", "Status reflected to the client portal");
+                          } catch (e) {
+                            toast(
+                              "error",
+                              e instanceof Error ? e.message : "Failed to reflect status"
+                            );
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                      >
+                        Reflect to portal
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                    Status changes on this task are NOT shown to the client until you
+                    reflect them.
+                  </p>
+                </div>
+              )}
 
               {/* References */}
               {selected.references && selected.references.length > 0 && (

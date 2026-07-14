@@ -1142,6 +1142,10 @@ export function ContentCalendarEntrySidebar({
   );
   const [editCreativeCopy, setEditCreativeCopy] = useState(task.creativeCopy ?? "");
   const [editCaption, setEditCaption] = useState(task.caption ?? "");
+  const [editPostTitle, setEditPostTitle] = useState((task as any).postTitle ?? "");
+  const [editPostDescription, setEditPostDescription] = useState(
+    (task as any).postDescription ?? ""
+  );
   const [saving, setSaving] = useState(false);
   const [sidebarTeamFilter, setSidebarTeamFilter] = useState<string>("");
   const teamFilterTouched = useRef(false);
@@ -1312,6 +1316,10 @@ export function ContentCalendarEntrySidebar({
         updates.creativeCopy = editCreativeCopy;
       if (editCaption !== (task.caption ?? ""))
         updates.caption = editCaption;
+      if (editPostTitle !== ((task as any).postTitle ?? ""))
+        updates.postTitle = editPostTitle;
+      if (editPostDescription !== ((task as any).postDescription ?? ""))
+        updates.postDescription = editPostDescription;
       if (editAssignee && editAssignee !== task.assigneeId)
         updates.assigneeId = editAssignee;
       // Assignor edits removed from UI — assignor is always the brand manager
@@ -2257,6 +2265,52 @@ export function ContentCalendarEntrySidebar({
                 </select>
               ) : (
                 <Badge variant="neutral">{si.label}</Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Post Title + Description — the CLIENT-FACING copy for this entry.
+            The client portal calendar shows these instead of the raw internal
+            title, keeping the client view clean. Entry-level only. */}
+        {viewingMain && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3 flex flex-col gap-2.5">
+            <p className="font-medium text-[11px] text-[var(--accent-admin)] uppercase tracking-wide">
+              Client Portal Display
+            </p>
+            <div>
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Post Title
+              </label>
+              {isEditable ? (
+                <input
+                  value={editPostTitle}
+                  onChange={(e) => setEditPostTitle(e.target.value)}
+                  placeholder="Shown to the client instead of the internal title"
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-primary)]">
+                  {(task as any).postTitle || "-"}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                Post Description
+              </label>
+              {isEditable ? (
+                <textarea
+                  value={editPostDescription}
+                  onChange={(e) => setEditPostDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Client-facing description for this post..."
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
+                  {(task as any).postDescription || "-"}
+                </p>
               )}
             </div>
           </div>

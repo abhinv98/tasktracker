@@ -1206,6 +1206,8 @@ function WorklogTab() {
   const updateEntry = useMutation(api.managerWorklog.updateEntry);
   const deleteEntry = useMutation(api.managerWorklog.deleteEntry);
   const setEntryStatus = useMutation(api.managerWorklog.setEntryStatus);
+  const toggleDone = useMutation(api.managerWorklog.toggleDone);
+  const convertToTask = useMutation(api.managerWorklog.convertEntryToTask);
 
   const [brandId, setBrandId] = useState<string>("");
   const [content, setContent] = useState("");
@@ -1215,6 +1217,13 @@ function WorklogTab() {
   const [editContent, setEditContent] = useState("");
   const [deletingId, setDeletingId] =
     useState<Id<"managerWorklog"> | null>(null);
+
+  // "Convert to self task" modal state
+  const [convertingEntry, setConvertingEntry] = useState<any | null>(null);
+  const [convTitle, setConvTitle] = useState("");
+  const [convDeadline, setConvDeadline] = useState("");
+  const [convDuration, setConvDuration] = useState("");
+  const [converting, setConverting] = useState(false);
 
   // Each non-empty line becomes a separate action item on save.
   const taskLines = content
@@ -1318,7 +1327,9 @@ function WorklogTab() {
             className={`${inputCls} resize-y`}
           />
           <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-            Each line is saved as a separate task. Set its deadline and status on the task card after saving.
+            Each line is saved as a separate line item. Tick it off when done —
+            unticked items carry forward to the next day. Use &quot;Convert to
+            self task&quot; on a line item to turn it into a real task.
           </p>
         </div>
 
@@ -1326,7 +1337,7 @@ function WorklogTab() {
           {submitting
             ? "Saving..."
             : taskLines.length > 1
-              ? `Save ${taskLines.length} Tasks`
+              ? `Save ${taskLines.length} Items`
               : "Save Worklog"}
         </Button>
       </form>
@@ -1343,7 +1354,7 @@ function WorklogTab() {
       ) : (
         <div className="space-y-3">
           {entries.map((e: any) => {
-            const isDone = e.taskStatus === "done";
+            const isDone = e.isTask ? e.taskStatus === "done" : !!e.done;
             const deadlineVal = e.taskDeadline
               ? new Date(e.taskDeadline).toISOString().slice(0, 10)
               : "";
@@ -1354,23 +1365,66 @@ function WorklogTab() {
             >
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-2 min-w-0">
+                  {/* Plain line items: tick when done. Task-backed items keep
+                      their status control instead. */}
+                  {!e.isTask && (
+                    <input
+                      type="checkbox"
+                      checked={isDone}
+                      title={isDone ? "Mark as not done" : "Mark as done"}
+                      onChange={async () => {
+                        try {
+                          await toggleDone({ entryId: e._id });
+                        } catch (err) {
+                          toast(
+                            "error",
+                            err instanceof Error ? err.message : "Failed"
+                          );
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-[var(--border)] accent-emerald-600 cursor-pointer shrink-0"
+                    />
+                  )}
                   <span
                     className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
                     style={{ background: e.brandColor }}
                   >
                     {e.brandName}
                   </span>
+                  {e.isTask && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Task
+                    </span>
+                  )}
                   {!isDone && e.carryOverDays > 0 && (
                     <span
                       className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700"
-                      title="Not completed by its original deadline, rolled forward each day"
+                      title={
+                        e.isTask
+                          ? "Not completed by its original deadline, rolled forward each day"
+                          : "Unticked, carried forward from a previous day"
+                      }
                     >
                       Carried over · {e.carryOverDays}d
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Status — like a brief's status control */}
+                  {!e.isTask && !isDone && (
+                    <button
+                      onClick={() => {
+                        setConvertingEntry(e);
+                        setConvTitle(e.content.slice(0, 80));
+                        setConvDeadline("");
+                        setConvDuration("");
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                    >
+                      Convert to self task
+                    </button>
+                  )}
+                  {/* Status — only for task-backed items */}
+                  {e.isTask && (
                   <select
                     value={e.taskStatus}
                     onChange={async (ev) => {
@@ -1397,7 +1451,9 @@ function WorklogTab() {
                     <option value="review">Review</option>
                     <option value="done">Done</option>
                   </select>
-                  {/* Deadline — settable any time, even after saving */}
+                  )}
+                  {/* Deadline — only meaningful for task-backed items */}
+                  {e.isTask && (
                   <input
                     type="date"
                     value={deadlineVal}
@@ -1424,6 +1480,7 @@ function WorklogTab() {
                     }}
                     className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
+                  )}
                   <button
                     onClick={() => {
                       setEditingId(e._id);
@@ -1503,6 +1560,93 @@ function WorklogTab() {
         }}
         onCancel={() => setDeletingId(null)}
       />
+
+      {convertingEntry && (
+        <Modal
+          title="Convert to Self Task"
+          onClose={() => setConvertingEntry(null)}
+        >
+          <div className="space-y-4">
+            <p className="text-[12px] text-[var(--text-muted)]">
+              Creates a self-assigned task under{" "}
+              <span className="font-medium text-[var(--text-primary)]">
+                {convertingEntry.brandName}
+              </span>{" "}
+              from this line item. It will appear in My Tasks and count like any
+              other task.
+            </p>
+            <div>
+              <label className={labelCls}>Task title</label>
+              <input
+                value={convTitle}
+                onChange={(e) => setConvTitle(e.target.value)}
+                className={inputCls}
+                placeholder="Task title"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Deadline (optional)</label>
+                <input
+                  type="date"
+                  value={convDeadline}
+                  onChange={(e) => setConvDeadline(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Duration (optional)</label>
+                <input
+                  value={convDuration}
+                  onChange={(e) => setConvDuration(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. 2h"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => setConvertingEntry(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={converting || !convTitle.trim()}
+                onClick={async () => {
+                  setConverting(true);
+                  try {
+                    await convertToTask({
+                      entryId: convertingEntry._id,
+                      title: convTitle.trim(),
+                      ...(convDeadline
+                        ? {
+                            deadline: new Date(
+                              convDeadline + "T23:59:59"
+                            ).getTime(),
+                          }
+                        : {}),
+                      ...(convDuration.trim()
+                        ? { duration: convDuration.trim() }
+                        : {}),
+                    });
+                    toast("success", "Converted to self task");
+                    setConvertingEntry(null);
+                  } catch (err) {
+                    toast(
+                      "error",
+                      err instanceof Error ? err.message : "Failed to convert"
+                    );
+                  }
+                  setConverting(false);
+                }}
+              >
+                {converting ? "Converting..." : "Create Task"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
