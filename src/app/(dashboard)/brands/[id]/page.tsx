@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
-import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit } from "lucide-react";
+import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit, Pencil } from "lucide-react";
 import ClientPortalTab from "@/components/brand/ClientPortalTab";
 import InternalJsrTab from "@/components/brand/InternalJsrTab";
 import MomTab from "@/components/brand/MomTab";
@@ -58,11 +58,32 @@ export default function BrandDetailPage() {
   const assignManager = useMutation(api.brands.assignManagerToBrand);
   const removeManager = useMutation(api.brands.removeManagerFromBrand);
   const deleteBrand = useMutation(api.brands.deleteBrand);
+  const updateBrand = useMutation(api.brands.updateBrand);
 
   const [addManagerId, setAddManagerId] = useState<string>("");
   const [showDeleteBrand, setShowDeleteBrand] = useState(false);
   const [removingManagerId, setRemovingManagerId] = useState<Id<"users"> | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
   const { toast } = useToast();
+
+  async function saveBrandName() {
+    const next = nameDraft.trim();
+    if (!next || next === brand?.name) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateBrand({ brandId, name: next });
+      toast("success", "Brand name updated");
+      setEditingName(false);
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Failed to rename brand");
+    }
+    setSavingName(false);
+  }
 
   const isAdmin = user?.role === "admin";
 
@@ -434,10 +455,40 @@ export default function BrandDetailPage() {
             </button>
           )}
         </div>
-        <div className="flex-1">
-          <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight">
-            {brand.name}
-          </h1>
+        <div className="flex-1 min-w-0">
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              disabled={savingName}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveBrandName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight bg-transparent border-b border-[var(--accent-admin)] focus:outline-none w-full max-w-md"
+            />
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight truncate">
+                {brand.name}
+              </h1>
+              {/* Only Brand Managers (admins) can rename a brand. */}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    setNameDraft(brand.name);
+                    setEditingName(true);
+                  }}
+                  title="Rename brand"
+                  className="shrink-0 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
           {brand.description && (
             <p className="text-[14px] text-[var(--text-secondary)]">{brand.description}</p>
           )}
