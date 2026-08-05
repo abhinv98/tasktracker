@@ -677,17 +677,25 @@ export default function BrandDetailPage() {
                 Team Members Working on This Brand
               </h2>
               <div className="grid grid-cols-2 gap-3">
-                {brand.employees.filter((e): e is NonNullable<typeof e> => !!e).map((emp) => (
+                {brand.employees.filter((e): e is NonNullable<typeof e> => !!e).map((emp) => {
+                  // "Brand Manager" only for managers actually assigned to THIS
+                  // brand — admins from other brands are just contributors here.
+                  const isManagerHere = assignedManagerIds.includes(emp._id);
+                  return (
                   <Card key={emp._id}>
                     <p className="font-medium text-[14px] text-[var(--text-primary)]">
                       {emp.name ?? emp.email ?? "Unknown"}
                     </p>
                     <p className="text-[12px] text-[var(--text-secondary)]">{emp.email}</p>
-                    <Badge variant={emp.role === "admin" ? "admin" : "employee"} className="mt-1">
-                      {emp.role === "admin" ? "Brand Manager" : "Employee"}
+                    <Badge
+                      variant={isManagerHere ? "admin" : emp.role === "admin" ? "manager" : "employee"}
+                      className="mt-1"
+                    >
+                      {isManagerHere ? "Brand Manager" : emp.role === "admin" ? "Contributor" : "Employee"}
                     </Badge>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
