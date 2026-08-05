@@ -108,7 +108,6 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/client-requests", label: "Client Requests" },
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
-      { href: "/invoices", label: "Invoices", superAdminOnly: true },
       { href: "/users", label: "Users & Teams" },
       { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
