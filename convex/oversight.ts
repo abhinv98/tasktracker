@@ -2,6 +2,7 @@ import { getAuthUserId } from "./lib/internalAuth";
 import { query, internalMutation, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { creativeSlotTarget } from "./lib/autoApproveDeliverables";
 
 // ── Oversight access ───────────────────────────────────────────
 // Oversight is a filterable board of tasks — who's doing them, for which
@@ -153,10 +154,17 @@ export const getOversightBoard = query({
     // Latest deliverable submission per task — what the employee "submitted".
     // A task with multiple revisions reports the most recent submission.
     const lastSubmissionByTask = new Map<string, number>();
+    // Deliverables filed per task — paired with the task's creative-slot
+    // target so the board can show "3 / 15 creatives" per row.
+    const deliverableCountByTask = new Map<string, number>();
     for (const d of allDeliverables) {
       const key = d.taskId as unknown as string;
       const prev = lastSubmissionByTask.get(key) ?? 0;
       if (d.submittedAt > prev) lastSubmissionByTask.set(key, d.submittedAt);
+      deliverableCountByTask.set(
+        key,
+        (deliverableCountByTask.get(key) ?? 0) + 1
+      );
     }
 
     const now = Date.now();
@@ -166,9 +174,17 @@ export const getOversightBoard = query({
       const assignee = userMap.get(t.assigneeId);
       const manager = userMap.get(t.assignedBy);
       const createdAt = (t as any)._creationTime as number;
+      // How many creative deliverables live inside this task (1 = ordinary
+      // single-deliverable task), and how many were actually filed.
+      const creativeSlots = t.handoffSourceTaskId
+        ? 1
+        : creativeSlotTarget(t, brief ?? null);
       return {
         _id: t._id,
         title: t.title,
+        creativeSlots,
+        creativesSubmitted:
+          deliverableCountByTask.get(t._id as unknown as string) ?? 0,
         status: t.status,
         deadline: t.deadline ?? null,
         completedAt: t.completedAt ?? null,
@@ -332,6 +348,11 @@ export const getOversightBoard = query({
       total: rows.length,
       summary: {
         total: rows.length,
+        // Work units behind those tasks: a task carrying N creatives counts
+        // N, an ordinary task counts 1. `multiCreativeTasks` is the
+        // bifurcation — how many rows hold more than one creative.
+        creativeTotal: rows.reduce((sum, r) => sum + r.creativeSlots, 0),
+        multiCreativeTasks: rows.filter((r) => r.creativeSlots > 1).length,
         pending: rows.filter((r) => r.status === "pending").length,
         inProgress: rows.filter((r) => r.status === "in-progress").length,
         review: rows.filter((r) => r.status === "review").length,

@@ -220,7 +220,15 @@ export default function OversightBoard() {
       <p className="text-[12px] text-[var(--text-muted)] mb-4">{scopeLabel}</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {[
-          { label: "Total", value: s.total },
+          {
+            label: "Total",
+            value: s.total,
+            // Bifurcation: tasks vs the creative deliverables inside them.
+            sub:
+              s.multiCreativeTasks > 0
+                ? `${s.creativeTotal} creatives · ${s.multiCreativeTasks} multi-creative task${s.multiCreativeTasks === 1 ? "" : "s"}`
+                : null,
+          },
           { label: "Pending", value: s.pending },
           { label: "In Progress", value: s.inProgress },
           { label: "Review", value: s.review },
@@ -234,6 +242,14 @@ export default function OversightBoard() {
             <p className="text-[22px] font-bold text-[var(--text-primary)] mt-1">
               {c.value}
             </p>
+            {(c as any).sub && (
+              <p
+                className="text-[10px] text-[var(--text-muted)] mt-0.5 leading-tight"
+                title="Creative deliverables inside these tasks — a task needing N creatives counts N"
+              >
+                {(c as any).sub}
+              </p>
+            )}
           </Card>
         ))}
       </div>
@@ -375,6 +391,7 @@ export default function OversightBoard() {
         </div>
         <span className="text-[12px] text-[var(--text-muted)] ml-auto">
           {board.total} task{board.total !== 1 ? "s" : ""}
+          {s.multiCreativeTasks > 0 && ` · ${s.creativeTotal} creatives`}
         </span>
       </div>
 
@@ -494,6 +511,14 @@ function FragmentRow({
         </td>
         <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[240px]">
           <span className="line-clamp-2">{r.title}</span>
+          {r.creativeSlots > 1 && (
+            <span
+              className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap"
+              title={`This task holds ${r.creativeSlots} creative deliverables — ${r.creativesSubmitted} submitted`}
+            >
+              {r.creativesSubmitted}/{r.creativeSlots} CREATIVES
+            </span>
+          )}
         </td>
         <td className="px-4 py-3 text-[var(--text-secondary)]">
           {r.assigneeName}
