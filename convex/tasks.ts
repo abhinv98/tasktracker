@@ -8,7 +8,7 @@ import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverable
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 import { tagForOversight } from "./lib/tagForOversight";
-import { ensureSheetForMonth } from "./contentCalendar";
+import { ensureSheetForMonth, canEditCalendarBrief } from "./contentCalendar";
 import { parseArgs } from "util";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -408,7 +408,10 @@ export const updateTask = mutation({
     const brief = await ctx.db.get(task.briefId);
     const user = await ctx.db.get(userId);
     if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
-      throw new Error("Only admins or assigned managers can edit tasks");
+      // Employees involved in a brand's content calendar edit its entries too.
+      if (!(await canEditCalendarBrief(ctx, userId, task.briefId))) {
+        throw new Error("Only admins or assigned managers can edit tasks");
+      }
     }
 
     const updates: Record<string, unknown> = {};
@@ -556,7 +559,9 @@ export const updateTaskStatus = mutation({
     const user = await ctx.db.get(userId);
 
     const canUpdate =
-      task.assigneeId === userId || user?.role === "admin";
+      task.assigneeId === userId ||
+      user?.role === "admin" ||
+      (await canEditCalendarBrief(ctx, userId, task.briefId));
     if (!canUpdate) throw new Error("Not authorized");
 
     if (newStatus === "done" && user?.role !== "admin") {

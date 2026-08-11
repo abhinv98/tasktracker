@@ -155,19 +155,15 @@ export default function ContentCalendarPage() {
 
   const user = useQuery(api.users.getCurrentUser);
   const allBrands = useQuery(api.brands.listBrands);
-  // For employees, the set of brand IDs whose calendar they're allowed to
-  // see (sticky — based on any past task in that brand's calendar brief).
-  // Admins get null here and see every brand.
-  const accessibleBrandIds = useQuery(
-    api.contentCalendar.getMyAccessibleCalendarBrandIds
+  // Brands whose calendar this user may open — sticky for employees, based on
+  // any past task in that brand's calendar brief. `brands.listBrands` returns
+  // nothing to employees, so their picker is fed by this scoped list instead.
+  const myCalendarBrands = useQuery(api.contentCalendar.listMyCalendarBrands);
+  const accessibleBrandIds = useMemo(
+    () => myCalendarBrands?.map((b: any) => b._id as string),
+    [myCalendarBrands]
   );
-  const brands = useMemo(() => {
-    if (!allBrands) return allBrands;
-    if (user?.role === "admin") return allBrands;
-    if (!accessibleBrandIds) return undefined; // still loading scope
-    const allowed = new Set(accessibleBrandIds);
-    return allBrands.filter((b: any) => allowed.has(b._id));
-  }, [allBrands, accessibleBrandIds, user?.role]);
+  const brands = user?.role === "admin" ? allBrands : myCalendarBrands;
   const allUsers = useQuery(api.users.listAllUsers);
   const allTeams = useQuery(api.teams.listTeams, {});
   const createBrand = useMutation(api.brands.createBrand);
@@ -210,14 +206,26 @@ export default function ContentCalendarPage() {
     selectedBrandId ? { brandId: selectedBrandId as Id<"brands"> } : "skip"
   );
 
+  // listAllUsers is admin-only; employees fall back to the two open lists so
+  // the assignee/assignor pickers aren't empty for them.
+  const nonAdmin = user != null && user.role !== "admin";
+  const employeeList = useQuery(
+    api.users.listEmployees,
+    nonAdmin ? {} : "skip"
+  );
+  const managerList = useQuery(
+    api.users.listManagers,
+    nonAdmin ? {} : "skip"
+  );
+
   const employees = useMemo(
-    () => (allUsers ?? []).filter((u: any) => u.role === "employee"),
-    [allUsers]
+    () => (allUsers ?? employeeList ?? []).filter((u: any) => u.role === "employee"),
+    [allUsers, employeeList]
   );
 
   const admins = useMemo(
-    () => (allUsers ?? []).filter((u: any) => u.role === "admin"),
-    [allUsers]
+    () => (allUsers ?? managerList ?? []).filter((u: any) => u.role === "admin"),
+    [allUsers, managerList]
   );
 
   const defaultAssignor = useMemo(() => {
@@ -226,7 +234,11 @@ export default function ContentCalendarPage() {
     return mgr?._id ?? "";
   }, [brandManagers, admins]);
 
-  const isEditable = user?.role === "admin";
+  const isAdmin = user?.role === "admin";
+  // Employees involved in a brand's calendar can edit it, not just read it.
+  const isEditable =
+    isAdmin ||
+    (!!selectedBrandId && !!accessibleBrandIds?.includes(selectedBrandId));
   const hasNoAccess =
     user?.role === "employee" &&
     accessibleBrandIds !== undefined &&
@@ -604,7 +616,7 @@ export default function ContentCalendarPage() {
               {(brands ?? []).map((b: any) => (
                 <option key={b._id} value={b._id}>{b.name}</option>
               ))}
-              {isEditable && <option value="__create__">+ Create new brand</option>}
+              {isAdmin && <option value="__create__">+ Create new brand</option>}
             </select>
           </div>
           {isEditable && calendarBriefId && (

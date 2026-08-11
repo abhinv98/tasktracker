@@ -366,6 +366,64 @@ export const getMyAccessibleCalendarBrandIds = query({
   },
 });
 
+/** Display info for the brands above. `brands.listBrands` returns nothing to
+ *  employees, so the calendar's brand picker needs its own scoped list. */
+export const listMyCalendarBrands = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user) return [];
+
+    const briefs = await ctx.db.query("briefs").collect();
+    const ccBriefs = briefs.filter(
+      (b: any) =>
+        b.briefType === "content_calendar" && b.status !== "archived"
+    );
+    if (ccBriefs.length === 0) return [];
+
+    const brandIds = new Set<string>();
+    if (user.role === "admin") {
+      for (const b of ccBriefs) {
+        if (b.brandId) brandIds.add(b.brandId as unknown as string);
+      }
+    } else {
+      const brandByBrief = new Map<string, string>();
+      for (const b of ccBriefs) {
+        if (b.brandId) {
+          brandByBrief.set(
+            b._id as unknown as string,
+            b.brandId as unknown as string
+          );
+        }
+      }
+      const myTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
+        .collect();
+      for (const t of myTasks) {
+        const brandId = brandByBrief.get(t.briefId as unknown as string);
+        if (brandId) brandIds.add(brandId);
+      }
+    }
+    if (brandIds.size === 0) return [];
+
+    const brands = await ctx.db.query("brands").collect();
+    const mine = brands
+      .filter((b) => brandIds.has(b._id as unknown as string))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return await Promise.all(
+      mine.map(async (b) => ({
+        _id: b._id,
+        name: b.name,
+        color: b.color,
+        logoUrl: b.logoId ? await ctx.storage.getUrl(b.logoId) : null,
+      }))
+    );
+  },
+});
+
 export const listTasksByBrandMonth = query({
   args: {
     brandId: v.id("brands"),
@@ -529,6 +587,51 @@ async function requireCalendarAdmin(ctx: any) {
   return userId;
 }
 
+/**
+ * Write-side gate. Mirrors `canViewBrandCalendar`: admins everywhere, and
+ * employees on any content-calendar brief they have ever been assigned a
+ * task in. Involvement grants edit, not just read — deletion stays
+ * admin-only (see `requireCalendarAdmin` call sites).
+ */
+export async function canEditCalendarBrief(
+  ctx: any,
+  userId: any,
+  briefId: any
+): Promise<boolean> {
+  const user = await ctx.db.get(userId);
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  const brief = await ctx.db.get(briefId);
+  if (!brief || brief.briefType !== "content_calendar") return false;
+  if (brief.status === "archived") return false;
+  const mine = await ctx.db
+    .query("tasks")
+    .withIndex("by_brief_assignee", (q: any) =>
+      q.eq("briefId", briefId).eq("assigneeId", userId)
+    )
+    .first();
+  return mine != null;
+}
+
+async function requireCalendarEditor(ctx: any, briefId: any) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+  if (!(await canEditCalendarBrief(ctx, userId, briefId)))
+    throw new Error("You don't have access to this content calendar");
+  return userId;
+}
+
+/** Brand-level variant: resolves the brand's calendar brief first. */
+async function requireCalendarEditorForBrand(ctx: any, brandId: any) {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("Not authenticated");
+  const user = await ctx.db.get(userId);
+  if (user?.role === "admin") return userId;
+  if (!(await canViewBrandCalendar(ctx, userId, brandId)))
+    throw new Error("You don't have access to this content calendar");
+  return userId;
+}
+
 /** All staged entries of a brand's content calendar, newest-staged first. */
 export const listStagedEntries = query({
   args: { brandId: v.id("brands") },
@@ -570,7 +673,10 @@ export const listStagedEntries = query({
 export const stageEntries = mutation({
   args: { taskIds: v.array(v.id("tasks")) },
   handler: async (ctx, { taskIds }) => {
-    const userId = await requireCalendarAdmin(ctx);
+    if (taskIds.length === 0) return;
+    const first = await ctx.db.get(taskIds[0]);
+    if (!first) throw new Error("Entry not found");
+    const userId = await requireCalendarEditor(ctx, first.briefId);
     const now = Date.now();
     for (const taskId of taskIds) {
       const task = await ctx.db.get(taskId);
@@ -585,9 +691,9 @@ export const stageEntries = mutation({
 export const unstageEntry = mutation({
   args: { taskId: v.id("tasks"), postDate: v.optional(v.string()) },
   handler: async (ctx, { taskId, postDate }) => {
-    const userId = await requireCalendarAdmin(ctx);
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Entry not found");
+    const userId = await requireCalendarEditor(ctx, task.briefId);
     if (postDate) {
       await ensureSheetForMonth(ctx, task.briefId, postDate.substring(0, 7), userId);
     }
@@ -608,11 +714,11 @@ export const bulkShiftDates = mutation({
     newStartDate: v.optional(v.string()),
   },
   handler: async (ctx, { taskIds, deltaDays, newStartDate }) => {
-    const userId = await requireCalendarAdmin(ctx);
     const tasks = (
       await Promise.all(taskIds.map((id) => ctx.db.get(id)))
     ).filter((t): t is NonNullable<typeof t> => !!t && !!t.postDate);
     if (tasks.length === 0) return;
+    const userId = await requireCalendarEditor(ctx, tasks[0].briefId);
 
     let delta: number;
     if (deltaDays !== undefined) {
@@ -647,7 +753,10 @@ export const bulkShiftDates = mutation({
 export const bulkMoveToMonth = mutation({
   args: { taskIds: v.array(v.id("tasks")), month: v.string() },
   handler: async (ctx, { taskIds, month }) => {
-    const userId = await requireCalendarAdmin(ctx);
+    if (taskIds.length === 0) return;
+    const first = await ctx.db.get(taskIds[0]);
+    if (!first) throw new Error("Entry not found");
+    const userId = await requireCalendarEditor(ctx, first.briefId);
     const maxDay = daysInMonth(month);
     let briefId: any = null;
     for (const taskId of taskIds) {
@@ -668,9 +777,9 @@ export const bulkMoveToMonth = mutation({
 export const duplicateEntry = mutation({
   args: { taskId: v.id("tasks"), postDate: v.string() },
   handler: async (ctx, { taskId, postDate }) => {
-    const userId = await requireCalendarAdmin(ctx);
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Entry not found");
+    const userId = await requireCalendarEditor(ctx, task.briefId);
 
     await ensureSheetForMonth(ctx, task.briefId, postDate.substring(0, 7), userId);
 
@@ -720,11 +829,7 @@ export const createEntryForBrand = mutation({
     handoffTargetTeamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can create calendar entries");
+    const userId = await requireCalendarEditorForBrand(ctx, args.brandId);
 
     const briefId = await getOrCreateCalendarBrief(ctx, args.brandId, userId);
     const assignor = args.assignedBy ?? userId;
@@ -807,11 +912,7 @@ export const createCalendarEntryWithCopyTask = mutation({
     copyDeadline: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can create calendar entries");
+    const userId = await requireCalendarEditorForBrand(ctx, args.brandId);
 
     const briefId = await getOrCreateCalendarBrief(ctx, args.brandId, userId);
     await ensureSheetForMonth(ctx, briefId, args.month, userId);
@@ -972,11 +1073,7 @@ export const toggleBreakDay = mutation({
     date: v.string(), // "YYYY-MM-DD"
   },
   handler: async (ctx, { briefId, date }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can manage break days");
+    const userId = await requireCalendarEditor(ctx, briefId);
 
     const existing = await ctx.db
       .query("contentCalendarBreakDays")
@@ -1021,11 +1118,7 @@ export const createSheet = mutation({
     month: v.string(),
   },
   handler: async (ctx, { briefId, month }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can manage sheets");
+    const userId = await requireCalendarEditor(ctx, briefId);
 
     const existing = await ctx.db
       .query("contentCalendarSheets")
@@ -1188,14 +1281,9 @@ export const updateReferenceLinks = mutation({
     referenceLinks: v.array(v.string()),
   },
   handler: async (ctx, { taskId, referenceLinks }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can manage reference links");
-
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
+    await requireCalendarEditor(ctx, task.briefId);
 
     await ctx.db.patch(taskId, { referenceLinks });
   },
@@ -1217,11 +1305,7 @@ export const createCalendarEntry = mutation({
     handoffTargetTeamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin")
-      throw new Error("Only admins can create calendar entries");
+    const userId = await requireCalendarEditor(ctx, args.briefId);
 
     const brief = await ctx.db.get(args.briefId);
     if (!brief) throw new Error("Brief not found");
@@ -1365,12 +1449,7 @@ export const createLinkedCalendarTask = mutation({
     teamId: v.optional(v.id("teams")),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      throw new Error("Only admins can assign linked calendar tasks");
-    }
+    const userId = await requireCalendarEditor(ctx, args.briefId);
 
     const brief = await ctx.db.get(args.briefId);
     if (!brief || brief.briefType !== "content_calendar") {

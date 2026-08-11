@@ -471,6 +471,10 @@ export default function BriefPage() {
   const teamsForBrief = useQuery(api.briefs.getTeamsForBrief, { briefId });
   const employees = useQuery(api.users.listEmployees);
   const user = useQuery(api.users.getCurrentUser);
+  // Brands whose content calendar the viewer may edit (admins: all).
+  const calendarBrandIds = useQuery(
+    api.contentCalendar.getMyAccessibleCalendarBrandIds
+  );
 
   const createTask = useMutation(api.tasks.createTask);
   const updateTask = useMutation(api.tasks.updateTask);
@@ -847,7 +851,10 @@ export default function BriefPage() {
         <div className="flex-1 overflow-hidden">
           <ContentCalendarView
             briefId={briefId}
-            isEditable={!!isAdmin}
+            isEditable={
+              !!isAdmin ||
+              (!!brief?.brandId && !!calendarBrandIds?.includes(brief.brandId))
+            }
             brandId={brief?.brandId}
             initialMonth={initialMonth}
           />

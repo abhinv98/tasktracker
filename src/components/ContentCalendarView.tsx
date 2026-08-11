@@ -158,6 +158,10 @@ export function ContentCalendarView({
 }: ContentCalendarViewProps) {
   const sheets = useQuery(api.contentCalendar.listSheets, { briefId });
   const allUsers = useQuery(api.users.listAllUsers, {});
+  // listAllUsers is admin-only — employees editing a calendar they're part of
+  // get the two open lists instead, so the pickers aren't empty.
+  const employeeList = useQuery(api.users.listEmployees, {});
+  const managerList = useQuery(api.users.listManagers, {});
   const user = useQuery(api.users.getCurrentUser);
   const brandManagers = useQuery(
     api.brands.getManagersForBrand,
@@ -173,6 +177,8 @@ export function ContentCalendarView({
   const toggleBreakDay = useMutation(api.contentCalendar.toggleBreakDay);
 
   const { toast } = useToast();
+  // Editing is open to anyone involved in the calendar; deleting is not.
+  const canDelete = user?.role === "admin";
 
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
   const [showNewSheet, setShowNewSheet] = useState(false);
@@ -224,10 +230,10 @@ export function ContentCalendarView({
     newTeamFilter ? { teamId: newTeamFilter as Id<"teams"> } : "skip"
   );
 
-  const employees = (allUsers ?? []).filter(
+  const employees = (allUsers ?? employeeList ?? []).filter(
     (u: any) => u.role === "employee"
   );
-  const admins = (allUsers ?? []).filter(
+  const admins = (allUsers ?? managerList ?? []).filter(
     (u: any) => u.role === "admin"
   );
   const defaultAssignor = brandManagers && brandManagers.length > 0 ? brandManagers[0] : "";
@@ -578,7 +584,7 @@ export function ContentCalendarView({
                 <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
                   Deadline
                 </th>
-                {isEditable && <th className="w-[40px]" />}
+                {canDelete && <th className="w-[40px]" />}
               </tr>
             </thead>
             <tbody>
@@ -720,7 +726,7 @@ export function ContentCalendarView({
                         );
                       })()}
                     </td>
-                    {isEditable && (
+                    {canDelete && (
                       <td
                         className="px-2 py-2.5"
                         onClick={(e) => e.stopPropagation()}
@@ -754,7 +760,7 @@ export function ContentCalendarView({
               {tasks?.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isEditable ? 9 : 8}
+                    colSpan={canDelete ? 9 : 8}
                     className="px-4 py-12 text-center"
                   >
                     <p className="text-[13px] text-[var(--text-muted)]">
@@ -823,7 +829,7 @@ export function ContentCalendarView({
               onClick={() => setActiveSheet(sheet.month)}
             >
               {monthLabel(sheet.month)}
-              {isEditable && (
+              {canDelete && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1614,7 +1620,7 @@ export function ContentCalendarEntrySidebar({
           </h3>
         </div>
         <div className="flex items-center gap-1">
-          {isEditable && (
+          {user?.role === "admin" && (
             <button
               onClick={handleDelete}
               className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
@@ -2481,6 +2487,7 @@ export function ContentCalendarEntrySidebar({
                           </p>
                         )}
                       </button>
+                      {user?.role === "admin" && (
                       <button
                         type="button"
                         disabled={deletingLinkedId === lt._id}
@@ -2515,6 +2522,7 @@ export function ContentCalendarEntrySidebar({
                           <Trash2 className="h-3 w-3" />
                         )}
                       </button>
+                      )}
                     </div>
                   ))}
               </div>
