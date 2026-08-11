@@ -220,15 +220,9 @@ export default function OversightBoard() {
       <p className="text-[12px] text-[var(--text-muted)] mb-4">{scopeLabel}</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {[
-          {
-            label: "Total",
-            value: s.total,
-            // Bifurcation: tasks vs the creative deliverables inside them.
-            sub:
-              s.multiCreativeTasks > 0
-                ? `${s.creativeTotal} creatives · ${s.multiCreativeTasks} multi-creative task${s.multiCreativeTasks === 1 ? "" : "s"}`
-                : null,
-          },
+          // Total counts creative deliverables, not rows: a task holding 15
+          // creatives counts 15. The per-row CREATIVES tag shows the split.
+          { label: "Total", value: s.creativeTotal },
           { label: "Pending", value: s.pending },
           { label: "In Progress", value: s.inProgress },
           { label: "Review", value: s.review },
@@ -242,14 +236,6 @@ export default function OversightBoard() {
             <p className="text-[22px] font-bold text-[var(--text-primary)] mt-1">
               {c.value}
             </p>
-            {(c as any).sub && (
-              <p
-                className="text-[10px] text-[var(--text-muted)] mt-0.5 leading-tight"
-                title="Creative deliverables inside these tasks — a task needing N creatives counts N"
-              >
-                {(c as any).sub}
-              </p>
-            )}
           </Card>
         ))}
       </div>
