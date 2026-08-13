@@ -84,6 +84,15 @@ export default function DashboardLayout({
     if (user.isHR !== true && pathname.startsWith("/hr-requests")) {
       router.replace("/dashboard");
     }
+    // Recruitment holds candidate PII — salaries, phone numbers, CVs. HR and
+    // super-admins only; brand managers have no business in there.
+    if (
+      user.isHR !== true &&
+      user.isSuperAdmin !== true &&
+      pathname.startsWith("/recruitment")
+    ) {
+      router.replace("/dashboard");
+    }
     // HR's view is deliberately stripped of brand work.
     if (
       user.isHR === true &&

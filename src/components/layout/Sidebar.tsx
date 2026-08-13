@@ -35,6 +35,7 @@ import {
   Inbox,
   LifeBuoy,
   Send,
+  UserSearch,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -74,6 +75,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/client-requests": Inbox,
   "/invoices": Receipt,
   "/hr-requests": LifeBuoy,
+  "/recruitment": UserSearch,
   "/my-requests": Send,
 };
 
@@ -143,7 +145,10 @@ const HR_NAV: NavCategory[] = [
   },
   {
     category: "People",
-    items: [{ href: "/hr-requests", label: "Requests" }],
+    items: [
+      { href: "/hr-requests", label: "Requests" },
+      { href: "/recruitment", label: "Recruitment" },
+    ],
   },
   {
     category: "Management",

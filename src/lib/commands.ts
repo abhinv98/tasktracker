@@ -17,6 +17,7 @@ import {
   Inbox,
   LifeBuoy,
   Send,
+  UserSearch,
   BookOpen,
   type LucideIcon,
 } from "lucide-react";
@@ -81,6 +82,14 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["hr", "appraisal", "staff", "triage"],
     hint: "HR inbox",
     visible: isHR,
+  },
+  {
+    label: "Recruitment",
+    href: "/recruitment",
+    icon: UserSearch,
+    keywords: ["hiring", "candidates", "applicants", "jobs", "cv", "resume"],
+    hint: "Candidates",
+    visible: (u) => isHR(u) || u.isSuperAdmin === true,
   },
   {
     label: "History",

@@ -1008,6 +1008,89 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_invoice", ["invoiceId"]),
 
+  // ─── RECRUITMENT ───────────────────────────────
+  // Imported from the cultform MySQL app (u601050392_cf_jobdata). Rows keep
+  // their original MySQL primary key as `sourceId` and reference each other by
+  // it rather than by Convex Id — that's what lets the import run as flat
+  // JSONL, and what lets the public form later dual-write into both systems
+  // and still be reconcilable.
+  recruitJobs: defineTable({
+    sourceId: v.number(),
+    name: v.string(),
+    description: v.string(),
+    formUrl: v.string(),
+    /** Set when this is a sub-position; candidates file under the parent. */
+    parentSourceId: v.optional(v.union(v.number(), v.null())),
+    createdAt: v.number(),
+  }).index("by_source", ["sourceId"]),
+
+  recruitCandidates: defineTable({
+    sourceId: v.optional(v.number()),
+    jobSourceId: v.number(),
+    name: v.string(),
+    number: v.string(),
+    email: v.string(),
+    age: v.optional(v.union(v.number(), v.null())),
+    experience: v.string(),
+    /** Absolute URL — WordPress media, Google Drive, Behance, etc. */
+    resume: v.string(),
+    portfolioLink: v.string(),
+    /** The specific sub-position label chosen; blank on legacy rows. */
+    position: v.string(),
+    currentCtc: v.string(),
+    expectedCtc: v.string(),
+    noticePeriod: v.string(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("non_active"),
+      v.literal("rejected"),
+      v.literal("on_hold")
+    ),
+    statusUpdatedAt: v.optional(v.union(v.number(), v.null())),
+    /** Null for ~1,100 legacy rows imported before the column existed. */
+    createdAt: v.optional(v.union(v.number(), v.null())),
+  })
+    .index("by_job", ["jobSourceId"])
+    .index("by_source", ["sourceId"])
+    .index("by_email", ["email"])
+    .index("by_status", ["status"]),
+
+  recruitTemplates: defineTable({
+    sourceId: v.optional(v.number()),
+    jobSourceId: v.number(),
+    name: v.string(),
+    subject: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
+  }).index("by_job", ["jobSourceId"]),
+
+  recruitCampaigns: defineTable({
+    sourceId: v.optional(v.number()),
+    jobSourceId: v.number(),
+    name: v.string(),
+    startDate: v.number(),
+    endDate: v.optional(v.union(v.number(), v.null())),
+    createdAt: v.number(),
+    source: v.union(v.literal("auto"), v.literal("manual")),
+  }).index("by_job", ["jobSourceId"]),
+
+  recruitEmailLogs: defineTable({
+    sourceId: v.optional(v.number()),
+    jobSourceId: v.number(),
+    jobName: v.string(),
+    contactEmail: v.string(),
+    contactName: v.string(),
+    templateName: v.string(),
+    smtpFrom: v.string(),
+    status: v.union(v.literal("sent"), v.literal("failed")),
+    error: v.string(),
+    sentAt: v.number(),
+    campaignSourceId: v.optional(v.union(v.number(), v.null())),
+  })
+    .index("by_job", ["jobSourceId"])
+    .index("by_email", ["contactEmail"])
+    .index("by_sent", ["sentAt"]),
+
   // ─── HR REQUESTS ───────────────────────────────
   // Staff → HR asks (appraisal, reimbursement, …). HR accepts/declines, moves
   // the status along and attaches documents the requester can then download.
