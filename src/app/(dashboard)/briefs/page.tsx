@@ -260,20 +260,7 @@ export default function BriefsPage() {
       grouped.get(key)!.push(brief);
     }
 
-    // Completion measured across EVERY brief for the brand, not just the ones
-    // this tab shows. The old counter read completed-briefs-inside-a-list-that-
-    // excludes-completed-briefs, so it was pinned to 0 in Active and to 100% in
-    // Completed — self-consistent, but it could never tell you anything.
-    const allByBrand = new Map<string, { total: number; done: number }>();
-    for (const brief of briefs ?? []) {
-      const key = (brief as any).brandId ?? "__no_brand__";
-      const acc = allByBrand.get(key) ?? { total: 0, done: 0 };
-      acc.total++;
-      if (brief.status === "completed") acc.done++;
-      allByBrand.set(key, acc);
-    }
-
-    const folders: { brandId: string; brandName: string; brandColor: string; briefs: typeof sorted; totalAllTabs: number; doneAllTabs: number }[] = [];
+    const folders: { brandId: string; brandName: string; brandColor: string; briefs: typeof sorted }[] = [];
 
     for (const [key, folderBriefs] of grouped) {
       if (key === "__no_brand__") continue;
@@ -283,8 +270,6 @@ export default function BriefsPage() {
         brandName: brand?.name ?? "Unknown Brand",
         brandColor: (brand as any)?.color ?? "#6b7280",
         briefs: folderBriefs,
-        totalAllTabs: allByBrand.get(key)?.total ?? folderBriefs.length,
-        doneAllTabs: allByBrand.get(key)?.done ?? 0,
       });
     }
 
@@ -297,8 +282,6 @@ export default function BriefsPage() {
         brandName: "No Brand",
         brandColor: "#9ca3af",
         briefs: noBrand,
-        totalAllTabs: allByBrand.get("__no_brand__")?.total ?? noBrand.length,
-        doneAllTabs: allByBrand.get("__no_brand__")?.done ?? 0,
       });
     }
 
@@ -411,6 +394,8 @@ export default function BriefsPage() {
   const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands]);
   const brandFolders = briefsTab === "active" ? activeFolders : briefsTab === "review" ? reviewFolders : completedFolders;
   const displayedBriefs = briefsTab === "active" ? activeBriefs : briefsTab === "review" ? reviewBriefs : completedBriefs;
+  const tabCountLabel =
+    briefsTab === "active" ? "active" : briefsTab === "review" ? "in review" : "completed";
 
   const sortedBrandFolders = useMemo(() => {
     return [...brandFolders].sort((a, b) => {
@@ -822,8 +807,8 @@ export default function BriefsPage() {
         <div className="flex flex-col gap-2">
           {sortedBrandFolders.map((folder) => {
             const isExpanded = expandedBrands.has(folder.brandId);
-            const { open: openCount, overdue: overdueCount, done: doneCount } =
-              folderCounts(folder.briefs);
+            // Only overdue is rendered now; open/done were for the removed bar.
+            const { overdue: overdueCount } = folderCounts(folder.briefs);
 
             return (
               <div
@@ -855,26 +840,14 @@ export default function BriefsPage() {
                     {folder.brandName}
                   </span>
 
+                  {/* Just the count for the tab you're in — an all-tabs
+                      completion ratio next to a tab-scoped list was two
+                      different denominators sitting side by side, which read
+                      as confusing rather than informative. The word makes the
+                      number unambiguous without a second figure. */}
                   <span className="text-[12px] text-[var(--text-muted)] tabular-nums shrink-0">
-                    {folder.briefs.length}
+                    {folder.briefs.length} {tabCountLabel}
                   </span>
-
-                  {/* Progress across every brief for this brand, not just the
-                      ones this tab shows — otherwise the ratio is pinned to 0
-                      in Active and to 100% in Completed. */}
-                  {folder.totalAllTabs > 0 && (
-                    <div className="hidden sm:flex items-center gap-2 shrink-0 w-[120px]">
-                      <div className="h-1 flex-1 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent-employee)] transition-[width] duration-300"
-                          style={{ width: `${Math.round((folder.doneAllTabs / folder.totalAllTabs) * 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                        {folder.doneAllTabs}/{folder.totalAllTabs}
-                      </span>
-                    </div>
-                  )}
 
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {overdueCount > 0 && (
