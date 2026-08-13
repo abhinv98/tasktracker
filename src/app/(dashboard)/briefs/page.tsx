@@ -819,14 +819,21 @@ export default function BriefsPage() {
           screen; this fits three times as many and the page becomes scannable.
           Cards also can't nest cleanly around the table that expands below. */}
       {viewMode === "folders" && (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden divide-y divide-[var(--border-subtle)]">
+        <div className="flex flex-col gap-2">
           {sortedBrandFolders.map((folder) => {
             const isExpanded = expandedBrands.has(folder.brandId);
             const { open: openCount, overdue: overdueCount, done: doneCount } =
               folderCounts(folder.briefs);
 
             return (
-              <div key={folder.brandId}>
+              <div
+                key={folder.brandId}
+                className={`rounded-lg border bg-white overflow-hidden transition-colors ${
+                  isExpanded
+                    ? "border-[var(--border-strong)]"
+                    : "border-[var(--border)]"
+                }`}
+              >
                 {/* Folder Header */}
                 <div
                   className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors group"
