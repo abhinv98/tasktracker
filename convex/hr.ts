@@ -171,17 +171,21 @@ export const removeDocument = mutation({
   },
 });
 
-/** Requester can withdraw a request HR hasn't picked up yet. */
+/** The requester (or HR) can delete a request outright, documents included. */
 export const deleteRequest = mutation({
   args: { requestId: v.id("hrRequests") },
   handler: async (ctx, { requestId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    const me = await ctx.db.get(userId);
     const req = await ctx.db.get(requestId);
     if (!req) throw new Error("Request not found");
-    if (req.userId !== userId) throw new Error("Not authorized");
-    if (req.status !== "pending")
-      throw new Error("Only pending requests can be withdrawn");
+    if (req.userId !== userId && me?.isHR !== true)
+      throw new Error("Not authorized");
+
+    for (const doc of req.documents ?? []) {
+      await ctx.storage.delete(doc.fileId);
+    }
     await ctx.db.delete(requestId);
   },
 });

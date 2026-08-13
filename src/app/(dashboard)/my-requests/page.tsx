@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import {
   PageHeader,
   Button,
+  ConfirmModal,
   Input,
   Select,
   Textarea,
@@ -21,6 +22,17 @@ import {
   type HrStatus,
 } from "@/lib/hrRequests";
 import { Send, X, Paperclip, Download, Trash2, Inbox } from "lucide-react";
+
+type MyRequest = {
+  _id: Id<"hrRequests">;
+  category: HrCategory;
+  subject: string;
+  details?: string;
+  status: HrStatus;
+  statusNote?: string;
+  documents: { fileId: Id<"_storage">; fileName: string; url: string | null }[];
+  createdAt: number;
+};
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("en-US", {
@@ -115,20 +127,116 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function RequestCard({
+  req,
+  onDelete,
+}: {
+  req: MyRequest;
+  onDelete: () => void;
+}) {
+  const meta = statusMeta(req.status);
+
+  return (
+    <div className="flex flex-col rounded-xl border border-[var(--border)] bg-white shadow-sm p-4 h-full">
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
+          {categoryLabel(req.category)}
+        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <StatusBadge color={meta.color} label={meta.label} />
+          <span className="text-[10px] text-[var(--text-muted)]">
+            {formatDate(req.createdAt)}
+          </span>
+        </div>
+      </div>
+
+      <h3 className="mt-2 font-medium text-[14px] text-[var(--text-primary)] leading-snug">
+        {req.subject}
+      </h3>
+      {req.details && (
+        <p className="mt-1 text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+          {req.details}
+        </p>
+      )}
+
+      {req.statusNote && (
+        <div className="mt-3 rounded-lg bg-[var(--bg-hover)] px-2.5 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Update from HR
+          </p>
+          <p className="mt-0.5 text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">
+            {req.statusNote}
+          </p>
+        </div>
+      )}
+
+      {req.documents.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1">
+          {req.documents.map((d) => (
+            <a
+              key={d.fileId}
+              href={d.url ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] hover:border-[var(--border)] group"
+            >
+              <Paperclip size={12} className="text-[var(--text-muted)] shrink-0" />
+              <span className="flex-1 truncate text-[11px] text-[var(--text-primary)]">
+                {d.fileName}
+              </span>
+              <Download
+                size={12}
+                className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100"
+              />
+            </a>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-auto pt-3 flex justify-end border-t border-[var(--border-subtle)]">
+        <button
+          onClick={onDelete}
+          className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+        >
+          <Trash2 size={12} />
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type Tab = "all" | HrCategory;
+
 export default function MyRequestsPage() {
-  const requests = useQuery(api.hr.listMine);
+  const requests = useQuery(api.hr.listMine) as MyRequest[] | undefined;
   const deleteRequest = useMutation(api.hr.deleteRequest);
   const { toast } = useToast();
   const [showModal, setShowModal] = useState(false);
+  const [tab, setTab] = useState<Tab>("all");
+  const [deleting, setDeleting] = useState<MyRequest | null>(null);
 
-  async function handleWithdraw(id: Id<"hrRequests">) {
+  async function handleDelete() {
+    if (!deleting) return;
     try {
-      await deleteRequest({ requestId: id });
-      toast("success", "Request withdrawn");
+      await deleteRequest({ requestId: deleting._id });
+      toast("success", "Request deleted");
     } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed");
+      toast("error", err instanceof Error ? err.message : "Failed to delete");
     }
+    setDeleting(null);
   }
+
+  const all = requests ?? [];
+  const visible = tab === "all" ? all : all.filter((r) => r.category === tab);
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: "all", label: "All", count: all.length },
+    ...HR_CATEGORIES.map((c) => ({
+      key: c.value as Tab,
+      label: c.label,
+      count: all.filter((r) => r.category === c.value).length,
+    })),
+  ];
 
   return (
     <div className="p-8">
@@ -146,7 +254,7 @@ export default function MyRequestsPage() {
 
       {requests === undefined ? (
         <p className="text-[14px] text-[var(--text-secondary)]">Loading…</p>
-      ) : requests.length === 0 ? (
+      ) : all.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
           <p className="text-[14px] font-medium text-[var(--text-secondary)]">
@@ -157,90 +265,95 @@ export default function MyRequestsPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {requests.map((r) => {
-            const meta = statusMeta(r.status as HrStatus);
-            return (
-              <div
-                key={r._id}
-                className="rounded-xl border border-[var(--border)] bg-white shadow-sm p-4"
+        <>
+          {/* Category tabs — same arrangement as HR's board */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6 flex-wrap">
+            {tabs.map(({ key, label, count }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                  tab === key
+                    ? "bg-white shadow-sm text-[var(--text-primary)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
-                        {categoryLabel(r.category as HrCategory)}
+                {label}
+                <span
+                  className={`px-1.5 rounded text-[10px] ${
+                    tab === key
+                      ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                      : "bg-white/60 text-[var(--text-muted)]"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {visible.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
+              <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+                No requests here
+              </p>
+            </div>
+          ) : tab === "all" ? (
+            <div className="flex flex-col gap-8">
+              {HR_CATEGORIES.map(({ value, label }) => {
+                const group = visible.filter((r) => r.category === value);
+                if (group.length === 0) return null;
+                return (
+                  <section key={value}>
+                    <h2 className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      {label}
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)] normal-case tracking-normal">
+                        {group.length}
                       </span>
-                      <StatusBadge color={meta.color} label={meta.label} />
-                    </div>
-                    <h3 className="mt-2 font-semibold text-[14px] text-[var(--text-primary)]">
-                      {r.subject}
-                    </h3>
-                    {r.details && (
-                      <p className="mt-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                        {r.details}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] text-[var(--text-muted)]">
-                      {formatDate(r.createdAt)}
-                    </span>
-                    {r.status === "pending" && (
-                      <button
-                        onClick={() => handleWithdraw(r._id)}
-                        title="Withdraw request"
-                        className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--danger)]"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {r.statusNote && (
-                  <div className="mt-3 rounded-lg bg-[var(--bg-hover)] px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      Update from HR
-                    </p>
-                    <p className="mt-0.5 text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
-                      {r.statusNote}
-                    </p>
-                  </div>
-                )}
-
-                {r.documents.length > 0 && (
-                  <div className="mt-3 flex flex-col gap-1.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      Documents ({r.documents.length})
-                    </p>
-                    {r.documents.map((d) => (
-                      <a
-                        key={d.fileId}
-                        href={d.url ?? "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] hover:border-[var(--border)] group"
-                      >
-                        <Paperclip size={13} className="text-[var(--text-muted)]" />
-                        <span className="flex-1 truncate text-[12px] text-[var(--text-primary)]">
-                          {d.fileName}
-                        </span>
-                        <Download
-                          size={13}
-                          className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100"
+                    </h2>
+                    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                      {group.map((r) => (
+                        <RequestCard
+                          key={r._id}
+                          req={r}
+                          onDelete={() => setDeleting(r)}
                         />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              {visible.map((r) => (
+                <RequestCard
+                  key={r._id}
+                  req={r}
+                  onDelete={() => setDeleting(r)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showModal && <NewRequestModal onClose={() => setShowModal(false)} />}
+
+      <ConfirmModal
+        open={deleting !== null}
+        title="Delete request"
+        message={
+          deleting && deleting.documents.length > 0
+            ? `Delete "${deleting.subject}"? Any documents HR attached to it will be removed too.`
+            : `Delete "${deleting?.subject}"? HR will no longer see it.`
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   );
 }
