@@ -69,8 +69,13 @@ export function Modal({
         // backdrop — anything inside the content div stops here.
         if (e.target === ref.current) onClose();
       }}
+      // m-auto is load-bearing: the UA stylesheet centres a modal <dialog>
+      // with `margin: auto` inside its inset-0 box, and Tailwind's preflight
+      // zeroes margin on every element — which drops the dialog into the
+      // top-left corner. Restoring it is what centres this.
       className={`
-        w-[calc(100%-2rem)] ${SIZES[size]} p-0 bg-transparent
+        m-auto w-[calc(100%-2rem)] ${SIZES[size]} max-h-[calc(100dvh-4rem)]
+        p-0 bg-transparent overflow-visible
         backdrop:bg-[#141413]/40 backdrop:backdrop-blur-[2px]
         open:animate-scaleIn
       `}
