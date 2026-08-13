@@ -1,9 +1,18 @@
-import { forwardRef, useRef, type ButtonHTMLAttributes } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+} from "react";
+import { Loader2 } from "lucide-react";
 
 type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  /** Force the spinner on. Omit and an async onClick drives it automatically. */
+  loading?: boolean;
   children: React.ReactNode;
 }
 
@@ -27,8 +36,20 @@ const variantStyles: Record<ButtonVariant, string> = {
 const RESUBMIT_WINDOW_MS = 2500;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", className = "", children, disabled, onClick, ...props }, ref) => {
+  ({ variant = "primary", className = "", children, disabled, loading, onClick, ...props }, ref) => {
     const lastSubmit = useRef(0);
+    // An async onClick drives the spinner on its own, so every action button
+    // gets one without touching its call site. `loading` overrides for forms,
+    // where the work hangs off onSubmit instead.
+    const [running, setRunning] = useState(false);
+    const mounted = useRef(true);
+    useEffect(() => {
+      mounted.current = true;
+      return () => {
+        mounted.current = false;
+      };
+    }, []);
+
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       if (props.type === "submit") {
         const now = Date.now();
@@ -39,14 +60,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         }
         lastSubmit.current = now;
       }
-      onClick?.(e);
+      const result = onClick?.(e) as unknown;
+      if (result && typeof (result as Promise<unknown>).then === "function") {
+        setRunning(true);
+        void (result as Promise<unknown>).finally(() => {
+          if (mounted.current) setRunning(false);
+        });
+      }
     };
+
+    const busy = loading === true || running;
     return (
       <button
         ref={ref}
         onClick={handleClick}
         className={`
-          inline-flex items-center justify-center gap-2 px-3.5 py-[7px]
+          relative inline-flex items-center justify-center gap-2 px-3.5 py-[7px]
           font-medium text-[13px]
           rounded-md
           transition-all duration-150
@@ -55,10 +84,23 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           ${variantStyles[variant]}
           ${className}
         `}
-        disabled={disabled}
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
         {...props}
       >
-        {children}
+        {/* Spinner sits on top and the label just goes invisible, so the
+            button keeps its width and nothing jumps around it. */}
+        {busy && (
+          <Loader2
+            className="absolute h-4 w-4 animate-spin"
+            aria-hidden
+          />
+        )}
+        <span
+          className={`inline-flex items-center gap-2 ${busy ? "invisible" : ""}`}
+        >
+          {children}
+        </span>
       </button>
     );
   }

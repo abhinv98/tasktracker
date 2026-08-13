@@ -15,7 +15,14 @@ import { useNavDepthTracker } from "@/lib/useSmartBack";
 const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks", "/freelancers"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
 const SUPERADMIN_ONLY_ROUTES = ["/invoices"];
-const HR_HIDDEN_ROUTES = ["/content-calendar", "/brands-overview", "/client-requests"];
+const HR_HIDDEN_ROUTES = [
+  "/content-calendar",
+  "/brands-overview",
+  "/client-requests",
+  "/discussions",
+  "/messages",
+  "/archive",
+];
 
 export default function DashboardLayout({
   children,

@@ -146,20 +146,12 @@ const HR_NAV: NavCategory[] = [
     items: [{ href: "/hr-requests", label: "Requests" }],
   },
   {
-    category: "Communication",
-    items: [
-      { href: "/discussions", label: "Discussions" },
-      { href: "/messages", label: "Messages" },
-    ],
-  },
-  {
     category: "Management",
     items: [
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
       { href: "/users", label: "Users & Teams" },
       { href: "/freelancers", label: "Freelancers" },
-      { href: "/archive", label: "Archive" },
     ],
   },
   {

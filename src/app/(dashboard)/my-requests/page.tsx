@@ -105,8 +105,8 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting || !subject.trim()}>
-              {submitting ? "Sending…" : "Send Request"}
+            <Button type="submit" loading={submitting} disabled={!subject.trim()}>
+              Send Request
             </Button>
           </div>
         </form>
