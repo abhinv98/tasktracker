@@ -1,12 +1,32 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PageHeader, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+
+// The date filters store YYYY-MM-DD (they always have; the filtering below
+// parses that). DatePicker speaks timestamps. Convert at the boundary rather
+// than migrating the filter format.
+function ymdToTs(ymd: string): number | undefined {
+  return ymd ? new Date(ymd + "T00:00:00").getTime() : undefined;
+}
+function tsToYmd(ts: number | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function fmtYmd(ymd: string): string {
+  const ts = ymdToTs(ymd);
+  return ts
+    ? new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "";
+}
+
 import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 
@@ -240,7 +260,20 @@ export default function BriefsPage() {
       grouped.get(key)!.push(brief);
     }
 
-    const folders: { brandId: string; brandName: string; brandColor: string; briefs: typeof sorted }[] = [];
+    // Completion measured across EVERY brief for the brand, not just the ones
+    // this tab shows. The old counter read completed-briefs-inside-a-list-that-
+    // excludes-completed-briefs, so it was pinned to 0 in Active and to 100% in
+    // Completed — self-consistent, but it could never tell you anything.
+    const allByBrand = new Map<string, { total: number; done: number }>();
+    for (const brief of briefs ?? []) {
+      const key = (brief as any).brandId ?? "__no_brand__";
+      const acc = allByBrand.get(key) ?? { total: 0, done: 0 };
+      acc.total++;
+      if (brief.status === "completed") acc.done++;
+      allByBrand.set(key, acc);
+    }
+
+    const folders: { brandId: string; brandName: string; brandColor: string; briefs: typeof sorted; totalAllTabs: number; doneAllTabs: number }[] = [];
 
     for (const [key, folderBriefs] of grouped) {
       if (key === "__no_brand__") continue;
@@ -250,6 +283,8 @@ export default function BriefsPage() {
         brandName: brand?.name ?? "Unknown Brand",
         brandColor: (brand as any)?.color ?? "#6b7280",
         briefs: folderBriefs,
+        totalAllTabs: allByBrand.get(key)?.total ?? folderBriefs.length,
+        doneAllTabs: allByBrand.get(key)?.done ?? 0,
       });
     }
 
@@ -262,6 +297,8 @@ export default function BriefsPage() {
         brandName: "No Brand",
         brandColor: "#9ca3af",
         briefs: noBrand,
+        totalAllTabs: allByBrand.get("__no_brand__")?.total ?? noBrand.length,
+        doneAllTabs: allByBrand.get("__no_brand__")?.done ?? 0,
       });
     }
 
@@ -288,6 +325,84 @@ export default function BriefsPage() {
     return list;
   }, [briefs, filterBriefType, filterTeamId, filterDateStart, filterDateEnd]);
 
+  // Overdue drives the ordering, so the page answers "where do I go now"
+  // instead of listing brands alphabetically. Ties fall back to the name so
+  // the order stays stable between renders.
+  function folderCounts(list: { status: string; deadline?: number }[]) {
+    let open = 0, overdue = 0, done = 0;
+    const now = Date.now();
+    for (const b of list) {
+      if (b.status === "completed") { done++; continue; }
+      if (b.status === "archived") continue;
+      open++;
+      if (b.deadline && b.deadline < now) overdue++;
+    }
+    return { open, overdue, done };
+  }
+
+  // ── Filter popover ────────────────────────────────────────────
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Click-outside to dismiss. The popover is absolutely positioned inside the
+  // filter row, which has no overflow clipping, so no portal is needed here.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function onDown(e: MouseEvent) {
+      if (!filterPopoverRef.current?.contains(e.target as Node)) setFiltersOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFiltersOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [filtersOpen]);
+
+  function clearAllFilters() {
+    setFilterManagerId("");
+    setFilterBriefType(""); 
+    setFilterTeamId("");
+    setFilterDateStart("");
+    setFilterDateEnd("");
+  }
+
+  const TYPE_LABELS: Record<string, string> = {
+    developmental: "Developmental",
+    designing: "Designing",
+    video_editing: "Video Editing",
+    copywriting: "Copywriting",
+    content_calendar: "Content Calendar",
+    single_task: "Single Task",
+  };
+
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string; value: string; clear: () => void }[] = [];
+    if (filterManagerId) {
+      const m = (managers ?? []).find((x: any) => x._id === filterManagerId);
+      chips.push({ key: "manager", label: "Manager", value: m?.name ?? m?.email ?? "—", clear: () => setFilterManagerId("") });
+    }
+    if (filterBriefType) {
+      chips.push({ key: "type", label: "Type", value: TYPE_LABELS[filterBriefType] ?? filterBriefType, clear: () => setFilterBriefType("") });
+    }
+    if (filterTeamId) {
+      const t = (allTeams ?? []).find((x: any) => x._id === filterTeamId);
+      chips.push({ key: "team", label: "Team", value: t?.name ?? "—", clear: () => setFilterTeamId("") });
+    }
+    if (filterDateStart) {
+      chips.push({ key: "from", label: "Due from", value: fmtYmd(filterDateStart), clear: () => setFilterDateStart("") });
+    }
+    if (filterDateEnd) {
+      chips.push({ key: "to", label: "Due to", value: fmtYmd(filterDateEnd), clear: () => setFilterDateEnd("") });
+    }
+    return chips;
+  }, [filterManagerId, filterBriefType, filterTeamId, filterDateStart, filterDateEnd, managers, allTeams]);
+
+  const activeFilterCount = activeFilterChips.length;
+
   const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
   const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
   const reviewBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "review"), [filteredBriefs]);
@@ -296,6 +411,19 @@ export default function BriefsPage() {
   const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands]);
   const brandFolders = briefsTab === "active" ? activeFolders : briefsTab === "review" ? reviewFolders : completedFolders;
   const displayedBriefs = briefsTab === "active" ? activeBriefs : briefsTab === "review" ? reviewBriefs : completedBriefs;
+
+  const sortedBrandFolders = useMemo(() => {
+    return [...brandFolders].sort((a, b) => {
+      const ao = folderCounts(a.briefs as any).overdue;
+      const bo = folderCounts(b.briefs as any).overdue;
+      if (ao !== bo) return bo - ao;
+      // "No Brand" is a catch-all, not a client — keep it last.
+      if (a.brandId === "__no_brand__") return 1;
+      if (b.brandId === "__no_brand__") return -1;
+      return a.brandName.localeCompare(b.brandName);
+    });
+  }, [brandFolders]);
+
 
 
   function parseDuration(str: string): number {
@@ -548,81 +676,122 @@ export default function BriefsPage() {
         </button>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-          <select
-            value={filterManagerId}
-            onChange={(e) => setFilterManagerId(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
-          >
-            <option value="">All Managers</option>
-            {(managers ?? []).map((m: any) => (
-              <option key={m._id} value={m._id}>
-                {m.name ?? m.email}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={filterBriefType}
-            onChange={(e) => setFilterBriefType(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
-          >
-            <option value="">All Types</option>
-            <option value="developmental">Developmental</option>
-            <option value="designing">Designing</option>
-            <option value="video_editing">Video Editing</option>
-            <option value="copywriting">Copywriting</option>
-            <option value="content_calendar">Content Calendar</option>
-            <option value="single_task">Single Task</option>
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={filterTeamId}
-            onChange={(e) => setFilterTeamId(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[150px]"
-          >
-            <option value="">All Teams</option>
-            {(allTeams ?? []).map((t: any) => (
-              <option key={t._id} value={t._id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-[var(--text-muted)]">From</span>
-          <input
-            type="date"
-            value={filterDateStart}
-            onChange={(e) => setFilterDateStart(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-          />
-          <span className="text-[11px] text-[var(--text-muted)]">To</span>
-          <input
-            type="date"
-            value={filterDateEnd}
-            onChange={(e) => setFilterDateEnd(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-          />
-        </div>
-        {(filterManagerId || filterBriefType || filterTeamId || filterDateStart || filterDateEnd) && (
+      {/* Filter Bar — five always-on controls became one button. They're used
+          occasionally; the rows below are used constantly, so the rows get the
+          vertical space. Anything set shows as a removable chip so an active
+          filter is never hidden behind a closed popover. */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative" ref={filterPopoverRef}>
           <button
-            onClick={() => { setFilterManagerId(""); setFilterBriefType(""); setFilterTeamId(""); setFilterDateStart(""); setFilterDateEnd(""); }}
-            className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${
+              activeFilterCount > 0
+                ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
+                : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
+            }`}
           >
-            <X className="h-3 w-3" />
-            Clear filters
+            <Filter className="h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-semibold tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {filtersOpen && (
+            <div className="animate-scaleIn absolute left-0 top-full mt-1.5 z-30 w-[280px] rounded-xl border border-[var(--border)] bg-white p-3 shadow-lg flex flex-col gap-3">
+              <Select
+                label="Manager"
+                value={filterManagerId}
+                onChange={(e) => setFilterManagerId(e.target.value)}
+                options={[
+                  { value: "", label: "All Managers" },
+                  ...(managers ?? []).map((m: any) => ({
+                    value: m._id,
+                    label: m.name ?? m.email,
+                  })),
+                ]}
+              />
+              <Select
+                label="Type"
+                value={filterBriefType}
+                onChange={(e) => setFilterBriefType(e.target.value)}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "developmental", label: "Developmental" },
+                  { value: "designing", label: "Designing" },
+                  { value: "video_editing", label: "Video Editing" },
+                  { value: "copywriting", label: "Copywriting" },
+                  { value: "content_calendar", label: "Content Calendar" },
+                  { value: "single_task", label: "Single Task" },
+                ]}
+              />
+              <Select
+                label="Team"
+                value={filterTeamId}
+                onChange={(e) => setFilterTeamId(e.target.value)}
+                options={[
+                  { value: "", label: "All Teams" },
+                  ...(allTeams ?? []).map((t: any) => ({ value: t._id, label: t.name })),
+                ]}
+              />
+              {/* The app's own DatePicker, not <input type="date"> — this page
+                  was the only place running a second date vocabulary. It speaks
+                  timestamps, the filters store YYYY-MM-DD, so convert here and
+                  leave the filtering logic below untouched. */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)]">
+                    Due from
+                  </label>
+                  <DatePicker
+                    value={ymdToTs(filterDateStart)}
+                    onChange={(ts) => setFilterDateStart(tsToYmd(ts))}
+                    placeholder="Any"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-medium text-[13px] text-[var(--text-secondary)]">
+                    Due to
+                  </label>
+                  <DatePicker
+                    value={ymdToTs(filterDateEnd)}
+                    onChange={(ts) => setFilterDateEnd(tsToYmd(ts))}
+                    placeholder="Any"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Active filters, always visible even with the popover shut. */}
+        {activeFilterChips.map((chip) => (
+          <button
+            key={chip.key}
+            onClick={chip.clear}
+            className="group flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--border)] bg-white text-[12px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
+          >
+            <span className="text-[var(--text-muted)]">{chip.label}:</span>
+            <span className="font-medium text-[var(--text-primary)]">{chip.value}</span>
+            <X className="h-3 w-3 text-[var(--text-muted)] group-hover:text-[var(--danger)]" />
+          </button>
+        ))}
+        {activeFilterCount > 1 && (
+          <button
+            onClick={clearAllFilters}
+            className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
+          >
+            Clear all
           </button>
         )}
+
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-auto">
           <button
             onClick={() => setViewMode("folders")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all ${
               viewMode === "folders" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -631,7 +800,7 @@ export default function BriefsPage() {
           </button>
           <button
             onClick={() => setViewMode("all")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all ${
               viewMode === "all" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -639,24 +808,28 @@ export default function BriefsPage() {
             Show All
           </button>
         </div>
-        <span className="text-[11px] text-[var(--text-muted)]">
+        <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
           {displayedBriefs.length} brief{displayedBriefs.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      {/* Brand Folders View */}
+      {/* Brand Folders View — one bordered container of divided rows rather
+          than a stack of Cards with 16px gutters. Each brand was taking ~108px
+          of height to show a name and a stat, so five brands filled a 1080p
+          screen; this fits three times as many and the page becomes scannable.
+          Cards also can't nest cleanly around the table that expands below. */}
       {viewMode === "folders" && (
-        <div className="flex flex-col gap-4">
-          {brandFolders.map((folder) => {
+        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden divide-y divide-[var(--border-subtle)]">
+          {sortedBrandFolders.map((folder) => {
             const isExpanded = expandedBrands.has(folder.brandId);
-            const doneBriefs = folder.briefs.filter((b) => b.status === "completed").length;
+            const { open: openCount, overdue: overdueCount, done: doneCount } =
+              folderCounts(folder.briefs);
 
             return (
-              <Card key={folder.brandId} className="p-0 overflow-hidden">
+              <div key={folder.brandId}>
                 {/* Folder Header */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
-                  style={{ borderLeft: `4px solid ${folder.brandColor}` }}
+                  className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors group"
                   onClick={() => toggleBrand(folder.brandId)}
                 >
                   {isExpanded ? (
@@ -664,30 +837,61 @@ export default function BriefsPage() {
                   ) : (
                     <ChevronRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                   )}
-                  <FolderOpen
-                    className="h-4.5 w-4.5 shrink-0"
-                    style={{ color: folder.brandColor }}
+                  {/* Brand identity moves from a 4px left stripe to a dot —
+                      same colour, same recognition, no accent bar. */}
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: folder.brandColor }}
+                    aria-hidden
                   />
-                  <span className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
+                  <span className="font-medium text-[13px] text-[var(--text-primary)] truncate">
                     {folder.brandName}
                   </span>
-                  <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">
-                    {doneBriefs}/{folder.briefs.length} completed
-                  </span>
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openCreateModalForBrand(folder.brandId === "__no_brand__" ? undefined : folder.brandId);
-                      }}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all shrink-0"
-                    >
-                      <Plus className="h-3 w-3" />
-                      New Brief
-                    </button>
-                  )}
-                </div>
 
+                  <span className="text-[12px] text-[var(--text-muted)] tabular-nums shrink-0">
+                    {folder.briefs.length}
+                  </span>
+
+                  {/* Progress across every brief for this brand, not just the
+                      ones this tab shows — otherwise the ratio is pinned to 0
+                      in Active and to 100% in Completed. */}
+                  {folder.totalAllTabs > 0 && (
+                    <div className="hidden sm:flex items-center gap-2 shrink-0 w-[120px]">
+                      <div className="h-1 flex-1 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent-employee)] transition-[width] duration-300"
+                          style={{ width: `${Math.round((folder.doneAllTabs / folder.totalAllTabs) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                        {folder.doneAllTabs}/{folder.totalAllTabs}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-2 shrink-0">
+                    {overdueCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-[var(--danger)] bg-[var(--danger-dim)] tabular-nums">
+                        {overdueCount} overdue
+                      </span>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCreateModalForBrand(folder.brandId === "__no_brand__" ? undefined : folder.brandId);
+                        }}
+                        // Hidden until the row is hovered or focused: it's on
+                        // every row, and 15 identical buttons compete with the
+                        // brand names people are actually scanning for.
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--accent-admin-dim)] transition-all"
+                      >
+                        <Plus className="h-3 w-3" />
+                        New Brief
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {/* Folder Body - Briefs Table */}
                 {isExpanded && (
                   <div className="border-t border-[var(--border)] overflow-x-auto">
@@ -825,7 +1029,7 @@ export default function BriefsPage() {
                     </Table>
                   </div>
                 )}
-              </Card>
+              </div>
             );
           })}
 
@@ -847,11 +1051,14 @@ export default function BriefsPage() {
             let globalIndex = 0;
             return (
               <div key={folder.brandId}>
-                <div
-                  className="flex items-center gap-2 mb-2 px-1"
-                  style={{ borderLeft: `3px solid ${folder.brandColor}`, paddingLeft: "10px" }}
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0" style={{ color: folder.brandColor }} />
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  {/* Brand dot, matching the folders view — the 3px left stripe
+                      that used to sit here is the same accent-bar tell. */}
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: folder.brandColor }}
+                    aria-hidden
+                  />
                   {folder.brandId !== "__no_brand__" ? (
                     <Link
                       href={`/brands/${folder.brandId}?returnTo=${encodeURIComponent("/briefs")}`}
