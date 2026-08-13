@@ -82,25 +82,8 @@ export default function RecruitmentJobPage() {
   const [campNotes, setCampNotes] = useState("");
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
+  const undatedCount = (candidates ?? []).filter((c) => c.createdAt == null).length;
   const ids = useMemo(() => [...selected] as Id<"recruitCandidates">[], [selected]);
-
-  /**
-   * Which optional columns are worth a column header for THIS job.
-   * Video Editors is 88% pre-migration rows with no experience/CTC/date, so a
-   * fixed table renders four columns of dashes and reads as broken data. A
-   * column has to earn its width on the job you're actually looking at.
-   */
-  const cols = useMemo(() => {
-    const rows = candidates ?? [];
-    if (rows.length === 0) return { details: false, added: false, role: false };
-    const has = (fn: (c: (typeof rows)[number]) => boolean) =>
-      rows.filter(fn).length / rows.length >= 0.15;
-    return {
-      details: has((c) => !!(c.experience || c.expectedCtc || c.currentCtc || c.noticePeriod)),
-      added: has((c) => c.createdAt != null),
-      role: has((c) => !!c.position),
-    };
-  }, [candidates]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -278,7 +261,7 @@ export default function RecruitmentJobPage() {
         <>
           <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full table-fixed border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
                     <th className="px-3 py-2 w-8">
@@ -292,17 +275,23 @@ export default function RecruitmentJobPage() {
                         className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
                       />
                     </th>
-                    {["Candidate",
-                      ...(cols.role ? ["Applied for"] : []),
-                      ...(cols.details ? ["Details"] : []),
-                      "Status",
-                      ...(cols.added ? ["Added"] : []),
-                      ""].map((h, i) => (
+                    {/* Identical columns for every position. Adapting them
+                        per job made each position render a differently-shaped
+                        table, which reads as broken far more than an empty
+                        cell does. Widths are fixed so nothing stretches. */}
+                    {[
+                      { label: "Candidate", w: "w-[30%]" },
+                      { label: "Applied for", w: "w-[14%]" },
+                      { label: "Details", w: "w-[30%]" },
+                      { label: "Status", w: "w-[10%]" },
+                      { label: "Added", w: "w-[9%]" },
+                      { label: "", w: "w-[7%]" },
+                    ].map((h, i) => (
                       <th
-                        key={h || i}
-                        className="px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap"
+                        key={h.label || i}
+                        className={`${h.w} px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap`}
                       >
-                        {h}
+                        {h.label}
                       </th>
                     ))}
                   </tr>
@@ -343,24 +332,21 @@ export default function RecruitmentJobPage() {
                             {c.number && <span> · {c.number}</span>}
                           </p>
                         </td>
-                        {cols.role && (
-                          <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
-                            {c.position || "—"}
-                          </td>
-                        )}
-                        {cols.details && (
-                          <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
-                            {details || "—"}
-                          </td>
-                        )}
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] truncate">
+                          {/* A blank position just means the old form didn't
+                              record a sub-position — they applied for the job
+                              itself, so name it rather than showing a dash. */}
+                          {c.position || job?.name || "—"}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+                          {details || <span className="text-[var(--text-disabled)]">Not provided</span>}
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <StatusBadge color={meta.color} label={meta.label} />
                         </td>
-                        {cols.added && (
-                          <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
-                            {fmt(c.createdAt) || "—"}
-                          </td>
-                        )}
+                        <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                          {fmt(c.createdAt) || <span className="text-[var(--text-disabled)]">—</span>}
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             {c.resume && (
@@ -387,15 +373,10 @@ export default function RecruitmentJobPage() {
             </div>
           </div>
 
-          {/* Say why columns are absent rather than leaving it a mystery. */}
-          {(!cols.details || !cols.added) && (
+          {undatedCount > 0 && (
             <p className="mt-3 text-[11px] text-[var(--text-muted)]">
-              {!cols.details && "Experience and salary "}
-              {!cols.details && !cols.added && "and "}
-              {!cols.added && "application dates "}
-              {!cols.details && !cols.added ? "are" : "is"} hidden for this position — these
-              candidates came through the older application form, which didn&apos;t collect
-              {!cols.added ? " them" : " it"}.
+              {undatedCount} of these {candidates.length} came through the older
+              application form, which didn&apos;t record a date or salary details.
             </p>
           )}
         </>
