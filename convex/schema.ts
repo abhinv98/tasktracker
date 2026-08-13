@@ -1072,6 +1072,12 @@ export default defineSchema({
     endDate: v.optional(v.union(v.number(), v.null())),
     createdAt: v.number(),
     source: v.union(v.literal("auto"), v.literal("manual")),
+    /** Members, as Convex ids. Campaigns are tens of people, not thousands —
+     *  an array beats a join table at this size and keeps the reads to one doc. */
+    candidateIds: v.optional(v.array(v.id("recruitCandidates"))),
+    /** Free-text note on what this round is for. */
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
   }).index("by_job", ["jobSourceId"]),
 
   recruitEmailLogs: defineTable({

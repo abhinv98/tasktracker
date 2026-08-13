@@ -336,6 +336,127 @@ export const deleteTemplate = mutation({
   },
 });
 
+/* ── Campaigns ─────────────────────────────────────────────── */
+
+/** Campaigns with member counts and their own send results. */
+export const listCampaigns = query({
+  args: { jobSourceId: v.optional(v.number()) },
+  handler: async (ctx, { jobSourceId }) => {
+    if (!(await canRecruit(ctx))) return [];
+    const jobs = await ctx.db.query("recruitJobs").collect();
+    const rows =
+      jobSourceId != null
+        ? await ctx.db
+            .query("recruitCampaigns")
+            .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
+            .collect()
+        : await ctx.db.query("recruitCampaigns").collect();
+
+    const logs = await ctx.db.query("recruitEmailLogs").collect();
+    rows.sort((a, b) => b.startDate - a.startDate);
+
+    return rows.map((c) => {
+      const mine = logs.filter((l) => l.campaignSourceId === c.sourceId);
+      return {
+        ...c,
+        memberCount: (c.candidateIds ?? []).length,
+        jobName: jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "Unknown",
+        sent: mine.filter((l) => l.status === "sent").length,
+        failed: mine.filter((l) => l.status === "failed").length,
+        isOpen: c.endDate == null,
+      };
+    });
+  },
+});
+
+/** Members of one campaign, resolved to full candidate records. */
+export const getCampaign = query({
+  args: { campaignId: v.id("recruitCampaigns") },
+  handler: async (ctx, { campaignId }) => {
+    if (!(await canRecruit(ctx))) return null;
+    const c = await ctx.db.get(campaignId);
+    if (!c) return null;
+    const members = [];
+    for (const id of c.candidateIds ?? []) {
+      const cand = await ctx.db.get(id);
+      // Candidates deleted since being added just drop out of the list.
+      if (cand) members.push(cand);
+    }
+    const jobs = await ctx.db.query("recruitJobs").collect();
+    return {
+      ...c,
+      members,
+      jobName: jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "Unknown",
+    };
+  },
+});
+
+export const createCampaign = mutation({
+  args: {
+    name: v.string(),
+    jobSourceId: v.number(),
+    candidateIds: v.array(v.id("recruitCandidates")),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, { name, jobSourceId, candidateIds, notes }) => {
+    const { userId } = await requireRecruiter(ctx);
+    if (!name.trim()) throw new Error("Campaign name is required");
+    const all = await ctx.db.query("recruitCampaigns").collect();
+    // Stay above the imported MySQL id range so email logs can attribute
+    // cleanly to either system's campaigns.
+    const nextId = Math.max(1000, ...all.map((c) => c.sourceId ?? 0)) + 1;
+    const now = Date.now();
+    return await ctx.db.insert("recruitCampaigns", {
+      sourceId: nextId,
+      jobSourceId,
+      name: name.trim(),
+      startDate: now,
+      endDate: null,
+      createdAt: now,
+      source: "manual",
+      candidateIds,
+      notes: notes?.trim() ?? "",
+      createdBy: userId,
+    });
+  },
+});
+
+export const updateCampaignMembers = mutation({
+  args: {
+    campaignId: v.id("recruitCampaigns"),
+    add: v.optional(v.array(v.id("recruitCandidates"))),
+    remove: v.optional(v.array(v.id("recruitCandidates"))),
+  },
+  handler: async (ctx, { campaignId, add, remove }) => {
+    await requireRecruiter(ctx);
+    const c = await ctx.db.get(campaignId);
+    if (!c) throw new Error("Campaign not found");
+    const set = new Set<string>((c.candidateIds ?? []).map(String));
+    for (const id of add ?? []) set.add(String(id));
+    for (const id of remove ?? []) set.delete(String(id));
+    const next = [...set] as typeof c.candidateIds;
+    await ctx.db.patch(campaignId, { candidateIds: next });
+    return { memberCount: next?.length ?? 0 };
+  },
+});
+
+export const closeCampaign = mutation({
+  args: { campaignId: v.id("recruitCampaigns"), reopen: v.optional(v.boolean()) },
+  handler: async (ctx, { campaignId, reopen }) => {
+    await requireRecruiter(ctx);
+    await ctx.db.patch(campaignId, { endDate: reopen ? null : Date.now() });
+  },
+});
+
+export const deleteCampaign = mutation({
+  args: { campaignId: v.id("recruitCampaigns") },
+  handler: async (ctx, { campaignId }) => {
+    await requireRecruiter(ctx);
+    // Only the grouping goes; the candidates and their send history stay.
+    await ctx.db.delete(campaignId);
+  },
+});
+
 /* ── Email sending ─────────────────────────────────────────── */
 
 /** Placeholder substitution, matching the PHP app's {{variable}} syntax. */
@@ -394,13 +515,10 @@ export const _logSend = internalMutation({
     smtpFrom: v.string(),
     status: v.union(v.literal("sent"), v.literal("failed")),
     error: v.string(),
+    campaignSourceId: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("recruitEmailLogs", {
-      ...args,
-      sentAt: Date.now(),
-      campaignSourceId: null,
-    });
+    await ctx.db.insert("recruitEmailLogs", { ...args, sentAt: Date.now() });
   },
 });
 
@@ -414,8 +532,13 @@ export const sendTemplateEmail = action({
   args: {
     candidateIds: v.array(v.id("recruitCandidates")),
     templateId: v.id("recruitTemplates"),
+    /** Attributes every log line to a campaign so its results are countable. */
+    campaignSourceId: v.optional(v.number()),
   },
-  handler: async (ctx, { candidateIds, templateId }): Promise<{ sent: number; failed: number }> => {
+  handler: async (
+    ctx,
+    { candidateIds, templateId, campaignSourceId }
+  ): Promise<{ sent: number; failed: number }> => {
     const token = process.env.ZEPTO_API_TOKEN;
     const fromEmail = process.env.ZEPTO_FROM_EMAIL ?? "hr@ecultify.com";
     const fromName = process.env.ZEPTO_FROM_NAME ?? "HR Team";
@@ -461,6 +584,7 @@ export const sendTemplateEmail = action({
         smtpFrom: fromEmail,
         status: ok ? "sent" : "failed",
         error: errText,
+        campaignSourceId: campaignSourceId ?? null,
       });
 
       if (ok) sent++;

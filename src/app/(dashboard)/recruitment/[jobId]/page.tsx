@@ -10,7 +10,9 @@ import {
   PageHeader,
   Button,
   Modal,
+  Input,
   Select,
+  Textarea,
   StatusBadge,
   ConfirmModal,
   SkeletonPageHeader,
@@ -25,6 +27,7 @@ import {
   Mail,
   Trash2,
   UserSearch,
+  Megaphone,
 } from "lucide-react";
 
 type Status = "active" | "non_active" | "rejected" | "on_hold";
@@ -35,11 +38,10 @@ const STATUSES: { value: Status; label: string; color: string }[] = [
   { value: "non_active", label: "Non Active", color: "#6b7280" },
   { value: "rejected", label: "Rejected", color: "#b91c1c" },
 ];
-
 const statusMeta = (s: string) => STATUSES.find((x) => x.value === s) ?? STATUSES[0];
 
 function fmt(ts?: number | null) {
-  if (!ts) return "—";
+  if (!ts) return "";
   return new Date(ts).toLocaleDateString("en-GB", {
     day: "numeric", month: "short", year: "2-digit",
   });
@@ -60,23 +62,45 @@ export default function RecruitmentJobPage() {
     ...(search.trim() ? { search: search.trim() } : {}),
   });
   const templates = useQuery(api.recruitment.listTemplates, {});
+  const campaigns = useQuery(api.recruitment.listCampaigns, { jobSourceId });
 
   const setCandidateStatus = useMutation(api.recruitment.setCandidateStatus);
   const deleteCandidates = useMutation(api.recruitment.deleteCandidates);
+  const createCampaign = useMutation(api.recruitment.createCampaign);
+  const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
   const { toast } = useToast();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mailOpen, setMailOpen] = useState(false);
+  const [campOpen, setCampOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
-  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [campTarget, setCampTarget] = useState("new");
+  const [campName, setCampName] = useState("");
+  const [campNotes, setCampNotes] = useState("");
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
-  const ids = useMemo(
-    () => [...selected] as Id<"recruitCandidates">[],
-    [selected]
-  );
+  const ids = useMemo(() => [...selected] as Id<"recruitCandidates">[], [selected]);
+
+  /**
+   * Which optional columns are worth a column header for THIS job.
+   * Video Editors is 88% pre-migration rows with no experience/CTC/date, so a
+   * fixed table renders four columns of dashes and reads as broken data. A
+   * column has to earn its width on the job you're actually looking at.
+   */
+  const cols = useMemo(() => {
+    const rows = candidates ?? [];
+    if (rows.length === 0) return { details: false, added: false, role: false };
+    const has = (fn: (c: (typeof rows)[number]) => boolean) =>
+      rows.filter(fn).length / rows.length >= 0.15;
+    return {
+      details: has((c) => !!(c.experience || c.expectedCtc || c.currentCtc || c.noticePeriod)),
+      added: has((c) => c.createdAt != null),
+      role: has((c) => !!c.position),
+    };
+  }, [candidates]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -88,10 +112,10 @@ export default function RecruitmentJobPage() {
   }
 
   async function applyStatus(next: Status) {
-    if (ids.length === 0) return;
+    if (!ids.length) return;
     try {
       const { updated } = await setCandidateStatus({ candidateIds: ids, status: next });
-      toast("success", `${updated} candidate${updated === 1 ? "" : "s"} marked ${statusMeta(next).label.toLowerCase()}`);
+      toast("success", `${updated} marked ${statusMeta(next).label.toLowerCase()}`);
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
@@ -99,23 +123,45 @@ export default function RecruitmentJobPage() {
   }
 
   async function handleSend() {
-    if (!templateId || ids.length === 0) return;
-    setSending(true);
+    if (!templateId || !ids.length) return;
+    setBusy(true);
     try {
       const { sent, failed } = await sendTemplateEmail({
         candidateIds: ids,
         templateId: templateId as Id<"recruitTemplates">,
       });
-      toast(
-        failed > 0 ? "error" : "success",
-        failed > 0 ? `${sent} sent, ${failed} failed` : `Sent to ${sent} candidate${sent === 1 ? "" : "s"}`
-      );
+      toast(failed ? "error" : "success",
+        failed ? `${sent} sent, ${failed} failed` : `Sent to ${sent}`);
       setMailOpen(false);
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Send failed");
     } finally {
-      setSending(false);
+      setBusy(false);
+    }
+  }
+
+  async function handleCampaign() {
+    setBusy(true);
+    try {
+      if (campTarget === "new") {
+        if (!campName.trim()) return;
+        await createCampaign({
+          name: campName.trim(), jobSourceId, candidateIds: ids,
+          notes: campNotes.trim() || undefined,
+        });
+        toast("success", `Campaign created with ${ids.length} candidates`);
+      } else {
+        const { memberCount } = await updateMembers({
+          campaignId: campTarget as Id<"recruitCampaigns">, add: ids,
+        });
+        toast("success", `Campaign now has ${memberCount} candidates`);
+      }
+      setCampOpen(false); setCampName(""); setCampNotes(""); setSelected(new Set());
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -123,7 +169,7 @@ export default function RecruitmentJobPage() {
     return (
       <div className="p-8">
         <SkeletonPageHeader />
-        <SkeletonTable rows={8} cols={6} what="candidates" />
+        <SkeletonTable rows={8} cols={5} what="candidates" />
       </div>
     );
   }
@@ -144,13 +190,12 @@ export default function RecruitmentJobPage() {
         title={job?.name ?? "Position"}
         subtitle={
           job?.parentName
-            ? `Sub-position of ${job.parentName} · ${candidates.length} shown`
-            : `${candidates.length} candidate${candidates.length === 1 ? "" : "s"} shown`
+            ? `Sub-position of ${job.parentName}`
+            : `${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`
         }
         icon={UserSearch}
       />
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -178,7 +223,8 @@ export default function RecruitmentJobPage() {
         </div>
       </div>
 
-      {/* Batch bar */}
+      {/* Batch bar. One primary action, a status menu, one secondary, one
+          destructive icon — six competing buttons was the old version. */}
       {selected.size > 0 && (
         <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent-admin)] bg-white px-3 py-2 shadow-sm">
           <span className="text-[12px] font-medium text-[var(--text-primary)]">
@@ -195,14 +241,28 @@ export default function RecruitmentJobPage() {
               <Mail size={14} />
               Send email
             </Button>
-            {STATUSES.map((s) => (
-              <Button key={s.value} variant="secondary" onClick={() => applyStatus(s.value)}>
-                {s.label}
-              </Button>
-            ))}
-            <Button variant="destructive" onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={14} />
+            <Button variant="secondary" onClick={() => setCampOpen(true)}>
+              <Megaphone size={14} />
+              Add to campaign
             </Button>
+            <select
+              value=""
+              onChange={(e) => e.target.value && applyStatus(e.target.value as Status)}
+              aria-label="Set status"
+              className="bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            >
+              <option value="">Set status…</option>
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              aria-label="Delete selected"
+              className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+            >
+              <Trash2 size={15} />
+            </button>
           </div>
         </div>
       )}
@@ -215,109 +275,130 @@ export default function RecruitmentJobPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
-                  <th className="px-3 py-2 w-8">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={() =>
-                        setSelected(allSelected ? new Set() : new Set(candidates.map((c) => c._id)))
-                      }
-                      aria-label="Select all shown"
-                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
-                    />
-                  </th>
-                  {["Name", "Contact", "Role applied", "Experience", "Expected", "Status", "Added", ""].map((h) => (
-                    <th
-                      key={h}
-                      className="px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap"
-                    >
-                      {h}
+        <>
+          <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() =>
+                          setSelected(allSelected ? new Set() : new Set(candidates.map((c) => c._id)))
+                        }
+                        aria-label="Select all shown"
+                        className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                      />
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {candidates.map((c) => {
-                  const meta = statusMeta(c.status);
-                  const isHit = highlight === c._id;
-                  return (
-                    <tr
-                      key={c._id}
-                      className={`border-b border-[var(--border-subtle)] transition-colors ${
-                        isHit ? "bg-[var(--accent-admin-dim)]" : "hover:bg-[var(--bg-hover)]"
-                      }`}
-                    >
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(c._id)}
-                          onChange={() => toggle(c._id)}
-                          aria-label={`Select ${c.name}`}
-                          className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] whitespace-nowrap">
-                        {c.name}
-                      </td>
-                      <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
-                        <a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a>
-                        {c.number && (
-                          <span className="block text-[11px] text-[var(--text-muted)]">{c.number}</span>
+                    {["Candidate",
+                      ...(cols.role ? ["Applied for"] : []),
+                      ...(cols.details ? ["Details"] : []),
+                      "Status",
+                      ...(cols.added ? ["Added"] : []),
+                      ""].map((h, i) => (
+                      <th
+                        key={h || i}
+                        className="px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidates.map((c) => {
+                    const meta = statusMeta(c.status);
+                    // Whatever this candidate actually has, joined — beats
+                    // three columns each mostly showing a dash.
+                    const details = [
+                      c.experience && `${c.experience} yr`,
+                      c.currentCtc && `now ${c.currentCtc}`,
+                      c.expectedCtc && `want ${c.expectedCtc}`,
+                      c.noticePeriod,
+                    ].filter(Boolean).join(" · ");
+                    return (
+                      <tr
+                        key={c._id}
+                        className={`border-b border-[var(--border-subtle)] transition-colors ${
+                          highlight === c._id ? "bg-[var(--accent-admin-dim)]" : "hover:bg-[var(--bg-hover)]"
+                        }`}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(c._id)}
+                            onChange={() => toggle(c._id)}
+                            aria-label={`Select ${c.name}`}
+                            className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                          />
+                        </td>
+                        <td className="px-3 py-2 min-w-[220px]">
+                          <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                            {c.name}
+                          </p>
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            <a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a>
+                            {c.number && <span> · {c.number}</span>}
+                          </p>
+                        </td>
+                        {cols.role && (
+                          <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                            {c.position || "—"}
+                          </td>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
-                        {c.position || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
-                        {c.experience || "—"}
-                      </td>
-                      <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
-                        {c.expectedCtc || "—"}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <StatusBadge color={meta.color} label={meta.label} />
-                      </td>
-                      <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
-                        {fmt(c.createdAt)}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          {c.resume && (
-                            <a
-                              href={c.resume}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Open résumé"
-                              className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
-                            >
-                              <FileText size={14} />
-                            </a>
-                          )}
-                          {c.portfolioLink && (
-                            <a
-                              href={c.portfolioLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Open portfolio"
-                              className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
-                            >
-                              <ExternalLink size={14} />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {cols.details && (
+                          <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+                            {details || "—"}
+                          </td>
+                        )}
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <StatusBadge color={meta.color} label={meta.label} />
+                        </td>
+                        {cols.added && (
+                          <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                            {fmt(c.createdAt) || "—"}
+                          </td>
+                        )}
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            {c.resume && (
+                              <a href={c.resume} target="_blank" rel="noreferrer"
+                                title="Open résumé"
+                                className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                                <FileText size={14} />
+                              </a>
+                            )}
+                            {c.portfolioLink && (
+                              <a href={c.portfolioLink} target="_blank" rel="noreferrer"
+                                title="Open portfolio"
+                                className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                                <ExternalLink size={14} />
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Say why columns are absent rather than leaving it a mystery. */}
+          {(!cols.details || !cols.added) && (
+            <p className="mt-3 text-[11px] text-[var(--text-muted)]">
+              {!cols.details && "Experience and salary "}
+              {!cols.details && !cols.added && "and "}
+              {!cols.added && "application dates "}
+              {!cols.details && !cols.added ? "are" : "is"} hidden for this position — these
+              candidates came through the older application form, which didn&apos;t collect
+              {!cols.added ? " them" : " it"}.
+            </p>
+          )}
+        </>
       )}
 
       {/* Send email */}
@@ -328,12 +409,8 @@ export default function RecruitmentJobPage() {
         icon={Mail}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setMailOpen(false)}>
-              Cancel
-            </Button>
-            <Button loading={sending} disabled={!templateId} onClick={handleSend}>
-              Send now
-            </Button>
+            <Button variant="secondary" onClick={() => setMailOpen(false)}>Cancel</Button>
+            <Button loading={busy} disabled={!templateId} onClick={handleSend}>Send now</Button>
           </>
         }
       >
@@ -343,29 +420,74 @@ export default function RecruitmentJobPage() {
             value={templateId}
             onChange={(e) => setTemplateId(e.target.value)}
             placeholder="Choose a template"
-            options={(templates ?? []).map((t) => ({
-              value: t._id,
-              label: `${t.name} — ${t.jobName}`,
-            }))}
+            options={(templates ?? []).map((t) => ({ value: t._id, label: `${t.name} — ${t.jobName}` }))}
           />
           <p className="text-[12px] text-[var(--text-secondary)]">
-            Sends from <strong>HR Team &lt;hr@ecultify.com&gt;</strong> via
-            ZeptoMail — the same sender the recruitment site already uses.
-            Placeholders like <code>{"{{name}}"}</code> are filled per candidate,
-            and every send is recorded in Email activity.
+            Sends from <strong>HR Team &lt;hr@ecultify.com&gt;</strong>. Placeholders
+            fill per candidate, and every send is recorded.
           </p>
-          {(templates ?? []).length === 0 && (
-            <p className="text-[12px] text-[var(--danger)]">
-              No templates yet — create one under Templates first.
-            </p>
+        </div>
+      </Modal>
+
+      {/* Campaign */}
+      <Modal
+        open={campOpen}
+        onClose={() => setCampOpen(false)}
+        title={`Add ${selected.size} to a campaign`}
+        icon={Megaphone}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCampOpen(false)}>Cancel</Button>
+            <Button
+              loading={busy}
+              disabled={campTarget === "new" && !campName.trim()}
+              onClick={handleCampaign}
+            >
+              {campTarget === "new" ? "Create campaign" : "Add to campaign"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <Select
+            label="Campaign"
+            value={campTarget}
+            onChange={(e) => setCampTarget(e.target.value)}
+            options={[
+              { value: "new", label: "＋ New campaign" },
+              ...(campaigns ?? [])
+                .filter((c) => c.isOpen)
+                .map((c) => ({ value: c._id, label: `${c.name} (${c.memberCount})` })),
+            ]}
+          />
+          {campTarget === "new" && (
+            <>
+              <Input
+                label="Campaign name"
+                value={campName}
+                onChange={(e) => setCampName(e.target.value)}
+                placeholder="e.g. Video Editor shortlist — August"
+              />
+              <Textarea
+                label="Notes (optional)"
+                value={campNotes}
+                onChange={(e) => setCampNotes(e.target.value)}
+                placeholder="What this round is for…"
+                className="min-h-[80px]"
+              />
+            </>
           )}
+          <p className="text-[12px] text-[var(--text-secondary)]">
+            A campaign is just a saved group. You can mail everyone in it from the
+            Campaigns page whenever you like.
+          </p>
         </div>
       </Modal>
 
       <ConfirmModal
         open={confirmDelete}
         title="Delete candidates"
-        message={`Permanently delete ${selected.size} candidate${selected.size === 1 ? "" : "s"}? Their details and résumé links go with them. This cannot be undone.`}
+        message={`Permanently delete ${selected.size} candidate${selected.size === 1 ? "" : "s"}? Their details and résumé links go too. This cannot be undone.`}
         confirmLabel="Delete"
         variant="danger"
         onConfirm={async () => {

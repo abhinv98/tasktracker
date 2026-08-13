@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Mail,
   FileText,
+  Megaphone,
   X,
 } from "lucide-react";
 
@@ -49,6 +50,12 @@ export default function RecruitmentPage() {
         icon={UserSearch}
         actions={
           <div className="flex items-center gap-2">
+            <Link href="/recruitment/campaigns">
+              <Button variant="secondary">
+                <Megaphone size={14} />
+                Campaigns
+              </Button>
+            </Link>
             <Link href="/recruitment/templates">
               <Button variant="secondary">
                 <FileText size={14} />
