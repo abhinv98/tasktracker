@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Card, PageHeader, TaskDetailModal } from "@/components/ui";
+import { Card, PageHeader, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
@@ -63,7 +63,8 @@ export default function MyTasksPage() {
   if (user === undefined || data === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <SkeletonPageHeader />
+        <SkeletonList rows={6} what="your tasks" />
       </div>
     );
   }

@@ -170,6 +170,41 @@ h1, h2, h3 {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Skeleton shimmer. Opacity, not a moving gradient sweep: a sweep across a
+   dozen placeholders at once looks like the page is malfunctioning, and it
+   repaints far more. This reads as "not here yet" and stays cheap. */
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.animate-shimmer { animation: shimmer 1.4s ease-in-out infinite; }
+
+/* "This one is waiting on you." A slow halo on the status dot, applied ONLY
+   when the viewer is the person blocking it — see StatusBadge's `mine` prop.
+   If everything pulsed, nothing would. */
+@keyframes awaitingYou {
+  0%, 100% { box-shadow: 0 0 0 0 var(--awaiting-hue); }
+  50% { box-shadow: 0 0 0 3px transparent; }
+}
+.animate-awaiting-you { animation: awaitingYou 2.4s ease-in-out infinite; }
+
+/* Success check draw — the three earned moments only. */
+@keyframes drawCheck {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+.animate-draw-check {
+  stroke-dasharray: 24;
+  animation: drawCheck 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes celebrateIn {
+  0% { opacity: 0; transform: scale(0.9); }
+  60% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-celebrate { animation: celebrateIn 0.4s cubic-bezier(0.25, 1, 0.5, 1); }
+
 /* Typing dots. Tailwind's animate-bounce is a hard parabola with a squash at
    the bottom — too physical for three 4px dots. This just breathes. */
 @keyframes typingDot {

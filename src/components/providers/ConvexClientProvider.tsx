@@ -4,6 +4,7 @@ import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import { type ReactNode } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
+import { CelebrateProvider } from "@/components/ui/Celebrate";
 import { DesktopNotificationBridge } from "./DesktopNotificationBridge";
 
 const convex = new ConvexReactClient(
@@ -14,7 +15,9 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   return (
     <ConvexAuthProvider client={convex}>
       <DesktopNotificationBridge />
-      <ToastProvider>{children}</ToastProvider>
+      <ToastProvider>
+        <CelebrateProvider>{children}</CelebrateProvider>
+      </ToastProvider>
     </ConvexAuthProvider>
   );
 }

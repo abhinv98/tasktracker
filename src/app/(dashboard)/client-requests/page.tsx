@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, useToast } from "@/components/ui";
+import { PageHeader, useToast, SkeletonList } from "@/components/ui";
 import {
   Inbox,
   X,
@@ -375,7 +375,7 @@ export default function ClientRequestsPage() {
       />
 
       {requests === undefined ? (
-        <p className="text-[13px] text-[var(--text-muted)] px-1 py-8">Loading…</p>
+        <SkeletonList rows={5} what="client requests" />
       ) : requests.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-14 h-14 rounded-2xl bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-3">

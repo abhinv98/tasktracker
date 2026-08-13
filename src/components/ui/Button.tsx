@@ -81,7 +81,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           font-medium text-[13px]
           rounded-md
           transition-all duration-150
-          disabled:opacity-50 disabled:cursor-not-allowed
+          active:translate-y-[1px] active:duration-[50ms]
+          disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0
           focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-primary)]
           ${variantStyles[variant]}
           ${className}

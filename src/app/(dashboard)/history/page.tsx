@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import {
   ChevronDown,
   ChevronRight,
@@ -116,7 +116,8 @@ export default function HistoryPage() {
   if (!user) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <SkeletonPageHeader />
+        <SkeletonList rows={6} what="your history" />
       </div>
     );
   }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, ConfirmModal, PageHeader, useToast } from "@/components/ui";
+import { Button, ConfirmModal, PageHeader, useToast, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import {
   Plus,
   NotebookPen,
@@ -85,7 +85,8 @@ export default function NotebookPage() {
   if (user === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <SkeletonPageHeader />
+        <SkeletonList rows={5} what="your notes" />
       </div>
     );
   }

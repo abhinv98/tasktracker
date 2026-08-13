@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast, useCelebrate } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
 import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2 } from "lucide-react";
@@ -540,6 +540,7 @@ export default function BriefPage() {
   }, []);
 
   const { toast } = useToast();
+  const { celebrate } = useCelebrate();
   const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
   const setFlowPositions = useMutation(api.tasks.updateTaskFlowPositions);
 
@@ -745,7 +746,15 @@ export default function BriefPage() {
               />
               <select
                 value={brief.status}
-                onChange={(e) => updateBrief({ briefId, status: e.target.value })}
+                onChange={async (e) => {
+                  const status = e.target.value;
+                  await updateBrief({ briefId, status });
+                  // Closing a brief out is the second of the three earned
+                  // moments — it's the end of a whole body of work.
+                  if (status === "completed") {
+                    celebrate("Brief completed", `${brief.title} is closed out`);
+                  }
+                }}
                 className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
                 <option value="draft">Draft</option>

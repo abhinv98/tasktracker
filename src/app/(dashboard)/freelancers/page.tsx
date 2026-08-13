@@ -1,5 +1,7 @@
 "use client";
 
+import { SkeletonPageHeader, SkeletonTable } from "@/components/ui";
+
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Briefcase } from "lucide-react";
@@ -41,7 +43,8 @@ export default function FreelancersPage() {
   if (data === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <SkeletonPageHeader />
+        <SkeletonTable rows={6} cols={5} what="freelancers" />
       </div>
     );
   }

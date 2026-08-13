@@ -4,17 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import {
-  PageHeader,
-  Button,
-  ConfirmModal,
-  Input,
-  Modal,
-  Select,
-  Textarea,
-  StatusBadge,
-  useToast,
-} from "@/components/ui";
+import { PageHeader, Button, ConfirmModal, Input, Modal, Select, Textarea, StatusBadge, useToast, SkeletonCards } from "@/components/ui";
 import {
   HR_CATEGORIES,
   categoryLabel,
@@ -246,7 +236,7 @@ export default function MyRequestsPage() {
       />
 
       {requests === undefined ? (
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading…</p>
+        <SkeletonCards count={3} what="your requests" />
       ) : all.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />

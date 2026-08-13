@@ -3,10 +3,10 @@
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, PageHeader, TaskDetailModal, DatePicker } from "@/components/ui";
+import { Card, PageHeader, TaskDetailModal, DatePicker, Skeleton, useCelebrate } from "@/components/ui";
 import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
@@ -254,6 +254,21 @@ function EmployeeTaskViews({
   const activeTasks = tasks.filter(
     (t) => (t as EmployeeTask & { briefStatus?: string }).briefStatus !== "on_hold"
   );
+
+  // Queue-to-zero: the third earned moment. Fires on the TRANSITION to empty,
+  // never on arriving at an already-empty queue — otherwise it greets you every
+  // morning and stops meaning anything. The ref starts null so the first render
+  // (whatever the count) can't trigger it.
+  const { celebrate } = useCelebrate();
+  const prevOpenCount = useRef<number | null>(null);
+  const openCount = activeTasks.filter((t) => t.status !== "done").length;
+  useEffect(() => {
+    const prev = prevOpenCount.current;
+    if (prev !== null && prev > 0 && openCount === 0) {
+      celebrate("Queue clear", "Nothing left on your plate. Well done.");
+    }
+    prevOpenCount.current = openCount;
+  }, [openCount, celebrate]);
 
   // Group tasks by status
   const grouped: Record<string, EmployeeTask[]> = {
@@ -661,7 +676,7 @@ export default function DashboardPage() {
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
               {todayLine}
             </p>
-            <h1 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
+            <h1 className="font-semibold text-[24px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
               {greeting}, {firstName}
             </h1>
             <p className="mt-1.5 text-[13px] text-[var(--text-secondary)]">
@@ -696,118 +711,102 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Needs attention: consolidated overdue → action-needed → client requests */}
-        <div className="mb-6 sm:mb-8">
-          <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
+        {/* Needs attention — the page's lead. Everything below it is reference;
+            this is the only block that asks the reader to DO something, so it
+            carries the largest heading, the tinted surface and the room. */}
+        <div className="mb-8 sm:mb-10">
+          <h2 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight mb-3 flex items-center gap-2.5">
             Needs attention
             {attentionLoaded && attentionTotal > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600 tabular-nums">
+              <span className="inline-flex items-center justify-center min-w-[26px] h-[24px] px-2 rounded-full bg-[var(--danger-dim)] border border-[var(--danger)]/25 text-[13px] font-semibold text-[var(--danger)] tabular-nums">
                 {attentionTotal}
               </span>
             )}
           </h2>
           {!attentionLoaded ? (
-            <Card>
-              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
-            </Card>
+            <div className="rounded-lg border border-[var(--border)] bg-white p-5 flex flex-col gap-3">
+              <Skeleton className="h-[13px] w-[60%]" />
+              <Skeleton className="h-[13px] w-[45%]" />
+              <Skeleton className="h-[13px] w-[52%]" />
+            </div>
           ) : attentionTotal === 0 ? (
-            <Card>
-              <p className="text-[13px] text-[var(--text-secondary)] flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+            <div className="rounded-lg border border-[var(--accent-employee)]/25 bg-[var(--accent-employee-dim)] px-5 py-6">
+              <p className="text-[15px] font-medium text-[var(--text-primary)] flex items-center gap-2.5">
+                <CheckCircle2 className="h-5 w-5 text-[var(--accent-employee-text)] shrink-0" />
                 All clear. Nothing needs your attention.
               </p>
-            </Card>
+              <p className="mt-1 ml-[30px] text-[13px] text-[var(--text-secondary)]">
+                Everything overdue, waiting on review, or sitting in the client
+                queue has been dealt with.
+              </p>
+            </div>
           ) : (
-            <Card className="p-0 overflow-hidden">
+            <div className="rounded-lg border border-[var(--danger)]/25 bg-white overflow-hidden shadow-sm">
               <div className="divide-y divide-[var(--border-subtle)]">
                 {attentionVisible.map((row) => {
                   const RowIcon = row.icon;
                   return (
-                    <div
+                    <Link
                       key={row.key}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors"
+                      href={row.href}
+                      // The whole row is the target, not a 40px "View" link at
+                      // the end of it — this is the thing you're here to click.
+                      className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <RowIcon className={`h-4 w-4 shrink-0 ${row.iconClass}`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                        <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">
                           {row.title}
                         </p>
-                        <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                        <p className="text-[12px] text-[var(--text-secondary)] truncate">
                           {row.context}
                         </p>
                       </div>
-                      <Link
-                        href={row.href}
-                        className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
-                      >
-                        View <ArrowRight className="h-3 w-3" />
-                      </Link>
-                    </div>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] group-hover:translate-x-0.5 transition-all" />
+                    </Link>
                   );
                 })}
                 {attentionTotal > attentionVisible.length && (
-                  <p className="px-4 py-2 text-[11px] text-[var(--text-muted)]">
+                  <p className="px-5 py-2.5 text-[12px] text-[var(--text-muted)]">
                     +{attentionTotal - attentionVisible.length} more in the sections below
                   </p>
                 )}
               </div>
-            </Card>
+            </div>
           )}
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card accent="admin" hover onClick={() => router.push("/briefs")} className="cursor-pointer">
-            <div className="flex items-start justify-between gap-2">
+        {/* Reference counts, deliberately quiet. These are orientation, not
+            work — four 20px numbers competing with the page heading is exactly
+            why the old dashboard had no lead. One strip, small figures. */}
+        <div className="mb-8 sm:mb-10 flex flex-wrap items-stretch divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border)] bg-white">
+          {[
+            { label: "Active Briefs", value: scopedActiveBriefs, href: "/briefs", Icon: Briefcase },
+            { label: "Open Tasks", value: scopedOpenTasks, href: "/worklog", Icon: ListChecks },
+            {
+              label: isSuperAdmin ? "Teams" : "My Brands",
+              value: isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size,
+              href: isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine",
+              Icon: Layers,
+            },
+            { label: "Employees", value: employeeCount, href: "/users", Icon: Users },
+          ].map(({ label, value, href, Icon }) => (
+            <button
+              key={label}
+              onClick={() => router.push(href)}
+              className="group flex-1 min-w-[140px] flex items-center gap-2.5 px-4 py-3 text-left hover:bg-[var(--bg-hover)] transition-colors first:rounded-l-lg last:rounded-r-lg"
+            >
+              <Icon className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] transition-colors" />
               <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                  Active Briefs
+                <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums leading-none">
+                  {value}
                 </p>
-                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
-                  {scopedActiveBriefs}
+                <p className="mt-1 text-[11px] text-[var(--text-muted)] truncate">
+                  {label}
                 </p>
               </div>
-              <Briefcase className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
-            </div>
-          </Card>
-          <Card accent="manager" hover onClick={() => router.push("/worklog")} className="cursor-pointer">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                  Open Tasks
-                </p>
-                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
-                  {scopedOpenTasks}
-                </p>
-              </div>
-              <ListChecks className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
-            </div>
-          </Card>
-          <Card accent="employee" hover onClick={() => router.push(isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine")} className="cursor-pointer">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                  {isSuperAdmin ? "Teams" : "My Brands"}
-                </p>
-                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
-                  {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
-                </p>
-              </div>
-              <Layers className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
-            </div>
-          </Card>
-          <Card hover onClick={() => router.push("/users")} className="cursor-pointer">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-                  Employees
-                </p>
-                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
-                  {employeeCount}
-                </p>
-              </div>
-              <Users className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
-            </div>
-          </Card>
+            </button>
+          ))}
         </div>
 
         {/* Brand Overview & Briefs Overview Shortcuts */}

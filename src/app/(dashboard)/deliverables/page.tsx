@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button, ConfirmModal, PageHeader, useToast } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal, PageHeader, useToast, useCelebrate } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
   Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
@@ -197,11 +197,17 @@ export default function DeliverablesPage() {
   );
 
   const { toast } = useToast();
+  const { celebrate } = useCelebrate();
 
-  async function handleApprove(deliverableId: string) {
+  async function handleApprove(deliverableId: string, taskTitle?: string) {
     try {
       await approveDeliverable({ deliverableId: deliverableId as any });
-      toast("success", "Deliverable approved");
+      // Final approval closes the task out — one of the three moments in this
+      // app worth marking. A toast would say the same thing and be forgotten.
+      celebrate(
+        "Deliverable approved",
+        taskTitle ? `${taskTitle} is done` : "The task is now done"
+      );
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Approval failed");
     }
@@ -776,7 +782,7 @@ export default function DeliverablesPage() {
                 {isAdmin && status === "pending" && d.submittedBy !== user?._id && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                     <button
-                      onClick={() => handleApprove(d._id)}
+                      onClick={() => handleApprove(d._id, d.taskTitle)}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                     >
                       <Check className="h-3.5 w-3.5" />
@@ -1481,7 +1487,7 @@ export default function DeliverablesPage() {
                               {deliverables.filter((x: any) => x.status !== "approved" && !x.isHandedOff).map((del: any, idx: number) => (
                                 <button
                                   key={del._id}
-                                  onClick={() => handleApprove(del._id)}
+                                  onClick={() => handleApprove(del._id, del.taskTitle ?? d?.taskTitle)}
                                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                                 >
                                   <Check className="h-3.5 w-3.5" />

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, Button, StatusBadge, useToast } from "@/components/ui";
+import { PageHeader, Button, StatusBadge, useToast, SkeletonPageHeader, SkeletonCards } from "@/components/ui";
 import {
   HR_CATEGORIES,
   HR_STATUSES,
@@ -140,7 +140,13 @@ function RequestCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <StatusBadge color={meta.color} label={meta.label} />
+          {/* On HR's own board, "pending" literally means waiting on her — the
+              one place in this view where the halo is honest. */}
+          <StatusBadge
+            color={meta.color}
+            label={meta.label}
+            mine={req.status === "pending"}
+          />
           <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
@@ -294,7 +300,8 @@ export default function HrRequestsPage() {
   if (requests === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading…</p>
+        <SkeletonPageHeader />
+        <SkeletonCards count={6} what="requests" />
       </div>
     );
   }

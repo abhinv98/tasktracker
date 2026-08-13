@@ -6,22 +6,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import TeamsPanel from "@/components/teams/TeamsPanel";
-import {
-  Badge,
-  Button,
-  Card,
-  ConfirmModal,
-  Input,
-  PageHeader,
-  Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  useToast,
-} from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Input, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, useToast, SkeletonTable, SkeletonPageHeader } from "@/components/ui";
 import { Trash2, UserPlus, Copy, X, Check, Link2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { getDisplayRole } from "@/lib/roles";
 
@@ -560,7 +545,7 @@ function ClientsPanel() {
   const [resetting, setResetting] = useState(false);
 
   if (clients === undefined) {
-    return <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>;
+    return <SkeletonTable rows={6} cols={4} what="users" />;
   }
 
   async function handleReset() {
@@ -739,9 +724,8 @@ export default function UsersPage() {
   if (users === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">
-          Loading...
-        </p>
+        <SkeletonPageHeader />
+        <SkeletonTable rows={8} cols={6} what="users" />
       </div>
     );
   }
