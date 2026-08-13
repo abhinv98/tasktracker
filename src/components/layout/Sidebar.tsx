@@ -33,6 +33,8 @@ import {
   UserCog,
   Receipt,
   Inbox,
+  LifeBuoy,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -71,6 +73,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/freelancers": UserCog,
   "/client-requests": Inbox,
   "/invoices": Receipt,
+  "/hr-requests": LifeBuoy,
+  "/my-requests": Send,
 };
 
 interface NavCategory {
@@ -106,6 +110,51 @@ const ADMIN_NAV: NavCategory[] = [
     category: "Management",
     items: [
       { href: "/client-requests", label: "Client Requests" },
+      { href: "/deliverables", label: "Deliverables" },
+      { href: "/worklog", label: "Work Log" },
+      { href: "/users", label: "Users & Teams" },
+      { href: "/freelancers", label: "Freelancers" },
+      { href: "/archive", label: "Archive" },
+    ],
+  },
+  {
+    category: "Personal",
+    items: [
+      { href: "/notebook", label: "My Notebook" },
+      { href: "/my-requests", label: "My Requests" },
+    ],
+  },
+  {
+    category: "Account",
+    items: [{ href: "/profile", label: "Profile" }],
+  },
+];
+
+// HR (role "admin" + isHR) — the brand-manager view stripped of brand work:
+// no content calendar, no brands overview, no client requests.
+const HR_NAV: NavCategory[] = [
+  {
+    category: "Work",
+    items: [
+      { href: "/dashboard", label: "Dashboard" },
+      { href: "/my-tasks", label: "My Tasks" },
+      { href: "/briefs", label: "Briefs" },
+    ],
+  },
+  {
+    category: "People",
+    items: [{ href: "/hr-requests", label: "Requests" }],
+  },
+  {
+    category: "Communication",
+    items: [
+      { href: "/discussions", label: "Discussions" },
+      { href: "/messages", label: "Messages" },
+    ],
+  },
+  {
+    category: "Management",
+    items: [
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
       { href: "/users", label: "Users & Teams" },
@@ -151,6 +200,10 @@ const EMPLOYEE_NAV: NavCategory[] = [
     items: [{ href: "/deliverables", label: "Deliverables" }],
   },
   {
+    category: "Personal",
+    items: [{ href: "/my-requests", label: "My Requests" }],
+  },
+  {
     category: "Account",
     items: [{ href: "/profile", label: "Profile" }],
   },
@@ -167,9 +220,11 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
   const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
   const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
+  const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
   // Oversight lives as a tab inside Work Log (no standalone nav item).
-  const baseNav: NavCategory[] = role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+  const baseNav: NavCategory[] =
+    user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
   const nav: NavCategory[] = baseNav
     .map((cat) => ({
       ...cat,
@@ -301,6 +356,11 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
                             <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[9px] font-bold px-1">
                               {pendingDeliverableCount}
+                            </span>
+                          )}
+                          {item.href === "/hr-requests" && pendingHrRequestCount > 0 && (
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
+                              {pendingHrRequestCount}
                             </span>
                           )}
                           {item.href === "/client-requests" && pendingClientRequestCount > 0 && (

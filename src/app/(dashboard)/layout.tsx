@@ -15,6 +15,7 @@ import { useNavDepthTracker } from "@/lib/useSmartBack";
 const ADMIN_ONLY_ROUTES = ["/users", "/worklog", "/reports", "/notebook", "/my-tasks", "/freelancers"];
 const MANAGER_OR_ADMIN_ROUTES = ["/teams", "/archive", "/analytics", "/brands-overview"];
 const SUPERADMIN_ONLY_ROUTES = ["/invoices"];
+const HR_HIDDEN_ROUTES = ["/content-calendar", "/brands-overview", "/client-requests"];
 
 export default function DashboardLayout({
   children,
@@ -70,6 +71,16 @@ export default function DashboardLayout({
     if (
       user.isSuperAdmin !== true &&
       SUPERADMIN_ONLY_ROUTES.some((r) => pathname.startsWith(r))
+    ) {
+      router.replace("/dashboard");
+    }
+    if (user.isHR !== true && pathname.startsWith("/hr-requests")) {
+      router.replace("/dashboard");
+    }
+    // HR's view is deliberately stripped of brand work.
+    if (
+      user.isHR === true &&
+      HR_HIDDEN_ROUTES.some((r) => pathname.startsWith(r))
     ) {
       router.replace("/dashboard");
     }

@@ -33,6 +33,8 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/notebook": "My Notebook",
   "/worklog": "Work Log",
   "/client-requests": "Client Requests",
+  "/hr-requests": "HR Requests",
+  "/my-requests": "My Requests",
 };
 
 function getPageTitle(pathname: string): string {
@@ -203,7 +205,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           {user.name ?? user.email ?? "User"}
         </span>
 
-        <Badge variant={roleVariant}>{role}</Badge>
+        <Badge variant={roleVariant}>{user.isHR ? "HR" : role}</Badge>
 
         <button
           onClick={() => signOut()}

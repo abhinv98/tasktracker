@@ -28,6 +28,8 @@ export default defineSchema({
     isOversightAdmin: v.optional(v.boolean()),
     /** Freelancers keep role "employee" (same login & views) — this flag scopes them onto the admin Freelancers page */
     isFreelancer: v.optional(v.boolean()),
+    /** HR keeps role "admin" (same permissions) — this flag swaps their nav to the HR view & unlocks the HR Requests page */
+    isHR: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
     clientBrandId: v.optional(v.id("brands")),
   })
@@ -1005,4 +1007,42 @@ export default defineSchema({
     recordedBy: v.id("users"),
     createdAt: v.number(),
   }).index("by_invoice", ["invoiceId"]),
+
+  // ─── HR REQUESTS ───────────────────────────────
+  // Staff → HR asks (appraisal, reimbursement, …). HR accepts/declines, moves
+  // the status along and attaches documents the requester can then download.
+  hrRequests: defineTable({
+    userId: v.id("users"),
+    category: v.union(
+      v.literal("appointment_letter"),
+      v.literal("appraisal_letter"),
+      v.literal("reimbursement_comp_off"),
+      v.literal("attendance_regularization")
+    ),
+    subject: v.string(),
+    details: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("declined")
+    ),
+    /** HR's free-text note on the current status — what the requester sees. */
+    statusNote: v.optional(v.string()),
+    documents: v.optional(
+      v.array(
+        v.object({
+          fileId: v.id("_storage"),
+          fileName: v.string(),
+          fileType: v.optional(v.string()),
+          uploadedAt: v.number(),
+        })
+      )
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"]),
 });

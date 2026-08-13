@@ -123,8 +123,9 @@ export const updateUserRole = mutation({
       v.literal("employee")
     ),
     isFreelancer: v.optional(v.boolean()),
+    isHR: v.optional(v.boolean()),
   },
-  handler: async (ctx, { userId, newRole, isFreelancer }) => {
+  handler: async (ctx, { userId, newRole, isFreelancer, isHR }) => {
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
@@ -150,6 +151,8 @@ export const updateUserRole = mutation({
       role: newRole,
       // Admins are never freelancers — clear the flag on promotion.
       isFreelancer: newRole === "admin" ? false : isFreelancer ?? false,
+      // HR rides on the admin role; demoting out of admin clears it.
+      isHR: newRole === "admin" ? isHR ?? false : false,
     });
   },
 });

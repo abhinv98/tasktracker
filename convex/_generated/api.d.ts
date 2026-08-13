@@ -30,6 +30,7 @@ import type * as debug from "../debug.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
 import type * as freelancers from "../freelancers.js";
+import type * as hr from "../hr.js";
 import type * as http from "../http.js";
 import type * as invoices from "../invoices.js";
 import type * as jsr from "../jsr.js";
@@ -51,6 +52,7 @@ import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlin
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_checkTimeEntries from "../migrations/checkTimeEntries.js";
 import type * as migrations_clearContentCalendarDeadlines from "../migrations/clearContentCalendarDeadlines.js";
+import type * as migrations_fillCreativeSlots from "../migrations/fillCreativeSlots.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
 import type * as migrations_findFaizOrphanTasks from "../migrations/findFaizOrphanTasks.js";
 import type * as migrations_findUser from "../migrations/findUser.js";
@@ -116,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   deliverables: typeof deliverables;
   dm: typeof dm;
   freelancers: typeof freelancers;
+  hr: typeof hr;
   http: typeof http;
   invoices: typeof invoices;
   jsr: typeof jsr;
@@ -137,6 +140,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/checkTimeEntries": typeof migrations_checkTimeEntries;
   "migrations/clearContentCalendarDeadlines": typeof migrations_clearContentCalendarDeadlines;
+  "migrations/fillCreativeSlots": typeof migrations_fillCreativeSlots;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;
   "migrations/findFaizOrphanTasks": typeof migrations_findFaizOrphanTasks;
   "migrations/findUser": typeof migrations_findUser;

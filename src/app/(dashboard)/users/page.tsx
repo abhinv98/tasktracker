@@ -748,13 +748,19 @@ export default function UsersPage() {
 
   async function handleRoleChange(
     userId: Id<"users">,
-    newRole: "admin" | "employee" | "freelancer"
+    newRole: "admin" | "employee" | "freelancer" | "hr"
   ) {
     try {
       await updateRole({
         userId,
-        newRole: newRole === "freelancer" ? "employee" : newRole,
+        newRole:
+          newRole === "freelancer"
+            ? "employee"
+            : newRole === "hr"
+              ? "admin"
+              : newRole,
         isFreelancer: newRole === "freelancer",
+        isHR: newRole === "hr",
       });
       toast("success", "Role updated");
     } catch (err) {
@@ -854,19 +860,26 @@ export default function UsersPage() {
                   ) : (
                     <select
                       value={
-                        (user as any).isFreelancer
-                          ? "freelancer"
-                          : user.role ?? "employee"
+                        (user as any).isHR
+                          ? "hr"
+                          : (user as any).isFreelancer
+                            ? "freelancer"
+                            : user.role ?? "employee"
                       }
                       onChange={(e) =>
                         handleRoleChange(
                           user._id,
-                          e.target.value as "admin" | "employee" | "freelancer"
+                          e.target.value as
+                            | "admin"
+                            | "employee"
+                            | "freelancer"
+                            | "hr"
                         )
                       }
                       className="bg-transparent rounded-md border border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] px-2 py-1 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] transition-colors duration-150"
                     >
                       <option value="admin">Brand Manager</option>
+                      <option value="hr">HR</option>
                       <option value="employee">Employee</option>
                       <option value="freelancer">Freelancer</option>
                     </select>
