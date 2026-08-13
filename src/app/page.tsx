@@ -20,7 +20,7 @@ export default function HomePage() {
   if (user === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Loading...
         </p>
       </div>
@@ -33,7 +33,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-      <p className="text-[14px] text-[var(--text-secondary)]">
+      <p className="text-[15px] text-[var(--text-secondary)]">
         Redirecting...
       </p>
     </div>

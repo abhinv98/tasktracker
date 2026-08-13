@@ -88,7 +88,7 @@ function StatusRow({
           style={{ width: `${pct}%`, backgroundColor: tint.bar }}
         >
           {showInside && (
-            <span className="text-[9px] font-semibold text-white tabular-nums">
+            <span className="text-[11px] font-semibold text-white tabular-nums">
               {Math.round(pct)}%
             </span>
           )}
@@ -120,7 +120,7 @@ export default function AnalyticsTab() {
 
   if (!data) {
     return (
-      <p className="text-[14px] text-[var(--text-secondary)]">Loading analytics...</p>
+      <p className="text-[15px] text-[var(--text-secondary)]">Loading analytics...</p>
     );
   }
 
@@ -133,23 +133,23 @@ export default function AnalyticsTab() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card className="p-4" accent="admin">
           <div className="flex items-center gap-2 mb-1">
-            <Briefcase className="h-4 w-4 text-[var(--accent-admin)]" />
+            <Briefcase className="h-4 w-4 text-[var(--accent-admin-text)]" />
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
               Briefs
             </p>
           </div>
-          <p className="font-bold text-[32px] tabular-nums text-[var(--text-primary)]">
+          <p className="font-bold text-[24px] tabular-nums text-[var(--text-primary)]">
             {data.totalBriefs}
           </p>
         </Card>
         <Card className="p-4" accent="manager">
           <div className="flex items-center gap-2 mb-1">
-            <CheckSquare className="h-4 w-4 text-[var(--accent-manager)]" />
+            <CheckSquare className="h-4 w-4 text-[var(--accent-manager-text)]" />
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
               Tasks
             </p>
           </div>
-          <p className="font-bold text-[32px] tabular-nums text-[var(--text-primary)]">
+          <p className="font-bold text-[24px] tabular-nums text-[var(--text-primary)]">
             {data.totalTasks}
           </p>
         </Card>
@@ -164,7 +164,7 @@ export default function AnalyticsTab() {
             </p>
           </div>
           <p
-            className={`font-bold text-[32px] tabular-nums ${
+            className={`font-bold text-[24px] tabular-nums ${
               data.overdueTasks > 0 ? "text-red-700" : "text-[var(--text-primary)]"
             }`}
           >
@@ -177,8 +177,8 @@ export default function AnalyticsTab() {
       <div className="grid grid-cols-3 gap-3">
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Users className="h-3.5 w-3.5 text-[var(--accent-employee)]" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <Users className="h-3.5 w-3.5 text-[var(--accent-employee-text)]" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               Teams
             </p>
           </div>
@@ -188,8 +188,8 @@ export default function AnalyticsTab() {
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Tag className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <Tag className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               Brands
             </p>
           </div>
@@ -200,13 +200,13 @@ export default function AnalyticsTab() {
         <Card className="p-3">
           <div className="flex items-center gap-2 mb-1">
             <Clock className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
               Avg Completion
             </p>
           </div>
           <p className="font-bold text-[20px] tabular-nums text-[var(--text-primary)]">
             {data.avgCompletionHours}
-            <span className="text-[14px] text-[var(--text-muted)] ml-0.5">h</span>
+            <span className="text-[15px] text-[var(--text-muted)] ml-0.5">h</span>
           </p>
         </Card>
       </div>
@@ -215,7 +215,7 @@ export default function AnalyticsTab() {
         {/* Tasks by Status */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
               Tasks by Status
             </h3>
             <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
@@ -247,7 +247,7 @@ export default function AnalyticsTab() {
         {/* Briefs by Status */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
               Briefs by Status
             </h3>
             <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
@@ -281,7 +281,7 @@ export default function AnalyticsTab() {
         {/* Weekly Velocity */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
               Weekly Velocity
             </h3>
             <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
@@ -317,7 +317,7 @@ export default function AnalyticsTab() {
                         minHeight: "4px",
                       }}
                     />
-                    <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
+                    <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
                       {w.week}
                     </span>
                   </div>
@@ -330,7 +330,7 @@ export default function AnalyticsTab() {
         {/* Employee Utilization (banded) */}
         <Card className="p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
               Employee Utilization
             </h3>
             <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
@@ -372,7 +372,7 @@ export default function AnalyticsTab() {
       {/* Recent Activity */}
       <Card className="p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             Recent Activity
           </h3>
           <Activity className="h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -386,7 +386,7 @@ export default function AnalyticsTab() {
                 className="flex items-start gap-2.5 py-1.5 border-b border-[var(--border-subtle)] last:border-0"
               >
                 <span
-                  className="inline-flex items-center justify-center min-w-[68px] h-5 px-1.5 rounded-md text-[9px] font-semibold uppercase tracking-wider mt-0.5 shrink-0"
+                  className="inline-flex items-center justify-center min-w-[68px] h-5 px-1.5 rounded-md text-[11px] font-semibold uppercase tracking-wider mt-0.5 shrink-0"
                   style={{ backgroundColor: sty.bg, color: sty.dot }}
                 >
                   {sty.label}
@@ -399,7 +399,7 @@ export default function AnalyticsTab() {
                     </span>{" "}
                     on <span className="font-medium">{log.briefTitle}</span>
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)]">
+                  <p className="text-[11px] text-[var(--text-muted)]">
                     {new Date(log.timestamp).toLocaleString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -438,10 +438,10 @@ function UtilGroup({
           className="w-1.5 h-1.5 rounded-full shrink-0"
           style={{ backgroundColor: tone }}
         />
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           {title}
         </p>
-        <span className="text-[10px] tabular-nums text-[var(--text-muted)]">
+        <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
           {count}
         </span>
       </div>
@@ -452,7 +452,7 @@ function UtilGroup({
             : 0;
           return (
             <div key={emp._id} className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-[var(--accent-employee)] flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+              <div className="w-5 h-5 rounded-full bg-[var(--accent-employee)] flex items-center justify-center text-[11px] font-bold text-white shrink-0">
                 {emp.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -460,7 +460,7 @@ function UtilGroup({
                   <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                     {emp.name}
                   </span>
-                  <span className="text-[10px] tabular-nums text-[var(--text-secondary)] shrink-0">
+                  <span className="text-[11px] tabular-nums text-[var(--text-secondary)] shrink-0">
                     {emp.doneTasks}/{emp.totalTasks}
                   </span>
                 </div>
@@ -471,7 +471,7 @@ function UtilGroup({
                   />
                 </div>
               </div>
-              <span className="text-[10px] text-[var(--text-muted)] shrink-0 w-9 text-right tabular-nums">
+              <span className="text-[11px] text-[var(--text-muted)] shrink-0 w-9 text-right tabular-nums">
                 {emp.trackedHours}h
               </span>
             </div>

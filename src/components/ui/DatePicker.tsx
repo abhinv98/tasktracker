@@ -123,7 +123,7 @@ export function DatePicker({
         <div className={`absolute right-0 z-50 w-[280px] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
-            <span className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <span className="font-semibold text-[15px] text-[var(--text-primary)]">
               {viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </span>
             <div className="flex items-center gap-0.5">
@@ -174,7 +174,7 @@ export function DatePicker({
                   className={`
                     h-8 rounded-md text-[13px] font-medium transition-colors
                     ${!isCurrentMonth ? "text-[var(--text-disabled)]" : "text-[var(--text-primary)]"}
-                    ${selected ? "bg-[var(--accent-admin)] text-white hover:bg-[var(--accent-admin)]" : ""}
+                    ${selected ? "bg-[var(--accent-admin-strong)] text-white hover:bg-[var(--accent-admin-strong)]" : ""}
                     ${!selected && isCurrentMonth ? "hover:bg-[var(--bg-hover)]" : ""}
                     ${isToday && !selected ? "ring-1 ring-[var(--accent-admin)]" : ""}
                   `}
@@ -197,7 +197,7 @@ export function DatePicker({
             <button
               type="button"
               onClick={setToday}
-              className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline transition-colors"
+              className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline transition-colors"
             >
               Today
             </button>

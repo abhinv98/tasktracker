@@ -129,7 +129,7 @@ function WorkLogPageInner() {
   if (!user || (!isAdmin && !isTeamLead)) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Access denied. Admin or Team Lead only.</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Access denied. Admin or Team Lead only.</p>
       </div>
     );
   }
@@ -193,7 +193,7 @@ function WorkLogPageInner() {
               <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
             </button>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[var(--accent-admin)]" />
+              <Calendar className="h-4 w-4 text-[var(--accent-admin-text)]" />
               <input
                 type="date"
                 value={selectedDate}
@@ -213,7 +213,7 @@ function WorkLogPageInner() {
             {selectedDate !== getTodayStr() && (
               <button
                 onClick={() => setSelectedDate(getTodayStr())}
-                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
               >
                 Today
               </button>
@@ -225,25 +225,25 @@ function WorkLogPageInner() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <Card>
                 <p className="text-[12px] font-medium text-[var(--text-secondary)]">Active Employees</p>
-                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                   {worklog.summary.employeesActive}
                 </p>
               </Card>
               <Card>
                 <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Tasks</p>
-                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                   {worklog.summary.totalTasks}
                 </p>
               </Card>
               <Card>
                 <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completed</p>
-                <p className="font-bold text-[28px] mt-1 tabular-nums" style={{ color: "#10b981" }}>
+                <p className="font-bold text-[24px] mt-1 tabular-nums" style={{ color: "#10b981" }}>
                   {worklog.summary.completedTasks}
                 </p>
               </Card>
               <Card>
                 <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completion Rate</p>
-                <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                   {worklog.summary.totalTasks > 0
                     ? Math.round((worklog.summary.completedTasks / worklog.summary.totalTasks) * 100)
                     : 0}%
@@ -279,7 +279,7 @@ function WorkLogPageInner() {
               </select>
             </div>
             {(filterSearch || filterStatus) && (
-              <button onClick={() => { setFilterSearch(""); setFilterStatus(""); }} className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline">
+              <button onClick={() => { setFilterSearch(""); setFilterStatus(""); }} className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline">
                 Clear Filters
               </button>
             )}
@@ -303,7 +303,7 @@ function WorkLogPageInner() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                      <span className="text-[12px] font-bold text-[var(--accent-admin)]">
+                      <span className="text-[12px] font-bold text-[var(--accent-admin-text)]">
                         {(emp.user.name ?? emp.user.email ?? "?")[0]?.toUpperCase()}
                       </span>
                     </div>
@@ -313,7 +313,7 @@ function WorkLogPageInner() {
                           {emp.user.name ?? emp.user.email ?? "Unknown"}
                         </p>
                         {emp.user.role === "admin" && (
-                          <span className="px-1 py-0.5 rounded text-[8px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]">
+                          <span className="px-1 py-0.5 rounded text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]">
                             {emp.user.isSuperAdmin ? "SA" : "ADM"}
                           </span>
                         )}
@@ -348,29 +348,29 @@ function WorkLogPageInner() {
                           <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">
                             {task.title}
                           </span>
-                          <span className="text-[10px] text-[var(--text-muted)] shrink-0">
+                          <span className="text-[11px] text-[var(--text-muted)] shrink-0">
                             {task.briefTitle}
                           </span>
                           {deadlineDate && (
-                            <span className={`text-[10px] flex items-center gap-0.5 shrink-0 ${isTaskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
+                            <span className={`text-[11px] flex items-center gap-0.5 shrink-0 ${isTaskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
                               <Calendar className="h-2.5 w-2.5" />
                               {deadlineDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </span>
                           )}
                           <span
-                            className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                            className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
                             style={{ color: statusInfo?.color, backgroundColor: statusInfo?.bg }}
                           >
                             {statusInfo?.label}
                           </span>
                           {task.timeSpentMinutes > 0 && (
-                            <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-0.5 shrink-0">
+                            <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-0.5 shrink-0">
                               <Clock className="h-2.5 w-2.5" />
                               {Math.round(task.timeSpentMinutes)}m
                             </span>
                           )}
                           {(task as any).changesCount > 0 && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 text-amber-700 bg-amber-50">
+                            <span className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0 text-amber-700 bg-amber-50">
                               {(task as any).changesCount} {(task as any).changesCount === 1 ? "change" : "changes"}
                             </span>
                           )}
@@ -405,12 +405,12 @@ function WorkLogPageInner() {
                     className="w-3 h-3 rounded-sm"
                     style={{ backgroundColor: team.team.color }}
                   />
-                  <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                     {team.team.name}
                   </h3>
                 </div>
                 <span
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
                   style={{
                     color: LOAD_COLORS[team.loadLevel]?.color,
                     backgroundColor: LOAD_COLORS[team.loadLevel]?.color + "15",
@@ -432,7 +432,7 @@ function WorkLogPageInner() {
                     </>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-1.5 text-[10px] text-[var(--text-muted)]">
+                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
                   <span>{team.statusCounts.pending} pending</span>
                   <span>{team.statusCounts["in-progress"]} in progress</span>
                   <span>{team.statusCounts.review} review</span>
@@ -450,7 +450,7 @@ function WorkLogPageInner() {
                   >
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                        <span className="text-[9px] font-bold text-[var(--accent-admin)]">
+                        <span className="text-[11px] font-bold text-[var(--accent-admin-text)]">
                           {(member.name ?? member.email ?? "?")[0]?.toUpperCase()}
                         </span>
                       </div>
@@ -459,11 +459,11 @@ function WorkLogPageInner() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
                         {member.taskCount} tasks
                       </span>
                       {member.supervisingCount > 0 && (
-                        <span className="text-[10px] font-medium tabular-nums px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] whitespace-nowrap">
+                        <span className="text-[11px] font-medium tabular-nums px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] whitespace-nowrap">
                           {member.supervisingCount} supervising
                         </span>
                       )}
@@ -515,7 +515,7 @@ function WorkLogPageInner() {
             <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--border)] shrink-0">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div className="w-8 h-8 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center shrink-0">
-                  <span className="text-[12px] font-bold text-[var(--accent-admin)]">
+                  <span className="text-[12px] font-bold text-[var(--accent-admin-text)]">
                     {(memberTasks?.user?.name ?? memberTasks?.user?.email ?? "?")[0]?.toUpperCase()}
                   </span>
                 </div>
@@ -560,13 +560,13 @@ function WorkLogPageInner() {
                       <table className="w-full text-left min-w-[880px]">
                         <thead>
                           <tr className="bg-[var(--bg-hover)]">
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Sent for Review</th>
-                            <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Approved</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Sent for Review</th>
+                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Approved</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -609,7 +609,7 @@ function WorkLogPageInner() {
                                     <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
                                       {task.title}
                                     </span>
-                                    <span className="text-[10px] text-[var(--text-muted)] block truncate max-w-[200px]">
+                                    <span className="text-[11px] text-[var(--text-muted)] block truncate max-w-[200px]">
                                       {task.briefTitle}
                                     </span>
                                   </td>
@@ -620,7 +620,7 @@ function WorkLogPageInner() {
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap"
                                       style={{ color: config.color, backgroundColor: config.color + "18" }}
                                     >
                                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
@@ -679,11 +679,11 @@ function WorkLogPageInner() {
                         <table className="w-full text-left min-w-[640px]">
                           <thead>
                             <tr className="bg-[var(--bg-hover)]">
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned to</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
-                              <th className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
+                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
+                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned to</th>
+                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
+                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
+                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -705,13 +705,13 @@ function WorkLogPageInner() {
                                     <span className="text-[11px] text-[var(--text-secondary)]">{t.assigneeName}</span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white" style={{ background: t.brandColor }}>
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white" style={{ background: t.brandColor }}>
                                       {t.brandName}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
                                     <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold whitespace-nowrap"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap"
                                       style={{ color: config.color, backgroundColor: config.color + "18" }}
                                     >
                                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />

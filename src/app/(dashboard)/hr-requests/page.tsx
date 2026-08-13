@@ -52,7 +52,15 @@ function formatDate(ts: number): string {
   });
 }
 
-function RequestCard({ req }: { req: HrRequest }) {
+function RequestCard({
+  req,
+  selected,
+  onToggleSelect,
+}: {
+  req: HrRequest;
+  selected: boolean;
+  onToggleSelect: () => void;
+}) {
   const setStatus = useMutation(api.hr.setStatus);
   const addDocument = useMutation(api.hr.addDocument);
   const removeDocument = useMutation(api.hr.removeDocument);
@@ -103,22 +111,37 @@ function RequestCard({ req }: { req: HrRequest }) {
   }
 
   return (
-    <div className="flex flex-col rounded-xl border border-[var(--border)] bg-white shadow-sm p-4 h-full">
+    <div
+      className={`flex flex-col rounded-xl border bg-white shadow-sm p-4 h-full transition-colors ${
+        selected
+          ? "border-[var(--accent-admin)] ring-1 ring-[var(--accent-admin)]"
+          : "border-[var(--border)]"
+      }`}
+    >
       {/* Who + when */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
-            {req.requesterName}
-          </p>
-          {req.requesterDesignation && (
-            <p className="text-[11px] text-[var(--text-muted)] truncate">
-              {req.requesterDesignation}
+        <div className="flex items-start gap-2.5 min-w-0">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`Select ${req.requesterName}'s request: ${req.subject}`}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent-admin-strong)]"
+          />
+          <div className="min-w-0">
+            <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
+              {req.requesterName}
             </p>
-          )}
+            {req.requesterDesignation && (
+              <p className="text-[11px] text-[var(--text-muted)] truncate">
+                {req.requesterDesignation}
+              </p>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <StatusBadge color={meta.color} label={meta.label} />
-          <span className="text-[10px] text-[var(--text-muted)]">
+          <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
         </div>
@@ -126,10 +149,10 @@ function RequestCard({ req }: { req: HrRequest }) {
 
       {/* What */}
       <div className="mt-3">
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
+        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
           {categoryLabel(req.category)}
         </span>
-        <h3 className="mt-1.5 font-medium text-[14px] text-[var(--text-primary)] leading-snug">
+        <h3 className="mt-1.5 font-medium text-[15px] text-[var(--text-primary)] leading-snug">
           {req.subject}
         </h3>
         {req.details && (
@@ -240,13 +263,38 @@ type Tab = "all" | HrCategory;
 
 export default function HrRequestsPage() {
   const requests = useQuery(api.hr.listAll) as HrRequest[] | undefined;
+  const setStatusBulk = useMutation(api.hr.setStatusBulk);
+  const { toast } = useToast();
   const [openOnly, setOpenOnly] = useState(false);
   const [tab, setTab] = useState<Tab>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Takes ids rather than reading `selected`, so it can only ever act on the
+  // requests actually visible in the batch bar.
+  async function applyBulk(status: HrStatus, ids: Id<"hrRequests">[]) {
+    if (ids.length === 0) return;
+    try {
+      const { updated } = await setStatusBulk({ requestIds: ids, status });
+      toast("success", `${updated} request${updated === 1 ? "" : "s"} updated`);
+      setSelected(new Set());
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Bulk update failed");
+    }
+  }
 
   if (requests === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading…</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading…</p>
       </div>
     );
   }
@@ -266,6 +314,13 @@ export default function HrRequestsPage() {
       count: scoped.filter((r) => r.category === c.value).length,
     })),
   ];
+
+  // Count only what's on screen: switching tab or toggling "Open only" must
+  // never leave a hidden request in the batch about to be actioned.
+  const selectedVisible = visible.filter((r) => selected.has(r._id));
+  const batchIds = selectedVisible.map((r) => r._id);
+  const allVisibleSelected =
+    visible.length > 0 && selectedVisible.length === visible.length;
 
   return (
     <div className="p-8">
@@ -297,9 +352,9 @@ export default function HrRequestsPage() {
           >
             {label}
             <span
-              className={`px-1.5 rounded text-[10px] ${
+              className={`px-1.5 rounded text-[11px] ${
                 tab === key
-                  ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                  ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                   : "bg-white/60 text-[var(--text-muted)]"
               }`}
             >
@@ -309,10 +364,61 @@ export default function HrRequestsPage() {
         ))}
       </div>
 
+      {/* Batch bar — sticks to the top of the scroll area so it stays reachable
+          in a long list, and only exists while something is selected. */}
+      {selectedVisible.length > 0 && (
+        <div className="sticky top-2 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent-admin)] bg-white px-3 py-2 shadow-sm">
+          <span className="text-[12px] font-medium text-[var(--text-primary)]">
+            {selectedVisible.length} selected
+          </span>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline"
+          >
+            Clear
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button onClick={() => applyBulk("accepted", batchIds)}>
+              <Check size={14} />
+              Accept all
+            </Button>
+            <Button variant="secondary" onClick={() => applyBulk("completed", batchIds)}>
+              Mark completed
+            </Button>
+            <Button variant="secondary" onClick={() => applyBulk("declined", batchIds)}>
+              <Ban size={14} />
+              Decline all
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {visible.length > 0 && (
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="select-all"
+            checked={allVisibleSelected}
+            onChange={() =>
+              setSelected(
+                allVisibleSelected ? new Set() : new Set(visible.map((r) => r._id))
+              )
+            }
+            className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+          />
+          <label
+            htmlFor="select-all"
+            className="text-[12px] text-[var(--text-muted)] cursor-pointer"
+          >
+            Select all {visible.length} shown
+          </label>
+        </div>
+      )}
+
       {visible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
             No requests here
           </p>
         </div>
@@ -332,7 +438,12 @@ export default function HrRequestsPage() {
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   {group.map((r) => (
-                    <RequestCard key={r._id} req={r} />
+                    <RequestCard
+                      key={r._id}
+                      req={r}
+                      selected={selected.has(r._id)}
+                      onToggleSelect={() => toggle(r._id)}
+                    />
                   ))}
                 </div>
               </section>
@@ -342,7 +453,12 @@ export default function HrRequestsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {visible.map((r) => (
-            <RequestCard key={r._id} req={r} />
+            <RequestCard
+              key={r._id}
+              req={r}
+              selected={selected.has(r._id)}
+              onToggleSelect={() => toggle(r._id)}
+            />
           ))}
         </div>
       )}

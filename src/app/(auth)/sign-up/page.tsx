@@ -69,21 +69,21 @@ function SignUpForm() {
         <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
           <span className="text-white font-bold text-[13px]">O</span>
         </div>
-        <span className="font-semibold text-[16px] text-[var(--text-primary)]">
+        <span className="font-semibold text-[15px] text-[var(--text-primary)]">
           The Ecultify
         </span>
       </div>
 
       {invite && (
         <div className="mb-4 rounded-lg bg-[var(--accent-admin)]/8 border border-[var(--accent-admin)]/20 px-4 py-3">
-          <p className="text-[13px] font-medium text-[var(--accent-admin)]">
+          <p className="text-[13px] font-medium text-[var(--accent-admin-text)]">
             You&apos;ve been invited to join as{" "}
             <span className="capitalize">{invite.role}</span>
           </p>
         </div>
       )}
 
-      <p className="text-[14px] text-[var(--text-secondary)] mb-6">
+      <p className="text-[15px] text-[var(--text-secondary)] mb-6">
         {invite ? "Complete your account setup" : "Create your account"}
       </p>
 
@@ -125,7 +125,7 @@ function SignUpForm() {
               placeholder="Min 8 characters"
               required
               minLength={8}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-[14px] px-3 py-2 pr-10 placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 focus:ring-offset-white transition-all duration-150"
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-[15px] px-3 py-2 pr-10 placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 focus:ring-offset-white transition-all duration-150"
             />
             <button
               type="button"
@@ -180,11 +180,11 @@ export default function SignUpPage() {
           <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
             <span className="text-white font-bold text-[13px]">O</span>
           </div>
-          <span className="font-semibold text-[16px] text-[var(--text-primary)]">
+          <span className="font-semibold text-[15px] text-[var(--text-primary)]">
             The Ecultify
           </span>
         </div>
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     }>
       <SignUpForm />

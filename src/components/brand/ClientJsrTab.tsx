@@ -256,13 +256,13 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                 <div key={brief._id} className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{brief.title}</p>
-                    <p className="text-[10px] text-[var(--text-muted)] capitalize">{brief.status}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] capitalize">{brief.status}</p>
                   </div>
                   <div className="flex items-center gap-2 ml-2">
                     <div className="w-16 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
                       <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${brief.progress}%` }} />
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
                       {brief.doneCount}/{brief.taskCount}
                     </span>
                   </div>
@@ -275,19 +275,19 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         return (
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-lg bg-gray-50">
-              <p className="text-[10px] font-medium text-[var(--text-muted)]">Pending</p>
+              <p className="text-[11px] font-medium text-[var(--text-muted)]">Pending</p>
               <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.pending ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-amber-50">
-              <p className="text-[10px] font-medium text-amber-600">In Progress</p>
+              <p className="text-[11px] font-medium text-amber-600">In Progress</p>
               <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.["in-progress"] ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-purple-50">
-              <p className="text-[10px] font-medium text-purple-600">Review</p>
+              <p className="text-[11px] font-medium text-purple-600">Review</p>
               <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.review ?? 0}</p>
             </div>
             <div className="p-3 rounded-lg bg-green-50">
-              <p className="text-[10px] font-medium text-green-600">Done</p>
+              <p className="text-[11px] font-medium text-green-600">Done</p>
               <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.done ?? 0}</p>
             </div>
           </div>
@@ -304,16 +304,16 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
             </div>
             <div className="grid grid-cols-3 gap-2 pt-1">
               <div className="text-center">
-                <p className="text-[18px] font-bold text-[var(--text-primary)] tabular-nums">{brand.briefs.length}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Briefs</p>
+                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.briefs.length}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Briefs</p>
               </div>
               <div className="text-center">
-                <p className="text-[18px] font-bold text-[var(--text-primary)] tabular-nums">{totalTasks}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Tasks</p>
+                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{totalTasks}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Tasks</p>
               </div>
               <div className="text-center">
-                <p className="text-[18px] font-bold text-[var(--text-primary)] tabular-nums">{brand.managers.length}</p>
-                <p className="text-[10px] text-[var(--text-muted)]">Managers</p>
+                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.managers.length}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Managers</p>
               </div>
             </div>
           </div>
@@ -329,9 +329,9 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                 <div key={task._id} className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
-                    <p className="text-[10px] text-[var(--text-secondary)]">{task.briefTitle}</p>
+                    <p className="text-[11px] text-[var(--text-secondary)]">{task.briefTitle}</p>
                   </div>
-                  <span className="text-[10px] text-[var(--text-muted)] capitalize shrink-0 ml-2">{task.status}</span>
+                  <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0 ml-2">{task.status}</span>
                 </div>
               ))
             )}
@@ -357,11 +357,11 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
             ) : (
               recent.map((msg: any) => (
                 <div key={msg._id} className={`p-2.5 rounded-lg ${msg.senderType === "manager" ? "bg-[var(--accent-admin)]/5 ml-4" : "bg-[var(--bg-hover)] mr-4"}`}>
-                  <p className="text-[10px] font-medium text-[var(--text-muted)] mb-0.5">
+                  <p className="text-[11px] font-medium text-[var(--text-muted)] mb-0.5">
                     {msg.senderName || (msg.senderType === "client" ? "Client" : "Manager")}
                   </p>
                   <p className="text-[12px] text-[var(--text-primary)] line-clamp-2">{msg.content}</p>
-                  <p className="text-[9px] text-[var(--text-muted)] mt-1">
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
                     {new Date(msg.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                   </p>
                 </div>
@@ -370,7 +370,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
             {msgs.length > 5 && (
               <button
                 onClick={() => setChatSidebarOpen(true)}
-                className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline w-full text-center py-1"
+                className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline w-full text-center py-1"
               >
                 View all {msgs.length} messages
               </button>
@@ -392,7 +392,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
             <div className="flex items-center gap-2">
               <ExternalLink className="h-4 w-4 text-[var(--text-secondary)]" />
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">JSR Links</h3>
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">JSR Links</h3>
               <span className="text-[11px] text-[var(--text-muted)]">({activeLinks.length})</span>
             </div>
             {canManageLinks && (
@@ -415,7 +415,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
               {activeLinks.map((link) => (
                 <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee)] shrink-0" />
+                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)] shrink-0" />
                     <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
                       {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
                     </span>
@@ -423,19 +423,19 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => copyJsrLink(link.token)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <Copy className="h-3 w-3" /> Copy
                     </button>
                     <button
                       onClick={() => setChatSidebarOpen(true)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/10 transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors"
                     >
                       <MessageCircle className="h-3 w-3" /> Show Chat
                     </button>
                     <button
                       onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                     >
                       Deactivate
                     </button>
@@ -451,7 +451,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
             <div className="flex items-center gap-2">
               <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Client Intake Links</h3>
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Intake Links</h3>
               <span className="text-[11px] text-[var(--text-muted)]">({activeIntakeLinks.length})</span>
             </div>
             {canManageLinks && (
@@ -478,7 +478,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
               {activeIntakeLinks.map((link) => (
                 <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                   <div className="flex items-center gap-2 mb-2">
-                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-admin)] shrink-0" />
+                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-admin-text)] shrink-0" />
                     <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
                       {typeof window !== "undefined" ? `${window.location.origin}/intake/${link.token}` : `/intake/${link.token}`}
                     </span>
@@ -486,13 +486,13 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => copyIntakeLink(link.token)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <Copy className="h-3 w-3" /> Copy
                     </button>
                     <button
                       onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                     >
                       Deactivate
                     </button>
@@ -507,7 +507,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border)]">
             <Eye className="h-4 w-4 text-[var(--text-secondary)]" />
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">What Clients See</h3>
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">What Clients See</h3>
           </div>
           <div className="p-4 space-y-3">
             <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
@@ -579,11 +579,11 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
       {/* Right: Configurable Sidebar Blocks */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Dashboard Blocks</h3>
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Dashboard Blocks</h3>
           <div className="relative">
             <button
               onClick={() => setShowAddBlock(!showAddBlock)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/10 transition-colors border border-[var(--accent-admin)]/20"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors border border-[var(--accent-admin)]/20"
             >
               <Plus className="h-3 w-3" />
               {hiddenBlocks.length > 0 ? `Add Block (${hiddenBlocks.length})` : "All Shown"}
@@ -629,8 +629,8 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
           <div className="fixed top-0 right-0 h-full w-[500px] max-w-[90vw] bg-white border-l border-[var(--border)] shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-[var(--accent-admin)]" />
-                <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Client Chat</h3>
+                <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
               </div>
               <button onClick={() => setChatSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
                 <X className="h-4 w-4" />
@@ -642,12 +642,12 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
               )}
               {(jsrMessages ?? []).map((msg: any) => (
                 <div key={msg._id} className={`flex ${msg.senderType === "manager" ? "justify-end" : "justify-start"} mb-1.5`}>
-                  <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
-                    <p className={`text-[10px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
+                  <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin-strong)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
+                    <p className={`text-[11px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                       {msg.senderName || (msg.senderType === "client" ? "Client" : "You")}
                     </p>
                     <p className="text-[12px] leading-relaxed">{msg.content}</p>
-                    <p className={`text-[9px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
+                    <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
                       {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                     </p>
                   </div>
@@ -681,7 +681,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                     .finally(() => setSendingJsrMsg(false));
                 }}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
-                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin)] text-white disabled:opacity-50 transition-colors"
+                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white disabled:opacity-50 transition-colors"
               >
                 <Send className="h-4 w-4" />
               </button>

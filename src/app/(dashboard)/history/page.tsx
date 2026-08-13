@@ -116,7 +116,7 @@ export default function HistoryPage() {
   if (!user) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
@@ -142,7 +142,7 @@ export default function HistoryPage() {
           <div className="relative">
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-admin)] text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-opacity print:hidden"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-admin-strong)] text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-opacity print:hidden"
           >
             <Download className="w-3.5 h-3.5" />
             Export
@@ -177,14 +177,14 @@ export default function HistoryPage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <Card>
           <div className="flex items-center gap-2 mb-1">
-            <Tag className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            <Tag className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">Brands</p>
           </div>
           <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalBrands}</p>
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1">
-            <Briefcase className="h-3.5 w-3.5 text-[var(--accent-manager)]" />
+            <Briefcase className="h-3.5 w-3.5 text-[var(--accent-manager-text)]" />
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">Briefs</p>
           </div>
           <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalBriefs}</p>
@@ -195,12 +195,12 @@ export default function HistoryPage() {
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">Tasks Done</p>
           </div>
           <p className="font-bold text-[24px] tabular-nums" style={{ color: "#10b981" }}>
-            {completedTasks}<span className="text-[14px] text-[var(--text-muted)]">/{totalTasks}</span>
+            {completedTasks}<span className="text-[15px] text-[var(--text-muted)]">/{totalTasks}</span>
           </p>
         </Card>
         <Card>
           <div className="flex items-center gap-2 mb-1">
-            <FileCheck className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            <FileCheck className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
             <p className="text-[11px] font-medium text-[var(--text-secondary)]">Deliverables</p>
           </div>
           <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalDeliverables}</p>
@@ -240,7 +240,7 @@ export default function HistoryPage() {
                   className="w-3 h-3 rounded-sm shrink-0"
                   style={{ backgroundColor: brandGroup.brand.color }}
                 />
-                <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">
+                <span className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
                   {brandGroup.brand.name}
                 </span>
                 <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">
@@ -275,7 +275,7 @@ export default function HistoryPage() {
                             {brief.status}
                           </Badge>
                           {brief.briefType && (
-                            <span className="text-[10px] text-[var(--text-muted)]">
+                            <span className="text-[11px] text-[var(--text-muted)]">
                               {brief.briefType === "content_calendar" ? "Content Calendar"
                                 : brief.briefType === "video_editing" ? "Video Editing"
                                 : brief.briefType === "developmental" ? "Developmental"
@@ -322,7 +322,7 @@ export default function HistoryPage() {
                                       {task.title}
                                     </span>
                                     <span
-                                      className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                                      className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
                                       style={{
                                         color: statusInfo.color,
                                         backgroundColor: `color-mix(in srgb, ${statusInfo.color} 12%, transparent)`,
@@ -330,11 +330,11 @@ export default function HistoryPage() {
                                     >
                                       {statusInfo.label}
                                     </span>
-                                    <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">
+                                    <span className="text-[11px] text-[var(--text-muted)] shrink-0 tabular-nums">
                                       {task.duration}
                                     </span>
                                     {hasDeliverables && (
-                                      <span className="text-[10px] text-[var(--text-muted)] shrink-0">
+                                      <span className="text-[11px] text-[var(--text-muted)] shrink-0">
                                         {task.deliverables.length} deliverable{task.deliverables.length !== 1 ? "s" : ""}
                                       </span>
                                     )}
@@ -356,7 +356,7 @@ export default function HistoryPage() {
                                                 {del.message}
                                               </p>
                                               <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[10px] text-[var(--text-muted)]">
+                                                <span className="text-[11px] text-[var(--text-muted)]">
                                                   {new Date(del.submittedAt).toLocaleDateString("en-US", {
                                                     month: "short",
                                                     day: "numeric",
@@ -364,14 +364,14 @@ export default function HistoryPage() {
                                                   })}
                                                 </span>
                                                 {del.fileNames && del.fileNames.length > 0 && (
-                                                  <span className="text-[10px] text-[var(--text-muted)]">
+                                                  <span className="text-[11px] text-[var(--text-muted)]">
                                                     {del.fileNames.length} file{del.fileNames.length !== 1 ? "s" : ""}
                                                   </span>
                                                 )}
                                               </div>
                                             </div>
                                             <span
-                                              className="text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0"
+                                              className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
                                               style={{ color: ds.color, backgroundColor: ds.bg }}
                                             >
                                               {ds.label}

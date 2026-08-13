@@ -20,24 +20,40 @@
   --bg-input: #f3f1eb;
   --bg-elevated: #FFFFFF;
 
-  /* Text — Anthropic dark */
+  /* Text — Anthropic dark.
+     Four steps, each one legible: the old --text-muted sat at 2.11:1 (AA wants
+     4.5:1) and was identical to --text-disabled, so "quiet" and "inert" looked
+     the same. The ramp shifted down a notch instead of just darkening muted,
+     which keeps the three readable steps visually distinct.
+     Contrast on --bg-primary: 17.4 / 7.3 / 5.2 / 2.5. */
   --text-primary: #141413;
-  --text-secondary: #6b6963;
-  --text-disabled: #b0aea5;
-  --text-muted: #b0aea5;
+  --text-secondary: #55534d;
+  --text-muted: #6b6963;
+  /* Disabled is intentionally below AA — WCAG exempts inactive controls, and it
+     has to read as unavailable next to --text-muted. Never use it for content. */
+  --text-disabled: #a3a199;
 
   /* Borders — Anthropic warm gray */
   --border: #e8e6dc;
   --border-strong: #d5d3c9;
   --border-subtle: #f0eee6;
 
-  /* Accents — Anthropic brand */
+  /* Accents — Anthropic brand.
+     Each hue has three roles. The base is the identity colour and stays on
+     fills, dots, borders and rings. -strong carries white text (the base is
+     only 3.1:1 behind white, so every primary button label failed AA).
+     -text is for the accent AS TEXT on its own -dim tint, where the base
+     measured 2.8:1. Base values are untouched, so the palette still reads. */
   --accent-primary: #d97757;
   --accent-admin: #d97757;
+  --accent-admin-strong: #b8532f;  /* 4.9:1 behind white */
+  --accent-admin-text: #a04525;    /* 5.6:1 on --accent-admin-dim */
   --accent-admin-dim: rgba(217, 119, 87, 0.12);
   --accent-manager: #6a9bcc;
+  --accent-manager-text: #2f6394;  /* 5.7:1 on --accent-manager-dim */
   --accent-manager-dim: rgba(106, 155, 204, 0.12);
   --accent-employee: #788c5d;
+  --accent-employee-text: #4a5a35; /* 6.8:1 on --accent-employee-dim */
   --accent-employee-dim: rgba(120, 140, 93, 0.12);
 
   /* Surfaces */
@@ -47,7 +63,10 @@
   /* Semantic */
   --danger: #c0392b;
   --danger-dim: rgba(192, 57, 43, 0.12);
-  --warning: #d97757;
+  /* Was the same hex as --accent-admin, so a warning and a primary action were
+     indistinguishable by colour alone. */
+  --warning: #b45309;
+  --warning-dim: rgba(180, 83, 9, 0.12);
 
   /* Typography — Inter */
   --font-heading: var(--font-inter), system-ui, sans-serif;
@@ -75,6 +94,26 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   letter-spacing: 0.01em;
+}
+
+/* The body's positive tracking helps small dense UI text but makes headings
+   look loose — large type wants to close up, not open out. */
+h1, h2, h3 {
+  letter-spacing: -0.011em;
+  text-wrap: balance;
+}
+
+/* Nothing in this app is motion-critical: every animation is a fade, a slide
+   or a pulse, so honouring the OS preference costs no meaning. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ─── Scrollbars ─── */
@@ -130,6 +169,14 @@ body {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* Typing dots. Tailwind's animate-bounce is a hard parabola with a squash at
+   the bottom — too physical for three 4px dots. This just breathes. */
+@keyframes typingDot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+.animate-typing-dot { animation: typingDot 1.2s ease-in-out infinite; }
 
 .animate-fadeIn { animation: fadeIn 0.15s ease-out; }
 .animate-scaleIn { animation: scaleIn 0.15s ease-out; }

@@ -38,6 +38,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
+      {/* Live regions have to be in the DOM *before* the text lands, so they're
+          permanent and empty rather than mounted with each toast. They carry
+          the announcement; the visible stack below is aria-hidden so the
+          message isn't read out twice. Politeness differs by type: a success
+          can wait for a pause in speech, a failure can't. */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {toasts.filter((t) => t.type !== "error").map((t) => (
+          <p key={t.id}>{t.message}</p>
+        ))}
+      </div>
+      <div className="sr-only" role="alert" aria-live="assertive">
+        {toasts.filter((t) => t.type === "error").map((t) => (
+          <p key={t.id}>{t.message}</p>
+        ))}
+      </div>
+
+      {/* Not aria-hidden: it holds a real dismiss button, and hiding focusable
+          content from AT is its own bug. It sits outside any live region, so
+          it stays silent on insert and the regions above do the announcing. */}
       <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <ToastMessage key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
@@ -48,32 +67,46 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: () => void }) {
+  const [paused, setPaused] = useState(false);
+
+  // Errors stay until dismissed — a failed save that disappears in 3.5s while
+  // the user is looking at the form is a support message later. Hovering holds
+  // the others open so a long message can actually be read.
   useEffect(() => {
+    if (item.type === "error" || paused) return;
     const timer = setTimeout(onDismiss, 3500);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, [onDismiss, item.type, paused]);
 
   const ICONS = {
-    success: <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee)]" />,
+    success: <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee-text)]" />,
     error: <XCircle className="h-4 w-4 text-[var(--danger)]" />,
-    info: <Info className="h-4 w-4 text-[var(--accent-admin)]" />,
+    info: <Info className="h-4 w-4 text-[var(--accent-admin-text)]" />,
   };
 
-  const BG = {
-    success: "border-l-[var(--accent-employee)]",
-    error: "border-l-[var(--danger)]",
-    info: "border-l-[var(--accent-admin)]",
+  // Tinted surface instead of the old 3px left stripe — same semantics, and it
+  // reads as a designed state rather than a tacked-on accent bar.
+  const SURFACE = {
+    success: "bg-[var(--accent-employee-dim)] border-[var(--accent-employee)]/30",
+    error: "bg-[var(--danger-dim)] border-[var(--danger)]/30",
+    info: "bg-white border-[var(--border)]",
   };
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-2.5 px-4 py-3 bg-white rounded-lg shadow-lg border border-[var(--border)] border-l-[3px] ${BG[item.type]} animate-slideInRight min-w-[260px] max-w-[380px]`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      className={`pointer-events-auto flex items-start gap-2.5 px-4 py-3 rounded-lg shadow-lg border ${SURFACE[item.type]} animate-slideInRight min-w-[260px] max-w-[380px]`}
     >
       <div className="shrink-0 mt-0.5">{ICONS[item.type]}</div>
       <p className="flex-1 text-[13px] text-[var(--text-primary)] leading-snug">
         {item.message}
       </p>
-      <button onClick={onDismiss} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss notification"
+        className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+      >
         <X className="h-3.5 w-3.5" />
       </button>
     </div>

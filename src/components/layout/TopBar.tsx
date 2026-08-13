@@ -105,7 +105,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search...</span>
-            <kbd className="ml-2 px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[9px] font-mono">
+            <kbd className="ml-2 px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[11px] font-mono">
               ⌘K
             </kbd>
           </button>
@@ -119,13 +119,13 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
             onClick={() => setShowNotifs(!showNotifs)}
             className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
               showNotifs
-                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             }`}
           >
             <Bell className="h-4 w-4" />
             {(unreadCount ?? 0) > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin)] text-[10px] font-semibold text-white">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-[11px] font-semibold text-white">
                 {unreadCount}
               </span>
             )}
@@ -142,7 +142,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
                   {(unreadCount ?? 0) > 0 && (
                     <button
                       onClick={() => markAllAsRead({})}
-                      className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                      className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                     >
                       Mark all read
                     </button>

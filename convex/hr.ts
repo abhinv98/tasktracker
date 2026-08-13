@@ -144,6 +144,32 @@ export const setStatus = mutation({
   },
 });
 
+/** Triage a whole selection in one round-trip — Monday-morning batches were
+ *  one click and one toast per request. */
+export const setStatusBulk = mutation({
+  args: {
+    requestIds: v.array(v.id("hrRequests")),
+    status: statusValidator,
+    statusNote: v.optional(v.string()),
+  },
+  handler: async (ctx, { requestIds, status, statusNote }) => {
+    await requireHR(ctx);
+    const now = Date.now();
+    let updated = 0;
+    for (const requestId of requestIds) {
+      const req = await ctx.db.get(requestId);
+      if (!req) continue;
+      await ctx.db.patch(requestId, {
+        status,
+        statusNote: statusNote?.trim() || req.statusNote,
+        updatedAt: now,
+      });
+      updated++;
+    }
+    return { updated };
+  },
+});
+
 export const addDocument = mutation({
   args: { requestId: v.id("hrRequests"), document: documentValidator },
   handler: async (ctx, { requestId, document }) => {

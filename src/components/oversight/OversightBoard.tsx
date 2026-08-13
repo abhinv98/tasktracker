@@ -99,7 +99,7 @@ function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
               >
                 <ExternalLink className="h-3 w-3" />
                 Link
@@ -176,13 +176,13 @@ export default function OversightBoard() {
 
   if (board === undefined)
     return (
-      <p className="text-[14px] text-[var(--text-secondary)] py-8">
+      <p className="text-[15px] text-[var(--text-secondary)] py-8">
         Loading...
       </p>
     );
   if (board === null)
     return (
-      <p className="text-[14px] text-[var(--text-secondary)] py-8">
+      <p className="text-[15px] text-[var(--text-secondary)] py-8">
         Access denied. Oversight is open to oversight admins, brand managers,
         and team leads.
       </p>
@@ -233,7 +233,7 @@ export default function OversightBoard() {
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
               {c.label}
             </p>
-            <p className="text-[22px] font-bold text-[var(--text-primary)] mt-1">
+            <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
               {c.value}
             </p>
           </Card>
@@ -499,7 +499,7 @@ function FragmentRow({
           <span className="line-clamp-2">{r.title}</span>
           {r.creativeSlots > 1 && (
             <span
-              className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap"
+              className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap"
               title={`This task holds ${r.creativeSlots} creative deliverables — ${r.creativesSubmitted} submitted`}
             >
               {r.creativesSubmitted}/{r.creativeSlots} CREATIVES
@@ -511,7 +511,7 @@ function FragmentRow({
         </td>
         <td className="px-4 py-3">
           <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
             style={{ background: r.brandColor }}
           >
             {r.brandName}
@@ -537,7 +537,7 @@ function FragmentRow({
             <span>{fmt(r.deadline)}</span>
             {r.carryOverDays > 0 && (
               <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
                 title="Worklog task rolled forward, not completed by its original deadline"
               >
                 Carried over · {r.carryOverDays}d
@@ -570,12 +570,12 @@ function FragmentRow({
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
             {r.deadlineExtended && (
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
                 EXTENDED
               </span>
             )}
             {r.isOverdue && (
-              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
                 OVERDUE
               </span>
             )}

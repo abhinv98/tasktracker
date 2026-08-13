@@ -38,7 +38,7 @@ function StatusPill({ status }: { status: string }) {
   };
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
       style={{ background: cfg.bg, color: cfg.color }}
     >
       {cfg.label}
@@ -63,14 +63,14 @@ export default function MyTasksPage() {
   if (user === undefined || data === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
   if (!user || data === null) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Access denied. My Tasks is for brand managers &amp; super-admins.
         </p>
       </div>
@@ -144,7 +144,7 @@ export default function MyTasksPage() {
             <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
               {c.label}
             </p>
-            <p className="text-[22px] font-bold text-[var(--text-primary)] mt-1">
+            <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
               {c.value}
             </p>
           </Card>
@@ -230,7 +230,7 @@ export default function MyTasksPage() {
       {/* Assigned to me */}
       {showMine && (
       <section className="mb-8">
-        <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
+        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <ClipboardCheck className="h-4 w-4 text-[var(--text-muted)]" />
           Assigned to me ({filteredMine.length}
           {filteredMine.length !== assignedToMe.length ? ` of ${assignedToMe.length}` : ""})
@@ -266,7 +266,7 @@ export default function MyTasksPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
                         style={{ background: t.brandColor }}
                       >
                         {t.brandName}
@@ -296,7 +296,7 @@ export default function MyTasksPage() {
       {/* Supervising */}
       {showSup && (
       <section>
-        <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
+        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-[var(--text-muted)]" />
           Supervising: tasks I delegated ({filteredSup.length}
           {filteredSup.length !== supervising.length ? ` of ${supervising.length}` : ""})
@@ -341,7 +341,7 @@ export default function MyTasksPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
                         style={{ background: t.brandColor }}
                       >
                         {t.brandName}
@@ -351,7 +351,7 @@ export default function MyTasksPage() {
                       <div className="flex items-center gap-2">
                         <StatusPill status={t.status} />
                         {t.needsReview && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
                             Review now
                           </span>
                         )}
@@ -367,7 +367,7 @@ export default function MyTasksPage() {
                             e.stopPropagation();
                             router.push("/deliverables");
                           }}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin)] hover:bg-[var(--bg-hover)]"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           Review

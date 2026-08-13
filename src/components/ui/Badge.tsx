@@ -7,9 +7,9 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  admin: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]",
-  manager: "bg-[var(--accent-manager-dim)] text-[var(--accent-manager)]",
-  employee: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]",
+  admin: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]",
+  manager: "bg-[var(--accent-manager-dim)] text-[var(--accent-manager-text)]",
+  employee: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]",
   neutral: "bg-[var(--bg-hover)] text-[var(--text-secondary)]",
   status: "bg-[var(--bg-hover)] text-[var(--text-primary)]",
   success: "bg-emerald-50 text-emerald-700",

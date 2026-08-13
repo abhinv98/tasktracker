@@ -15,13 +15,13 @@ export default function WorkDataTab() {
 
   if (user === undefined || overview === undefined) {
     return (
-      <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+      <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
     );
   }
 
   if (!user || user.role !== "admin") {
     return (
-      <p className="text-[14px] text-[var(--text-secondary)]">
+      <p className="text-[15px] text-[var(--text-secondary)]">
         Access denied. Work Data is for brand managers &amp; super-admins.
       </p>
     );
@@ -40,23 +40,23 @@ export default function WorkDataTab() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Card>
           <p className="text-[12px] font-medium text-[var(--text-secondary)]">Brands</p>
-          <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBrands}</p>
+          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBrands}</p>
         </Card>
         <Card accent="admin">
           <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Briefs</p>
-          <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBriefs}</p>
+          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBriefs}</p>
         </Card>
         <Card accent="manager">
           <p className="text-[12px] font-medium text-[var(--text-secondary)]">Active Briefs</p>
-          <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">{totalActiveBriefs}</p>
+          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalActiveBriefs}</p>
         </Card>
         <Card>
           <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Tasks</p>
-          <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">{totalTasks}</p>
+          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalTasks}</p>
         </Card>
         <Card accent="employee">
           <p className="text-[12px] font-medium text-[var(--text-secondary)]">Overall Progress</p>
-          <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">{Math.round(overallProgress)}%</p>
+          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{Math.round(overallProgress)}%</p>
         </Card>
       </div>
 
@@ -80,7 +80,7 @@ export default function WorkDataTab() {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-[16px] text-[var(--text-primary)]">
+                <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
                   {brand.name}
                 </h2>
                 {brand.description && (
@@ -93,7 +93,7 @@ export default function WorkDataTab() {
                     `/brands/${brand._id}?returnTo=${encodeURIComponent(RETURN_TO)}`
                   )
                 }
-                className="text-[var(--text-muted)] hover:text-[var(--accent-admin)] transition-colors"
+                className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] transition-colors"
               >
                 <Eye className="h-5 w-5" />
               </button>
@@ -120,19 +120,19 @@ export default function WorkDataTab() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-[var(--accent-manager)]" />
+                  <AlertCircle className="h-4 w-4 text-[var(--accent-manager-text)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
                     <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.["in-progress"] ?? 0}</span> in progress
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-[var(--accent-admin)]" />
+                  <Eye className="h-4 w-4 text-[var(--accent-admin-text)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
                     <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.review ?? 0}</span> in review
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee)]" />
+                  <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee-text)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
                     <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.done ?? 0}</span> done
                   </span>

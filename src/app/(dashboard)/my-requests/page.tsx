@@ -9,6 +9,7 @@ import {
   Button,
   ConfirmModal,
   Input,
+  Modal,
   Select,
   Textarea,
   StatusBadge,
@@ -21,7 +22,7 @@ import {
   type HrCategory,
   type HrStatus,
 } from "@/lib/hrRequests";
-import { Send, X, Paperclip, Download, Trash2, Inbox } from "lucide-react";
+import { Send, Paperclip, Download, Trash2, Inbox } from "lucide-react";
 
 type MyRequest = {
   _id: Id<"hrRequests">;
@@ -70,60 +71,52 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 backdrop-blur-[2px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-xl shadow-lg">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <Send size={15} className="text-[var(--accent-admin)]" />
-            </div>
-            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] tracking-tight">
-              Send Request to HR
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+    <Modal
+      open
+      onClose={onClose}
+      title="Send Request to HR"
+      icon={Send}
+      footer={
+        <>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="hr-request-form"
+            loading={submitting}
+            disabled={!subject.trim()}
           >
-            <X size={15} className="text-[var(--text-muted)]" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="px-6 py-5 flex flex-col gap-4">
-          <Select
-            label="Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as HrCategory)}
-            options={HR_CATEGORIES}
-          />
-          <Input
-            label="Subject"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="e.g. Appraisal letter for FY 25-26"
-          />
-          <Textarea
-            label="Your query"
-            value={details}
-            onChange={(e) => setDetails(e.target.value)}
-            placeholder="Add any detail HR needs to action this…"
-          />
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting} disabled={!subject.trim()}>
-              Send Request
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+            Send Request
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="hr-request-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        <Select
+          label="Category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as HrCategory)}
+          options={HR_CATEGORIES}
+        />
+        <Input
+          label="Subject"
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder="e.g. Appraisal letter for FY 25-26"
+        />
+        <Textarea
+          label="Your query"
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          placeholder="Add any detail HR needs to action this…"
+        />
+      </form>
+    </Modal>
   );
 }
 
@@ -139,18 +132,18 @@ function RequestCard({
   return (
     <div className="flex flex-col rounded-xl border border-[var(--border)] bg-white shadow-sm p-4 h-full">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
+        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
           {categoryLabel(req.category)}
         </span>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <StatusBadge color={meta.color} label={meta.label} />
-          <span className="text-[10px] text-[var(--text-muted)]">
+          <span className="text-[11px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
         </div>
       </div>
 
-      <h3 className="mt-2 font-medium text-[14px] text-[var(--text-primary)] leading-snug">
+      <h3 className="mt-2 font-medium text-[15px] text-[var(--text-primary)] leading-snug">
         {req.subject}
       </h3>
       {req.details && (
@@ -161,7 +154,7 @@ function RequestCard({
 
       {req.statusNote && (
         <div className="mt-3 rounded-lg bg-[var(--bg-hover)] px-2.5 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Update from HR
           </p>
           <p className="mt-0.5 text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">
@@ -253,11 +246,11 @@ export default function MyRequestsPage() {
       />
 
       {requests === undefined ? (
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading…</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading…</p>
       ) : all.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
             No requests yet
           </p>
           <p className="text-[13px] text-[var(--text-muted)] mt-1">
@@ -280,9 +273,9 @@ export default function MyRequestsPage() {
               >
                 {label}
                 <span
-                  className={`px-1.5 rounded text-[10px] ${
+                  className={`px-1.5 rounded text-[11px] ${
                     tab === key
-                      ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                      ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                       : "bg-white/60 text-[var(--text-muted)]"
                   }`}
                 >
@@ -295,7 +288,7 @@ export default function MyRequestsPage() {
           {visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-              <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+              <p className="text-[15px] font-medium text-[var(--text-secondary)]">
                 No requests here
               </p>
             </div>

@@ -182,7 +182,7 @@ export default function ManagerWorklogPanel() {
                 </Card>
               </div>
 
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-2">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
                 Brand-wise worklog
               </h3>
               {day.entries.length === 0 ? (
@@ -205,13 +205,13 @@ export default function ManagerWorklogPanel() {
                             {e.brandName}
                           </span>
                           {e.done && (
-                            <span className="text-[10px] font-medium text-[var(--accent-employee)] uppercase tracking-wider">
+                            <span className="text-[11px] font-medium text-[var(--accent-employee-text)] uppercase tracking-wider">
                               Done
                             </span>
                           )}
                           {!e.done && (e.carryOverDays ?? 0) > 0 && (
                             <span
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
                               title="Not completed by its original deadline, rolled forward each day"
                             >
                               Carried over · {e.carryOverDays}d
@@ -240,7 +240,7 @@ export default function ManagerWorklogPanel() {
               )}
 
               <div className="mb-6">
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-1">
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-1">
                   Supervising: open delegated tasks
                 </h3>
                 <p className="text-[12px] text-[var(--text-muted)] mb-2">
@@ -284,7 +284,7 @@ export default function ManagerWorklogPanel() {
                               </td>
                               <td className="px-4 py-2.5">
                                 <span
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
                                   style={{ background: t.brandColor }}
                                 >
                                   {t.brandName}
@@ -292,7 +292,7 @@ export default function ManagerWorklogPanel() {
                               </td>
                               <td className="px-4 py-2.5">
                                 <span
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize"
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
                                   style={{ background: sc.b, color: sc.c }}
                                 >
                                   {t.status}
@@ -317,7 +317,7 @@ export default function ManagerWorklogPanel() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-2">
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
                     Tasks handled
                   </h3>
                   {day.tasks.length === 0 ? (
@@ -343,7 +343,7 @@ export default function ManagerWorklogPanel() {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-2">
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
                     MoMs that day
                   </h3>
                   {day.moms.length === 0 ? (
@@ -355,7 +355,7 @@ export default function ManagerWorklogPanel() {
                           key={m._id}
                           className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] flex items-center gap-2"
                         >
-                          <FileText className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+                          <FileText className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
                           <span className="font-medium text-[var(--text-primary)]">
                             {m.title}
                           </span>
@@ -472,7 +472,7 @@ export default function ManagerWorklogPanel() {
 
                       {b.entries.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
                             Worklog by day
                           </p>
                           <div className="space-y-1.5">
@@ -498,14 +498,14 @@ export default function ManagerWorklogPanel() {
 
                       {b.tasks.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
                             Tasks
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {b.tasks.map((t: any) => (
                               <span
                                 key={t._id}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[var(--bg-hover)] text-[var(--text-secondary)]"
                               >
                                 {t.title}
                                 <span className="text-[var(--text-muted)]">

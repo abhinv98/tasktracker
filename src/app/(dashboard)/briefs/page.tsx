@@ -520,7 +520,7 @@ export default function BriefsPage() {
         >
           <Briefcase className="h-3.5 w-3.5" />
           Active
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{activeBriefs.length}</span>
+          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{activeBriefs.length}</span>
         </button>
         <button
           onClick={() => setBriefsTab("review")}
@@ -532,7 +532,7 @@ export default function BriefsPage() {
         >
           <Eye className="h-3.5 w-3.5" />
           Review
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{reviewBriefs.length}</span>
+          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{reviewBriefs.length}</span>
         </button>
         <button
           onClick={() => setBriefsTab("completed")}
@@ -544,7 +544,7 @@ export default function BriefsPage() {
         >
           <CheckCircle2 className="h-3.5 w-3.5" />
           Completed
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
+          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
         </button>
       </div>
 
@@ -613,7 +613,7 @@ export default function BriefsPage() {
         {(filterManagerId || filterBriefType || filterTeamId || filterDateStart || filterDateEnd) && (
           <button
             onClick={() => { setFilterManagerId(""); setFilterBriefType(""); setFilterTeamId(""); setFilterDateStart(""); setFilterDateEnd(""); }}
-            className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+            className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
           >
             <X className="h-3 w-3" />
             Clear filters
@@ -668,7 +668,7 @@ export default function BriefsPage() {
                     className="h-4.5 w-4.5 shrink-0"
                     style={{ color: folder.brandColor }}
                   />
-                  <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">
+                  <span className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
                     {folder.brandName}
                   </span>
                   <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">
@@ -680,7 +680,7 @@ export default function BriefsPage() {
                         e.stopPropagation();
                         openCreateModalForBrand(folder.brandId === "__no_brand__" ? undefined : folder.brandId);
                       }}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin)] hover:text-white transition-all shrink-0"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all shrink-0"
                     >
                       <Plus className="h-3 w-3" />
                       New Brief
@@ -761,7 +761,7 @@ export default function BriefsPage() {
                                       {formatDate(dl)}
                                     </span>
                                     {daysLeft !== null && brief.status !== "completed" && brief.status !== "archived" && (
-                                      <span className={`text-[10px] ${overdue ? "text-[var(--danger)]" : daysLeft <= 3 ? "text-[var(--warning)]" : "text-[var(--text-muted)]"}`}>
+                                      <span className={`text-[11px] ${overdue ? "text-[var(--danger)]" : daysLeft <= 3 ? "text-[var(--warning)]" : "text-[var(--text-muted)]"}`}>
                                         {overdue ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
                                       </span>
                                     )}
@@ -855,14 +855,14 @@ export default function BriefsPage() {
                   {folder.brandId !== "__no_brand__" ? (
                     <Link
                       href={`/brands/${folder.brandId}?returnTo=${encodeURIComponent("/briefs")}`}
-                      className="group inline-flex items-center gap-1 font-semibold text-[14px] text-[var(--text-primary)] hover:text-[var(--accent-admin)] hover:underline transition-colors"
+                      className="group inline-flex items-center gap-1 font-semibold text-[15px] text-[var(--text-primary)] hover:text-[var(--accent-admin-text)] hover:underline transition-colors"
                       title={`Open ${folder.brandName}`}
                     >
                       {folder.brandName}
                       <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                   ) : (
-                    <span className="font-semibold text-[14px] text-[var(--text-primary)]">
+                    <span className="font-semibold text-[15px] text-[var(--text-primary)]">
                       {folder.brandName}
                     </span>
                   )}
@@ -957,7 +957,7 @@ export default function BriefsPage() {
                                     {formatDate(dl)}
                                   </span>
                                   {daysLeft !== null && brief.status !== "completed" && brief.status !== "archived" && (
-                                    <span className={`text-[10px] ${overdue ? "text-[var(--danger)]" : daysLeft <= 3 ? "text-[var(--warning)]" : "text-[var(--text-muted)]"}`}>
+                                    <span className={`text-[11px] ${overdue ? "text-[var(--danger)]" : daysLeft <= 3 ? "text-[var(--warning)]" : "text-[var(--text-muted)]"}`}>
                                       {overdue ? `${Math.abs(daysLeft)}d late` : `${daysLeft}d`}
                                     </span>
                                   )}
@@ -1051,7 +1051,7 @@ export default function BriefsPage() {
         >
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto relative">
             <div className="flex items-start justify-between gap-2 mb-4">
-              <h2 className="font-semibold text-[18px] text-[var(--text-primary)]">
+              <h2 className="font-semibold text-[20px] text-[var(--text-primary)]">
                 Create Brief
               </h2>
               <button
@@ -1358,10 +1358,10 @@ function BriefSubRowsPanel({
         <div key={bucket.key}>
           {bucket.label && (
             <div className="px-6 py-1.5 bg-[var(--bg-hover)] border-y border-[var(--border-subtle)]">
-              <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+              <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                 {bucket.label}
               </span>
-              <span className="text-[10px] text-[var(--text-muted)] ml-2 tabular-nums">
+              <span className="text-[11px] text-[var(--text-muted)] ml-2 tabular-nums">
                 ({bucket.tasks.length})
               </span>
             </div>
@@ -1408,7 +1408,7 @@ function BriefSubRowsPanel({
                     {assigneeName}
                   </span>
                   <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium"
                     style={{
                       color: statusColor,
                       backgroundColor: `${statusColor}15`,
@@ -1564,7 +1564,7 @@ function IndividualTaskFields({
         <button
           type="button"
           onClick={addTeamBlock}
-          className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin)] hover:text-white transition-all"
+          className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all"
         >
           <Plus className="h-3 w-3" />
           Add another team

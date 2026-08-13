@@ -279,7 +279,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
             {canManageLinks && (
               <a
                 href="/users?tab=clients"
-                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
               >
                 <UserPlus className="h-3.5 w-3.5" />
                 Manage in Users & Teams
@@ -374,7 +374,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between py-1.5">
                   <span className="text-[12px] text-[var(--text-secondary)]">JSR Track</span>
-                  <span className="text-[10px] text-[var(--text-muted)]">Always visible</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">Always visible</span>
                 </div>
                 {PORTAL_TAB_OPTIONS.map((tab) => {
                   const hidden = hiddenTabs.includes(tab.key);
@@ -383,7 +383,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                       <span className="text-[12px] text-[var(--text-secondary)]">{tab.label}</span>
                       <button
                         onClick={() => void toggleTab(tab.key)}
-                        className={`p-1.5 rounded transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--accent-admin)]"} hover:bg-[var(--bg-hover)]`}
+                        className={`p-1.5 rounded transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--accent-admin-text)]"} hover:bg-[var(--bg-hover)]`}
                         title={hidden ? "Show tab" : "Hide tab"}
                       >
                         {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -457,7 +457,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                 }
                                 className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
                                   on
-                                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                                     : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
                                 }`}
                               >
@@ -488,7 +488,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
             {canManageLinks && (
               <button
                 onClick={() => setShowAddDeck(!showAddDeck)}
-                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
               >
                 {showAddDeck ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                 {showAddDeck ? "Cancel" : "Add"}
@@ -632,18 +632,18 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                           {item.title}
                         </a>
                         {item.addedByClientName && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] shrink-0">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] shrink-0">
                             From {item.addedByClientName}
                           </span>
                         )}
                         {item.category && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
                             {item.category}
                           </span>
                         )}
                         {item.requiresApproval && (
                           <span
-                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                               item.approvalStatus === "client_approved"
                                 ? "text-emerald-600 bg-emerald-50"
                                 : item.approvalStatus === "client_changes_requested"
@@ -669,7 +669,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                             </button>
                             <button
                               onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
-                              className={`p-1.5 rounded hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)]"}`}
+                              className={`p-1.5 rounded hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--accent-admin-text)]" : "text-[var(--text-muted)]"}`}
                               title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -748,7 +748,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                       ) : (
                         <button
                           onClick={() => setDeckReplyFor(item._id)}
-                          className="mt-1.5 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                          className="mt-1.5 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                         >
                           Comment
                         </button>
@@ -784,7 +784,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                         <span className="font-semibold">{a.clientName}</span> {activityLine(a)}
                       </p>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">{timeAgo(a.createdAt)}</span>
+                    <span className="text-[11px] text-[var(--text-muted)] shrink-0">{timeAgo(a.createdAt)}</span>
                   </div>
                 ))}
               </div>

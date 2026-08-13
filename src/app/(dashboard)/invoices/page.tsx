@@ -85,7 +85,7 @@ function StatusChip({
 }) {
   return (
     <span
-      className="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      className="inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
       style={{ color: meta.color, backgroundColor: meta.bg }}
     >
       {meta.label}
@@ -121,7 +121,7 @@ function LineItemEditor({
 
   return (
     <div>
-      <div className="grid grid-cols-[1fr_64px_110px_100px_28px] gap-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+      <div className="grid grid-cols-[1fr_64px_110px_100px_28px] gap-2 mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
         <span>Description</span>
         <span>Qty</span>
         <span>Rate (₹)</span>
@@ -170,7 +170,7 @@ function LineItemEditor({
         onClick={() =>
           onChange([...items, { description: "", qty: 1, rate: 0, amount: 0 }])
         }
-        className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+        className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
       >
         <Plus className="h-3.5 w-3.5" /> Add line
       </button>
@@ -195,7 +195,7 @@ function LineItemEditor({
           </span>
           <span className="tabular-nums w-28 text-right">{fmtINR(tax)}</span>
         </div>
-        <div className="flex items-center gap-6 font-semibold text-[14px]">
+        <div className="flex items-center gap-6 font-semibold text-[15px]">
           <span>Total</span>
           <span className="tabular-nums w-28 text-right">{fmtINR(subtotal + tax)}</span>
         </div>
@@ -323,7 +323,7 @@ export default function InvoicesPage() {
           <button
             onClick={() => setQuoteModal({})}
             disabled={needsProfile}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
           >
             <Plus className="h-4 w-4" /> New Quotation
           </button>
@@ -333,7 +333,7 @@ export default function InvoicesPage() {
             <button
               onClick={() => setShowNewInvoiceMenu((v) => !v)}
               disabled={needsProfile}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
             >
               <Plus className="h-4 w-4" /> New Invoice
             </button>
@@ -348,7 +348,7 @@ export default function InvoicesPage() {
                     }}
                     className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left"
                   >
-                    <FileText className="h-4 w-4 text-[var(--accent-admin)] shrink-0 mt-0.5" />
+                    <FileText className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0 mt-0.5" />
                     <span>
                       <span className="block font-semibold text-[var(--text-primary)]">Generate invoice</span>
                       <span className="block text-[11px] text-[var(--text-muted)]">Line items + GST, printable</span>
@@ -361,7 +361,7 @@ export default function InvoicesPage() {
                     }}
                     className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left"
                   >
-                    <Upload className="h-4 w-4 text-[var(--accent-admin)] shrink-0 mt-0.5" />
+                    <Upload className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0 mt-0.5" />
                     <span>
                       <span className="block font-semibold text-[var(--text-primary)]">Track external invoice</span>
                       <span className="block text-[11px] text-[var(--text-muted)]">Made elsewhere. Attach the PDF</span>
@@ -478,7 +478,7 @@ function OverviewTab({ overview }: { overview: any }) {
               />
             </div>
             <p
-              className={`text-[22px] font-semibold tabular-nums leading-none ${
+              className={`text-[20px] font-semibold tabular-nums leading-none ${
                 t.danger ? "text-[var(--danger)]" : "text-[var(--text-primary)]"
               }`}
             >
@@ -490,7 +490,7 @@ function OverviewTab({ overview }: { overview: any }) {
       </div>
 
       <section>
-        <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3">
+        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
           Recent payments
         </h2>
         {overview.recentPayments.length === 0 ? (
@@ -562,7 +562,7 @@ function QuotationsTab({
     return (
       <div className="text-center py-16">
         <FileText className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-        <p className="text-[14px] font-medium text-[var(--text-secondary)]">No quotations yet</p>
+        <p className="text-[15px] font-medium text-[var(--text-secondary)]">No quotations yet</p>
         <p className="text-[12px] text-[var(--text-muted)] mt-1">
           Create one per project you pitch. Approve it, then convert it to an invoice.
         </p>
@@ -709,7 +709,7 @@ function QuotationsTab({
                   );
                   setConvertId(null);
                 }}
-                className="flex-1 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold"
+                className="flex-1 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold"
               >
                 Create invoice
               </button>
@@ -735,7 +735,7 @@ function RowBtn({
       onClick={onClick}
       className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
         primary
-          ? "bg-[var(--accent-admin)] text-white"
+          ? "bg-[var(--accent-admin-strong)] text-white"
           : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
       }`}
     >
@@ -759,7 +759,7 @@ function InvoicesTab({
     return (
       <div className="text-center py-16">
         <Receipt className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-        <p className="text-[14px] font-medium text-[var(--text-secondary)]">No invoices yet</p>
+        <p className="text-[15px] font-medium text-[var(--text-secondary)]">No invoices yet</p>
         <p className="text-[12px] text-[var(--text-muted)] mt-1">
           Generate one in-app, track an external one, or convert an approved quotation.
         </p>
@@ -901,7 +901,7 @@ function QuotationModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {editId ? "Edit quotation (draft)" : "New quotation"}
           </h3>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
@@ -963,7 +963,7 @@ function QuotationModal({
           <button
             onClick={handleSave}
             disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {editId ? "Save changes" : "Create draft"}
@@ -1064,7 +1064,7 @@ function NewInvoiceModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {source === "generated" ? "Generate invoice" : "Track external invoice"}
           </h3>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
@@ -1157,7 +1157,7 @@ function NewInvoiceModal({
           <button
             onClick={handleSave}
             disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {source === "generated" ? "Create draft" : "Track invoice"}
@@ -1220,7 +1220,7 @@ function InvoiceDetailModal({
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2.5 min-w-0">
-            <h3 className="font-semibold text-[16px] text-[var(--text-primary)] truncate">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
               {invoice.invoiceNumber}
             </h3>
             <StatusChip meta={meta} />
@@ -1255,8 +1255,8 @@ function InvoiceDetailModal({
             },
           ].map((t) => (
             <div key={t.label} className="rounded-lg border border-[var(--border-subtle)] px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t.label}</p>
-              <p className={`text-[16px] font-semibold tabular-nums ${t.danger ? "text-[var(--danger)]" : "text-[var(--text-primary)]"}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t.label}</p>
+              <p className={`text-[15px] font-semibold tabular-nums ${t.danger ? "text-[var(--danger)]" : "text-[var(--text-primary)]"}`}>
                 {t.value}
               </p>
             </div>
@@ -1268,7 +1268,7 @@ function InvoiceDetailModal({
           <div className="mb-4 rounded-lg border border-[var(--border-subtle)] overflow-hidden">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="bg-[var(--bg-hover)] text-left text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">
+                <tr className="bg-[var(--bg-hover)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
                   <th className="px-3 py-1.5">Item</th>
                   <th className="px-3 py-1.5 text-right">Qty</th>
                   <th className="px-3 py-1.5 text-right">Rate</th>
@@ -1299,7 +1299,7 @@ function InvoiceDetailModal({
             <button
               onClick={() => act(() => finalize({ invoiceId: invoice._id }), "Invoice finalized. Now unpaid")}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40"
             >
               Finalize invoice
             </button>
@@ -1404,7 +1404,7 @@ function InvoiceDetailModal({
                 setPayRef("");
               }}
               disabled={busy}
-              className="px-3 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-40 whitespace-nowrap"
+              className="px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40 whitespace-nowrap"
             >
               Record
             </button>
@@ -1515,7 +1515,7 @@ function AgencyProfileModal({
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Agency profile</h3>
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Agency profile</h3>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X className="h-4 w-4" />
           </button>
@@ -1642,7 +1642,7 @@ function AgencyProfileModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Save profile

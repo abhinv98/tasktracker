@@ -199,7 +199,7 @@ export default function BrandDetailPage() {
   if (brand === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
@@ -207,7 +207,7 @@ export default function BrandDetailPage() {
   if (brand === null) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Brand not found.</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Brand not found.</p>
       </div>
     );
   }
@@ -490,7 +490,7 @@ export default function BrandDetailPage() {
             </div>
           )}
           {brand.description && (
-            <p className="text-[14px] text-[var(--text-secondary)]">{brand.description}</p>
+            <p className="text-[15px] text-[var(--text-secondary)]">{brand.description}</p>
           )}
           {(brand as any).creatorName && (
             <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
@@ -520,7 +520,7 @@ export default function BrandDetailPage() {
             onClick={() => navigateToTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
-                ? "border-[var(--accent-admin)] text-[var(--accent-admin)]"
+                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
                 : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
             }`}
           >
@@ -555,25 +555,25 @@ export default function BrandDetailPage() {
           <div className="grid grid-cols-2 gap-4 mb-8">
             <Card>
               <p className="text-[12px] font-medium text-[var(--text-secondary)]">Managers</p>
-              <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                 {brand.managers.length}
               </p>
             </Card>
             <Card>
               <p className="text-[12px] font-medium text-[var(--text-secondary)]">Briefs</p>
-              <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                 {brand.briefs.length}
               </p>
             </Card>
             <Card>
               <p className="text-[12px] font-medium text-[var(--text-secondary)]">Employees</p>
-              <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                 {brand.employeeCount}
               </p>
             </Card>
             <Card>
               <p className="text-[12px] font-medium text-[var(--text-secondary)]">Tasks</p>
-              <p className="font-bold text-[28px] text-[var(--text-primary)] mt-1 tabular-nums">
+              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
                 {brand.totalTasks}
               </p>
             </Card>
@@ -581,7 +581,7 @@ export default function BrandDetailPage() {
 
           {/* Managers */}
           <div className="mb-8">
-            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] mb-4">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
               Managers
             </h2>
             <Card>
@@ -595,7 +595,7 @@ export default function BrandDetailPage() {
                     className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <div>
-                      <p className="font-medium text-[14px] text-[var(--text-primary)]">
+                      <p className="font-medium text-[15px] text-[var(--text-primary)]">
                         {manager.name ?? manager.email ?? "Unknown"}
                       </p>
                       {manager.email && manager.name && (
@@ -638,7 +638,7 @@ export default function BrandDetailPage() {
           {/* Task Status 2×2 */}
           {brand.totalTasks > 0 && (
             <div className="mb-8">
-              <h2 className="font-semibold text-[16px] text-[var(--text-primary)] mb-4">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
                 Task Status
               </h2>
               <div className="grid grid-cols-2 gap-4">
@@ -673,7 +673,7 @@ export default function BrandDetailPage() {
           {/* Employees */}
           {brand.employees.length > 0 && (
             <div className="mb-8">
-              <h2 className="font-semibold text-[16px] text-[var(--text-primary)] mb-4">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
                 Team Members Working on This Brand
               </h2>
               <div className="grid grid-cols-2 gap-3">
@@ -683,7 +683,7 @@ export default function BrandDetailPage() {
                   const isManagerHere = assignedManagerIds.includes(emp._id);
                   return (
                   <Card key={emp._id}>
-                    <p className="font-medium text-[14px] text-[var(--text-primary)]">
+                    <p className="font-medium text-[15px] text-[var(--text-primary)]">
                       {emp.name ?? emp.email ?? "Unknown"}
                     </p>
                     <p className="text-[12px] text-[var(--text-secondary)]">{emp.email}</p>
@@ -714,7 +714,7 @@ export default function BrandDetailPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Files</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Files</h3>
                 <span className="text-[11px] text-[var(--text-muted)]">({brandDocs?.length ?? 0})</span>
               </div>
               {isAdmin && (
@@ -736,8 +736,8 @@ export default function BrandDetailPage() {
             <div className="p-4">
               {dragOver && (
                 <div className="flex flex-col items-center justify-center py-10 mb-3 rounded-lg border-2 border-dashed border-[var(--accent-admin)] bg-[var(--accent-admin)]/5">
-                  <Upload className="h-8 w-8 text-[var(--accent-admin)] mb-2" />
-                  <p className="text-[13px] font-medium text-[var(--accent-admin)]">Drop files here</p>
+                  <Upload className="h-8 w-8 text-[var(--accent-admin-text)] mb-2" />
+                  <p className="text-[13px] font-medium text-[var(--accent-admin-text)]">Drop files here</p>
                 </div>
               )}
               {!dragOver && (brandDocs ?? []).length === 0 && !uploadingDoc && (
@@ -770,11 +770,11 @@ export default function BrandDetailPage() {
                         <p className="font-medium text-[11px] text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5 min-h-[30px]">
                           {doc.fileName}
                         </p>
-                        <p className="text-[9px] text-[var(--text-muted)] mb-2">
+                        <p className="text-[11px] text-[var(--text-muted)] mb-2">
                           {doc.uploaderName} · {new Date(doc.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-[var(--bg-hover)] text-[var(--text-secondary)] uppercase tracking-wider">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-[var(--bg-hover)] text-[var(--text-secondary)] uppercase tracking-wider">
                             {ext}
                           </span>
                           {doc.visibility === "admin_only" && (
@@ -802,7 +802,7 @@ export default function BrandDetailPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <Link2 className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Important Links</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Important Links</h3>
                 <span className="text-[11px] text-[var(--text-muted)]">({brandLinks?.length ?? 0})</span>
               </div>
               {canManageLinks && !showAddLink && (
@@ -828,18 +828,18 @@ export default function BrandDetailPage() {
                     className="flex items-start justify-between py-2 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] transition-colors group"
                   >
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <ExternalLink className="h-3.5 w-3.5 text-[var(--accent-admin)] mt-0.5 shrink-0" />
+                      <ExternalLink className="h-3.5 w-3.5 text-[var(--accent-admin-text)] mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <a
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-medium text-[12px] text-[var(--accent-admin)] hover:underline block"
+                          className="font-medium text-[12px] text-[var(--accent-admin-text)] hover:underline block"
                         >
                           {link.label}
                         </a>
                         {link.description && (
-                          <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">{link.description}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{link.description}</p>
                         )}
                       </div>
                     </div>
@@ -895,7 +895,7 @@ export default function BrandDetailPage() {
                 className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border)] w-full text-left"
               >
                 <KeyRound className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">Credentials</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">Credentials</h3>
                 <Badge variant="admin">Admin Only</Badge>
                 <span className="text-[11px] text-[var(--text-muted)] ml-1">({credentials?.length ?? 0})</span>
                 {credsExpanded ? <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)]" /> : <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
@@ -945,13 +945,13 @@ export default function BrandDetailPage() {
                         {cred.url && (
                           <div className="flex items-center gap-2 text-[11px] mb-1">
                             <span className="text-[var(--text-muted)] w-12">URL:</span>
-                            <a href={cred.url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-admin)] hover:underline truncate">
+                            <a href={cred.url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-admin-text)] hover:underline truncate">
                               {cred.url}
                             </a>
                           </div>
                         )}
                         {cred.notes && (
-                          <p className="text-[10px] text-[var(--text-secondary)] mt-1">{cred.notes}</p>
+                          <p className="text-[11px] text-[var(--text-secondary)] mt-1">{cred.notes}</p>
                         )}
                       </div>
                     ))}
@@ -1013,7 +1013,7 @@ export default function BrandDetailPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Briefs</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Briefs</h3>
                 <span className="text-[11px] text-[var(--text-muted)]">({brand.briefs.length})</span>
               </div>
             </div>
@@ -1049,7 +1049,7 @@ export default function BrandDetailPage() {
                         {brief.title}
                       </h4>
                       <span
-                        className="font-medium text-[10px] capitalize shrink-0"
+                        className="font-medium text-[11px] capitalize shrink-0"
                         style={{ color: STATUS_COLORS[brief.status] ?? "var(--text-secondary)" }}
                       >
                         {brief.status}
@@ -1062,7 +1062,7 @@ export default function BrandDetailPage() {
                           style={{ width: `${brief.progress}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
                         {brief.doneCount}/{brief.taskCount}
                       </span>
                     </div>
@@ -1077,7 +1077,7 @@ export default function BrandDetailPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                 <div className="flex items-center gap-2">
                   <ExternalLink className="h-4 w-4 text-[var(--text-secondary)]" />
-                  <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">JSR Links</h3>
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">JSR Links</h3>
                   <span className="text-[11px] text-[var(--text-muted)]">({(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length})</span>
                 </div>
                 <button
@@ -1098,7 +1098,7 @@ export default function BrandDetailPage() {
                   {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").map((link) => (
                     <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                       <div className="flex items-center gap-2 mb-2">
-                        <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee)] shrink-0" />
+                        <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)] shrink-0" />
                         <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
                           {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
                         </span>
@@ -1106,19 +1106,19 @@ export default function BrandDetailPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => copyJsrLink(link.token)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <Copy className="h-3 w-3" /> Copy
                         </button>
                         <button
                           onClick={() => setChatSidebarOpen(true)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/10 transition-colors"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
                         >
                           <MessageCircle className="h-3 w-3" /> Show Chat
                         </button>
                         <button
                           onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                         >
                           Deactivate
                         </button>
@@ -1136,7 +1136,7 @@ export default function BrandDetailPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-[var(--text-secondary)]" />
-                  <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Manage Client Tasks</h3>
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Manage Client Tasks</h3>
                 </div>
               </div>
               <div className="p-4 max-h-[400px] overflow-y-auto">
@@ -1148,27 +1148,27 @@ export default function BrandDetailPage() {
                     <div key={task._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-[12px] font-medium text-[var(--text-primary)] truncate flex-1 mr-2">{task.title}</p>
-                        <span className="text-[10px] text-[var(--text-muted)] shrink-0 capitalize">{task.status}</span>
+                        <span className="text-[11px] text-[var(--text-muted)] shrink-0 capitalize">{task.status}</span>
                       </div>
-                      <p className="text-[10px] text-[var(--text-secondary)] mb-2">{task.briefTitle}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)] mb-2">{task.briefTitle}</p>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {task.clientFacing && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-700">Client-facing</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700">Client-facing</span>
                         )}
                         {task.needsClientInput && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-50 text-orange-700">Needs client input</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-orange-50 text-orange-700">Needs client input</span>
                         )}
                         {task.clientStatus === "pending_client" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-50 text-purple-700">Sent to client</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700">Sent to client</span>
                         )}
                         {task.clientStatus === "client_approved" && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-700"><CheckCircle2 className="h-2.5 w-2.5" />Approved</span>
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700"><CheckCircle2 className="h-2.5 w-2.5" />Approved</span>
                         )}
                         {task.clientStatus === "client_changes_requested" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-amber-50 text-amber-700">Changes requested</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700">Changes requested</span>
                         )}
                         {task.clientStatus === "client_denied" && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-50 text-red-700"><XCircle className="h-2.5 w-2.5" />Denied</span>
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-700"><XCircle className="h-2.5 w-2.5" />Denied</span>
                         )}
                       </div>
                       {/* Actions */}
@@ -1176,7 +1176,7 @@ export default function BrandDetailPage() {
                         {!task.needsClientInput && task.clientFacing && (
                           <button
                             onClick={() => { setClientInputTaskId(task._id); setClientInputMsg(""); }}
-                            className="text-[10px] font-medium text-orange-600 hover:bg-orange-50 px-2 py-1 rounded transition-colors"
+                            className="text-[11px] font-medium text-orange-600 hover:bg-orange-50 px-2 py-1 rounded transition-colors"
                           >
                             Request Client Input
                           </button>
@@ -1189,7 +1189,7 @@ export default function BrandDetailPage() {
                                 toast("success", "Client input flag cleared");
                               } catch { toast("error", "Failed to clear flag"); }
                             }}
-                            className="text-[10px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] px-2 py-1 rounded transition-colors"
+                            className="text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] px-2 py-1 rounded transition-colors"
                           >
                             Clear Input Request
                           </button>
@@ -1202,7 +1202,7 @@ export default function BrandDetailPage() {
                                 toast("success", "Sent to client for review");
                               } catch (err) { toast("error", err instanceof Error ? err.message : "Failed"); }
                             }}
-                            className="text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/10 px-2 py-1 rounded transition-colors"
+                            className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 px-2 py-1 rounded transition-colors"
                           >
                             Send to Client
                           </button>
@@ -1227,13 +1227,13 @@ export default function BrandDetailPage() {
                                 setClientInputMsg("");
                               } catch { toast("error", "Failed"); }
                             }}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-orange-500 text-white text-[10px] font-medium"
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-orange-500 text-white text-[11px] font-medium"
                           >
                             Send
                           </button>
                           <button
                             onClick={() => { setClientInputTaskId(null); setClientInputMsg(""); }}
-                            className="shrink-0 px-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] text-[10px]"
+                            className="shrink-0 px-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] text-[11px]"
                           >
                             Cancel
                           </button>
@@ -1256,8 +1256,8 @@ export default function BrandDetailPage() {
           <div className="fixed top-0 right-0 h-full w-[500px] max-w-[90vw] bg-white border-l border-[var(--border)] shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-[var(--accent-admin)]" />
-                <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Client Chat</h3>
+                <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
               </div>
               <button onClick={() => setChatSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
                 <X className="h-4 w-4" />
@@ -1293,7 +1293,7 @@ export default function BrandDetailPage() {
                       className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/5 transition-colors"
                     >
                       <span className="text-[11px] font-semibold text-[var(--text-primary)]">{dateLabel(d)}</span>
-                      <span className="text-[9px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded-full">{dateCounts[d]}</span>
+                      <span className="text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded-full">{dateCounts[d]}</span>
                     </button>
                   ))}
                 </div>
@@ -1322,17 +1322,17 @@ export default function BrandDetailPage() {
                       {showDateHeader && (
                         <div id={`chat-date-${dateKey}`} className="sticky top-0 z-10 flex items-center gap-3 my-3 py-1 bg-white/95 backdrop-blur-sm">
                           <div className="flex-1 h-px bg-[var(--border)]" />
-                          <span className="text-[10px] font-bold text-[var(--accent-admin)] bg-[var(--accent-admin)]/8 px-3 py-1 rounded-full shrink-0">{dateLabel}</span>
+                          <span className="text-[11px] font-bold text-[var(--accent-admin-text)] bg-[var(--accent-admin)]/8 px-3 py-1 rounded-full shrink-0">{dateLabel}</span>
                           <div className="flex-1 h-px bg-[var(--border)]" />
                         </div>
                       )}
                       <div className={`flex ${msg.senderType === "manager" ? "justify-end" : "justify-start"} mb-1.5`}>
-                        <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
-                          <p className={`text-[10px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
+                        <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin-strong)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
+                          <p className={`text-[11px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                             {msg.senderName || (msg.senderType === "client" ? "Client" : "You")}
                           </p>
                           <p className="text-[12px] leading-relaxed">{msg.content}</p>
-                          <p className={`text-[9px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
+                          <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
                             {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </p>
                         </div>
@@ -1371,7 +1371,7 @@ export default function BrandDetailPage() {
                     .finally(() => setSendingJsrMsg(false));
                 }}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
-                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin)] text-white disabled:opacity-50 transition-colors"
+                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white disabled:opacity-50 transition-colors"
               >
                 <Send className="h-4 w-4" />
               </button>

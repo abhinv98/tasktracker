@@ -578,8 +578,8 @@ export default function ContentCalendarPage() {
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-white shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <Calendar className="h-5 w-5 text-[var(--accent-admin)]" />
-            <h1 className="font-semibold text-[18px] text-[var(--text-primary)]">
+            <Calendar className="h-5 w-5 text-[var(--accent-admin-text)]" />
+            <h1 className="font-semibold text-[20px] text-[var(--text-primary)]">
               Content Calendar
             </h1>
           </div>
@@ -594,7 +594,7 @@ export default function ContentCalendarPage() {
                 {selectedBrand.logoUrl ? (
                   <img src={selectedBrand.logoUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-white text-[10px] font-bold">
+                  <span className="text-white text-[11px] font-bold">
                     {selectedBrand.name?.charAt(0)?.toUpperCase()}
                   </span>
                 )}
@@ -642,7 +642,7 @@ export default function ContentCalendarPage() {
               }}
               className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
                 selectMode
-                  ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin)]"
+                  ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                   : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               }`}
             >
@@ -670,7 +670,7 @@ export default function ContentCalendarPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="font-semibold text-[14px] text-[var(--text-primary)] min-w-[140px] text-center">
+          <span className="font-semibold text-[15px] text-[var(--text-primary)] min-w-[140px] text-center">
             {MONTHS[month]} {year}
           </span>
           <button
@@ -683,7 +683,7 @@ export default function ContentCalendarPage() {
           {/* Status legend */}
           <div className="hidden lg:flex items-center gap-3 pl-3 border-l border-[var(--border)]">
             {Object.entries(STATUS_COLORS).map(([key, sc]) => (
-              <span key={key} className="inline-flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+              <span key={key} className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }} />
                 {sc.label}
               </span>
@@ -739,7 +739,7 @@ export default function ContentCalendarPage() {
                     {noAssignee > 0 && noDeadline > 0 && " · "}
                     {noDeadline > 0 && `${noDeadline} no deadline`}
                   </span>
-                  <span className="text-[10px] text-amber-600 ml-auto">Click a task to assign</span>
+                  <span className="text-[11px] text-amber-600 ml-auto">Click a task to assign</span>
                 </div>
               );
             })()}
@@ -770,7 +770,7 @@ export default function ContentCalendarPage() {
                   return (
                     <div className="grid grid-cols-7 gap-1 max-w-[420px]">
                       {weekdays.map((wd) => (
-                        <div key={wd} className="text-center text-[10px] font-semibold text-amber-900/70 py-0.5">
+                        <div key={wd} className="text-center text-[11px] font-semibold text-amber-900/70 py-0.5">
                           {wd}
                         </div>
                       ))}
@@ -898,7 +898,7 @@ export default function ContentCalendarPage() {
                             e.stopPropagation();
                             setPopoverDate(popoverDate === dateStr ? null : dateStr);
                           }}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <div className="flex items-center gap-0.5">
                             {dayTasks.slice(2).map((t: any) => {
@@ -1049,7 +1049,7 @@ export default function ContentCalendarPage() {
               <button
                 type="button"
                 onClick={handleBulkShift}
-                className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold"
+                className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold"
               >
                 Apply
               </button>
@@ -1082,7 +1082,7 @@ export default function ContentCalendarPage() {
                 type="button"
                 onClick={handleBulkMonth}
                 disabled={!targetMonth}
-                className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-50"
+                className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-50"
               >
                 Move
               </button>
@@ -1119,7 +1119,7 @@ export default function ContentCalendarPage() {
               type="button"
               onClick={handleDuplicate}
               disabled={!duplicateDate}
-              className="w-full py-2 rounded-md bg-[var(--accent-admin)] text-white text-[13px] font-semibold disabled:opacity-50"
+              className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-50"
             >
               Duplicate
             </button>
@@ -1142,7 +1142,7 @@ export default function ContentCalendarPage() {
             onClick={() => handleAddToShelf(trayContextMenu.taskId)}
             className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
           >
-            <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
             Move to staging shelf
           </button>
           <button
@@ -1154,7 +1154,7 @@ export default function ContentCalendarPage() {
             }}
             className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
           >
-            <Copy className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            <Copy className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
             Duplicate to date…
           </button>
         </div>
@@ -1165,7 +1165,7 @@ export default function ContentCalendarPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                 Add Entry - Go Live: {new Date(addingDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </h3>
               <button
@@ -1271,7 +1271,7 @@ export default function ContentCalendarPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Create Brand</h3>
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Create Brand</h3>
               <button onClick={() => setShowCreateBrand(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                 <X className="h-4 w-4" />
               </button>
@@ -1359,7 +1359,7 @@ function DroppableDayCell({
             isBreakDay
               ? "bg-white/20 text-white w-6 h-6 rounded-full flex items-center justify-center"
               : isToday
-                ? "bg-[var(--accent-admin)] text-white w-6 h-6 rounded-full flex items-center justify-center"
+                ? "bg-[var(--accent-admin-strong)] text-white w-6 h-6 rounded-full flex items-center justify-center"
                 : "text-[var(--text-secondary)]"
           }`}
         >
@@ -1371,7 +1371,7 @@ function DroppableDayCell({
             className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all ${
               isBreakDay
                 ? "text-white/70 hover:text-white hover:bg-white/15"
-                : "text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)]"
+                : "text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
             }`}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -1425,7 +1425,7 @@ function DraggableTaskCard({
             }
           : undefined
       }
-      className={`w-full text-left px-1.5 py-1 rounded-md text-[10px] leading-tight transition-all hover:shadow-sm ${
+      className={`w-full text-left px-1.5 py-1 rounded-md text-[11px] leading-tight transition-all hover:shadow-sm ${
         isSelected && !selectMode ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
       } ${selectMode && isChecked ? "outline outline-2 outline-[var(--accent-admin)]" : ""} ${
         isDragging ? "opacity-30" : ""
@@ -1470,7 +1470,7 @@ function TaskCardOverlay({ task }: { task: any }) {
 
   return (
     <div
-      className="px-1.5 py-1 rounded-md text-[10px] leading-tight shadow-lg ring-2 ring-[var(--accent-admin)] cursor-grabbing w-[140px]"
+      className="px-1.5 py-1 rounded-md text-[11px] leading-tight shadow-lg ring-2 ring-[var(--accent-admin)] cursor-grabbing w-[140px]"
       style={{ backgroundColor: sc.bg }}
     >
       <div className="flex items-center gap-1">
@@ -1532,7 +1532,7 @@ function DayPopover({
             {isEditable && (
               <button
                 onClick={onAddEntry}
-                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
               </button>
@@ -1570,7 +1570,7 @@ function DayPopover({
             );
           })}
         </div>
-        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] text-center">
+        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] text-center">
           {tasks.length} {tasks.length === 1 ? "entry" : "entries"}
         </div>
       </div>
@@ -1607,11 +1607,11 @@ function StagingShelf({
       }`}
     >
       <div className="flex items-center gap-2 px-3 py-2">
-        <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+        <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">
           Staging shelf
         </span>
-        <span className="text-[10px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
+        <span className="text-[11px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
           {tasks.length}
         </span>
         <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
@@ -1702,7 +1702,7 @@ function ShelfChip({
         {task.title}
       </button>
       {origDate && (
-        <span className="text-[9px] font-medium text-[var(--text-muted)] bg-white/70 rounded px-1 py-px shrink-0">
+        <span className="text-[11px] font-medium text-[var(--text-muted)] bg-white/70 rounded px-1 py-px shrink-0">
           was {origDate}
         </span>
       )}

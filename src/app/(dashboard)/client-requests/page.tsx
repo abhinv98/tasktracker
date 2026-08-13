@@ -401,7 +401,7 @@ export default function ClientRequestsPage() {
               >
                 Awaiting Review
                 <span
-                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
                     tab === "pending" ? "bg-white/25 text-white" : "bg-amber-500 text-white"
                   }`}
                 >
@@ -418,7 +418,7 @@ export default function ClientRequestsPage() {
               >
                 On Hold
                 <span
-                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold px-1 ${
+                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
                     tab === "held"
                       ? "bg-white/25 text-white"
                       : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
@@ -459,7 +459,7 @@ export default function ClientRequestsPage() {
           {/* ACCEPTED / IN PROGRESS */}
           {accepted.length > 0 && (
             <section>
-              <h2 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3">Accepted &amp; In Progress</h2>
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Accepted &amp; In Progress</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {accepted.map((r) => (
                   <RequestCard key={r._id} r={r} onClick={() => setSelectedId(r._id)} />
@@ -482,7 +482,7 @@ export default function ClientRequestsPage() {
                   {selected.brandName}
                 </span>
                 <span
-                  className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full"
                   style={{
                     color: (STATUS_META[selected.status] ?? STATUS_META.pending_review).color,
                     backgroundColor: (STATUS_META[selected.status] ?? STATUS_META.pending_review).bg,
@@ -502,12 +502,12 @@ export default function ClientRequestsPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6" style={{ overscrollBehavior: "contain" }}>
               {/* Submitted details */}
               <div>
-                <h3 className="font-semibold text-[17px] text-[var(--text-primary)] leading-snug">{selected.title}</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)] leading-snug">{selected.title}</h3>
                 <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
                   {selected.clientName && (
                     <span>
                       From {selected.clientName}
-                      {selected.viaPortal && <span className="text-[var(--accent-admin)] font-medium"> · via Portal</span>}
+                      {selected.viaPortal && <span className="text-[var(--accent-admin-text)] font-medium"> · via Portal</span>}
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1">
@@ -563,7 +563,7 @@ export default function ClientRequestsPage() {
                             );
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                       >
                         Reflect to portal
                       </button>
@@ -730,7 +730,7 @@ export default function ClientRequestsPage() {
                             onClick={() => setCampaignChoice("new")}
                             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                               campaignChoice === "new"
-                                ? "border-[var(--accent-admin)] text-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
                                 : "border-[var(--border)] text-[var(--text-secondary)]"
                             }`}
                           >
@@ -740,7 +740,7 @@ export default function ClientRequestsPage() {
                             onClick={() => setCampaignChoice("existing")}
                             className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                               campaignChoice === "existing"
-                                ? "border-[var(--accent-admin)] text-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
+                                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
                                 : "border-[var(--border)] text-[var(--text-secondary)]"
                             }`}
                           >
@@ -874,7 +874,7 @@ export default function ClientRequestsPage() {
                     <button
                       onClick={handleAssign}
                       disabled={busy || !assigneeId}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-semibold disabled:opacity-40 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40 transition-colors"
                     >
                       {busyAction === "assign" ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1006,18 +1006,18 @@ function RequestCard({ r, onClick }: { r: ClientRequest; onClick: () => void }) 
       <div className="flex items-start justify-between gap-2 mb-1">
         <p className="font-medium text-[13px] text-[var(--text-primary)] line-clamp-2 flex-1">{r.title}</p>
         <span
-          className="shrink-0 text-[9px] font-semibold px-2 py-0.5 rounded-full"
+          className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full"
           style={{ color: meta.color, backgroundColor: meta.bg }}
         >
           {meta.label}
         </span>
       </div>
       {r.description && <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mb-2">{r.description}</p>}
-      <div className="flex flex-wrap items-center gap-3 text-[10px] text-[var(--text-muted)]">
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-muted)]">
         {r.clientName && (
           <span>
             {r.clientName}
-            {r.viaPortal && <span className="text-[var(--accent-admin)] font-medium"> · via Portal</span>}
+            {r.viaPortal && <span className="text-[var(--accent-admin-text)] font-medium"> · via Portal</span>}
           </span>
         )}
         {r.proposedDeadline && (

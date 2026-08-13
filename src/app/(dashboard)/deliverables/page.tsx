@@ -419,7 +419,7 @@ export default function DeliverablesPage() {
               key={idx}
               type="button"
               onClick={() => setPreviewFile(file)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin)] transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
             >
               {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
               <span className="max-w-[150px] truncate">{file.name}</span>
@@ -496,7 +496,7 @@ export default function DeliverablesPage() {
             >
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--accent-admin)] text-white text-[10px] font-bold">
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold">
                   {tab.count}
                 </span>
               )}
@@ -594,7 +594,7 @@ export default function DeliverablesPage() {
               const showAssignorBtn = !!selected?.assignedBy && selected.assignedBy !== user?._id;
               return (
                 <div className="flex flex-col gap-2">
-                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Submit to</p>
+                  <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Submit to</p>
                   <div className="flex flex-wrap gap-2">
                     <Button type="submit" variant="primary">Team Lead</Button>
                     <button
@@ -642,7 +642,7 @@ export default function DeliverablesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {isSubTask && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                           HELPER
                         </span>
                       )}
@@ -661,7 +661,7 @@ export default function DeliverablesPage() {
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                     {maStyle && (
                       <span
-                        className="px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        className="px-2 py-0.5 rounded-md text-[11px] font-medium"
                         style={{ backgroundColor: maStyle.bg, color: maStyle.text }}
                       >
                         {maStyle.label}
@@ -669,14 +669,14 @@ export default function DeliverablesPage() {
                     )}
                     {tlStyle && (
                       <span
-                        className="px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        className="px-2 py-0.5 rounded-md text-[11px] font-medium"
                         style={{ backgroundColor: tlStyle.bg, color: tlStyle.text }}
                       >
                         {tlStyle.label}
                       </span>
                     )}
                     <span
-                      className="px-2 py-0.5 rounded-md text-[10px] font-medium"
+                      className="px-2 py-0.5 rounded-md text-[11px] font-medium"
                       style={{ backgroundColor: style.bg, color: style.text }}
                     >
                       {style.label}
@@ -696,7 +696,7 @@ export default function DeliverablesPage() {
                 <p className="text-[12px] text-[var(--text-secondary)] mb-2">{d.message}</p>
 
                 {d.link && (
-                  <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin)] hover:underline mb-2">
+                  <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-2">
                     <ExternalLink className="h-3 w-3" />
                     {d.link}
                   </a>
@@ -761,7 +761,7 @@ export default function DeliverablesPage() {
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                       <button
                         onClick={() => openEdit(d)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--accent-admin)] text-[var(--accent-admin)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] transition-colors"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--accent-admin)] text-[var(--accent-admin-text)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] transition-colors"
                       >
                         Edit
                       </button>
@@ -879,7 +879,7 @@ export default function DeliverablesPage() {
                             <>
                               {needPick && (
                                 <div>
-                                  <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Attach deliverable to</label>
+                                  <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Attach deliverable to</label>
                                   <select
                                     value={choice}
                                     onChange={(e) =>
@@ -898,7 +898,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
+                                <p className="text-[11px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -920,7 +920,7 @@ export default function DeliverablesPage() {
                                     className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <div>
-                                    <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
                                     <input
                                       type="date"
                                       value={handoffDeadline[d._id] ?? ""}
@@ -1054,7 +1054,7 @@ export default function DeliverablesPage() {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
+                    <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                       HELPER
                     </span>
                     <p className="font-medium text-[13px] text-[var(--text-primary)]">
@@ -1067,7 +1067,7 @@ export default function DeliverablesPage() {
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 shrink-0">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 shrink-0">
                   Awaiting Your Review
                 </span>
               </div>
@@ -1083,7 +1083,7 @@ export default function DeliverablesPage() {
               <p className="text-[12px] text-[var(--text-secondary)] mb-2">{d.message}</p>
 
               {d.link && (
-                <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin)] hover:underline mb-2">
+                <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-2">
                   <ExternalLink className="h-3 w-3" />
                   {d.link}
                 </a>
@@ -1117,13 +1117,13 @@ export default function DeliverablesPage() {
 
                 {d.mainAssigneeStatus === "approved" && !d.teamLeadStatus && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--accent-employee)] font-medium flex items-center gap-1">
+                    <span className="text-[11px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
                       <UserCheck className="h-3 w-3" />
                       Approved by you
                     </span>
                     <button
                       onClick={() => handlePassSubTaskToTeamLead(d._id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                     >
                       <ArrowRight className="h-3.5 w-3.5" />
                       Pass to Team Lead
@@ -1160,7 +1160,7 @@ export default function DeliverablesPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     {d.isSubTask && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                         HELPER
                       </span>
                     )}
@@ -1168,7 +1168,7 @@ export default function DeliverablesPage() {
                       {d.taskTitle}
                     </p>
                     {isMultiCreative && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-600 shrink-0">
+                      <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-600 shrink-0">
                         {deliverables.length} CREATIVES
                       </span>
                     )}
@@ -1182,7 +1182,7 @@ export default function DeliverablesPage() {
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 shrink-0">
+                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 shrink-0">
                   {isMultiCreative
                     ? `${d.taskApprovedByTLCount ?? 0}/${deliverables.length} Approved`
                     : "Awaiting Review"}
@@ -1205,11 +1205,11 @@ export default function DeliverablesPage() {
               {deliverables.map((del: any, idx: number) => (
                 <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-purple-200 mb-2" : "mb-2"}`}>
                   {isMultiCreative && (
-                    <p className="text-[10px] font-semibold text-purple-600 mb-1">Creative {idx + 1}</p>
+                    <p className="text-[11px] font-semibold text-purple-600 mb-1">Creative {idx + 1}</p>
                   )}
                   <p className="text-[12px] text-[var(--text-secondary)] mb-1">{del.message}</p>
                   {del.link && (
-                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin)] hover:underline mb-1">
+                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-1">
                       <ExternalLink className="h-3 w-3" />
                       {del.link}
                     </a>
@@ -1229,7 +1229,7 @@ export default function DeliverablesPage() {
                         {del.isAlsoBrandManager && (
                           <button
                             onClick={() => handleTeamLeadAndManagerApprove(del._id)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Approve as TL & Manager
@@ -1251,11 +1251,11 @@ export default function DeliverablesPage() {
 
                     {del.teamLeadStatus === "approved" && !del.passedToManagerAt && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[var(--accent-employee)] font-medium">TL Approved</span>
+                        <span className="text-[11px] text-[var(--accent-employee-text)] font-medium">TL Approved</span>
                         {del.isAlsoBrandManager ? (
                           <button
                             onClick={() => handleManagerApproveFromTeamLead(del._id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Final Approve (Brand Manager)
@@ -1267,7 +1267,7 @@ export default function DeliverablesPage() {
                               onClick={async () => {
                                 try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                               }}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                             >
                               <ArrowRight className="h-3.5 w-3.5" />
                               Pass to {mgr.name}
@@ -1318,7 +1318,7 @@ export default function DeliverablesPage() {
                       {d.taskTitle}
                     </p>
                     {d.taskClientFacing && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-50 text-blue-600">Client-facing</span>
+                      <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-600">Client-facing</span>
                     )}
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
@@ -1328,29 +1328,29 @@ export default function DeliverablesPage() {
                   </p>
                 </div>
                 {isMultiCreative && (
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-600 shrink-0">
+                  <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-600 shrink-0">
                     {deliverables.length} CREATIVES
                   </span>
                 )}
                 {allHandedOff ? (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
                     Handed Off{d.handoffTargetTeamName ? ` → ${d.handoffTargetTeamName}` : ""}
                     {d.hasIncompleteChainTasks ? " (in progress)" : " ✓"}
                   </span>
                 ) : hasSendToClient ? (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 text-purple-700 shrink-0">
                     Ready to Send to Client
                   </span>
                 ) : allApproved ? (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-green-50 text-green-700 shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-green-50 text-green-700 shrink-0">
                     All Approved{d.taskHasHandoffTarget ? ", awaiting handoff" : ""}
                   </span>
                 ) : d.awaitingHandoff ? (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-800 shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-800 shrink-0">
                     TL approved, handoff pending
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 shrink-0">
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 shrink-0">
                     {isMultiCreative
                       ? `${deliverables.filter((x: any) => x.status === "approved").length}/${deliverables.length} Approved`
                       : "Awaiting Your Approval"}
@@ -1372,12 +1372,12 @@ export default function DeliverablesPage() {
                 <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-purple-200 mb-3" : "mb-2"}`}>
                   {isMultiCreative && (
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-[10px] font-semibold text-purple-600">Creative {idx + 1}</p>
+                      <p className="text-[11px] font-semibold text-purple-600">Creative {idx + 1}</p>
                       {del.isHandedOff && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-50 text-indigo-600">Handed Off</span>
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-600">Handed Off</span>
                       )}
                       {del.status === "approved" && !del.isHandedOff && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-600">Approved</span>
+                        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-600">Approved</span>
                       )}
                     </div>
                   )}
@@ -1390,7 +1390,7 @@ export default function DeliverablesPage() {
                   )}
 
                   {del.link && (
-                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin)] hover:underline mb-1">
+                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-1">
                       <ExternalLink className="h-3 w-3" />
                       {del.link}
                     </a>
@@ -1428,7 +1428,7 @@ export default function DeliverablesPage() {
                           setReassignTarget((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
                         } catch {}
                       }}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Send Back to Team Member
@@ -1442,7 +1442,7 @@ export default function DeliverablesPage() {
                         onClick={async () => {
                           try { await sendToClientMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                         }}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                       >
                         <Send className="h-3.5 w-3.5" />
                         Send to Client
@@ -1462,7 +1462,7 @@ export default function DeliverablesPage() {
                           onClick={async () => {
                             try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                           }}
-                          className="flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                          className="flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
                         >
                           <ArrowRight className="h-3.5 w-3.5" />
                           Receive{isMultiCreative ? ` #${deliverables.indexOf(del) + 1}` : ""} for review
@@ -1491,7 +1491,7 @@ export default function DeliverablesPage() {
                             </div>
                           )}
                           {allApproved && !allHandedOff && (
-                            <span className="text-[11px] text-[var(--accent-employee)] font-medium flex items-center gap-1">
+                            <span className="text-[11px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
                               <Check className="h-3 w-3" /> All Approved
                             </span>
                           )}
@@ -1613,7 +1613,7 @@ export default function DeliverablesPage() {
                             <>
                               {needPick && (
                                 <div>
-                                  <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Attach deliverables to</label>
+                                  <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Attach deliverables to</label>
                                   <select
                                     value={choice}
                                     onChange={(e) =>
@@ -1632,7 +1632,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[10px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
+                                <p className="text-[11px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -1654,7 +1654,7 @@ export default function DeliverablesPage() {
                                     className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <div>
-                                    <label className="block text-[10px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
                                     <input
                                       type="date"
                                       value={handoffDeadline[tk] ?? ""}

@@ -46,12 +46,12 @@ const STATUS_LABELS: Record<SuggestionStatus, string> = {
 //                accent-admin orange that flooded the previous amber pill).
 //   Planned   -> deep blue.
 const STATUS_STYLES: Record<SuggestionStatus, string> = {
-  new: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--accent-admin)]",
+  new: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] border border-[var(--accent-admin)]",
   reviewing:
     "bg-[#ede9fe] text-[#4c1d95] border border-[#7c3aed]",
   planned:
     "bg-[#dbeafe] text-[#1e3a8a] border border-[#2563eb]",
-  done: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] border border-[var(--accent-employee)]",
+  done: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] border border-[var(--accent-employee)]",
   declined:
     "bg-[var(--bg-muted)] text-[var(--text-muted)] border border-[var(--border)]",
 };
@@ -105,7 +105,7 @@ export default function ProfilePage() {
   if (user === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
@@ -235,7 +235,7 @@ export default function ProfilePage() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
-                ? "border-[var(--accent-admin)] text-[var(--accent-admin)]"
+                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
                 : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
             }`}
           >
@@ -264,7 +264,7 @@ export default function ProfilePage() {
                         className="w-20 h-20 rounded-full object-cover border-2 border-[var(--border)]"
                       />
                     ) : (
-                      <div className="w-20 h-20 rounded-full bg-[var(--accent-admin)] flex items-center justify-center border-2 border-[var(--border)]">
+                      <div className="w-20 h-20 rounded-full bg-[var(--accent-admin-strong)] flex items-center justify-center border-2 border-[var(--border)]">
                         <span className="text-white text-[24px] font-bold">
                           {(user.name ?? user.email ?? "?")
                             .charAt(0)
@@ -301,7 +301,7 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingPhoto}
-                      className="text-[13px] font-medium text-[var(--accent-admin)] hover:underline disabled:opacity-50 text-left"
+                      className="text-[13px] font-medium text-[var(--accent-admin-text)] hover:underline disabled:opacity-50 text-left"
                     >
                       {uploadingPhoto ? "Uploading..." : "Upload photo"}
                     </button>
@@ -351,7 +351,7 @@ export default function ProfilePage() {
           <Card className="mt-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-semibold text-[16px] text-[var(--text-primary)]">
+                <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
                   Password
                 </h2>
                 <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
@@ -366,7 +366,7 @@ export default function ProfilePage() {
             </div>
 
             {pwSuccess && (
-              <div className="bg-[var(--accent-employee-dim)] border border-[var(--accent-employee)] text-[var(--accent-employee)] rounded-lg px-4 py-2 text-[13px] mb-4">
+              <div className="bg-[var(--accent-employee-dim)] border border-[var(--accent-employee)] text-[var(--accent-employee-text)] rounded-lg px-4 py-2 text-[13px] mb-4">
                 Password updated successfully
               </div>
             )}
@@ -442,8 +442,8 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="font-semibold text-[18px] text-[var(--text-primary)] flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-[var(--accent-admin)]" />
+        <h2 className="font-semibold text-[20px] text-[var(--text-primary)] flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-[var(--accent-admin-text)]" />
           Suggestion Box
         </h2>
         <p className="text-[13px] text-[var(--text-secondary)] mt-1">
@@ -528,7 +528,7 @@ function MySuggestionsView() {
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
               <Plus className="h-4 w-4" />
               New suggestion
             </h3>
@@ -562,7 +562,7 @@ function MySuggestionsView() {
       </Card>
 
       <div>
-        <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3">
+        <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
           Your submissions
           {mySuggestions && mySuggestions.length > 0 && (
             <span className="ml-2 text-[12px] font-normal text-[var(--text-muted)]">
@@ -662,7 +662,7 @@ function MySuggestionItem({
               maxLength={200}
             />
           ) : (
-            <h4 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
+            <h4 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
               {suggestion.title || "Untitled suggestion"}
             </h4>
           )}
@@ -735,7 +735,7 @@ function MySuggestionItem({
       {suggestion.adminNote && !editing && (
         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
           <div className="flex items-center gap-1.5 mb-1">
-            <Shield className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+            <Shield className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
             <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
               Response from admin
             </span>
@@ -829,7 +829,7 @@ function AllSuggestionsView() {
             onClick={() => setStatusFilter(key as SuggestionStatus | "all")}
             className={`text-[12px] px-2.5 py-1 rounded-full border transition-colors ${
               statusFilter === key
-                ? "bg-[var(--accent-admin)] text-white border-[var(--accent-admin)]"
+                ? "bg-[var(--accent-admin-strong)] text-white border-[var(--accent-admin)]"
                 : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
@@ -954,7 +954,7 @@ function AdminSuggestionItem({
             className="w-9 h-9 rounded-full object-cover border border-[var(--border)] flex-shrink-0"
           />
         ) : (
-          <div className="w-9 h-9 rounded-full bg-[var(--accent-admin)] flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-[var(--accent-admin-strong)] flex items-center justify-center flex-shrink-0">
             <span className="text-white text-[13px] font-semibold">
               {initial}
             </span>
@@ -991,7 +991,7 @@ function AdminSuggestionItem({
           </div>
 
           {suggestion.title && (
-            <h4 className="font-semibold text-[14px] text-[var(--text-primary)] mt-3">
+            <h4 className="font-semibold text-[15px] text-[var(--text-primary)] mt-3">
               {suggestion.title}
             </h4>
           )}
@@ -1041,7 +1041,7 @@ function AdminSuggestionItem({
                     setDraftStatus(suggestion.status);
                     setEditingNote(true);
                   }}
-                  className="text-[11px] text-[var(--accent-admin)] hover:underline"
+                  className="text-[11px] text-[var(--accent-admin-text)] hover:underline"
                 >
                   Edit
                 </button>
@@ -1060,7 +1060,7 @@ function AdminSuggestionItem({
                 setDraftStatus(suggestion.status);
                 setEditingNote(true);
               }}
-              className="mt-3 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+              className="mt-3 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
             >
               + Add response
             </button>

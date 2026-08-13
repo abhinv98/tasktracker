@@ -245,8 +245,8 @@ export default function MessagesPage() {
         {/* Header */}
         <div className="px-4 py-3 border-b border-[var(--border)]">
           <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="h-4 w-4 text-[var(--accent-admin)]" />
-            <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Messages</h1>
+            <MessageSquare className="h-4 w-4 text-[var(--accent-admin-text)]" />
+            <h1 className="font-semibold text-[15px] text-[var(--text-primary)]">Messages</h1>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
@@ -286,7 +286,7 @@ export default function MessagesPage() {
                   ) : (
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${
                       hasUnread
-                        ? "bg-[var(--accent-admin)] text-white"
+                        ? "bg-[var(--accent-admin-strong)] text-white"
                         : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
                     }`}>
                       {contact.name.charAt(0).toUpperCase()}
@@ -300,13 +300,13 @@ export default function MessagesPage() {
                         {contact.name}
                       </span>
                       {contact.lastMessageTime && (
-                        <span className="text-[9px] text-[var(--text-muted)] shrink-0 tabular-nums">
+                        <span className="text-[11px] text-[var(--text-muted)] shrink-0 tabular-nums">
                           {formatTime(contact.lastMessageTime)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <span className={`text-[10px] truncate ${hasUnread ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"}`}>
+                      <span className={`text-[11px] truncate ${hasUnread ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"}`}>
                         {contact.lastMessage
                           ? contact.lastMessage.length > 40
                             ? contact.lastMessage.slice(0, 40) + "..."
@@ -314,7 +314,7 @@ export default function MessagesPage() {
                           : `${contact.role}`}
                       </span>
                       {hasUnread && (
-                        <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin)] text-white text-[9px] font-bold px-1 shrink-0">
+                        <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold px-1 shrink-0">
                           {contact.unreadCount}
                         </span>
                       )}
@@ -342,7 +342,7 @@ export default function MessagesPage() {
               )}
               <div>
                 <p className="text-[13px] font-semibold text-[var(--text-primary)]">{selectedContact.name}</p>
-                <p className="text-[10px] text-[var(--text-muted)] capitalize">
+                <p className="text-[11px] text-[var(--text-muted)] capitalize">
                   {String(selectedContactId) === String(user._id)
                     ? "Messages to yourself"
                     : selectedContact.role}
@@ -366,7 +366,7 @@ export default function MessagesPage() {
                     {/* Date separator */}
                     <div className="flex items-center gap-3 my-4">
                       <div className="flex-1 border-t border-[var(--border-subtle)]" />
-                      <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-primary)] px-2">{group.date}</span>
+                      <span className="text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-primary)] px-2">{group.date}</span>
                       <div className="flex-1 border-t border-[var(--border-subtle)]" />
                     </div>
 
@@ -379,17 +379,17 @@ export default function MessagesPage() {
                           <div
                             className={`px-3 py-2 rounded-2xl text-[12px] leading-relaxed ${
                               msg.isMine
-                                ? "bg-[var(--accent-admin)] text-white rounded-br-md"
+                                ? "bg-[var(--accent-admin-strong)] text-white rounded-br-md"
                                 : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-md"
                             }`}
                           >
                             {msg.content}
                           </div>
                           <div className={`flex items-center gap-1 mt-0.5 ${msg.isMine ? "justify-end" : "justify-start"}`}>
-                            <span className="text-[9px] text-[var(--text-disabled)] tabular-nums">{formatTime(msg.createdAt)}</span>
+                            <span className="text-[11px] text-[var(--text-disabled)] tabular-nums">{formatTime(msg.createdAt)}</span>
                             {msg.isMine && (
                               msg.readAt ? (
-                                <CheckCheck className="h-3 w-3 text-[var(--accent-employee)]" />
+                                <CheckCheck className="h-3 w-3 text-[var(--accent-employee-text)]" />
                               ) : (
                                 <Check className="h-3 w-3 text-[var(--text-disabled)]" />
                               )
@@ -429,7 +429,7 @@ export default function MessagesPage() {
                 <button
                   onClick={handleSend}
                   disabled={!messageText.trim()}
-                  className="p-2.5 rounded-lg bg-[var(--accent-admin)] text-white hover:bg-[#c4684d] disabled:opacity-30 transition-colors shrink-0"
+                  className="p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525] disabled:opacity-30 transition-colors shrink-0"
                 >
                   <Send className="h-4 w-4" />
                 </button>
@@ -442,7 +442,7 @@ export default function MessagesPage() {
             <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-4">
               <MessageSquare className="h-7 w-7 text-[var(--text-muted)]" />
             </div>
-            <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-1">Your Messages</h2>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">Your Messages</h2>
             <p className="text-[12px] text-[var(--text-muted)] max-w-[300px]">
               Select someone from the list, or search your own name to message yourself. Direct messages are private.
             </p>

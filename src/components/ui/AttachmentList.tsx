@@ -56,7 +56,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline disabled:opacity-50"
+          className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline disabled:opacity-50"
         >
           {isUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
           {isUploading ? "Uploading..." : "Attach file"}
@@ -74,7 +74,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
               <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                 {att.fileName}
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">
+              <p className="text-[11px] text-[var(--text-muted)]">
                 {att.uploaderName}
               </p>
             </div>
@@ -84,7 +84,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
                   href={att.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)]"
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
                 >
                   <Download className="h-3.5 w-3.5" />
                 </a>

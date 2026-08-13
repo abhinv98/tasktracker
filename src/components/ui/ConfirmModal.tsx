@@ -55,7 +55,7 @@ export function ConfirmModal({
   const btnColor =
     variant === "danger"
       ? "bg-[var(--danger)] hover:bg-[#a93225]"
-      : "bg-[var(--accent-admin)] hover:bg-[#c4684d]";
+      : "bg-[var(--accent-admin-strong)] hover:bg-[#a04525]";
 
   async function handleConfirm() {
     setLoading(true);

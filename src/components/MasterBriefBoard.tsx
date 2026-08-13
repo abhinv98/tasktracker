@@ -294,13 +294,13 @@ export function MasterBriefBoard({
               <h3 className="text-[13px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
                 {team.teamName}
               </h3>
-              <span className="text-[10px] font-medium text-[var(--text-muted)] tabular-nums">
+              <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
                 {team.tasks.length} task{team.tasks.length !== 1 ? "s" : ""}
               </span>
               {isAdmin && (
                 <button
                   onClick={() => onCreateTask(team.teamId)}
-                  className="ml-auto text-[10px] font-semibold text-[var(--accent-admin)] hover:text-[var(--accent-admin)] hover:underline transition-colors"
+                  className="ml-auto text-[11px] font-semibold text-[var(--accent-admin-text)] hover:text-[var(--accent-admin-text)] hover:underline transition-colors"
                 >
                   + Add task
                 </button>
@@ -376,17 +376,17 @@ export function MasterBriefBoard({
                         {/* Assignee + Deadline row */}
                         <div className="flex items-center gap-1.5 mt-2">
                           <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                            className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
                             style={{ backgroundColor: team.teamColor }}
                           >
                             {task.assigneeName.charAt(0).toUpperCase()}
                           </div>
-                          <span className="text-[10px] text-[var(--text-secondary)] truncate flex-1">
+                          <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1">
                             {task.assigneeName}
                           </span>
                           {task.deadline && (
                             <span
-                              className={`text-[9px] font-medium tabular-nums shrink-0 ${
+                              className={`text-[11px] font-medium tabular-nums shrink-0 ${
                                 task.status !== "done" && task.status !== "review" && task.deadline < Date.now()
                                   ? "text-red-500"
                                   : "text-[var(--text-muted)]"
@@ -403,7 +403,7 @@ export function MasterBriefBoard({
                         {/* Status + Connect handle row */}
                         <div className="flex items-center justify-between mt-2">
                           <span
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold"
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold"
                             style={{ color: st.color, backgroundColor: st.bg }}
                           >
                             {st.label}
@@ -417,7 +417,7 @@ export function MasterBriefBoard({
                                 startConnect(task._id);
                               }}
                               title="Connect to another task"
-                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all"
+                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all"
                             >
                               <ArrowRight className="h-3 w-3" />
                             </button>
@@ -439,7 +439,7 @@ export function MasterBriefBoard({
                                 return (
                                   <span
                                     key={c._id}
-                                    className="group/conn inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] max-w-full"
+                                    className="group/conn inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] max-w-full"
                                   >
                                     <ArrowRight className="h-2.5 w-2.5 shrink-0" />
                                     <span className="truncate">{targetName || "Task"}</span>
@@ -473,7 +473,7 @@ export function MasterBriefBoard({
             <div className="w-12 h-12 rounded-2xl bg-[var(--bg-hover)] flex items-center justify-center mb-3">
               <LinkIcon className="h-5 w-5 text-[var(--text-disabled)]" />
             </div>
-            <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+            <p className="text-[15px] font-medium text-[var(--text-secondary)]">
               No teams assigned
             </p>
             <p className="text-[12px] text-[var(--text-muted)] mt-1">

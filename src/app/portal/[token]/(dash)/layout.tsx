@@ -140,7 +140,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {session.brand.name[0]}
               </span>
             </div>
-            <p className="font-semibold text-[14px] text-[var(--p-text)]">{session.brand.name}</p>
+            <p className="font-semibold text-[15px] text-[var(--p-text)]">{session.brand.name}</p>
           </div>
         </header>
         <main className="flex-1 min-h-0">{children}</main>

@@ -98,9 +98,9 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <UserPlus size={16} className="text-[var(--accent-admin)]" />
+              <UserPlus size={16} className="text-[var(--accent-admin-text)]" />
             </div>
-            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] tracking-tight">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
               Create User Invite
             </h2>
           </div>
@@ -117,7 +117,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           {inviteLink ? (
             /* ─── Success state ─── */
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--accent-employee)]">
+              <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--accent-employee-text)]">
                 <Check size={16} />
                 Invite created successfully
               </div>
@@ -287,9 +287,9 @@ function ResetPasswordModal({
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <KeyRound size={16} className="text-[var(--accent-admin)]" />
+              <KeyRound size={16} className="text-[var(--accent-admin-text)]" />
             </div>
-            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] tracking-tight">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
               Reset Password
             </h2>
           </div>
@@ -305,7 +305,7 @@ function ResetPasswordModal({
         <div className="px-6 py-5">
           {done ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--accent-employee)]">
+              <div className="flex items-center gap-2 text-[15px] font-medium text-[var(--accent-employee-text)]">
                 <Check size={16} />
                 Password updated for {user.name}
               </div>
@@ -368,7 +368,7 @@ function ResetPasswordModal({
                 <button
                   type="button"
                   onClick={generate}
-                  className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                  className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
                   Generate a strong password
                 </button>
@@ -462,9 +462,9 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <UserPlus size={16} className="text-[var(--accent-admin)]" />
+              <UserPlus size={16} className="text-[var(--accent-admin-text)]" />
             </div>
-            <h2 className="font-semibold text-[16px] text-[var(--text-primary)] tracking-tight">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
               Create Client Login
             </h2>
           </div>
@@ -526,7 +526,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={generate}
-                className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
               >
                 Generate a strong password
               </button>
@@ -560,7 +560,7 @@ function ClientsPanel() {
   const [resetting, setResetting] = useState(false);
 
   if (clients === undefined) {
-    return <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>;
+    return <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>;
   }
 
   async function handleReset() {
@@ -637,7 +637,7 @@ function ClientsPanel() {
                             autoFocus
                           />
                           {newPassword.length > 0 && newPassword.length < 8 && (
-                            <span className="text-[10px] text-[var(--danger)] mt-0.5">
+                            <span className="text-[11px] text-[var(--danger)] mt-0.5">
                               At least 8 characters ({newPassword.length}/8)
                             </span>
                           )}
@@ -645,7 +645,7 @@ function ClientsPanel() {
                         <button
                           onClick={() => void handleReset()}
                           disabled={newPassword.length < 8 || resetting}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--accent-employee)] hover:bg-[var(--bg-hover)] disabled:opacity-40"
+                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--accent-employee-text)] hover:bg-[var(--bg-hover)] disabled:opacity-40"
                           title="Save new password"
                         >
                           <Check size={15} />
@@ -661,7 +661,7 @@ function ClientsPanel() {
                       <div className="flex items-center justify-end gap-0.5">
                         <button
                           onClick={() => { setResetId(c._id); setNewPassword(""); }}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
+                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
                           title="Reset password"
                         >
                           <KeyRound size={15} />
@@ -729,7 +729,7 @@ export default function UsersPage() {
   if (users === null) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Access denied. Admin only.
         </p>
       </div>
@@ -739,7 +739,7 @@ export default function UsersPage() {
   if (users === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Loading...
         </p>
       </div>
@@ -906,7 +906,7 @@ export default function UsersPage() {
                             name: user.name ?? user.email ?? "User",
                           })
                         }
-                        className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
+                        className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
                         title="Reset password"
                       >
                         <KeyRound size={15} />

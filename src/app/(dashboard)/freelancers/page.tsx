@@ -41,7 +41,7 @@ export default function FreelancersPage() {
   if (data === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
@@ -49,7 +49,7 @@ export default function FreelancersPage() {
   if (data === null) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Access denied. Only brand managers can view this page.
         </p>
       </div>
@@ -72,7 +72,7 @@ export default function FreelancersPage() {
 
       {data.freelancers.length === 0 ? (
         <Card>
-          <p className="text-[14px] text-[var(--text-secondary)]">
+          <p className="text-[15px] text-[var(--text-secondary)]">
             {data.isSuperAdmin
               ? "No freelancers yet. Invite one from Users & Teams with the Freelancer role."
               : "No freelancers are working on your brands yet."}
@@ -93,7 +93,7 @@ export default function FreelancersPage() {
                       className="w-9 h-9 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] text-[12px] font-semibold">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] text-[12px] font-semibold">
                       {initials(f.name, f.email)}
                     </div>
                   )}

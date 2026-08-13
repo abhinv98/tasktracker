@@ -343,7 +343,7 @@ export function ContentCalendarView({
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Calendar className="h-10 w-10 text-[var(--text-muted)]" />
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           No content calendar sheets yet
         </p>
         {isEditable && (
@@ -406,7 +406,7 @@ export function ContentCalendarView({
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)] bg-white shrink-0">
-        <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+        <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
           {currentSheetMonth ? monthLabel(currentSheetMonth) : "Content Calendar"}
         </h3>
         <div className="flex items-center gap-2">
@@ -458,7 +458,7 @@ export function ContentCalendarView({
             return (
               <div className="grid grid-cols-7 gap-1 max-w-[420px]">
                 {weekdays.map((wd) => (
-                  <div key={wd} className="text-center text-[10px] font-semibold text-[var(--text-muted)] py-0.5">
+                  <div key={wd} className="text-center text-[11px] font-semibold text-[var(--text-muted)] py-0.5">
                     {wd}
                   </div>
                 ))}
@@ -500,7 +500,7 @@ export function ContentCalendarView({
       {/* Month strip: break days visible even when no entry exists for that date */}
       {currentSheetMonth && (
         <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-primary)] shrink-0">
-          <p className="text-[10px] font-medium text-[var(--text-muted)] mb-1.5">
+          <p className="text-[11px] font-medium text-[var(--text-muted)] mb-1.5">
             {monthLabel(currentSheetMonth)} - break days (red)
           </p>
           <div className="flex flex-wrap gap-1 max-w-full">
@@ -514,7 +514,7 @@ export function ContentCalendarView({
                   <div
                     key={dateStr}
                     title={dateStr}
-                    className={`w-7 h-7 flex items-center justify-center rounded text-[10px] font-medium shrink-0 ${
+                    className={`w-7 h-7 flex items-center justify-center rounded text-[11px] font-medium shrink-0 ${
                       isBreak
                         ? "bg-red-500 text-white"
                         : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
@@ -553,7 +553,7 @@ export function ContentCalendarView({
                   {noAssignee > 0 && noDeadline > 0 && " · "}
                   {noDeadline > 0 && `${noDeadline} no deadline`}
                 </span>
-                <span className="text-[10px] text-amber-600 ml-auto">Click a row to assign</span>
+                <span className="text-[11px] text-amber-600 ml-auto">Click a row to assign</span>
               </div>
             );
           })()}
@@ -617,12 +617,12 @@ export function ContentCalendarView({
                             <span className="text-[12px] font-medium text-[var(--text-primary)]">
                               {pd.display}
                             </span>
-                            <span className="text-[10px] text-[var(--text-muted)] ml-1">
+                            <span className="text-[11px] text-[var(--text-muted)] ml-1">
                               {pd.weekday}
                             </span>
                           </div>
                           {isBreakDay && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white bg-red-500">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold text-white bg-red-500">
                               BREAK
                             </span>
                           )}
@@ -648,14 +648,14 @@ export function ContentCalendarView({
                         {task.title}
                       </span>
                       {task.description && (
-                        <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate max-w-[200px]">
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate max-w-[200px]">
                           {task.description}
                         </p>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium"
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
                         style={{
                           color: si.color,
                           backgroundColor: `${si.color}15`,
@@ -675,13 +675,13 @@ export function ContentCalendarView({
                             {task.copyAssigneeName}
                           </span>
                           {task.copyAssigneeDesignation && (
-                            <p className="text-[10px] text-[var(--text-muted)]">
+                            <p className="text-[11px] text-[var(--text-muted)]">
                               {task.copyAssigneeDesignation}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-amber-700 bg-amber-100">
                           Unassigned
                         </span>
                       )}
@@ -694,7 +694,7 @@ export function ContentCalendarView({
                             {task.designAssigneeName}
                           </span>
                           {task.designAssigneeDesignation && (
-                            <p className="text-[10px] text-[var(--text-muted)]">
+                            <p className="text-[11px] text-[var(--text-muted)]">
                               {task.designAssigneeDesignation}
                             </p>
                           )}
@@ -720,7 +720,7 @@ export function ContentCalendarView({
                             })}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-700 bg-amber-100">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-amber-700 bg-amber-100">
                             No Deadline
                           </span>
                         );
@@ -769,7 +769,7 @@ export function ContentCalendarView({
                     {isEditable && (
                       <button
                         onClick={() => setShowAddEntry(true)}
-                        className="mt-2 text-[12px] font-medium text-[var(--accent-admin)] hover:underline"
+                        className="mt-2 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
                       >
                         Add your first entry
                       </button>
@@ -846,7 +846,7 @@ export function ContentCalendarView({
         {isEditable && (
           <button
             onClick={() => setShowNewSheet(true)}
-            className="flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -858,7 +858,7 @@ export function ContentCalendarView({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                 Add Month Sheet
               </h3>
               <button
@@ -903,7 +903,7 @@ export function ContentCalendarView({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                 Add Content Entry
               </h3>
               <button
@@ -1000,7 +1000,7 @@ export function ContentCalendarView({
                       </option>
                     ))}
                 </select>
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
                   The copy team owns the entry. Design is assigned separately from the entry's sidebar.
                 </p>
               </div>
@@ -1024,7 +1024,7 @@ export function ContentCalendarView({
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
                   Assignor is auto-set to the brand manager.
                 </p>
               </div>
@@ -1060,7 +1060,7 @@ export function ContentCalendarView({
       {deleteSheetId && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
-            <h3 className="font-semibold text-[16px] text-[var(--text-primary)] mb-2">
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
               Delete Sheet
             </h3>
             <p className="text-[13px] text-[var(--text-secondary)] mb-4">
@@ -1601,14 +1601,14 @@ export function ContentCalendarEntrySidebar({
             <button
               type="button"
               onClick={() => onSelectTask(task.parentTaskId as string)}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
               title="Back to parent entry"
             >
               <ChevronRight className="h-3.5 w-3.5 rotate-180" />
             </button>
           )}
           <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: si.color }} />
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
             {isViewingLinkedChild
               ? selfLinked?.teamName ??
                 (selfLinked?.role === "copy"
@@ -1768,7 +1768,7 @@ export function ContentCalendarEntrySidebar({
                         {/\bteam\s*$/i.test(c.label) ? "" : " Team"}
                       </span>
                     </div>
-                    <span className="text-[10px] text-[var(--accent-admin)]">Open →</span>
+                    <span className="text-[11px] text-[var(--accent-admin-text)]">Open →</span>
                   </div>
                   {c.assigneeName ? (
                     <p className="text-[12px] text-[var(--text-primary)] truncate">
@@ -1789,7 +1789,7 @@ export function ContentCalendarEntrySidebar({
                     setCreatingNew(true);
                     setOpenTaskId(null);
                   }}
-                  className="w-full text-left p-2.5 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin)] transition-colors text-[12px] font-medium"
+                  className="w-full text-left p-2.5 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin-text)] transition-colors text-[12px] font-medium"
                 >
                   + Add team task
                 </button>
@@ -1801,19 +1801,19 @@ export function ContentCalendarEntrySidebar({
               {(briefMeta?.brand?.name || briefMeta?.briefType || briefMeta?.manager) && (
                 <div className="pt-2 flex flex-wrap gap-1.5">
                   {briefMeta?.brand?.name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
                       {briefMeta.brand.name}
                     </span>
                   )}
                   {briefMeta?.briefType && briefMeta.briefType !== "content_calendar" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-100">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-100">
                       {briefMeta.briefType === "video_editing" ? "Video Editing"
                         : briefMeta.briefType === "single_task" ? "Single Task"
                         : briefMeta.briefType.replace(/_/g, " ")}
                     </span>
                   )}
                   {briefMeta?.manager?.name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
                       Manager: {briefMeta.manager.name}
                     </span>
                   )}
@@ -1857,7 +1857,7 @@ export function ContentCalendarEntrySidebar({
                 setOpenTaskId(null);
                 setCreatingNew(false);
               }}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Back to entry"
             >
               <ChevronRight className="h-3.5 w-3.5 rotate-180" />
@@ -1941,7 +1941,7 @@ export function ContentCalendarEntrySidebar({
                   placeholder="e.g. 4"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
                 />
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
                   Shows on this design assignee's task as "X / N creatives required" with separate deliverable slots.
                 </p>
               </div>
@@ -1954,7 +1954,7 @@ export function ContentCalendarEntrySidebar({
                   const teamLabel = (teams.find((t: any) => t._id === oTeam)?.name as string | undefined) ?? "Team";
                   handleSaveOpenTask(teamLabel);
                 }}
-                className="w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {oSaving ? "Creating…" : "Create team task"}
               </button>
@@ -2017,7 +2017,7 @@ export function ContentCalendarEntrySidebar({
                 const b = upstreamStatusBadge(upstreamInfo.upstream.status);
                 return (
                   <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold"
                     style={{ backgroundColor: b.bg, color: b.fg }}
                   >
                     From {upstreamInfo.label} · {b.label}
@@ -2063,7 +2063,7 @@ export function ContentCalendarEntrySidebar({
                 const b = upstreamStatusBadge(upstreamInfo.upstream.status);
                 return (
                   <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-semibold"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold"
                     style={{ backgroundColor: b.bg, color: b.fg }}
                   >
                     From {upstreamInfo.label} · {b.label}
@@ -2109,7 +2109,7 @@ export function ContentCalendarEntrySidebar({
             {isEditable && user?.role === "admin" && (
               <button
                 onClick={() => setShowLinkInput(true)}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
               >
                 <Plus className="h-3 w-3" />
                 Add Link
@@ -2128,7 +2128,7 @@ export function ContentCalendarEntrySidebar({
               />
               <button
                 onClick={handleAddLink}
-                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:opacity-90"
+                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:opacity-90"
               >
                 Add
               </button>
@@ -2147,7 +2147,7 @@ export function ContentCalendarEntrySidebar({
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin)] hover:underline flex-1 min-w-0"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin-text)] hover:underline flex-1 min-w-0"
                 >
                   <ExternalLink className="h-3 w-3 shrink-0" />
                   <span className="truncate">{link}</span>
@@ -2281,7 +2281,7 @@ export function ContentCalendarEntrySidebar({
             title, keeping the client view clean. Entry-level only. */}
         {viewingMain && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3 flex flex-col gap-2.5">
-            <p className="font-medium text-[11px] text-[var(--accent-admin)] uppercase tracking-wide">
+            <p className="font-medium text-[11px] text-[var(--accent-admin-text)] uppercase tracking-wide">
               Client Portal Display
             </p>
             <div>
@@ -2351,7 +2351,7 @@ export function ContentCalendarEntrySidebar({
                   placeholder="e.g. 4"
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 />
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
                   Shows on the design assignee's task as "X / N creatives required" with separate deliverable slots.
                 </p>
               </>
@@ -2455,14 +2455,14 @@ export function ContentCalendarEntrySidebar({
             wires the sequential handoff chain for any team. */}
         {isViewingLinkedChild && isEditable && (
           <div className="pt-3 border-t border-[var(--border)]">
-            <p className="text-[10px] text-[var(--text-muted)]">
+            <p className="text-[11px] text-[var(--text-muted)]">
               Teams work this entry in sequence — an approved deliverable is
               passed to the next team&apos;s task automatically. Add teams from
               the entry view.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
-                <p className="text-[10px] font-medium text-[var(--text-muted)] uppercase">Linked tasks</p>
+                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase">Linked tasks</p>
                 {linkedTasks
                   .filter((lt: any) => lt._id !== task._id)
                   .map((lt: any) => (
@@ -2477,11 +2477,11 @@ export function ContentCalendarEntrySidebar({
                         disabled={!onSelectTask}
                         title={onSelectTask ? "Open this linked task to edit it" : ""}
                       >
-                        <p className="text-[11px] text-[var(--text-secondary)] truncate hover:text-[var(--accent-admin)]">
+                        <p className="text-[11px] text-[var(--text-secondary)] truncate hover:text-[var(--accent-admin-text)]">
                           · {lt.title}
                         </p>
                         {lt.assigneeName && (
-                          <p className="text-[10px] text-[var(--text-muted)] ml-2.5">
+                          <p className="text-[11px] text-[var(--text-muted)] ml-2.5">
                             Assigned to: <span className="font-medium text-[var(--text-secondary)]">{lt.assigneeName}</span>
                             {lt.assigneeDesignation ? ` - ${lt.assigneeDesignation}` : ""}
                           </p>
@@ -2717,7 +2717,7 @@ export function ContentCalendarEntrySidebar({
                       </span>
                     </div>
                     {d.teamLeadReviewNote && (
-                      <p className="text-[10px] text-[var(--text-secondary)] pl-5 italic">
+                      <p className="text-[11px] text-[var(--text-secondary)] pl-5 italic">
                         {d.teamLeadReviewNote}
                       </p>
                     )}
@@ -2737,7 +2737,7 @@ export function ContentCalendarEntrySidebar({
                       </div>
                     )}
                     {d.reviewNote && (
-                      <p className="text-[10px] text-[var(--text-secondary)] pl-5 italic">
+                      <p className="text-[11px] text-[var(--text-secondary)] pl-5 italic">
                         {d.reviewNote}
                       </p>
                     )}
@@ -2778,7 +2778,7 @@ export function ContentCalendarEntrySidebar({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline disabled:opacity-50"
+              className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline disabled:opacity-50"
             >
               {isUploading ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -2800,7 +2800,7 @@ export function ContentCalendarEntrySidebar({
                   <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                     {att.fileName}
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)]">
+                  <p className="text-[11px] text-[var(--text-muted)]">
                     {att.uploaderName}
                     {att.uploaderDesignation
                       ? ` - ${att.uploaderDesignation}`
@@ -2813,7 +2813,7 @@ export function ContentCalendarEntrySidebar({
                       href={att.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)]"
+                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </a>
@@ -2925,7 +2925,7 @@ function RequestChangesControl({
           className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
         {deadlinePast && !newDeadline && (
-          <p className="text-[10px] text-amber-700 mt-1">
+          <p className="text-[11px] text-amber-700 mt-1">
             The old deadline already passed. Set a new one so the assignee
             isn't flagged overdue immediately.
           </p>

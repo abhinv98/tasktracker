@@ -95,7 +95,7 @@ export function PortalSidebar({
               className="w-10 h-10 rounded-[var(--p-radius-md)] flex items-center justify-center"
               style={{ backgroundColor: "var(--p-brand-soft)" }}
             >
-              <span className="font-bold text-[16px]" style={{ color: bc }}>
+              <span className="font-bold text-[15px]" style={{ color: bc }}>
                 {brand.name[0]}
               </span>
             </div>
@@ -133,7 +133,7 @@ export function PortalSidebar({
               <span className="flex-1 min-w-0 truncate">{tabLabel(tab.key, tab.label)}</span>
               {badge !== null && (
                 <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
+                  className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
                     active ? "bg-white/25 text-white" : "text-white"
                   }`}
                   style={active ? {} : { backgroundColor: bc }}

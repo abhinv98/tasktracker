@@ -197,13 +197,13 @@ export default function PortalCalendarPage() {
                             <div className="flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dot }} />
                               {e.platform && (
-                                <span className="text-[8px] font-semibold uppercase truncate text-[var(--p-text-3)]">
+                                <span className="text-[11px] font-semibold uppercase truncate text-[var(--p-text-3)]">
                                   {e.platform}
                                 </span>
                               )}
                             </div>
                             <p
-                              className={`text-[10px] text-[var(--p-text)] leading-tight truncate ${
+                              className={`text-[11px] text-[var(--p-text)] leading-tight truncate ${
                                 e.status === "done" ? "line-through" : ""
                               }`}
                             >
@@ -213,7 +213,7 @@ export default function PortalCalendarPage() {
                         );
                       })}
                       {dayEntries.length > 3 && (
-                        <span className="text-[9px] font-medium text-[var(--p-text-2)]">
+                        <span className="text-[11px] font-medium text-[var(--p-text-2)]">
                           +{dayEntries.length - 3} more
                         </span>
                       )}

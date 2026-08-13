@@ -102,7 +102,7 @@ export function PromptModal({
             <button
               type="submit"
               disabled={loading || !value.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? activeLabel : confirmLabel}
               {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

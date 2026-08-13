@@ -38,12 +38,12 @@ export default function SignInPage() {
         <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
           <span className="text-white font-bold text-[13px]">O</span>
         </div>
-        <span className="font-semibold text-[16px] text-[var(--text-primary)]">
+        <span className="font-semibold text-[15px] text-[var(--text-primary)]">
           The Ecultify
         </span>
       </div>
 
-      <p className="text-[14px] text-[var(--text-secondary)] mb-6">
+      <p className="text-[15px] text-[var(--text-secondary)] mb-6">
         {step === "signIn"
           ? "Sign in to your account"
           : "Create your account"}
@@ -80,7 +80,7 @@ export default function SignInPage() {
               type={showPassword ? "text" : "password"}
               placeholder={step === "signUp" ? "Min 8 characters" : "Your password"}
               required
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-[14px] px-3 py-2 pr-10 placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 focus:ring-offset-white transition-all duration-150"
+              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-[15px] px-3 py-2 pr-10 placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 focus:ring-offset-white transition-all duration-150"
             />
             <button
               type="button"

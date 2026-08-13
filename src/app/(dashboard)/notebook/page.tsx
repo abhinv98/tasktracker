@@ -85,14 +85,14 @@ export default function NotebookPage() {
   if (user === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
   if (!user || user.role !== "admin") {
     return (
       <div className="p-8">
-        <p className="text-[14px] text-[var(--text-secondary)]">
+        <p className="text-[15px] text-[var(--text-secondary)]">
           Access denied. The notebook is available to managers only.
         </p>
       </div>
@@ -333,7 +333,7 @@ function NotesTab() {
           onSubmit={handleCreate}
           className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6"
         >
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-4">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
             New Note
           </h3>
           <div className="mb-4">
@@ -438,16 +438,16 @@ function NotesTab() {
               style={{ background: n.color || "#ffffff" }}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
-                <p className="font-semibold text-[14px] text-[var(--text-primary)] break-words">
+                <p className="font-semibold text-[15px] text-[var(--text-primary)] break-words">
                   {n.title}
                 </p>
                 <button
                   onClick={() => togglePin({ noteId: n._id })}
                   title={n.pinned ? "Unpin" : "Pin"}
-                  className="text-[var(--text-muted)] hover:text-[var(--accent-admin)] shrink-0"
+                  className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] shrink-0"
                 >
                   {n.pinned ? (
-                    <Pin className="h-4 w-4 fill-[var(--accent-admin)] text-[var(--accent-admin)]" />
+                    <Pin className="h-4 w-4 fill-[var(--accent-admin)] text-[var(--accent-admin-text)]" />
                   ) : (
                     <PinOff className="h-4 w-4" />
                   )}
@@ -491,27 +491,27 @@ function NotesTab() {
 
               <div className="flex flex-wrap items-center gap-1.5 mb-2">
                 {n.brandName && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)]">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)]">
                     {n.brandName}
                   </span>
                 )}
                 {(n.tags ?? []).map((t: string, i: number) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/70 text-[var(--text-secondary)] border border-[var(--border)]"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/70 text-[var(--text-secondary)] border border-[var(--border)]"
                   >
                     <TagIcon className="h-2.5 w-2.5" />
                     {t}
                   </span>
                 ))}
                 {n.remindAt && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700">
                     <Bell className="h-2.5 w-2.5" />
                     {new Date(n.remindAt).toLocaleDateString()}
                   </span>
                 )}
                 {n.convertedTo && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 text-green-700">
                     <ArrowRightCircle className="h-2.5 w-2.5" />
                     {n.convertedTo.kind}
                   </span>
@@ -1299,7 +1299,7 @@ function WorklogTab() {
         onSubmit={handleAdd}
         className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6"
       >
-        <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-4">
+        <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
           Log work for {formatDate(date)}
         </h3>
         <div className="mb-4">
@@ -1392,13 +1392,13 @@ function WorklogTab() {
                     {e.brandName}
                   </span>
                   {e.isTask && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                       Task
                     </span>
                   )}
                   {!isDone && e.carryOverDays > 0 && (
                     <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-700"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700"
                       title={
                         e.isTask
                           ? "Not completed by its original deadline, rolled forward each day"
@@ -1672,7 +1672,7 @@ function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {title}
           </h3>
           <button

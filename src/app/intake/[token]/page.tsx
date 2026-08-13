@@ -183,7 +183,7 @@ export default function IntakePublicPage() {
             <Inbox className="h-8 w-8 text-[#ef4444]" />
           </div>
           <h1 className="text-[20px] font-semibold text-[#171717] mb-2">Link Expired</h1>
-          <p className="text-[14px] text-[#737373] leading-relaxed">
+          <p className="text-[15px] text-[#737373] leading-relaxed">
             This intake link is no longer active. Please contact your account manager for an updated link.
           </p>
         </div>
@@ -364,7 +364,7 @@ export default function IntakePublicPage() {
             <button
               onClick={submit}
               disabled={!title.trim() || submitting || uploading}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[14px] font-semibold transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-[15px] font-semibold transition-all disabled:opacity-50"
               style={{ backgroundColor: bc }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -403,7 +403,7 @@ export default function IntakePublicPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-[14px] text-[#171717]">{t.title}</p>
+                        <p className="font-medium text-[15px] text-[#171717]">{t.title}</p>
                         {t.description && (
                           <p className="text-[12px] text-[#737373] mt-0.5 line-clamp-2">{t.description}</p>
                         )}
@@ -421,7 +421,7 @@ export default function IntakePublicPage() {
                         </div>
                       </div>
                       <span
-                        className="shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                        className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-full"
                         style={{ color: meta.color, backgroundColor: meta.bg }}
                       >
                         {meta.label}

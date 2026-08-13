@@ -167,7 +167,7 @@ export default function JsrPublicPage() {
             <Inbox className="h-8 w-8 text-[#ef4444]" />
           </div>
           <h1 className="text-[20px] font-semibold text-[#171717] mb-2">Link Expired</h1>
-          <p className="text-[14px] text-[#737373] leading-relaxed">
+          <p className="text-[15px] text-[#737373] leading-relaxed">
             This Job Status Report link is no longer active. Please contact your account manager for an updated link.
           </p>
         </div>
@@ -235,7 +235,7 @@ export default function JsrPublicPage() {
                   </div>
                 )}
                 {jsr.lastUpdated && (
-                  <span className="text-[10px] text-white/50 font-medium">
+                  <span className="text-[11px] text-white/50 font-medium">
                     Updated {timeAgo(jsr.lastUpdated)}
                   </span>
                 )}
@@ -251,7 +251,7 @@ export default function JsrPublicPage() {
                 <div key={phase.label} className="flex items-center flex-1">
                   <div className="flex items-center gap-1.5 flex-1">
                     <div
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
                         phase.done ? "text-white" : phase.active ? "text-white" : "bg-[#f0f0f0] text-[#a3a3a3]"
                       }`}
                       style={phase.done ? { backgroundColor: "#10b981" } : phase.active ? { backgroundColor: bc } : {}}
@@ -277,7 +277,7 @@ export default function JsrPublicPage() {
         <section className="bg-white rounded-2xl border border-[#e5e5e5] overflow-hidden shadow-sm">
           <div className="p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold text-[16px] text-[#171717]">Project Overview</h2>
+              <h2 className="font-semibold text-[15px] text-[#171717]">Project Overview</h2>
               {jsr.internalSummary.internalDeadline && (
                 <div className="flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-lg" style={{ color: bc, backgroundColor: bc + "10" }}>
                   <Calendar className="h-3 w-3" />
@@ -301,7 +301,7 @@ export default function JsrPublicPage() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[18px] font-bold text-[#171717] tabular-nums">{progressPct}%</span>
+                  <span className="text-[20px] font-bold text-[#171717] tabular-nums">{progressPct}%</span>
                 </div>
               </div>
               <div className="flex-1 grid grid-cols-4 gap-2">
@@ -313,7 +313,7 @@ export default function JsrPublicPage() {
                 ].map((stat) => (
                   <div key={stat.label} className="text-center py-2.5 rounded-xl" style={{ backgroundColor: stat.color + "08" }}>
                     <p className="font-bold text-[20px] tabular-nums" style={{ color: stat.color }}>{stat.value}</p>
-                    <p className="text-[10px] text-[#737373] font-medium mt-0.5">{stat.label}</p>
+                    <p className="text-[11px] text-[#737373] font-medium mt-0.5">{stat.label}</p>
                   </div>
                 ))}
               </div>
@@ -344,7 +344,7 @@ export default function JsrPublicPage() {
                 <div key={req._id} className={`px-6 py-4 ${i < jsr.ecultifyRequests.length - 1 ? "border-b border-[#f5f5f5]" : ""}`}>
                   <div className="flex items-center gap-2 mb-1.5">
                     <p className="font-medium text-[13px] text-[#171717]">{req.title}</p>
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">{req.briefTitle}</span>
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full text-orange-600 bg-orange-50">{req.briefTitle}</span>
                   </div>
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50/60 border border-orange-100">
                     <AlertCircle className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
@@ -378,9 +378,9 @@ export default function JsrPublicPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-[13px] text-[#171717] truncate">{item.taskTitle}</p>
-                    <p className="text-[10px] text-[#a3a3a3]">{item.briefTitle}</p>
+                    <p className="text-[11px] text-[#a3a3a3]">{item.briefTitle}</p>
                   </div>
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0" style={{ color: bc, backgroundColor: bc + "10" }}>
                     Review
                   </span>
                 </button>
@@ -450,7 +450,7 @@ export default function JsrPublicPage() {
                     <p className="text-[12px] font-semibold text-[#525252] mb-3">{monthLabelStr(calendarGridMonth)}</p>
                     <div className="grid grid-cols-7 gap-1">
                       {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                        <div key={i} className="text-center text-[9px] font-semibold text-[#a3a3a3] py-1">{d}</div>
+                        <div key={i} className="text-center text-[11px] font-semibold text-[#a3a3a3] py-1">{d}</div>
                       ))}
                       {Array.from({ length: calendarGrid.firstDayOfWeek }, (_, i) => (
                         <div key={`empty-${i}`} />
@@ -501,16 +501,16 @@ export default function JsrPublicPage() {
                             <p className={`text-[13px] text-[#171717] ${entry.status === "done" ? "line-through" : ""}`}>{entry.title}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               {entry.platform && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color: bc, backgroundColor: bc + "10" }}>
+                                <span className="text-[11px] font-medium px-1.5 py-0.5 rounded" style={{ color: bc, backgroundColor: bc + "10" }}>
                                   {entry.platform}
                                 </span>
                               )}
-                              {entry.contentType && <span className="text-[10px] text-[#a3a3a3]">{entry.contentType}</span>}
+                              {entry.contentType && <span className="text-[11px] text-[#a3a3a3]">{entry.contentType}</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {entry.postDate && <span className="text-[11px] text-[#737373]">{formatPostDate(entry.postDate)}</span>}
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: info.color, backgroundColor: info.color + "12" }}>
+                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: info.color, backgroundColor: info.color + "12" }}>
                               {info.label}
                             </span>
                           </div>
@@ -546,9 +546,9 @@ export default function JsrPublicPage() {
                     <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: bc }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] text-[#171717]">{a.label}</p>
-                      {a.briefTitle && <p className="text-[10px] text-[#a3a3a3]">{a.briefTitle}</p>}
+                      {a.briefTitle && <p className="text-[11px] text-[#a3a3a3]">{a.briefTitle}</p>}
                     </div>
-                    <span className="text-[10px] text-[#a3a3a3] shrink-0">{timeAgo(a.timestamp)}</span>
+                    <span className="text-[11px] text-[#a3a3a3] shrink-0">{timeAgo(a.timestamp)}</span>
                   </div>
                 ))}
               </div>
@@ -592,11 +592,11 @@ export default function JsrPublicPage() {
                       }`}
                       style={msg.senderType === "client" ? { backgroundColor: bc } : {}}
                     >
-                      <p className={`text-[10px] font-semibold mb-0.5 ${msg.senderType === "client" ? "text-white/70" : "text-[#737373]"}`}>
+                      <p className={`text-[11px] font-semibold mb-0.5 ${msg.senderType === "client" ? "text-white/70" : "text-[#737373]"}`}>
                         {msg.senderName || (msg.senderType === "client" ? "Client" : "Manager")}
                       </p>
                       <p className="text-[13px] leading-relaxed">{msg.content}</p>
-                      <p className={`text-[9px] mt-1 ${msg.senderType === "client" ? "text-white/50" : "text-[#a3a3a3]"}`}>
+                      <p className={`text-[11px] mt-1 ${msg.senderType === "client" ? "text-white/50" : "text-[#a3a3a3]"}`}>
                         {timeAgo(msg.createdAt)}
                       </p>
                     </div>
@@ -671,7 +671,7 @@ export default function JsrPublicPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-[15px] font-bold" style={{ color: bc }}>{formatDate(jsr.overallDeadline)}</span>
                       {deadlineInfo && (
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${deadlineInfo.overdue ? "bg-red-100 text-red-600" : deadlineInfo.urgent ? "bg-amber-100 text-amber-700" : "bg-[#f0f0f0] text-[#525252]"}`}>
+                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${deadlineInfo.overdue ? "bg-red-100 text-red-600" : deadlineInfo.urgent ? "bg-amber-100 text-amber-700" : "bg-[#f0f0f0] text-[#525252]"}`}>
                           {deadlineInfo.text}
                         </span>
                       )}
@@ -694,14 +694,14 @@ export default function JsrPublicPage() {
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setReviewSidebarItem(null)} />
           <div className="fixed top-0 right-0 h-full w-[520px] max-w-[90vw] bg-white border-l border-[#e5e5e5] shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e5e5]">
-              <h3 className="font-semibold text-[16px] text-[#171717]">Review Deliverable</h3>
+              <h3 className="font-semibold text-[15px] text-[#171717]">Review Deliverable</h3>
               <button onClick={() => setReviewSidebarItem(null)} className="p-1.5 rounded-lg hover:bg-[#f0f0f0] text-[#a3a3a3]">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-5" style={{ overscrollBehavior: "contain" }}>
               <div>
-                <h4 className="font-semibold text-[14px] text-[#171717] mb-1">{reviewSidebarItem.taskTitle}</h4>
+                <h4 className="font-semibold text-[15px] text-[#171717] mb-1">{reviewSidebarItem.taskTitle}</h4>
                 <p className="text-[12px] text-[#a3a3a3] mb-2">{reviewSidebarItem.briefTitle}</p>
                 {reviewSidebarItem.taskDescription && (
                   <p className="text-[13px] text-[#525252] leading-relaxed">{reviewSidebarItem.taskDescription}</p>
@@ -818,7 +818,7 @@ function BriefGroup({ title, tasks, done, total, pct, brandColor, token, addJsrR
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: brandColor }} />
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-[14px] text-[#171717] truncate text-left">{title}</h3>
+            <h3 className="font-semibold text-[15px] text-[#171717] truncate text-left">{title}</h3>
             <p className="text-[11px] text-[#a3a3a3] text-left">{done}/{total} complete</p>
           </div>
         </div>
@@ -845,14 +845,14 @@ function BriefGroup({ title, tasks, done, total, pct, brandColor, token, addJsrR
                     {hasDels && (
                       <button
                         onClick={() => setExpandedDeliverables((prev) => ({ ...prev, [task._id]: !prev[task._id] }))}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors"
+                        className="text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors"
                         style={{ color: brandColor, backgroundColor: brandColor + "10" }}
                       >
                         {task.deliverables.length} deliverable{task.deliverables.length > 1 ? "s" : ""}
                         {delsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                       </button>
                     )}
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ color: info.color, backgroundColor: info.color + "12" }}>{info.label}</span>
+                    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: info.color, backgroundColor: info.color + "12" }}>{info.label}</span>
                   </div>
                 </div>
                 {hasDels && delsOpen && (
@@ -929,7 +929,7 @@ function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2 text-[10px] text-[#a3a3a3]">
+        <div className="flex items-center gap-2 text-[11px] text-[#a3a3a3]">
           <span>{timeAgo(deliverable.submittedAt)}</span>
           {deliverable.status && (
             <span className={`font-medium px-1.5 py-0.5 rounded ${
@@ -948,7 +948,7 @@ function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
         <div className="border-t border-[#e5e5e5] px-4 py-2 space-y-2">
           {deliverable.remarks.map((r: any) => (
             <div key={r._id} className="flex gap-2">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5 ${
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5 ${
                 r.senderType === "client" ? "text-white" : "bg-[#e5e5e5] text-[#525252]"
               }`} style={r.senderType === "client" ? { backgroundColor: brandColor } : {}}>
                 {(r.senderName || (r.senderType === "client" ? "C" : "M"))[0].toUpperCase()}
@@ -956,7 +956,7 @@ function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-semibold text-[#171717]">{r.senderName || (r.senderType === "client" ? "Client" : "Manager")}</span>
-                  <span className="text-[9px] text-[#a3a3a3]">{timeAgo(r.createdAt)}</span>
+                  <span className="text-[11px] text-[#a3a3a3]">{timeAgo(r.createdAt)}</span>
                 </div>
                 <p className="text-[12px] text-[#525252] leading-relaxed">{r.content}</p>
               </div>

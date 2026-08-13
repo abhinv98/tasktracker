@@ -23,7 +23,7 @@ export function RemarkThread({ remarks, brandColor }: { remarks: Remark[]; brand
       {remarks.map((r) => (
         <div key={r._id} className="flex gap-2">
           <div
-            className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5 ${
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5 ${
               r.senderType === "client" ? "text-white" : "bg-[var(--p-surface-2)] text-[var(--p-text-2)]"
             }`}
             style={r.senderType === "client" ? { backgroundColor: brandColor } : {}}
@@ -35,7 +35,7 @@ export function RemarkThread({ remarks, brandColor }: { remarks: Remark[]; brand
               <span className="text-[11px] font-semibold text-[var(--p-text)]">
                 {r.senderName || (r.senderType === "client" ? "Client" : "Manager")}
               </span>
-              <span className="text-[10px] text-[var(--p-text-3)]">{timeAgo(r.createdAt)}</span>
+              <span className="text-[11px] text-[var(--p-text-3)]">{timeAgo(r.createdAt)}</span>
             </div>
             <p className="p-secondary">{r.content}</p>
           </div>

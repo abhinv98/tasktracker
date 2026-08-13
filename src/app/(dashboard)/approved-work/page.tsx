@@ -12,7 +12,7 @@ export default function ApprovedWorkRedirect() {
   }, [router]);
   return (
     <div className="p-8">
-      <p className="text-[14px] text-[var(--text-secondary)]">
+      <p className="text-[15px] text-[var(--text-secondary)]">
         Redirecting to Oversight…
       </p>
     </div>

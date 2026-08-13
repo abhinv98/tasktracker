@@ -135,7 +135,7 @@ function TaskNode({ data }: { data: TaskData }) {
             className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{ backgroundColor: data.teamColor }}
           />
-          <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide truncate">
+          <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide truncate">
             {data.teamName}
           </span>
         </div>
@@ -164,13 +164,13 @@ function TaskNode({ data }: { data: TaskData }) {
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ backgroundColor: status.color }}
             />
-            <span className="text-[10px] text-[var(--text-secondary)] truncate">
+            <span className="text-[11px] text-[var(--text-secondary)] truncate">
               {data.assigneeName}
             </span>
           </div>
 
           {data.deadline && (
-            <p className="text-[9px] text-[var(--text-muted)] mt-1">
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">
               {new Date(data.deadline).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -182,7 +182,7 @@ function TaskNode({ data }: { data: TaskData }) {
         {/* Status badge */}
         <div className="px-3 pb-2">
           <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium"
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium"
             style={{
               color: status.color,
               backgroundColor: `color-mix(in srgb, ${status.color} 12%, transparent)`,
@@ -241,12 +241,12 @@ function EmptyDraftNode({
       >
         <div className="h-1.5 rounded-t-[10px] bg-[var(--bg-hover)]" />
         <div className="px-3 pt-2 pb-1">
-          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">New task</p>
+          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">New task</p>
         </div>
         <div className="px-3 pb-3">
           <div className="rounded-lg bg-amber-50 border border-amber-200/90 px-2 py-1.5 flex items-start gap-1.5 text-left">
             <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
-            <p className="text-[10px] text-amber-950 leading-snug">
+            <p className="text-[11px] text-amber-950 leading-snug">
               Finish in the panel on the right. Select team, assignee, title, and deadline.
             </p>
           </div>
@@ -561,7 +561,7 @@ function BriefFlowCanvasInner({
           onClick={onRequestAddTeam}
           className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-white/95 border border-[var(--border)] text-[var(--text-primary)] shadow-sm hover:bg-[var(--accent-admin-dim)] hover:border-[var(--accent-admin)] transition-colors"
         >
-          <Plus className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+          <Plus className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
           Add team to brief
         </button>
       )}
@@ -581,7 +581,7 @@ function BriefFlowCanvasInner({
                     key={team.teamId}
                     type="button"
                     onClick={() => onCreateTask(team.teamId)}
-                    className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] border border-[var(--border)] hover:bg-[var(--accent-admin)] hover:text-white hover:border-[var(--accent-admin)] transition-colors"
+                    className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] border border-[var(--border)] hover:bg-[var(--accent-admin-strong)] hover:text-white hover:border-[var(--accent-admin)] transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5 shrink-0" />
                     Add task - {team.teamName}

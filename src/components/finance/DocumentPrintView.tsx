@@ -102,7 +102,7 @@ export function DocumentPrintView({
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[22px] font-bold tracking-wide">{doc.kind}</p>
+            <p className="text-[20px] font-bold tracking-wide">{doc.kind}</p>
             <p className="text-[13px] font-semibold mt-1">{doc.number}</p>
             <p className="text-[11px] text-[#57534e] mt-1">
               Date: {fmtDate(doc.date)}
@@ -118,10 +118,10 @@ export function DocumentPrintView({
         {/* Bill to */}
         <div className="flex items-start justify-between py-5">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1">
               {doc.kind === "INVOICE" ? "Billed to" : "Prepared for"}
             </p>
-            <p className="text-[14px] font-semibold">{doc.brandName}</p>
+            <p className="text-[15px] font-semibold">{doc.brandName}</p>
             {doc.projectName && (
               <p className="text-[12px] text-[#57534e]">Project: {doc.projectName}</p>
             )}
@@ -131,7 +131,7 @@ export function DocumentPrintView({
         {/* Line items */}
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-y border-[#d6d3d1] text-[10px] font-bold uppercase tracking-widest text-[#57534e]">
+            <tr className="border-y border-[#d6d3d1] text-[11px] font-bold uppercase tracking-widest text-[#57534e]">
               <th className="py-2 text-left">Description</th>
               <th className="py-2 text-right w-16">Qty</th>
               <th className="py-2 text-right w-28">Rate</th>
@@ -161,7 +161,7 @@ export function DocumentPrintView({
               <span className="text-[#57534e]">GST ({doc.gstPercent}%)</span>
               <span className="tabular-nums">{inr(doc.taxAmount)}</span>
             </div>
-            <div className="flex justify-between pt-1.5 border-t-2 border-[#1c1917] text-[14px] font-bold">
+            <div className="flex justify-between pt-1.5 border-t-2 border-[#1c1917] text-[15px] font-bold">
               <span>Total</span>
               <span className="tabular-nums">{inr(doc.total)}</span>
             </div>
@@ -184,7 +184,7 @@ export function DocumentPrintView({
         <div className="mt-10 pt-5 border-t border-[#d6d3d1] grid grid-cols-2 gap-6">
           {(agency.bankName || agency.upiId) && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5">
                 Payment details
               </p>
               <div className="text-[11px] text-[#57534e] leading-relaxed">
@@ -199,7 +199,7 @@ export function DocumentPrintView({
           <div>
             {doc.notes && (
               <>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5">
                   Notes
                 </p>
                 <p className="text-[11px] text-[#57534e] leading-relaxed">{doc.notes}</p>
@@ -207,7 +207,7 @@ export function DocumentPrintView({
             )}
             {agency.termsNote && (
               <>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5 mt-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-[#a8a29e] mb-1.5 mt-3">
                   Terms
                 </p>
                 <p className="text-[11px] text-[#57534e] leading-relaxed">

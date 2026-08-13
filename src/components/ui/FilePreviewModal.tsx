@@ -62,7 +62,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
               <a
                 href={file.url}
                 download={file.name}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors"
               >
                 <Download className="h-3.5 w-3.5" />
                 Download
@@ -102,7 +102,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
             {!canPreview && (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <FileText className="h-12 w-12 text-[var(--text-muted)]" />
-                <p className="text-[14px] font-medium text-[var(--text-primary)]">
+                <p className="text-[15px] font-medium text-[var(--text-primary)]">
                   {file.name}
                 </p>
                 <p className="text-[12px] text-[var(--text-secondary)]">
@@ -111,7 +111,7 @@ export function FilePreviewModal({ file, onClose }: FilePreviewModalProps) {
                 <a
                   href={file.url}
                   download={file.name}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors mt-2"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors mt-2"
                 >
                   <Download className="h-4 w-4" />
                   Download File

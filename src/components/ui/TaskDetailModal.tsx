@@ -427,7 +427,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-5 border-b border-[var(--border)]">
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-[16px] text-[var(--text-primary)] leading-snug">
+            <h2 className="font-bold text-[15px] text-[var(--text-primary)] leading-snug">
               {task.title}
             </h2>
             <p className="text-[12px] text-[var(--text-secondary)] mt-1">
@@ -460,9 +460,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     setEditingTag(true);
                     setTagDraft((task as { tag?: string }).tag ?? "");
                   }}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
                     (task as { tag?: string }).tag
-                      ? "text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-80"
+                      ? "text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:opacity-80"
                       : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                   }`}
                   title="Edit category tag"
@@ -477,7 +477,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {isAdmin && !isEditLocked && (
               <button
                 onClick={openEditForm}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
                 title="Edit task"
               >
                 <Pencil className="h-4 w-4" />
@@ -653,7 +653,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 {statusInfo.label}
               </span>
               {isDelivered && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
                   🔒 Task Done by Employee
                 </span>
               )}
@@ -669,7 +669,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 </button>
               )}
               {isBriefOnHold && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
                   ⏸ Brief On Hold
                 </span>
               )}
@@ -704,7 +704,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 <button
                   onClick={handleStatusUpdate}
                   disabled={isUpdatingStatus}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-60"
                 >
                   {isUpdatingStatus ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -761,7 +761,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
                       />
                       {deadlinePast && !redoDeadline && (
-                        <p className="text-[10px] text-amber-700 mt-1">
+                        <p className="text-[11px] text-amber-700 mt-1">
                           This task's deadline already passed. Set a new one so the assignee isn't flagged overdue immediately.
                         </p>
                       )}
@@ -852,7 +852,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <button
                     type="button"
                     onClick={() => setShowReassign(true)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100"
                   >
                     <UserPlus className="h-3 w-3" />
                     Reassign
@@ -877,7 +877,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     {new Date(task.deadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
                   </span>
                   {task.deadlineExtended && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700">
+                    <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700">
                       EXTENDED
                     </span>
                   )}
@@ -942,7 +942,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               {isAssignee && task.status !== "done" && (
                 <button
                   onClick={() => { setShowSummaryForm(!showSummaryForm); setSummaryDate(new Date().toISOString().slice(0, 10)); setSummaryText(""); }}
-                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
                   <FileText className="h-3 w-3" />
                   {showSummaryForm ? "Cancel" : "Add Daily Update"}
@@ -985,7 +985,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     } finally { setIsAddingSummary(false); }
                   }}
                   disabled={isAddingSummary || !summaryText.trim()}
-                  className="px-3 py-1.5 bg-[var(--accent-admin)] text-white rounded-lg text-[11px] font-semibold disabled:opacity-50"
+                  className="px-3 py-1.5 bg-[var(--accent-admin-strong)] text-white rounded-lg text-[11px] font-semibold disabled:opacity-50"
                 >
                   {isAddingSummary ? "Saving..." : "Save"}
                 </button>
@@ -997,14 +997,14 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 {(dailySummaries ?? []).map((s: any, idx: number) => (
                   <div key={s._id} className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-[11px] font-medium text-[var(--accent-admin)]">
+                      <p className="text-[11px] font-medium text-[var(--accent-admin-text)]">
                         Day {idx + 1} - {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p>
                       {isAssignee && (
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => { setEditingSummaryId(s._id); setEditingSummaryText(s.summary); }}
-                            className="text-[var(--text-muted)] hover:text-[var(--accent-admin)]"
+                            className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
                           >
                             <Pencil className="h-3 w-3" />
                           </button>
@@ -1031,18 +1031,18 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                               await updateDailySummary({ summaryId: s._id as Id<"taskDailySummaries">, summary: editingSummaryText.trim() });
                               setEditingSummaryId(null);
                             }}
-                            className="px-2.5 py-1 bg-[var(--accent-admin)] text-white rounded text-[10px] font-semibold"
+                            className="px-2.5 py-1 bg-[var(--accent-admin-strong)] text-white rounded text-[11px] font-semibold"
                           >Save</button>
                           <button
                             onClick={() => setEditingSummaryId(null)}
-                            className="px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded text-[10px] font-semibold"
+                            className="px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded text-[11px] font-semibold"
                           >Cancel</button>
                         </div>
                       </div>
                     ) : (
                       <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">{s.summary}</p>
                     )}
-                    <p className="text-[10px] text-[var(--text-muted)] mt-1">- {s.authorName}</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">- {s.authorName}</p>
                   </div>
                 ))}
               </div>
@@ -1061,7 +1061,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 {isAdmin && task.status !== "done" && (
                   <button
                     onClick={() => setShowAddHelper(!showAddHelper)}
-                    className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                    className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                   >
                     <UserPlus className="h-3 w-3" />
                     Add Helper
@@ -1123,7 +1123,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     <button
                       type="submit"
                       disabled={isCreatingSubTask}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
                     >
                       {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
                       {isCreatingSubTask ? "Adding..." : "Add Helper"}
@@ -1145,12 +1145,12 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         <p className="text-[12px] text-[var(--text-primary)] leading-snug">
                           {st.description ?? st.title}
                         </p>
-                        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
                           {st.assigneeName}{st.duration ? ` · ${st.duration}` : ""}
                         </p>
                       </div>
                       <span
-                        className="px-2 py-0.5 rounded-md text-[10px] font-medium shrink-0"
+                        className="px-2 py-0.5 rounded-md text-[11px] font-medium shrink-0"
                         style={{ color: stStatus.color, backgroundColor: stStatus.bg }}
                       >
                         {stStatus.label}
@@ -1223,7 +1223,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               {isAssignee && status !== "done" && (
                 <button
                   onClick={() => setShowDeliverableForm(!showDeliverableForm)}
-                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
                   <Send className="h-3 w-3" />
                   Submit deliverable
@@ -1292,12 +1292,12 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Route to</p>
+                  <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Route to</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="submit"
                       disabled={!deliverableMessage.trim() || isSubmitting}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
                     >
                       {isSubmitting ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -1349,7 +1349,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     key={d._id}
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
                   >
-                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                    <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
                       {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                     </p>
                     <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -1362,7 +1362,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span
-                          className="px-2 py-0.5 rounded-md text-[10px] font-medium"
+                          className="px-2 py-0.5 rounded-md text-[11px] font-medium"
                           style={{ backgroundColor: ds.bg, color: ds.color }}
                         >
                           {ds.label}
@@ -1386,7 +1386,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         href={d.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-start gap-1 mt-1.5 text-[11px] text-[var(--accent-admin)] hover:underline min-w-0"
+                        className="flex items-start gap-1 mt-1.5 text-[11px] text-[var(--accent-admin-text)] hover:underline min-w-0"
                       >
                         <ExternalLink className="h-3 w-3 shrink-0 mt-0.5" />
                         <span className="min-w-0 break-all">{d.link}</span>
@@ -1401,7 +1401,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                               key={idx}
                               type="button"
                               onClick={() => setPreviewFile(file)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin)] transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
                             >
                               {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
                               <span className="max-w-[120px] truncate">{file.name}</span>
@@ -1415,7 +1415,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-white border border-[var(--border-subtle)]">
                         <MessageSquare className="h-3 w-3 text-[var(--text-muted)] mt-0.5 shrink-0" />
                         <div>
-                          <p className="text-[10px] font-medium text-[var(--text-secondary)]">
+                          <p className="text-[11px] font-medium text-[var(--text-secondary)]">
                             {d.reviewerName ?? "Reviewer"}:
                           </p>
                           <p className="text-[11px] text-[var(--text-secondary)]">
@@ -1461,7 +1461,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     key={`empty-creative-${n}`}
                     className="p-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)]/40"
                   >
-                    <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+                    <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
                       Creative {n}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>
@@ -1502,7 +1502,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-white rounded-xl border border-[var(--border)] shadow-2xl">
               <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-                <h3 className="font-semibold text-[16px] text-[var(--text-primary)]">Edit Task</h3>
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Edit Task</h3>
                 <button
                   onClick={() => setShowEditForm(false)}
                   className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -1579,7 +1579,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <button
                     type="submit"
                     disabled={isSavingEdit}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin)] hover:bg-[#c4684d] transition-colors disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-60"
                   >
                     {isSavingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     {isSavingEdit ? "Saving..." : "Save Changes"}

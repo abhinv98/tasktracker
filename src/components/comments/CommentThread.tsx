@@ -75,8 +75,8 @@ function renderContent(content: string, isOwnMessage?: boolean): React.ReactNode
           key={match.index}
           className={`font-semibold ${
             type === "user"
-              ? "text-[var(--accent-manager)]"
-              : "text-[var(--accent-admin)]"
+              ? "text-[var(--accent-manager-text)]"
+              : "text-[var(--accent-admin-text)]"
           }`}
         >
           @{displayName}
@@ -397,9 +397,9 @@ export function CommentThread({
         <div className="mb-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
           <button
             onClick={() => setShowPinnedSection(!showPinnedSection)}
-            className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide hover:bg-[var(--bg-hover)] rounded-t-lg transition-colors"
+            className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide hover:bg-[var(--bg-hover)] rounded-t-lg transition-colors"
           >
-            <Pin className="h-3 w-3 text-[var(--accent-admin)]" />
+            <Pin className="h-3 w-3 text-[var(--accent-admin-text)]" />
             Pinned ({pinnedComments.length})
             <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${showPinnedSection ? "" : "-rotate-90"}`} />
           </button>
@@ -407,10 +407,10 @@ export function CommentThread({
             <div className="px-3 pb-2 space-y-1">
               {pinnedComments.map((c) => (
                 <div key={`pin-${c._id}`} className="flex items-start gap-2 px-2 py-1.5 rounded-md bg-white border border-[var(--border-subtle)]">
-                  <Pin className="h-3 w-3 text-[var(--accent-admin)] shrink-0 mt-0.5" />
+                  <Pin className="h-3 w-3 text-[var(--accent-admin-text)] shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-semibold text-[var(--text-primary)]">{c.authorName}: </span>
-                    <span className="text-[10px] text-[var(--text-secondary)]">{c.content.slice(0, 120)}{c.content.length > 120 ? "..." : ""}</span>
+                    <span className="text-[11px] font-semibold text-[var(--text-primary)]">{c.authorName}: </span>
+                    <span className="text-[11px] text-[var(--text-secondary)]">{c.content.slice(0, 120)}{c.content.length > 120 ? "..." : ""}</span>
                   </div>
                 </div>
               ))}
@@ -453,7 +453,7 @@ export function CommentThread({
                     />
                   ) : (
                     <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
                       style={{ backgroundColor: roleColor }}
                     >
                       {c.authorName.charAt(0).toUpperCase()}
@@ -473,13 +473,13 @@ export function CommentThread({
                     <span className="text-[11px] font-semibold text-[var(--text-primary)]">
                       {isMe ? "You" : c.authorName}
                     </span>
-                    {isPinned && <Pin className="h-2.5 w-2.5 text-[var(--accent-admin)]" />}
+                    {isPinned && <Pin className="h-2.5 w-2.5 text-[var(--accent-admin-text)]" />}
                     {taskName && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] font-medium">
                         on: {taskName}
                       </span>
                     )}
-                    <span className="text-[9px] text-[var(--text-muted)]">
+                    <span className="text-[11px] text-[var(--text-muted)]">
                       {formatTime(c.createdAt)}
                     </span>
                   </div>
@@ -487,7 +487,7 @@ export function CommentThread({
                 <div
                   className={`relative px-3 py-1.5 rounded-xl text-[12px] leading-relaxed ${
                     isMe
-                      ? "bg-[var(--accent-admin)] text-white rounded-tr-sm"
+                      ? "bg-[var(--accent-admin-strong)] text-white rounded-tr-sm"
                       : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-tl-sm"
                   }`}
                 >
@@ -511,7 +511,7 @@ export function CommentThread({
                           href={(c as { attachmentUrl: string }).attachmentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
                             isMe ? "bg-white/20 text-white hover:bg-white/30" : "bg-[var(--bg-primary)] text-[var(--text-primary)] hover:bg-[var(--border)]"
                           }`}
                         >
@@ -527,7 +527,7 @@ export function CommentThread({
                     {/* Reaction button */}
                     <button
                       onClick={() => setShowEmojiPicker(showEmojiPicker === c._id ? null : c._id)}
-                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin)] transition-colors"
+                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] transition-colors"
                     >
                       <SmilePlus className="h-3 w-3" />
                     </button>
@@ -535,7 +535,7 @@ export function CommentThread({
                     {user?.role === "admin" && (
                       <button
                         onClick={() => isPinned ? unpinComment({ commentId: c._id }) : pinComment({ commentId: c._id })}
-                        className={`p-0.5 rounded transition-colors ${isPinned ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)] hover:text-[var(--accent-admin)]"}`}
+                        className={`p-0.5 rounded transition-colors ${isPinned ? "text-[var(--accent-admin-text)]" : "text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"}`}
                       >
                         <Pin className="h-3 w-3" />
                       </button>
@@ -558,7 +558,7 @@ export function CommentThread({
                         <button
                           key={ep.label}
                           onClick={() => { toggleReaction({ commentId: c._id, emoji: ep.label }); setShowEmojiPicker(null); }}
-                          className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)] text-[14px] transition-colors"
+                          className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)] text-[15px] transition-colors"
                         >
                           {ep.emoji}
                         </button>
@@ -574,9 +574,9 @@ export function CommentThread({
                       <button
                         key={r.emoji}
                         onClick={() => toggleReaction({ commentId: c._id, emoji: r.emoji })}
-                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] border transition-colors ${
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] border transition-colors ${
                           r.myReaction
-                            ? "bg-[var(--accent-admin-dim)] border-[var(--accent-admin)] text-[var(--accent-admin)]"
+                            ? "bg-[var(--accent-admin-dim)] border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
                             : "bg-white border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-admin)]"
                         }`}
                       >
@@ -603,11 +603,11 @@ export function CommentThread({
         {typingUsers && typingUsers.length > 0 && (
           <div className="flex items-center gap-2 px-2 py-1 mt-1">
             <div className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: "300ms" }} />
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-typing-dot" style={{ animationDelay: "0ms" }} />
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-typing-dot" style={{ animationDelay: "150ms" }} />
+              <span className="w-1 h-1 rounded-full bg-[var(--text-muted)] animate-typing-dot" style={{ animationDelay: "300ms" }} />
             </div>
-            <span className="text-[10px] text-[var(--text-muted)] italic">
+            <span className="text-[11px] text-[var(--text-muted)] italic">
               {typingUsers.map((u) => u.name).join(" and ")} {typingUsers.length === 1 ? "is" : "are"} typing...
             </span>
           </div>
@@ -622,7 +622,7 @@ export function CommentThread({
             <button
               type="button"
               onClick={() => setShowTargetPicker(!showTargetPicker)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
             >
               Posting to: <span className="text-[var(--text-primary)]">{postTarget.label}</span>
               <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -641,7 +641,7 @@ export function CommentThread({
                     }`}
                   >
                     {opt.type === "brief" ? (
-                      <span className="text-[var(--accent-admin)]">Brief</span>
+                      <span className="text-[var(--accent-admin-text)]">Brief</span>
                     ) : (
                       <CheckSquare className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
                     )}
@@ -668,14 +668,14 @@ export function CommentThread({
                 }`}
               >
                 {item.type === "user" ? (
-                  <User className="h-3 w-3 text-[var(--accent-manager)] shrink-0" />
+                  <User className="h-3 w-3 text-[var(--accent-manager-text)] shrink-0" />
                 ) : (
-                  <CheckSquare className="h-3 w-3 text-[var(--accent-admin)] shrink-0" />
+                  <CheckSquare className="h-3 w-3 text-[var(--accent-admin-text)] shrink-0" />
                 )}
                 <span className="truncate text-[var(--text-primary)]">
                   {item.label}
                 </span>
-                <span className="ml-auto text-[9px] text-[var(--text-muted)]">
+                <span className="ml-auto text-[11px] text-[var(--text-muted)]">
                   {item.type === "user" ? "Person" : "Task"}
                 </span>
               </button>
@@ -700,7 +700,7 @@ export function CommentThread({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="shrink-0 p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Attach a file"
           >
             <Paperclip className="h-3.5 w-3.5" />
@@ -740,7 +740,7 @@ export function CommentThread({
                   }, 0);
                 }
               }}
-              className="shrink-0 p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="shrink-0 p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Mention a person or task"
             >
               <AtSign className="h-3.5 w-3.5" />
@@ -760,7 +760,7 @@ export function CommentThread({
           <button
             type="submit"
             disabled={(!text.trim() && !pendingFile) || uploading}
-            className="shrink-0 p-2 rounded-xl bg-[var(--accent-admin)] text-white disabled:opacity-30 hover:bg-[#c4684d] transition-colors"
+            className="shrink-0 p-2 rounded-xl bg-[var(--accent-admin-strong)] text-white disabled:opacity-30 hover:bg-[#a04525] transition-colors"
           >
             {uploading ? (
               <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

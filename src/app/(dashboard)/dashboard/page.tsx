@@ -32,7 +32,7 @@ function ActivityFeed() {
               <span className="text-[var(--text-secondary)]">{log.action.replace(/_/g, " ")}</span>{" "}
               on <span className="font-medium">{log.briefTitle}</span>
             </p>
-            <p className="text-[10px] text-[var(--text-muted)]">
+            <p className="text-[11px] text-[var(--text-muted)]">
               {new Date(log.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
             </p>
           </div>
@@ -109,29 +109,29 @@ function EmployeeTaskCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             {!!t.parentTaskId && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-50 text-blue-600 shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                 HELPER
               </span>
             )}
             {t.deadlineExtended && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
                 EXTENDED
               </span>
             )}
             {t.briefStatus === "on_hold" && (
-              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
                 ⏸ ON HOLD
               </span>
             )}
             {(task as any).creativesRequired > 0 && (
               <span
-                className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0"
+                className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0"
                 title={`${(task as any).creativesRequired} creative deliverables required`}
               >
                 {(task as any).creativesRequired} CREATIVES REQUIRED
               </span>
             )}
-            <h3 className="font-semibold text-[13px] sm:text-[14px] text-[var(--text-primary)]">
+            <h3 className="font-semibold text-[13px] sm:text-[15px] text-[var(--text-primary)]">
               {task.title}
             </h3>
           </div>
@@ -354,7 +354,7 @@ function EmployeeTaskViews({
             aria-pressed={viewMode === "kanban"}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
               viewMode === "kanban"
-                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             }`}
           >
@@ -366,7 +366,7 @@ function EmployeeTaskViews({
             aria-pressed={viewMode === "list"}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
               viewMode === "list"
-                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             }`}
           >
@@ -445,9 +445,9 @@ function EmployeeTaskViews({
                   />
                   {tab.label}
                   <span
-                    className={`inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full text-[10px] font-semibold tabular-nums ${
+                    className={`inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full text-[11px] font-semibold tabular-nums ${
                       isActive
-                        ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]"
+                        ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
                         : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
                     }`}
                   >
@@ -636,7 +636,7 @@ export default function DashboardPage() {
       ...pendingRequests.map((r): AttentionRow => ({
         key: `request-${r._id}`,
         icon: Inbox,
-        iconClass: "text-[var(--accent-admin)]",
+        iconClass: "text-[var(--accent-admin-text)]",
         title: r.title,
         context: `${r.brandName} · Client request`,
         href: "/client-requests",
@@ -661,7 +661,7 @@ export default function DashboardPage() {
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
               {todayLine}
             </p>
-            <h1 className="font-semibold text-[22px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
+            <h1 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
               {greeting}, {firstName}
             </h1>
             <p className="mt-1.5 text-[13px] text-[var(--text-secondary)]">
@@ -675,7 +675,7 @@ export default function DashboardPage() {
                     {i > 0 && <span className="mx-1.5 text-[var(--text-muted)]">·</span>}
                     <Link
                       href={seg.href}
-                      className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-admin)] hover:underline underline-offset-2 transition-colors"
+                      className="font-medium text-[var(--text-primary)] hover:text-[var(--accent-admin-text)] hover:underline underline-offset-2 transition-colors"
                     >
                       {seg.label}
                     </Link>
@@ -687,7 +687,7 @@ export default function DashboardPage() {
           {(myBrandIds ?? []).length > 0 && (
             <button
               onClick={() => router.push("/brands-overview?filter=mine")}
-              className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+              className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
             >
               <Briefcase className="h-4 w-4" />
               My Brands
@@ -738,7 +738,7 @@ export default function DashboardPage() {
                       </div>
                       <Link
                         href={row.href}
-                        className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+                        className="shrink-0 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
                       >
                         View <ArrowRight className="h-3 w-3" />
                       </Link>
@@ -762,7 +762,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
                   Active Briefs
                 </p>
-                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
                   {scopedActiveBriefs}
                 </p>
               </div>
@@ -775,7 +775,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
                   Open Tasks
                 </p>
-                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
                   {scopedOpenTasks}
                 </p>
               </div>
@@ -788,7 +788,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
                   {isSuperAdmin ? "Teams" : "My Brands"}
                 </p>
-                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
                   {isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
                 </p>
               </div>
@@ -801,7 +801,7 @@ export default function DashboardPage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
                   Employees
                 </p>
-                <p className="text-[22px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
+                <p className="text-[20px] font-semibold text-[var(--text-primary)] mt-1 tabular-nums">
                   {employeeCount}
                 </p>
               </div>
@@ -822,10 +822,10 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-[var(--accent-admin)]" />
+                <BarChart3 className="h-5 w-5 text-[var(--accent-admin-text)]" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                   Brand Overview
                 </h3>
                 <p className="text-[12px] text-[var(--text-secondary)]">
@@ -843,10 +843,10 @@ export default function DashboardPage() {
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-[var(--accent-employee-dim)] flex items-center justify-center">
-                <Briefcase className="h-5 w-5 text-[var(--accent-employee)]" />
+                <Briefcase className="h-5 w-5 text-[var(--accent-employee-text)]" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
                   Briefs Overview
                 </h3>
                 <p className="text-[12px] text-[var(--text-secondary)]">
@@ -871,7 +871,7 @@ export default function DashboardPage() {
               </h2>
               <Link
                 href="/deliverables"
-                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+                className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
               >
                 View all →
               </Link>
@@ -936,19 +936,19 @@ export default function DashboardPage() {
                           } catch {}
                         }}
                         disabled={isContacted}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
                         <Phone className="h-3 w-3" />
                         {isContacted ? "Contacted" : "Contact Manager"}
                       </button>
                     </div>
                     {isContacted && (
-                      <p className="text-[10px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
+                      <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
                         Waiting for the brand manager to confirm.
                       </p>
                     )}
                     {!isContacted && ot.overdueContactDenied && (
-                      <p className="text-[10px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
+                      <p className="text-[11px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
                         It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
                       </p>
                     )}
@@ -972,7 +972,7 @@ export default function DashboardPage() {
               </h2>
               <Link
                 href="/worklog"
-                className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+                className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
               >
                 View all →
               </Link>
@@ -997,7 +997,7 @@ export default function DashboardPage() {
                       {" "}({Math.round((Date.now() - ot.deadline) / (1000 * 60 * 60))}h overdue)
                     </p>
                     {ot.deadlineExtended && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
                         EXTENDED
                       </span>
                     )}
@@ -1029,7 +1029,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                   {ot.briefType === "content_calendar" && (
-                    <p className="text-[10px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
                       <Calendar className="h-2.5 w-2.5" /> Content Calendar
                     </p>
                   )}
@@ -1095,7 +1095,7 @@ export default function DashboardPage() {
                                 setExtendDeadline(undefined);
                                 setExtendDeadlineTime("");
                               }}
-                              className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                              className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                             >
                               Save
                             </button>
@@ -1109,7 +1109,7 @@ export default function DashboardPage() {
                         ) : (
                           <button
                             onClick={() => setExtendingTaskId(ot._id)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                           >
                             <CalendarClock className="h-3 w-3" />
                             Extend Deadline
@@ -1154,7 +1154,7 @@ export default function DashboardPage() {
                             }
                             setResolvingTaskId(null);
                           }}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                         >
                           No, Continue
                         </button>
@@ -1219,12 +1219,12 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     {t.briefType === "content_calendar" && (
-                      <p className="text-[10px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                      <p className="text-[11px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
                         <Calendar className="h-2.5 w-2.5" /> Content Calendar
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColor}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${labelColor}`}>
                         {label}
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -1236,7 +1236,7 @@ export default function DashboardPage() {
                               router.push(`/brief/${t.briefId}`);
                             }
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin)] hover:opacity-90 transition-opacity"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                         >
                           {t.briefType === "content_calendar" ? "Open Calendar" : "Take Action"}
                           <ArrowRight className="h-3 w-3" />
@@ -1273,7 +1273,7 @@ export default function DashboardPage() {
                               }
                               setResolvingTaskId(null);
                             }}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                           >
                             No, Continue
                           </button>
@@ -1324,13 +1324,13 @@ export default function DashboardPage() {
                       supervising
                     </span>
                     {(myWork?.counts.needsReview ?? 0) > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
                         {myWork!.counts.needsReview} awaiting your review
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin)]">
+                <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)]">
                   Open My Tasks
                 </span>
               </div>
@@ -1363,7 +1363,7 @@ export default function DashboardPage() {
                 )}
                 <Link
                   href="/teams"
-                  className="text-[12px] font-medium text-[var(--accent-admin)] hover:underline underline-offset-2"
+                  className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
                 >
                   View all →
                 </Link>
@@ -1396,7 +1396,7 @@ export default function DashboardPage() {
                         className="w-3 h-3 rounded-sm shrink-0"
                         style={{ backgroundColor: teamData.team.color }}
                       />
-                      <h3 className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">
+                      <h3 className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
                         {teamData.team.name}
                       </h3>
                       <div className="flex items-center gap-3 shrink-0">
@@ -1407,7 +1407,7 @@ export default function DashboardPage() {
                               style={{ width: `${progress}%` }}
                             />
                           </div>
-                          <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                          <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
                             {doneTasks}/{totalTasks}
                           </span>
                         </div>
@@ -1433,7 +1433,7 @@ export default function DashboardPage() {
                                 {memberData.user.avatarUrl ? (
                                   <img src={memberData.user.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
                                 ) : (
-                                  <div className="w-7 h-7 rounded-full bg-[var(--accent-employee-dim)] flex items-center justify-center text-[10px] font-bold text-[var(--accent-employee)]">
+                                  <div className="w-7 h-7 rounded-full bg-[var(--accent-employee-dim)] flex items-center justify-center text-[11px] font-bold text-[var(--accent-employee-text)]">
                                     {(memberData.user.name ?? memberData.user.email ?? "?").charAt(0).toUpperCase()}
                                   </div>
                                 )}
@@ -1443,14 +1443,14 @@ export default function DashboardPage() {
                                       {memberData.user.name ?? memberData.user.email}
                                     </span>
                                     {memberData.user.designation && (
-                                      <span className="text-[10px] text-[var(--text-muted)]">{memberData.user.designation}</span>
+                                      <span className="text-[11px] text-[var(--text-muted)]">{memberData.user.designation}</span>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-2 mt-0.5">
                                     <div className="w-20 h-1 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                                       <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${memberPct}%` }} />
                                     </div>
-                                    <span className="text-[10px] text-[var(--text-muted)] tabular-nums">
+                                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
                                       {memberDone}/{memberTotal} tasks
                                     </span>
                                   </div>
@@ -1550,19 +1550,19 @@ export default function DashboardPage() {
                         } catch {}
                       }}
                       disabled={isContacted}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                       <Phone className="h-3 w-3" />
                       {isContacted ? "Contacted" : "Contact Manager"}
                     </button>
                   </div>
                   {isContacted && (
-                    <p className="text-[10px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
+                    <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
                       Waiting for the brand manager to confirm.
                     </p>
                   )}
                   {!isContacted && ot.overdueContactDenied && (
-                    <p className="text-[10px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
+                    <p className="text-[11px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
                       It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
                     </p>
                   )}

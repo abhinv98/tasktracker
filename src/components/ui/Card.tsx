@@ -33,9 +33,9 @@ export function Card({
         ${className}
       `}
       style={{
-        ...(hasAccent && accentColor
-          ? { borderLeft: `2px solid ${accentColor}` }
-          : {}),
+        // A full hairline in the accent hue rather than a thick left stripe —
+        // same signal, without the tacked-on accent bar.
+        ...(hasAccent && accentColor ? { borderColor: accentColor } : {}),
         ...style,
       }}
       onClick={onClick}

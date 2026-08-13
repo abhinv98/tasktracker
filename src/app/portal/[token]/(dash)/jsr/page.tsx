@@ -114,7 +114,7 @@ export default function PortalJsrPage() {
               Awaiting your input <ArrowRight className="h-3 w-3" />
             </p>
           </div>
-          <p className="text-[22px] font-semibold tabular-nums mt-1 text-[var(--p-text)]">
+          <p className="text-[20px] font-semibold tabular-nums mt-1 text-[var(--p-text)]">
             {awaitingInput}
           </p>
         </Link>
@@ -217,7 +217,7 @@ function SummaryChip({ label, value, dot }: { label: string; value: number; dot:
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dot }} />
         <p className="p-secondary text-[var(--p-text-3)]">{label}</p>
       </div>
-      <p className="text-[22px] font-semibold tabular-nums mt-1 text-[var(--p-text)]">{value}</p>
+      <p className="text-[20px] font-semibold tabular-nums mt-1 text-[var(--p-text)]">{value}</p>
     </div>
   );
 }

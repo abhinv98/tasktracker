@@ -177,7 +177,7 @@ export default function TeamsPanel() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
-            <h2 className="font-semibold text-[18px] text-[var(--text-primary)] mb-4">
+            <h2 className="font-semibold text-[20px] text-[var(--text-primary)] mb-4">
               Create Team
             </h2>
             <form onSubmit={handleCreateTeam} className="flex flex-col gap-4">
@@ -260,7 +260,7 @@ export default function TeamsPanel() {
                   style={{ backgroundColor: selectedTeam.color }}
                 />
               )}
-              <h2 className="font-semibold text-[18px] text-[var(--text-primary)] truncate">
+              <h2 className="font-semibold text-[20px] text-[var(--text-primary)] truncate">
                 {selectedTeam?.name ?? "Loading..."}
               </h2>
             </div>
@@ -291,7 +291,7 @@ export default function TeamsPanel() {
                     <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
                       Description
                     </p>
-                    <p className="text-[14px] text-[var(--text-primary)] leading-relaxed">
+                    <p className="text-[15px] text-[var(--text-primary)] leading-relaxed">
                       {selectedTeam.description}
                     </p>
                   </div>
@@ -313,7 +313,7 @@ export default function TeamsPanel() {
                         ))}
                       </select>
                     ) : (
-                      <p className="text-[14px] text-[var(--text-primary)] font-medium">
+                      <p className="text-[15px] text-[var(--text-primary)] font-medium">
                         {selectedTeam.leadName}
                       </p>
                     )}
@@ -369,7 +369,7 @@ export default function TeamsPanel() {
                           className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors group"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">
+                            <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">
                               {member.name ?? "Unnamed"}
                             </p>
                             <p className="text-[12px] text-[var(--text-secondary)] truncate">

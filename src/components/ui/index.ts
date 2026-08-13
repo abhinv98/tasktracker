@@ -5,6 +5,7 @@ export { PageHeader } from "./PageHeader";
 export { ConfirmModal } from "./ConfirmModal";
 export { DatePicker } from "./DatePicker";
 export { Input } from "./Input";
+export { Modal } from "./Modal";
 export { PromptModal } from "./PromptModal";
 export { Select } from "./Select";
 export {

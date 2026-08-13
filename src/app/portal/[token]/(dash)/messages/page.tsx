@@ -144,7 +144,7 @@ export default function PortalMessagesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
                         <span className="text-[13px] font-bold text-[var(--p-text)]">{name}</span>
-                        <span className="text-[10px] text-[var(--p-text-3)]">{timeLabel(group.first.createdAt)}</span>
+                        <span className="text-[11px] text-[var(--p-text-3)]">{timeLabel(group.first.createdAt)}</span>
                       </div>
                       <p className="p-body break-words whitespace-pre-wrap">{group.first.content}</p>
                       {group.rest.map((m) => (
@@ -195,7 +195,7 @@ export default function PortalMessagesPage() {
               <Send className="h-4 w-4" />
             </button>
           </div>
-          <p className="text-[10px] text-[var(--p-text-3)] mt-1.5 px-1">
+          <p className="text-[11px] text-[var(--p-text-3)] mt-1.5 px-1">
             Enter to send, Shift+Enter for a new line
           </p>
         </div>

@@ -106,7 +106,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   );
 
   if (overview === undefined) {
-    return <p className="text-[14px] text-[var(--text-secondary)] py-8">Loading...</p>;
+    return <p className="text-[15px] text-[var(--text-secondary)] py-8">Loading...</p>;
   }
 
   const statusCounts = {
@@ -192,7 +192,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
               setFilterTag("");
               setPage(0);
             }}
-            className="text-[11px] font-medium text-[var(--accent-admin)] hover:underline"
+            className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
           >
             Clear filters
           </button>
@@ -215,34 +215,34 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
             <table className="w-full min-w-[1100px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Task
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Tag
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Assignee
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Status
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Deadline
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Assigned
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Submitted
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Approved
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Overseer
                   </th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
                     Team lead
                   </th>
                 </tr>
@@ -270,10 +270,10 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                         <p className="text-[12px] font-medium text-[var(--text-primary)] leading-snug">
                           {task.taskTitle}
                         </p>
-                        <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate" title={task.briefTitle}>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate" title={task.briefTitle}>
                           {task.briefTitle}
                         </p>
-                        <p className="text-[10px] text-[var(--text-disabled)] mt-0.5">{task.teamName}</p>
+                        <p className="text-[11px] text-[var(--text-disabled)] mt-0.5">{task.teamName}</p>
                       </td>
                       <td
                         className="px-3 py-2.5 align-top whitespace-nowrap"
@@ -301,9 +301,9 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                               setEditingTagFor(task._id);
                               setTagDraft(task.tag ?? "");
                             }}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
                               task.tag
-                                ? "text-[var(--accent-admin)] bg-[var(--accent-admin-dim)] hover:opacity-80"
+                                ? "text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:opacity-80"
                                 : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                             }`}
                             title="Edit tag"
@@ -318,7 +318,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                       </td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${cfg.color} ${cfg.bg}`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${cfg.color} ${cfg.bg}`}
                         >
                           {cfg.label}
                         </span>

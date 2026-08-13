@@ -80,7 +80,7 @@ export default function DiscussionsPage() {
         {/* Header */}
         <div className="px-4 py-3 border-b border-[var(--border)]">
           <div className="flex items-center gap-2 mb-3">
-            <MessageCircle className="h-4 w-4 text-[var(--accent-admin)]" />
+            <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
             <h1 className="font-semibold text-[15px] text-[var(--text-primary)]">
               Discussions
             </h1>
@@ -140,7 +140,7 @@ export default function DiscussionsPage() {
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium capitalize"
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium capitalize"
                         style={{
                           color: statusColor,
                           backgroundColor: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
@@ -149,7 +149,7 @@ export default function DiscussionsPage() {
                         {brief.status}
                       </span>
                       {brief.managerName && (
-                        <span className="text-[10px] text-[var(--text-muted)] truncate">
+                        <span className="text-[11px] text-[var(--text-muted)] truncate">
                           {brief.managerName}
                         </span>
                       )}
@@ -157,7 +157,7 @@ export default function DiscussionsPage() {
                     {brief.teamNames && brief.teamNames.length > 0 && (
                       <div className="flex items-center gap-1 mt-1">
                         <Users className="h-2.5 w-2.5 text-[var(--text-disabled)]" />
-                        <span className="text-[10px] text-[var(--text-disabled)] truncate">
+                        <span className="text-[11px] text-[var(--text-disabled)] truncate">
                           {brief.teamNames.join(", ")}
                         </span>
                       </div>
@@ -165,12 +165,12 @@ export default function DiscussionsPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {unreadCounts?.[brief._id] ? (
-                      <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin)] text-white text-[9px] font-bold px-1">
+                      <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold px-1">
                         {unreadCounts[brief._id]}
                       </span>
                     ) : null}
                     {isSelected && (
-                      <ChevronRight className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+                      <ChevronRight className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
                     )}
                   </div>
                 </div>
@@ -181,7 +181,7 @@ export default function DiscussionsPage() {
 
         {/* Brief count */}
         <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-primary)]">
-          <p className="text-[10px] text-[var(--text-muted)]">
+          <p className="text-[11px] text-[var(--text-muted)]">
             {filteredBriefs.length} brief
             {filteredBriefs.length !== 1 ? "s" : ""} available
           </p>
@@ -195,10 +195,10 @@ export default function DiscussionsPage() {
             {/* Chat Header */}
             <div className="px-5 py-3 border-b border-[var(--border)] bg-white flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                <Hash className="h-4 w-4 text-[var(--accent-admin)]" />
+                <Hash className="h-4 w-4 text-[var(--accent-admin-text)]" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
+                <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                   {selectedBrief.title}
                 </h2>
                 <div className="flex items-center gap-2">
@@ -245,7 +245,7 @@ export default function DiscussionsPage() {
                       }}
                     />
                   </div>
-                  <span className="text-[10px] font-medium text-[var(--text-muted)] tabular-nums">
+                  <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
                     {Math.round(selectedBrief.progress)}%
                   </span>
                 </div>
@@ -273,9 +273,9 @@ export default function DiscussionsPage() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-xs">
               <div className="w-16 h-16 rounded-2xl bg-[var(--accent-admin-dim)] flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="h-8 w-8 text-[var(--accent-admin)]" />
+                <MessageCircle className="h-8 w-8 text-[var(--accent-admin-text)]" />
               </div>
-              <h2 className="font-semibold text-[16px] text-[var(--text-primary)] mb-2">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
                 Brief Discussions
               </h2>
               <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-1">

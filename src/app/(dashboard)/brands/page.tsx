@@ -15,7 +15,7 @@ export default function BrandsRedirect() {
   }, [router, searchParams]);
   return (
     <div className="p-8">
-      <p className="text-[14px] text-[var(--text-secondary)]">
+      <p className="text-[15px] text-[var(--text-secondary)]">
         Redirecting to Brands Overview…
       </p>
     </div>

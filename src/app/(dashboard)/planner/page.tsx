@@ -598,8 +598,8 @@ export default function PlannerPage() {
         {/* Header */}
         <div className="px-3 py-3 border-b border-[var(--border)]">
           <div className="flex items-center gap-2 mb-2">
-            <CalendarDays className="h-4 w-4 text-[var(--accent-admin)]" />
-            <h1 className="font-semibold text-[14px] text-[var(--text-primary)]">Planner</h1>
+            <CalendarDays className="h-4 w-4 text-[var(--accent-admin-text)]" />
+            <h1 className="font-semibold text-[15px] text-[var(--text-primary)]">Planner</h1>
           </div>
           {isAdminOrManager && (
             <div className="relative">
@@ -618,7 +618,7 @@ export default function PlannerPage() {
         {/* Employee selector (admin/manager) */}
         {isAdminOrManager && (
           <div className="flex-1 overflow-y-auto border-b border-[var(--border)]" style={{ maxHeight: "45%" }}>
-            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">People</p>
+            <p className="px-3 pt-2 pb-1 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">People</p>
             {filteredEmployees.map((emp) => {
               const isActive = viewingUserId === emp._id;
               return (
@@ -629,12 +629,12 @@ export default function PlannerPage() {
                     isActive ? "bg-[var(--accent-admin-dim)] border-l-[3px] border-l-[var(--accent-admin)]" : "hover:bg-[var(--bg-hover)] border-l-[3px] border-l-transparent"
                   }`}
                 >
-                  <div className="w-6 h-6 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[10px] font-bold text-[var(--text-secondary)]">
+                  <div className="w-6 h-6 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
                     {emp.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-medium text-[var(--text-primary)] truncate">{emp.name}</div>
-                    <div className="text-[10px] text-[var(--text-muted)]">{emp.totalHours}h scheduled</div>
+                    <div className="text-[11px] text-[var(--text-muted)]">{emp.totalHours}h scheduled</div>
                   </div>
                   <span className={`w-2 h-2 rounded-full shrink-0 ${emp.isBusy ? "bg-[var(--accent-admin)]" : "bg-[var(--accent-employee)]"}`} title={emp.isBusy ? "Busy" : "Free"} />
                 </button>
@@ -646,10 +646,10 @@ export default function PlannerPage() {
         {/* Unscheduled Tasks Tray */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-3 pt-2 pb-1 flex items-center justify-between">
-            <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
+            <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
               Unscheduled ({unscheduledTasks?.length ?? 0})
             </p>
-            <span className="text-[8px] text-[var(--text-disabled)] italic">sorted by priority</span>
+            <span className="text-[11px] text-[var(--text-disabled)] italic">sorted by priority</span>
           </div>
           {(unscheduledTasks ?? []).length === 0 ? (
             <p className="px-3 py-4 text-[11px] text-[var(--text-disabled)] text-center">All tasks scheduled!</p>
@@ -662,7 +662,7 @@ export default function PlannerPage() {
                 <div className="flex items-start justify-between gap-1">
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => openQuickAddWithTask(task._id)}>
                     <div className="flex items-center gap-1.5">
-                      <span className={`shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded text-[8px] font-bold px-1 ${
+                      <span className={`shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded text-[11px] font-bold px-1 ${
                         task.sortOrder <= 1000 ? "bg-red-100 text-red-700" :
                         task.sortOrder <= 5000 ? "bg-amber-100 text-amber-700" :
                         "bg-slate-100 text-slate-500"
@@ -672,13 +672,13 @@ export default function PlannerPage() {
                       <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 ml-[26px]">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium truncate max-w-[100px]">{task.briefName}</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">{task.duration}</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] font-medium truncate max-w-[100px]">{task.briefName}</span>
+                      <span className="text-[11px] text-[var(--text-muted)]">{task.duration}</span>
                     </div>
                   </div>
                   <button
                     onClick={() => quickScheduleTask(task._id)}
-                    className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-[var(--accent-admin)] text-white text-[9px] font-medium hover:bg-[#c4684d] transition-all"
+                    className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:bg-[#a04525] transition-all"
                     title="Quick schedule on current day"
                   >
                     <Plus className="h-3 w-3 inline mr-0.5" />Add
@@ -703,19 +703,19 @@ export default function PlannerPage() {
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <h2 className="font-semibold text-[14px] text-[var(--text-primary)]">{formatDateHeader(selectedDate)}</h2>
-          {selectedDate === todayStr() && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[var(--accent-admin)] text-white">Today</span>}
-          {isWeekend(selectedDate) && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Weekend</span>}
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">{formatDateHeader(selectedDate)}</h2>
+          {selectedDate === todayStr() && <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--accent-admin-strong)] text-white">Today</span>}
+          {isWeekend(selectedDate) && <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Weekend</span>}
           <div className="ml-auto flex items-center gap-1">
             <button onClick={() => setShowCopyDay(true)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-muted)]" title="Copy from another day">
               <Copy className="h-3.5 w-3.5" />
             </button>
-            <button onClick={() => setShowNotes(!showNotes)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] ${showNotes ? "text-[var(--accent-admin)]" : "text-[var(--text-muted)]"}`} title="Daily notes">
+            <button onClick={() => setShowNotes(!showNotes)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] ${showNotes ? "text-[var(--accent-admin-text)]" : "text-[var(--text-muted)]"}`} title="Daily notes">
               <StickyNote className="h-3.5 w-3.5" />
             </button>
             <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-1">
-              <button onClick={() => setViewMode("day")} className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${viewMode === "day" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Day</button>
-              <button onClick={() => setViewMode("week")} className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${viewMode === "week" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Week</button>
+              <button onClick={() => setViewMode("day")} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${viewMode === "day" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Day</button>
+              <button onClick={() => setViewMode("week")} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${viewMode === "week" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Week</button>
             </div>
             <button onClick={() => setShowShortcuts(!showShortcuts)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-muted)] relative" title="Keyboard shortcuts">
               <HelpCircle className="h-3.5 w-3.5" />
@@ -723,7 +723,7 @@ export default function PlannerPage() {
                 <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-[var(--border)] rounded-lg shadow-lg z-30 p-3 text-left">
                   <p className="text-[11px] font-semibold text-[var(--text-primary)] mb-2">Shortcuts</p>
                   {[["←/→", "Prev/Next day"], ["T", "Today"], ["N", "New block"], ["D/W", "Day/Week view"], ["Esc", "Close panels"]].map(([k, v]) => (
-                    <div key={k} className="flex justify-between text-[10px] py-0.5">
+                    <div key={k} className="flex justify-between text-[11px] py-0.5">
                       <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] font-mono text-[var(--text-primary)]">{k}</kbd>
                       <span className="text-[var(--text-muted)]">{v}</span>
                     </div>
@@ -739,15 +739,15 @@ export default function PlannerPage() {
           <div className="px-4 py-2 border-b border-[var(--border-subtle)] bg-white flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-4 text-[11px]">
               <span className="text-[var(--text-secondary)]"><Clock className="h-3 w-3 inline mr-1" /><strong>{dailySummary.totalHours}h</strong> scheduled</span>
-              <span className="text-[var(--accent-admin)]"><Briefcase className="h-3 w-3 inline mr-1" />{dailySummary.briefHours}h brief</span>
-              <span className="text-[var(--accent-manager)]"><User className="h-3 w-3 inline mr-1" />{dailySummary.personalHours}h personal</span>
+              <span className="text-[var(--accent-admin-text)]"><Briefcase className="h-3 w-3 inline mr-1" />{dailySummary.briefHours}h brief</span>
+              <span className="text-[var(--accent-manager-text)]"><User className="h-3 w-3 inline mr-1" />{dailySummary.personalHours}h personal</span>
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <div className="w-24 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden flex">
                 <div className="h-full bg-[var(--accent-admin)]" style={{ width: `${Math.min(100, (dailySummary.briefHours / WORK_HOURS) * 100)}%` }} />
                 <div className="h-full bg-[var(--accent-manager)]" style={{ width: `${Math.min(100 - (dailySummary.briefHours / WORK_HOURS) * 100, (dailySummary.personalHours / WORK_HOURS) * 100)}%` }} />
               </div>
-              <span className="text-[10px] font-medium text-[var(--text-muted)] tabular-nums">{dailySummary.utilizationPct}%</span>
+              <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">{dailySummary.utilizationPct}%</span>
             </div>
           </div>
         )}
@@ -759,14 +759,14 @@ export default function PlannerPage() {
             {isWeekend(selectedDate) && (
               <div className="mx-4 mt-3 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
                 <span className="text-[11px] font-medium">{dayName(selectedDate)} - Emergency / overtime work only.</span>
-                <span className="text-[10px] text-amber-600">Blocks added here will be visible to your manager.</span>
+                <span className="text-[11px] text-amber-600">Blocks added here will be visible to your manager.</span>
               </div>
             )}
             <div className="relative" style={{ height: (gridEndHour - gridStartHour) * HOUR_HEIGHT + GRID_PAD_TOP + 16 }}>
               {/* Hour lines */}
               {Array.from({ length: gridEndHour - gridStartHour + 1 }, (_, i) => (
                 <div key={i} className="absolute left-0 right-0 flex items-start" style={{ top: GRID_PAD_TOP + i * HOUR_HEIGHT }}>
-                  <span className={`w-16 shrink-0 text-right pr-3 text-[10px] -translate-y-1.5 select-none ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "text-amber-400" : "text-[var(--text-muted)]"}`}>{formatMin((gridStartHour + i) * 60)}</span>
+                  <span className={`w-16 shrink-0 text-right pr-3 text-[11px] -translate-y-1.5 select-none ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "text-amber-400" : "text-[var(--text-muted)]"}`}>{formatMin((gridStartHour + i) * 60)}</span>
                   <div className={`flex-1 border-t ${(gridStartHour + i) < START_HOUR || (gridStartHour + i) > END_HOUR ? "border-amber-200" : "border-[var(--border-subtle)]"}`} />
                 </div>
               ))}
@@ -794,7 +794,7 @@ export default function PlannerPage() {
                     onClick={() => openQuickAdd(slotTime)}
                   >
                     <div className="flex items-center justify-center h-full">
-                      <Plus className="h-3 w-3 text-[var(--accent-admin)]" />
+                      <Plus className="h-3 w-3 text-[var(--accent-admin-text)]" />
                     </div>
                   </div>
                 );
@@ -840,9 +840,9 @@ export default function PlannerPage() {
                       {height >= 40 && (
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {block.briefTitle && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] font-medium truncate max-w-[120px]">{block.briefTitle}</span>
+                            <span className="text-[11px] px-1 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] font-medium truncate max-w-[120px]">{block.briefTitle}</span>
                           )}
-                          <span className="text-[9px] text-[var(--text-muted)]">{formatMin(block.startTime)} - {formatMin(block.endTime)}</span>
+                          <span className="text-[11px] text-[var(--text-muted)]">{formatMin(block.startTime)} - {formatMin(block.endTime)}</span>
                           {block.taskStatus && (
                             <span className={`w-1.5 h-1.5 rounded-full ${block.taskStatus === "done" ? "bg-[var(--accent-employee)]" : block.taskStatus === "in-progress" ? "bg-[var(--accent-manager)]" : "bg-[var(--text-muted)]"}`} />
                           )}
@@ -862,20 +862,20 @@ export default function PlannerPage() {
                     {showBlockDetail === block._id && (
                       <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-[var(--border)] rounded-lg shadow-lg p-3" style={{ zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
                         <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">{block.title}</p>
-                        {block.briefTitle && <p className="text-[11px] text-[var(--accent-admin)] mb-1">Brief: {block.briefTitle}</p>}
+                        {block.briefTitle && <p className="text-[11px] text-[var(--accent-admin-text)] mb-1">Brief: {block.briefTitle}</p>}
                         <p className="text-[11px] text-[var(--text-secondary)] mb-2">{formatMin(block.startTime)} - {formatMin(block.endTime)}</p>
                         {block.description && <p className="text-[11px] text-[var(--text-muted)] mb-2">{block.description}</p>}
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => handleCompleteBlock(block)} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${block.completed ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee)]" : "bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--accent-employee-dim)]"}`}>
+                          <button onClick={() => handleCompleteBlock(block)} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${block.completed ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]" : "bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--accent-employee-dim)]"}`}>
                             <Check className="h-3 w-3" />{block.completed ? "Completed" : "Complete"}
                           </button>
                           {(isViewingSelf || isAdmin) && (
-                            <button onClick={() => handleDeleteBlock(block._id)} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-[var(--danger-dim)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors">
+                            <button onClick={() => handleDeleteBlock(block._id)} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--danger-dim)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors">
                               <Trash2 className="h-3 w-3" />Delete
                             </button>
                           )}
                           {isAdminOrManager && !isViewingSelf && block.type === "brief_task" && block.taskId && (
-                            <button onClick={() => { setShowPriority(block.taskId!); setShowBlockDetail(null); }} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] hover:bg-[var(--accent-admin)] hover:text-white transition-colors">
+                            <button onClick={() => { setShowPriority(block.taskId!); setShowBlockDetail(null); }} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-colors">
                               Priority
                             </button>
                           )}
@@ -887,7 +887,7 @@ export default function PlannerPage() {
                               await updateTaskStatus({ taskId: block.taskId as Id<"tasks">, newStatus: "done" });
                               toast("success", "Task marked as Done");
                             }}
-                            className="mt-2 w-full text-center py-1.5 rounded-md text-[10px] font-medium bg-[var(--accent-employee-dim)] text-[var(--accent-employee)] hover:bg-[var(--accent-employee)] hover:text-white transition-colors"
+                            className="mt-2 w-full text-center py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] hover:bg-[var(--accent-employee)] hover:text-white transition-colors"
                           >
                             Also mark task as Done?
                           </button>
@@ -930,17 +930,17 @@ export default function PlannerPage() {
                       isToday ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]" : "border-[var(--border)] bg-white"
                     }`}
                   >
-                    <p className={`text-[11px] font-semibold mb-2 ${isToday ? "text-[var(--accent-admin)]" : "text-[var(--text-secondary)]"}`}>{shortDay(date)}</p>
+                    <p className={`text-[11px] font-semibold mb-2 ${isToday ? "text-[var(--accent-admin-text)]" : "text-[var(--text-secondary)]"}`}>{shortDay(date)}</p>
                     <div className="flex-1 flex flex-col gap-1">
                       {blocks.slice(0, 6).map((b) => (
                         <div key={b._id} className="flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: b.color ?? (b.type === "brief_task" ? "var(--accent-admin)" : "var(--accent-manager)") }} />
-                          <span className={`text-[9px] text-[var(--text-primary)] truncate ${b.completed ? "line-through opacity-50" : ""}`}>{b.title}</span>
+                          <span className={`text-[11px] text-[var(--text-primary)] truncate ${b.completed ? "line-through opacity-50" : ""}`}>{b.title}</span>
                         </div>
                       ))}
-                      {blocks.length > 6 && <p className="text-[9px] text-[var(--text-muted)]">+{blocks.length - 6} more</p>}
+                      {blocks.length > 6 && <p className="text-[11px] text-[var(--text-muted)]">+{blocks.length - 6} more</p>}
                     </div>
-                    <p className="text-[10px] text-[var(--text-muted)] mt-2 pt-1 border-t border-[var(--border-subtle)]">{(totalMin / 60).toFixed(1)}h</p>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-2 pt-1 border-t border-[var(--border-subtle)]">{(totalMin / 60).toFixed(1)}h</p>
                   </button>
                 );
               })}
@@ -954,7 +954,7 @@ export default function PlannerPage() {
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20" onClick={() => setShowQuickAdd(false)}>
           <div className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-[380px] p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">Schedule Block</h3>
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Schedule Block</h3>
               <button onClick={() => setShowQuickAdd(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"><X className="h-4 w-4" /></button>
             </div>
             {/* Tabs */}
@@ -1035,7 +1035,7 @@ export default function PlannerPage() {
               </div>
             </div>
 
-            <button onClick={handleCreateBlock} disabled={quickAddTab === "brief_task" ? !quickAddTaskId : !quickAddTitle.trim()} className="mt-3 w-full py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:bg-[#c4684d] disabled:opacity-30 transition-colors">
+            <button onClick={handleCreateBlock} disabled={quickAddTab === "brief_task" ? !quickAddTaskId : !quickAddTitle.trim()} className="mt-3 w-full py-2 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:bg-[#a04525] disabled:opacity-30 transition-colors">
               Add to Schedule
             </button>
           </div>
@@ -1046,12 +1046,12 @@ export default function PlannerPage() {
       {showCopyDay && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20" onClick={() => setShowCopyDay(false)}>
           <div className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-[320px] p-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3">Copy from another day</h3>
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Copy from another day</h3>
             <p className="text-[11px] text-[var(--text-secondary)] mb-2">Clone schedule blocks to <strong>{formatDateHeader(selectedDate)}</strong></p>
             <input type="date" value={copySource} onChange={(e) => setCopySource(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] mb-3" />
             <div className="flex gap-2">
               <button onClick={() => setShowCopyDay(false)} className="flex-1 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">Cancel</button>
-              <button onClick={handleCopyDay} disabled={!copySource} className="flex-1 py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:bg-[#c4684d] disabled:opacity-30">Copy</button>
+              <button onClick={handleCopyDay} disabled={!copySource} className="flex-1 py-2 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:bg-[#a04525] disabled:opacity-30">Copy</button>
             </div>
           </div>
         </div>
@@ -1061,15 +1061,15 @@ export default function PlannerPage() {
       {showPriority && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20" onClick={() => { setShowPriority(null); setPriorityReason(""); }}>
           <div className="bg-white rounded-xl border border-[var(--border)] shadow-xl w-[320px] p-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-3">Adjust Priority</h3>
+            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Adjust Priority</h3>
             <p className="text-[11px] text-[var(--text-secondary)] mb-3">
               {(userTasks ?? []).find((t) => t._id === showPriority)?.title ?? "Task"}
             </p>
             <div className="flex gap-2 mb-3">
-              <button onClick={() => handlePrioritySave(showPriority, "up")} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium hover:bg-[var(--accent-employee-dim)] hover:text-[var(--accent-employee)] transition-colors">
+              <button onClick={() => handlePrioritySave(showPriority, "up")} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium hover:bg-[var(--accent-employee-dim)] hover:text-[var(--accent-employee-text)] transition-colors">
                 <ArrowUp className="h-3.5 w-3.5" />Higher
               </button>
-              <button onClick={() => handlePrioritySave(showPriority, "down")} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] hover:text-[var(--accent-admin)] transition-colors">
+              <button onClick={() => handlePrioritySave(showPriority, "down")} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] hover:text-[var(--accent-admin-text)] transition-colors">
                 <ArrowDown className="h-3.5 w-3.5" />Lower
               </button>
             </div>
@@ -1104,9 +1104,9 @@ export default function PlannerPage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <span className="text-[11px] font-medium text-amber-900">&quot;{c.title}&quot;</span>
-                    <span className="text-[10px] text-amber-700 ml-1">({formatMin(c.startTime)} - {formatMin(c.endTime)})</span>
+                    <span className="text-[11px] text-amber-700 ml-1">({formatMin(c.startTime)} - {formatMin(c.endTime)})</span>
                     {c.createdByName && (
-                      <span className="text-[10px] text-amber-600 ml-1">scheduled by {c.createdByName}</span>
+                      <span className="text-[11px] text-amber-600 ml-1">scheduled by {c.createdByName}</span>
                     )}
                   </div>
                 </div>
@@ -1131,7 +1131,7 @@ export default function PlannerPage() {
                     onClick={() => handleConflictDm(creator.id, creator.name)}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
-                    <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+                    <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
                     Message {creator.name}
                   </button>
                 ));
@@ -1143,14 +1143,14 @@ export default function PlannerPage() {
                   onClick={() => handleConflictDm(conflictModal.conflicts[0].employeeId, conflictModal.conflicts[0].employeeName)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
-                  <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-manager)]" />
+                  <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-manager-text)]" />
                   Message Employee
                 </button>
               )}
 
               <button
                 onClick={handleForceCreate}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-admin)] text-white text-[11px] font-medium hover:bg-[#c4684d] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:bg-[#a04525] transition-colors"
               >
                 Add Anyway
               </button>

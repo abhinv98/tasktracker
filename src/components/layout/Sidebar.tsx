@@ -289,10 +289,10 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                   onClick={() => toggleCategory(group.category)}
                   className={`
                     w-full flex items-center justify-between px-2 py-1.5 rounded-md
-                    text-[10px] font-semibold uppercase tracking-wider
+                    text-[11px] font-semibold uppercase tracking-wider
                     transition-colors duration-150
                     ${hasActiveItem && !isOpen
-                      ? "text-[var(--accent-admin)]"
+                      ? "text-[var(--accent-admin-text)]"
                       : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                     }
                   `}
@@ -322,7 +322,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             font-medium text-[13px] transition-colors duration-150
                             ${
                               isActive
-                                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-[var(--accent-admin)]"
+                                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-[var(--accent-admin)]"
                                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                             }
                           `}
@@ -331,32 +331,32 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
                               isActive
                                 ? ""
-                                : "group-hover:text-[var(--accent-admin)]"
+                                : "group-hover:text-[var(--accent-admin-text)]"
                             }`}
                           />
                           <span className="flex-1">{item.label}</span>
                           {item.href === "/messages" && unreadDmCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold px-1">
                               {unreadDmCount}
                             </span>
                           )}
                           {item.href === "/content-calendar" && pendingCalendarCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
                               {pendingCalendarCount}
                             </span>
                           )}
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[9px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[11px] font-bold px-1">
                               {pendingDeliverableCount}
                             </span>
                           )}
                           {item.href === "/hr-requests" && pendingHrRequestCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
                               {pendingHrRequestCount}
                             </span>
                           )}
                           {item.href === "/client-requests" && pendingClientRequestCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[9px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
                               {pendingClientRequestCount}
                             </span>
                           )}
@@ -376,7 +376,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
             <p className="text-[11px] text-[var(--text-muted)] truncate">
               {user.name ?? user.email}
             </p>
-            <p className="text-[10px] text-[var(--text-disabled)] capitalize">
+            <p className="text-[11px] text-[var(--text-disabled)] capitalize">
               {getDisplayRole(user)}
             </p>
           </div>

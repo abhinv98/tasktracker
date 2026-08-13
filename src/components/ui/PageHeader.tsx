@@ -26,7 +26,7 @@ export function PageHeader({
     >
       <div className="flex items-start gap-2.5">
         {Icon && (
-          <Icon className="h-5 w-5 mt-[3px] text-[var(--accent-admin)] shrink-0" />
+          <Icon className="h-5 w-5 mt-[3px] text-[var(--accent-admin-text)] shrink-0" />
         )}
         <div>
           <h1 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight leading-snug">

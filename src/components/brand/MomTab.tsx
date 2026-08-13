@@ -160,7 +160,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
   }
 
   if (moms === undefined) {
-    return <p className="text-[14px] text-[var(--text-secondary)] py-8">Loading...</p>;
+    return <p className="text-[15px] text-[var(--text-secondary)] py-8">Loading...</p>;
   }
 
   return (
@@ -168,7 +168,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="font-semibold text-[16px] text-[var(--text-primary)]">Meeting Minutes</h2>
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">Meeting Minutes</h2>
           <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{moms.length} minute{moms.length !== 1 ? "s" : ""} recorded</p>
         </div>
         {canEdit && !showAdd && (
@@ -182,7 +182,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
       {/* Add Form */}
       {showAdd && (
         <form onSubmit={handleCreate} className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6">
-          <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-4">New Meeting Minutes</h3>
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">New Meeting Minutes</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Title</label>
@@ -264,7 +264,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
               </button>
               {transcriptFile && (
                 <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)]">
-                  <FileText className="h-3.5 w-3.5 text-[var(--accent-admin)]" />
+                  <FileText className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
                   <span className="truncate max-w-[200px]">{transcriptFile.name}</span>
                   <button
                     type="button"
@@ -315,31 +315,31 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">{mom.title}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                    <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                       <Calendar className="h-3 w-3" />
                       {formatDate(mom.meetingDate)}
                     </span>
                     {(mom.startTime || mom.endTime) && (
-                      <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                      <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                         <Clock className="h-3 w-3" />
                         {mom.startTime ?? "?"} – {mom.endTime ?? "?"}
                       </span>
                     )}
                     {mom.attendees && mom.attendees.length > 0 && (
-                      <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+                      <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                         <Users className="h-3 w-3" />
                         {mom.attendees.length} attendee{mom.attendees.length !== 1 ? "s" : ""}
                       </span>
                     )}
                     {mom.transcriptUrl && (
-                      <span className="flex items-center gap-1 text-[10px] text-[var(--accent-admin)]">
+                      <span className="flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)]">
                         <FileText className="h-3 w-3" />
                         Transcript
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="text-[10px] text-[var(--text-muted)] shrink-0">
+                <span className="text-[11px] text-[var(--text-muted)] shrink-0">
                   by {mom.creatorName}
                 </span>
               </button>
@@ -361,7 +361,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                       />
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">Start Time</label>
+                          <label className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">Start Time</label>
                           <input
                             type="time"
                             value={editStartTime}
@@ -370,7 +370,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">End Time</label>
+                          <label className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">End Time</label>
                           <input
                             type="time"
                             value={editEndTime}
@@ -402,10 +402,10 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                     <>
                       {mom.attendees && mom.attendees.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Attendees</p>
+                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Attendees</p>
                           <div className="flex flex-wrap gap-1.5">
                             {mom.attendees.map((a: string, i: number) => (
-                              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)]">
+                              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)]">
                                 {a}
                               </span>
                             ))}
@@ -413,7 +413,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                         </div>
                       )}
                       <div className="mb-3">
-                        <p className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Minutes</p>
+                        <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Minutes</p>
                         <div className="text-[12px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
                           {mom.content}
                         </div>
@@ -424,7 +424,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                             href={mom.transcriptUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/5 transition-colors"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/5 transition-colors"
                           >
                             <Download className="h-3.5 w-3.5" />
                             {mom.transcriptFileName ?? "Download Transcript"}

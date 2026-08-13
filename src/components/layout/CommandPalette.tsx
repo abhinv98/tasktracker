@@ -95,7 +95,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search briefs, tasks, brands, teams..."
-            className="flex-1 bg-transparent text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none"
+            className="flex-1 bg-transparent text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none"
           />
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X className="h-4 w-4" />
@@ -140,11 +140,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {item.sub && (
-                        <span className="text-[10px] text-[var(--text-muted)] capitalize">
+                        <span className="text-[11px] text-[var(--text-muted)] capitalize">
                           {item.sub}
                         </span>
                       )}
-                      <span className="text-[10px] font-medium text-[var(--text-disabled)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">
+                      <span className="text-[11px] font-medium text-[var(--text-disabled)] bg-[var(--bg-primary)] px-1.5 py-0.5 rounded">
                         {item.type}
                       </span>
                     </div>
@@ -157,10 +157,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-primary)]">
-          <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
-            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[9px]">↑↓</kbd> Navigate</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[9px]">↵</kbd> Open</span>
-            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[9px]">esc</kbd> Close</span>
+          <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[11px]">↑↓</kbd> Navigate</span>
+            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[11px]">↵</kbd> Open</span>
+            <span><kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[11px]">esc</kbd> Close</span>
           </div>
         </div>
       </div>

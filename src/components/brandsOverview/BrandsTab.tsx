@@ -60,7 +60,7 @@ export default function BrandsTab() {
 
   if (brands === undefined) {
     return (
-      <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+      <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
     );
   }
 
@@ -72,7 +72,7 @@ export default function BrandsTab() {
             onClick={() => setFilterMine((p) => !p)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold transition-colors border ${
               filterMine
-                ? "bg-[var(--accent-admin)] text-white border-[var(--accent-admin)]"
+                ? "bg-[var(--accent-admin-strong)] text-white border-[var(--accent-admin)]"
                 : "bg-white text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-hover)]"
             }`}
           >
@@ -133,7 +133,7 @@ export default function BrandsTab() {
                 <span className="font-semibold text-[var(--text-primary)]">{brand.briefCount}</span> brief{brand.briefCount !== 1 ? "s" : ""}
               </span>
               <span className="text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--accent-employee)]">{brand.activeBriefCount}</span> active
+                <span className="font-semibold text-[var(--accent-employee-text)]">{brand.activeBriefCount}</span> active
               </span>
             </div>
             {brand.managerNames.length > 0 && (
@@ -157,7 +157,7 @@ export default function BrandsTab() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-[18px] text-[var(--text-primary)]">
+              <h2 className="font-semibold text-[20px] text-[var(--text-primary)]">
                 Create Brand
               </h2>
               <button onClick={() => setShowModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">

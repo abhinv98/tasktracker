@@ -122,7 +122,7 @@ export function CreateUserForm() {
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
       <div className="flex items-center gap-2 mb-1">
-        <UserPlus className="h-4 w-4 text-[var(--accent-admin)]" />
+        <UserPlus className="h-4 w-4 text-[var(--accent-admin-text)]" />
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">
           Create New User
         </span>
@@ -130,7 +130,7 @@ export function CreateUserForm() {
 
       {/* Name */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Name *
         </label>
         <input
@@ -145,7 +145,7 @@ export function CreateUserForm() {
 
       {/* Email */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Email *
         </label>
         <input
@@ -160,7 +160,7 @@ export function CreateUserForm() {
 
       {/* Role */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Role *
         </label>
         <div className="relative">
@@ -178,7 +178,7 @@ export function CreateUserForm() {
 
       {/* Designation */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Designation
         </label>
         <input
@@ -201,7 +201,7 @@ export function CreateUserForm() {
         <button
           type="submit"
           disabled={isSubmitting || !name.trim() || !email.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -300,7 +300,7 @@ export function DeleteBriefForm() {
 
       {/* Brand selector */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select Brand *
         </label>
         <div className="relative">
@@ -326,7 +326,7 @@ export function DeleteBriefForm() {
 
       {/* Brief selector */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select Brief *
         </label>
         <div className="relative">
@@ -358,7 +358,7 @@ export function DeleteBriefForm() {
           const brief = brandBriefs.find((b) => b._id === selectedBriefId);
           if (!brief) return null;
           return (
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">
               {brief.taskCount} task{brief.taskCount !== 1 ? "s" : ""} will also be deleted
             </p>
           );
@@ -467,7 +467,7 @@ export function DeleteUserForm() {
 
       {/* User selector */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select User *
         </label>
         <div className="relative">
@@ -492,7 +492,7 @@ export function DeleteUserForm() {
           const user = allUsers.find((u) => u._id === selectedUserId);
           if (!user) return null;
           return (
-            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
               <span>{user.email}</span>
               <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] capitalize font-medium">
                 {user.role}
@@ -603,7 +603,7 @@ export function DeleteTeamForm() {
       </div>
 
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select Team *
         </label>
         <div className="relative">
@@ -628,7 +628,7 @@ export function DeleteTeamForm() {
           const team = teams.find((t) => t._id === selectedTeamId);
           if (!team) return null;
           return (
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">
               Lead: {team.leadName} &middot; {team.memberCount} member{team.memberCount !== 1 ? "s" : ""}
             </p>
           );
@@ -738,14 +738,14 @@ export function AssignTeamLeadForm() {
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
       <div className="flex items-center gap-2 mb-1">
-        <Users className="h-4 w-4 text-[var(--accent-admin)]" />
+        <Users className="h-4 w-4 text-[var(--accent-admin-text)]" />
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">
           Assign Team Lead
         </span>
       </div>
 
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select Team *
         </label>
         <div className="relative">
@@ -766,7 +766,7 @@ export function AssignTeamLeadForm() {
       </div>
 
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           New Team Lead *
         </label>
         <div className="relative">
@@ -794,7 +794,7 @@ export function AssignTeamLeadForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedTeamId || !selectedUserId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
           {isSubmitting ? "Assigning..." : "Assign Lead"}
@@ -881,7 +881,7 @@ export function AssignTeamForm() {
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
       <div className="flex items-center gap-2 mb-1">
-        <Users className="h-4 w-4 text-[var(--accent-admin)]" />
+        <Users className="h-4 w-4 text-[var(--accent-admin-text)]" />
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">
           Assign User to Team
         </span>
@@ -889,7 +889,7 @@ export function AssignTeamForm() {
 
       {/* User selector */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select User *
         </label>
         <div className="relative">
@@ -914,7 +914,7 @@ export function AssignTeamForm() {
 
       {/* Team selector */}
       <div>
-        <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
           Select Team *
         </label>
         <div className="relative">
@@ -947,7 +947,7 @@ export function AssignTeamForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedUserId || !selectedTeamId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

@@ -17,8 +17,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
+  // -strong, not the base accent: white on #d97757 is 3.1:1 and every primary
+  // label in the app failed AA. Same hue, two steps down.
   primary:
-    "bg-[var(--accent-admin)] text-white hover:bg-[#c4684d]",
+    "bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525]",
   secondary:
     "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]",
   destructive:

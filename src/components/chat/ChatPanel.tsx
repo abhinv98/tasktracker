@@ -283,7 +283,7 @@ function ToolStepsDisplay({ stepsJson }: { stepsJson: string }) {
             return (
               <div key={i} className="flex items-start gap-1.5 pl-2">
                 {step.success ? (
-                  <CheckCircle2 className="h-3 w-3 text-[var(--accent-employee)] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-3 w-3 text-[var(--accent-employee-text)] shrink-0 mt-0.5" />
                 ) : (
                   <XCircle className="h-3 w-3 text-[var(--danger)] shrink-0 mt-0.5" />
                 )}
@@ -291,7 +291,7 @@ function ToolStepsDisplay({ stepsJson }: { stepsJson: string }) {
                   <p className="text-[11px] font-medium text-[var(--text-primary)]">
                     {TOOL_LABELS[step.tool] ?? step.tool.replace(/_/g, " ")}
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)] truncate max-w-[250px]">
+                  <p className="text-[11px] text-[var(--text-muted)] truncate max-w-[250px]">
                     {resultPreview}
                   </p>
                 </div>
@@ -411,7 +411,7 @@ function ConversationList({
                       </p>
                       <div className="flex items-center gap-1 mt-0.5">
                         <Clock className="h-3 w-3 text-[var(--text-disabled)]" />
-                        <span className="text-[10px] text-[var(--text-disabled)]">
+                        <span className="text-[11px] text-[var(--text-disabled)]">
                           {timeAgo(convo.updatedAt)}
                         </span>
                       </div>
@@ -625,7 +625,7 @@ function ChatView({
             <div className="w-12 h-12 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-3">
               <Bot className="h-6 w-6 text-[var(--text-muted)]" />
             </div>
-            <p className="text-[14px] font-medium text-[var(--text-primary)] mb-1">
+            <p className="text-[15px] font-medium text-[var(--text-primary)] mb-1">
               How can I help?
             </p>
             <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
@@ -674,7 +674,7 @@ function ChatView({
             <div
               className={`max-w-[80%] rounded-xl px-3.5 py-2.5 ${
                 msg.role === "user"
-                  ? "bg-[var(--accent-admin)] text-white"
+                  ? "bg-[var(--accent-admin-strong)] text-white"
                   : "bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
               }`}
             >
@@ -700,7 +700,7 @@ function ChatView({
             </div>
             <div className="bg-[var(--bg-secondary)] rounded-xl px-4 py-3 border border-[var(--border-subtle)]">
               <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-admin)]" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-admin-text)]" />
                 <span>Thinking...</span>
               </div>
             </div>
@@ -713,7 +713,7 @@ function ChatView({
       {/* Pending file indicator */}
       {pendingFile && (
         <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center gap-2">
-          <FileText className="h-4 w-4 text-[var(--accent-admin)] shrink-0" />
+          <FileText className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0" />
           <span className="text-[12px] text-[var(--text-secondary)] truncate flex-1">
             {pendingFile.name}
           </span>
@@ -768,7 +768,7 @@ function ChatView({
           <button
             onClick={handleSend}
             disabled={isLoading || (!message.trim() && !pendingFile)}
-            className="shrink-0 p-2 rounded-lg bg-[var(--accent-admin)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="shrink-0 p-2 rounded-lg bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             title="Send message"
           >
             {isLoading ? (
@@ -848,7 +848,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             <div className="w-7 h-7 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
               <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-semibold text-[14px] text-[var(--text-primary)]">
+            <span className="font-semibold text-[15px] text-[var(--text-primary)]">
               AI Assistant
             </span>
           </div>
@@ -857,7 +857,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
               <button
                 onClick={handleNewChat}
                 disabled={isCreating}
-                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
                 title="New chat"
               >
                 {isCreating ? (

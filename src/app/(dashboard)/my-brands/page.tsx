@@ -47,7 +47,7 @@ export default function MyBrandsPage() {
       />
 
       {brands === undefined ? (
-        <p className="text-[14px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       ) : brands.length === 0 ? (
         <Card>
           <p className="text-[13px] text-[var(--text-muted)] text-center py-6">
@@ -79,7 +79,7 @@ export default function MyBrandsPage() {
                     />
                   </span>
                 )}
-                <span className="font-semibold text-[14px] text-[var(--text-primary)] truncate">
+                <span className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                   {brand.name}
                 </span>
               </div>
@@ -134,7 +134,7 @@ function BrandDetail({
             <Tag className="h-5 w-5" style={{ color: color ?? "#6b7280" }} />
           </span>
         )}
-        <h1 className="font-semibold text-[18px] text-[var(--text-primary)]">
+        <h1 className="font-semibold text-[20px] text-[var(--text-primary)]">
           {name}
         </h1>
       </div>

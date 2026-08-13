@@ -131,7 +131,7 @@ export default function DashboardLayout({
   if (user === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <p className="text-[14px] font-medium text-[var(--text-secondary)]">
+        <p className="text-[15px] font-medium text-[var(--text-secondary)]">
           Loading...
         </p>
       </div>
