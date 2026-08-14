@@ -379,12 +379,27 @@ export default function RecruitmentJobPage() {
                             className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
                           />
                         </td>
-                        <td className="px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] whitespace-nowrap">
-                          {c.name}
+                        <td className="px-3 py-2">
+                          {/* A handful of applicants pasted a whole paragraph
+                              into the name field (one hit the varchar(255)
+                              ceiling). With auto table layout one of those
+                              widens the column and shoves every other column
+                              off screen, so the cell is capped and the full
+                              text lives in the tooltip. */}
+                          <div
+                            title={c.name}
+                            className="max-w-[200px] truncate text-[13px] font-medium text-[var(--text-primary)]"
+                          >
+                            {c.name}
+                          </div>
                         </td>
-                        <td className="px-3 py-2 text-[12px] whitespace-nowrap">
+                        <td className="px-3 py-2 text-[12px]">
                           {c.email ? (
-                            <a href={`mailto:${c.email}`} className="text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] hover:underline">
+                            <a
+                              href={`mailto:${c.email}`}
+                              title={c.email}
+                              className="block max-w-[220px] truncate text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] hover:underline"
+                            >
                               {c.email}
                             </a>
                           ) : dash}
@@ -392,10 +407,12 @@ export default function RecruitmentJobPage() {
                         <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
                           {c.number || dash}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
                           {/* Blank position = the old form recorded no sub-position,
                               so they applied for the job itself. */}
-                          {c.position || job?.name || dash}
+                          <div className="max-w-[160px] truncate" title={c.position || job?.name || ""}>
+                            {c.position || job?.name || dash}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
                           {years == null ? dash : formatYears(years)}
