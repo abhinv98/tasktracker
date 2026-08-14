@@ -1047,13 +1047,28 @@ export default defineSchema({
       v.literal("on_hold")
     ),
     statusUpdatedAt: v.optional(v.union(v.number(), v.null())),
+    /** Where the candidate sits in the funnel. Optional only so the backfill
+     *  could run against imported rows; treat a missing stage as "applied". */
+    stage: v.optional(
+      v.union(
+        v.literal("applied"),
+        v.literal("screened"),
+        v.literal("interview"),
+        v.literal("offer"),
+        v.literal("hired"),
+        v.literal("rejected"),
+        v.literal("on_hold")
+      )
+    ),
+    stageUpdatedAt: v.optional(v.number()),
     /** Null for ~1,100 legacy rows imported before the column existed. */
     createdAt: v.optional(v.union(v.number(), v.null())),
   })
     .index("by_job", ["jobSourceId"])
     .index("by_source", ["sourceId"])
     .index("by_email", ["email"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_stage", ["stage"]),
 
   recruitTemplates: defineTable({
     sourceId: v.optional(v.number()),
@@ -1096,6 +1111,20 @@ export default defineSchema({
     .index("by_job", ["jobSourceId"])
     .index("by_email", ["contactEmail"])
     .index("by_sent", ["sentAt"]),
+
+  /** One timeline per candidate: notes HR writes, and every stage move.
+   *  Sent emails live in recruitEmailLogs and get merged in at read time —
+   *  duplicating them here would let the two disagree. */
+  recruitActivity: defineTable({
+    candidateId: v.id("recruitCandidates"),
+    kind: v.union(v.literal("note"), v.literal("stage")),
+    body: v.string(),
+    fromStage: v.optional(v.string()),
+    toStage: v.optional(v.string()),
+    authorId: v.optional(v.id("users")),
+    authorName: v.string(),
+    createdAt: v.number(),
+  }).index("by_candidate", ["candidateId", "createdAt"]),
 
   // ─── HR REQUESTS ───────────────────────────────
   // Staff → HR asks (appraisal, reimbursement, …). HR accepts/declines, moves

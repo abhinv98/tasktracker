@@ -19,6 +19,8 @@ import {
   SkeletonTable,
   useToast,
 } from "@/components/ui";
+import { STAGES, OPEN_STAGES, stageMeta, type Stage } from "@/lib/recruitStages";
+import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import {
   parseCtcLpa, formatLpa, parseYears, formatYears, parseNoticeDays, formatNotice,
 } from "@/lib/recruitParse";
@@ -35,7 +37,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-type Status = "active" | "non_active" | "rejected" | "on_hold";
 type SortKey = "name" | "years" | "current" | "expected" | "notice" | "status" | "added";
 
 /** Every column is its own column. Numbers sit right-aligned and sortable —
@@ -50,18 +51,12 @@ const COLUMNS: { key: SortKey | null; label: string; align?: "right"; cls: strin
   { key: "current", label: "Current", align: "right", cls: "min-w-[90px]" },
   { key: "expected", label: "Expected", align: "right", cls: "min-w-[95px]" },
   { key: "notice", label: "Notice", align: "right", cls: "min-w-[85px]" },
-  { key: "status", label: "Status", cls: "min-w-[105px]" },
+  { key: "status", label: "Stage", cls: "min-w-[105px]" },
   { key: "added", label: "Added", align: "right", cls: "min-w-[90px]" },
   { key: null, label: "", cls: "min-w-[70px]" },
 ];
 
-const STATUSES: { value: Status; label: string; color: string }[] = [
-  { value: "active", label: "Active", color: "#059669" },
-  { value: "on_hold", label: "On Hold", color: "#d97706" },
-  { value: "non_active", label: "Non Active", color: "#6b7280" },
-  { value: "rejected", label: "Rejected", color: "#b91c1c" },
-];
-const statusMeta = (s: string) => STATUSES.find((x) => x.value === s) ?? STATUSES[0];
+
 
 function fmt(ts?: number | null) {
   if (!ts) return "";
@@ -77,17 +72,18 @@ export default function RecruitmentJobPage() {
   const highlight = searchParams.get("highlight");
 
   const jobs = useQuery(api.recruitment.listJobs);
-  const [status, setStatus] = useState<Status | "">("");
+  const [stage, setStage] = useState<Stage | "" | "open">("open");
+  const [openId, setOpenId] = useState<Id<"recruitCandidates"> | null>(null);
   const [search, setSearch] = useState("");
   const candidates = useQuery(api.recruitment.listCandidates, {
     jobSourceId,
-    ...(status ? { status } : {}),
+    ...(stage && stage !== "open" ? { stage } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
   });
   const templates = useQuery(api.recruitment.listTemplates, {});
   const campaigns = useQuery(api.recruitment.listCampaigns, { jobSourceId });
 
-  const setCandidateStatus = useMutation(api.recruitment.setCandidateStatus);
+  const setStageMut = useMutation(api.recruitment.setStage);
   const deleteCandidates = useMutation(api.recruitment.deleteCandidates);
   const createCampaign = useMutation(api.recruitment.createCampaign);
   const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
@@ -118,11 +114,11 @@ export default function RecruitmentJobPage() {
     });
   }
 
-  async function applyStatus(next: Status) {
+  async function applyStage(next: Stage) {
     if (!ids.length) return;
     try {
-      const { updated } = await setCandidateStatus({ candidateIds: ids, status: next });
-      toast("success", `${updated} marked ${statusMeta(next).label.toLowerCase()}`);
+      const { updated } = await setStageMut({ candidateIds: ids, stage: next });
+      toast("success", `${updated} moved to ${stageMeta(next).label}`);
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
@@ -183,7 +179,12 @@ export default function RecruitmentJobPage() {
 
   // Parse once, then sort on the parsed numbers — sorting the raw strings
   // would put "900000 LPA" above "9 LPA" despite being the same salary.
-  const rows = candidates
+  const visible =
+    stage === "open"
+      ? candidates.filter((c) => OPEN_STAGES.includes((c.stage ?? "applied") as Stage))
+      : candidates;
+
+  const rows = visible
     .map((c) => ({
       c,
       years: parseYears(c.experience),
@@ -202,12 +203,12 @@ export default function RecruitmentJobPage() {
         case "current": return (nul(a.current) - nul(b.current)) * dir;
         case "expected": return (nul(a.expected) - nul(b.expected)) * dir;
         case "notice": return (nul(a.notice) - nul(b.notice)) * dir;
-        case "status": return a.c.status.localeCompare(b.c.status) * dir;
+        case "status": return (a.c.stage ?? "applied").localeCompare(b.c.stage ?? "applied") * dir;
         default: return (nul(a.c.createdAt) - nul(b.c.createdAt)) * dir;
       }
     });
 
-  const allSelected = candidates.length > 0 && selected.size === candidates.length;
+  const allSelected = rows.length > 0 && selected.size === rows.length;
 
   return (
     <div className="p-8">
@@ -239,18 +240,21 @@ export default function RecruitmentJobPage() {
             className="w-[240px] bg-[var(--bg-input)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           />
         </div>
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)]">
-          {[{ value: "", label: "All" }, ...STATUSES].map((s) => (
+        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] flex-wrap">
+          {/* "In play" first and selected by default — the closed-out majority
+              is history, and opening a position to 1,437 rejected+applied rows
+              buries the handful actually moving. */}
+          {[{ value: "open", label: "In play" }, { value: "", label: "All" }, ...STAGES].map((t) => (
             <button
-              key={s.value || "all"}
-              onClick={() => setStatus(s.value as Status | "")}
+              key={t.value || "all"}
+              onClick={() => setStage(t.value as Stage | "" | "open")}
               className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${
-                status === s.value
+                stage === t.value
                   ? "bg-white shadow-sm text-[var(--text-primary)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               }`}
             >
-              {s.label}
+              {t.label}
             </button>
           ))}
         </div>
@@ -280,13 +284,13 @@ export default function RecruitmentJobPage() {
             </Button>
             <select
               value=""
-              onChange={(e) => e.target.value && applyStatus(e.target.value as Status)}
-              aria-label="Set status"
+              onChange={(e) => e.target.value && applyStage(e.target.value as Stage)}
+              aria-label="Move to stage"
               className="bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             >
-              <option value="">Set status…</option>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+              <option value="">Move to…</option>
+              {STAGES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
             <button
@@ -300,7 +304,7 @@ export default function RecruitmentJobPage() {
         </div>
       )}
 
-      {candidates.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <UserSearch size={28} className="text-[var(--text-disabled)] mb-3" />
           <p className="text-[15px] font-medium text-[var(--text-secondary)]">
@@ -319,7 +323,7 @@ export default function RecruitmentJobPage() {
                         type="checkbox"
                         checked={allSelected}
                         onChange={() =>
-                          setSelected(allSelected ? new Set() : new Set(candidates.map((c) => c._id)))
+                          setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.c._id)))
                         }
                         aria-label="Select all shown"
                         className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
@@ -361,7 +365,7 @@ export default function RecruitmentJobPage() {
                 </thead>
                 <tbody>
                   {rows.map(({ c, years, current, expected, notice }) => {
-                    const meta = statusMeta(c.status);
+                    const meta = stageMeta((c.stage ?? "applied") as Stage);
                     const dash = <span className="text-[var(--text-disabled)]">—</span>;
                     return (
                       <tr
@@ -386,12 +390,13 @@ export default function RecruitmentJobPage() {
                               widens the column and shoves every other column
                               off screen, so the cell is capped and the full
                               text lives in the tooltip. */}
-                          <div
+                          <button
+                            onClick={() => setOpenId(c._id)}
                             title={c.name}
-                            className="max-w-[200px] truncate text-[13px] font-medium text-[var(--text-primary)]"
+                            className="block max-w-[200px] truncate text-left text-[13px] font-medium text-[var(--text-primary)] hover:text-[var(--accent-admin-text)] hover:underline"
                           >
                             {c.name}
-                          </div>
+                          </button>
                         </td>
                         <td className="px-3 py-2 text-[12px]">
                           {c.email ? (
@@ -547,6 +552,17 @@ export default function RecruitmentJobPage() {
           </p>
         </div>
       </Modal>
+
+      {openId && (
+        <CandidatePanel
+          candidateId={openId}
+          onClose={() => setOpenId(null)}
+          onOpenOther={(id, job) => {
+            if (job === jobSourceId) setOpenId(id);
+            else window.location.href = `/recruitment/${job}?highlight=${id}`;
+          }}
+        />
+      )}
 
       <ConfirmModal
         open={confirmDelete}

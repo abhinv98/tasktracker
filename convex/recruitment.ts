@@ -18,6 +18,16 @@ import { Doc } from "./_generated/dataModel";
 // Access: HR and super-admins. Brand managers deliberately can't see
 // candidate PII — salaries, phone numbers and CVs are HR's business.
 
+const stageValidator = v.union(
+  v.literal("applied"),
+  v.literal("screened"),
+  v.literal("interview"),
+  v.literal("offer"),
+  v.literal("hired"),
+  v.literal("rejected"),
+  v.literal("on_hold")
+);
+
 const statusValidator = v.union(
   v.literal("active"),
   v.literal("non_active"),
@@ -51,18 +61,22 @@ export const listJobs = query({
     const jobs = await ctx.db.query("recruitJobs").collect();
     const candidates = await ctx.db.query("recruitCandidates").collect();
 
-    const counts = new Map<number, { total: number; active: number; rejected: number }>();
+    const counts = new Map<number, { total: number; active: number; rejected: number; inPlay: number }>();
     for (const c of candidates) {
-      const acc = counts.get(c.jobSourceId) ?? { total: 0, active: 0, rejected: 0 };
+      const acc = counts.get(c.jobSourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0 };
+      const st = c.stage ?? "applied";
       acc.total++;
-      if (c.status === "active") acc.active++;
-      if (c.status === "rejected") acc.rejected++;
+      if (st === "rejected") acc.rejected++;
+      else acc.active++;
+      // "In play" = past first contact and not closed out — the number that
+      // tells HR whether a position is actually moving.
+      if (st === "screened" || st === "interview" || st === "offer") acc.inPlay++;
       counts.set(c.jobSourceId, acc);
     }
 
     const withCounts = jobs.map((j) => ({
       ...j,
-      ...(counts.get(j.sourceId) ?? { total: 0, active: 0, rejected: 0 }),
+      ...(counts.get(j.sourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0 }),
       parentName:
         j.parentSourceId != null
           ? jobs.find((p) => p.sourceId === j.parentSourceId)?.name ?? null
@@ -94,6 +108,14 @@ export const getStats = query({
     };
     for (const c of candidates) byStatus[c.status] = (byStatus[c.status] ?? 0) + 1;
 
+    const byStage: Record<string, number> = {
+      applied: 0, screened: 0, interview: 0, offer: 0, hired: 0, rejected: 0, on_hold: 0,
+    };
+    for (const c of candidates) {
+      const st = c.stage ?? "applied";
+      byStage[st] = (byStage[st] ?? 0) + 1;
+    }
+
     // "This month" only counts dated rows — ~1,100 legacy imports have no
     // createdAt, so this is deliberately a floor, not a total.
     const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -103,6 +125,7 @@ export const getStats = query({
       totalCandidates: candidates.length,
       totalJobs: jobs.length,
       byStatus,
+      byStage,
       recent,
       undated: candidates.filter((c) => c.createdAt == null).length,
       emailsSent: logs.filter((l) => l.status === "sent").length,
@@ -115,17 +138,52 @@ export const getStats = query({
 export const listCandidates = query({
   args: {
     jobSourceId: v.number(),
-    status: v.optional(statusValidator),
+    stage: v.optional(stageValidator),
     search: v.optional(v.string()),
+    /** Range filters over the parsed figures, all inclusive. */
+    minYears: v.optional(v.number()),
+    maxExpected: v.optional(v.number()),
+    maxNoticeDays: v.optional(v.number()),
   },
-  handler: async (ctx, { jobSourceId, status, search }) => {
+  handler: async (ctx, { jobSourceId, stage, search, minYears, maxExpected, maxNoticeDays }) => {
     if (!(await canRecruit(ctx))) return [];
     let rows = await ctx.db
       .query("recruitCandidates")
       .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
       .collect();
 
-    if (status) rows = rows.filter((r) => r.status === status);
+    if (stage) rows = rows.filter((r) => (r.stage ?? "applied") === stage);
+    // Same normalisation the UI uses: values >= 1000 are annual rupees, below
+    // that they're already lakhs. Kept in sync with src/lib/recruitParse.ts.
+    const lpa = (raw: string) => {
+      const m = (raw || "").replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+      if (!m) return null;
+      const n = parseFloat(m[0]);
+      if (!isFinite(n) || n <= 0) return null;
+      return n >= 1000 ? n / 100000 : n;
+    };
+    const yrs = (raw: string) => {
+      const m = (raw || "").match(/-?\d+(\.\d+)?/);
+      return m ? parseFloat(m[0]) : null;
+    };
+    const notice = (raw: string) => {
+      const t = (raw || "").trim().toLowerCase();
+      if (!t) return null;
+      if (t.startsWith("imm")) return 0;
+      const m = t.match(/\d+/);
+      if (!m) return null;
+      const n = parseInt(m[0], 10);
+      return /month/.test(t) ? n * 30 : n;
+    };
+    if (minYears != null) rows = rows.filter((r) => (yrs(r.experience) ?? -1) >= minYears);
+    if (maxExpected != null) rows = rows.filter((r) => {
+      const v = lpa(r.expectedCtc);
+      return v != null && v <= maxExpected;
+    });
+    if (maxNoticeDays != null) rows = rows.filter((r) => {
+      const v = notice(r.noticePeriod);
+      return v != null && v <= maxNoticeDays;
+    });
     if (search && search.trim()) {
       const s = search.trim().toLowerCase();
       rows = rows.filter(
@@ -333,6 +391,150 @@ export const deleteTemplate = mutation({
   handler: async (ctx, { templateId }) => {
     await requireRecruiter(ctx);
     await ctx.db.delete(templateId);
+  },
+});
+
+/* ── Stages, notes & the candidate profile ─────────────────── */
+
+/** Move candidates through the funnel. Every move is written to the timeline,
+ *  because "when did she reject him and why" is the question HR always asks
+ *  three weeks later. */
+export const setStage = mutation({
+  args: {
+    candidateIds: v.array(v.id("recruitCandidates")),
+    stage: stageValidator,
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, { candidateIds, stage, note }) => {
+    const { userId, user } = await requireRecruiter(ctx);
+    const authorName = user.name ?? user.email ?? "HR";
+    const now = Date.now();
+    let updated = 0;
+    for (const id of candidateIds) {
+      const c = await ctx.db.get(id);
+      if (!c) continue;
+      const from = c.stage ?? "applied";
+      if (from === stage && !note) continue;
+      await ctx.db.patch(id, { stage, stageUpdatedAt: now });
+      await ctx.db.insert("recruitActivity", {
+        candidateId: id,
+        kind: "stage",
+        body: note?.trim() ?? "",
+        fromStage: from,
+        toStage: stage,
+        authorId: userId,
+        authorName,
+        createdAt: now,
+      });
+      updated++;
+    }
+    return { updated };
+  },
+});
+
+export const addNote = mutation({
+  args: { candidateId: v.id("recruitCandidates"), body: v.string() },
+  handler: async (ctx, { candidateId, body }) => {
+    const { userId, user } = await requireRecruiter(ctx);
+    if (!body.trim()) throw new Error("Note can't be empty");
+    return await ctx.db.insert("recruitActivity", {
+      candidateId,
+      kind: "note",
+      body: body.trim(),
+      authorId: userId,
+      authorName: user.name ?? user.email ?? "HR",
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const deleteActivity = mutation({
+  args: { activityId: v.id("recruitActivity") },
+  handler: async (ctx, { activityId }) => {
+    await requireRecruiter(ctx);
+    const a = await ctx.db.get(activityId);
+    if (!a) return;
+    // Stage moves are the audit trail — only notes are removable.
+    if (a.kind !== "note") throw new Error("Stage history can't be deleted");
+    await ctx.db.delete(activityId);
+  },
+});
+
+/** Everything about one candidate: the record, their job, the notes and stage
+ *  history, and every email ever sent to them — merged into one timeline. */
+export const getCandidate = query({
+  args: { candidateId: v.id("recruitCandidates") },
+  handler: async (ctx, { candidateId }) => {
+    if (!(await canRecruit(ctx))) return null;
+    const c = await ctx.db.get(candidateId);
+    if (!c) return null;
+
+    const jobs = await ctx.db.query("recruitJobs").collect();
+    const activity = await ctx.db
+      .query("recruitActivity")
+      .withIndex("by_candidate", (q) => q.eq("candidateId", candidateId))
+      .collect();
+
+    const emails = c.email
+      ? (
+          await ctx.db
+            .query("recruitEmailLogs")
+            .withIndex("by_email", (q) => q.eq("contactEmail", c.email))
+            .collect()
+        )
+      : [];
+
+    // Same email address may have applied to several roles; the timeline is
+    // about the person, so all of their mail belongs here.
+    const timeline = [
+      ...activity.map((a) => ({
+        id: String(a._id),
+        kind: a.kind as "note" | "stage" | "email",
+        at: a.createdAt,
+        body: a.body,
+        fromStage: a.fromStage ?? null,
+        toStage: a.toStage ?? null,
+        who: a.authorName,
+        ok: true,
+      })),
+      ...emails.map((e) => ({
+        id: String(e._id),
+        kind: "email" as const,
+        at: e.sentAt,
+        body: e.templateName || "Email",
+        fromStage: null,
+        toStage: null,
+        who: e.smtpFrom,
+        ok: e.status === "sent",
+      })),
+    ].sort((a, b) => b.at - a.at);
+
+    // Other applications from the same person — the duplicate problem, surfaced
+    // where it matters instead of as a cleanup chore.
+    const alsoApplied = c.email
+      ? (
+          await ctx.db
+            .query("recruitCandidates")
+            .withIndex("by_email", (q) => q.eq("email", c.email))
+            .collect()
+        )
+          .filter((o) => o._id !== c._id)
+          .map((o) => ({
+            _id: o._id,
+            jobSourceId: o.jobSourceId,
+            jobName: jobs.find((j) => j.sourceId === o.jobSourceId)?.name ?? "Unknown",
+            stage: o.stage ?? "applied",
+            createdAt: o.createdAt ?? null,
+          }))
+      : [];
+
+    return {
+      ...c,
+      stage: c.stage ?? "applied",
+      jobName: jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "Unknown",
+      timeline,
+      alsoApplied,
+    };
   },
 });
 
@@ -591,5 +793,38 @@ export const sendTemplateEmail = action({
       else failed++;
     }
     return { sent, failed };
+  },
+});
+
+/* ── Migration ─────────────────────────────────────────────── */
+
+/**
+ * One-shot backfill: give every imported candidate a funnel stage derived from
+ * their old flat status. Idempotent — rows that already have a stage are left
+ * alone, so it's safe to re-run.
+ *   npx convex run recruitment:backfillStages
+ */
+export const backfillStages = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query("recruitCandidates").collect();
+    const MAP: Record<string, "applied" | "rejected" | "on_hold"> = {
+      active: "applied",
+      rejected: "rejected",
+      on_hold: "on_hold",
+      // Exactly one row is non_active and it predates any real meaning —
+      // park it rather than guess that it was a rejection.
+      non_active: "on_hold",
+    };
+    let updated = 0;
+    for (const r of rows) {
+      if (r.stage) continue;
+      await ctx.db.patch(r._id, {
+        stage: MAP[r.status] ?? "applied",
+        stageUpdatedAt: r.statusUpdatedAt ?? r.createdAt ?? undefined,
+      });
+      updated++;
+    }
+    return { total: rows.length, updated };
   },
 });

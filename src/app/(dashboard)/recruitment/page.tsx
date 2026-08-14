@@ -75,14 +75,16 @@ export default function RecruitmentPage() {
       {/* Reference counts, kept quiet — the positions below are the work. */}
       {stats && (
         <div className="mb-6 flex flex-wrap items-stretch divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border)] bg-white">
+          {/* The funnel, not a pile of totals — this answers "where is everyone". */}
           {[
-            { label: "Candidates", value: stats.totalCandidates },
-            { label: "Active", value: stats.byStatus.active ?? 0 },
-            { label: "Rejected", value: stats.byStatus.rejected ?? 0 },
-            { label: "Positions", value: stats.totalJobs },
-            { label: "Emails sent", value: stats.emailsSent },
+            { label: "Applied", value: stats.byStage?.applied ?? 0 },
+            { label: "Screened", value: stats.byStage?.screened ?? 0 },
+            { label: "Interview", value: stats.byStage?.interview ?? 0 },
+            { label: "Offer", value: stats.byStage?.offer ?? 0 },
+            { label: "Hired", value: stats.byStage?.hired ?? 0 },
+            { label: "Rejected", value: stats.byStage?.rejected ?? 0 },
           ].map(({ label, value }) => (
-            <div key={label} className="flex-1 min-w-[120px] px-4 py-3">
+            <div key={label} className="flex-1 min-w-[110px] px-4 py-3">
               <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums leading-none">
                 {value.toLocaleString()}
               </p>
@@ -169,15 +171,12 @@ export default function RecruitmentPage() {
                   {job.total} candidate{job.total === 1 ? "" : "s"}
                 </span>
                 <div className="ml-auto flex items-center gap-3 shrink-0">
-                  {job.active > 0 && (
-                    <span className="text-[11px] font-medium text-[var(--accent-employee-text)] tabular-nums">
-                      {job.active} active
+                  {job.inPlay > 0 ? (
+                    <span className="text-[11px] font-medium text-[var(--accent-admin-text)] tabular-nums">
+                      {job.inPlay} in play
                     </span>
-                  )}
-                  {job.rejected > 0 && (
-                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                      {job.rejected} rejected
-                    </span>
+                  ) : (
+                    <span className="text-[11px] text-[var(--text-muted)]">nobody in play</span>
                   )}
                   <ChevronRight
                     size={15}
