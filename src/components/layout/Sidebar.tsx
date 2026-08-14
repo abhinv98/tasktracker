@@ -36,6 +36,9 @@ import {
   LifeBuoy,
   Send,
   UserSearch,
+  Megaphone,
+  ArrowLeft,
+  Users2,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -76,6 +79,10 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/invoices": Receipt,
   "/hr-requests": LifeBuoy,
   "/recruitment": UserSearch,
+  "/recruitment/candidates": Users2,
+  "/recruitment/campaigns": Megaphone,
+  "/recruitment/templates": FileBarChart,
+  "/recruitment/activity": MessageSquare,
   "/my-requests": Send,
 };
 
@@ -206,6 +213,29 @@ const EMPLOYEE_NAV: NavCategory[] = [
   },
 ];
 
+/**
+ * Recruitment is its own workspace: once you're inside /recruitment the sidebar
+ * becomes recruitment's navigation rather than the whole app's. It earns that
+ * because it has five destinations of its own plus a live list of positions —
+ * they were previously buttons in a page header, which is not where people
+ * look for top-level navigation.
+ *
+ * The escape hatch at the top is not optional. A nested nav without an obvious
+ * way out is how people get stranded.
+ */
+const RECRUITMENT_NAV: NavCategory[] = [
+  {
+    category: "Recruitment",
+    items: [
+      { href: "/recruitment", label: "Overview" },
+      { href: "/recruitment/candidates", label: "All Candidates" },
+      { href: "/recruitment/campaigns", label: "Campaigns" },
+      { href: "/recruitment/templates", label: "Templates" },
+      { href: "/recruitment/activity", label: "Email Activity" },
+    ],
+  },
+];
+
 function getIconForRoute(href: string): LucideIcon {
   return ROUTE_ICONS[href] ?? LayoutGrid;
 }
@@ -219,9 +249,20 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
+  const inRecruitment = pathname.startsWith("/recruitment");
+  const canRecruit = user.isHR === true || user.isSuperAdmin === true;
+  // Positions are fetched only inside the workspace — no point paying for the
+  // query on every other page in the app.
+  const jobs = useQuery(
+    api.recruitment.listJobs,
+    inRecruitment && canRecruit ? {} : "skip"
+  );
+
   // Oversight lives as a tab inside Work Log (no standalone nav item).
   const baseNav: NavCategory[] =
-    user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+    inRecruitment && canRecruit
+      ? RECRUITMENT_NAV
+      : user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
   const nav: NavCategory[] = baseNav
     .map((cat) => ({
       ...cat,
@@ -281,6 +322,17 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
 
         {/* Nav with categories */}
         <nav className="flex flex-1 flex-col py-2 overflow-y-auto px-3">
+          {/* Leaving the workspace has to be the first thing you see. */}
+          {inRecruitment && canRecruit && (
+            <Link
+              href="/dashboard"
+              onClick={onClose}
+              className="mb-2 flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to workspace
+            </Link>
+          )}
           {nav.map((group) => {
             const isOpen = openCategories.has(group.category);
             const hasActiveItem = group.items.some(
@@ -373,6 +425,47 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               </div>
             );
           })}
+          {/* Live positions — jumping straight to a role is the single most
+              common thing HR does in here, so it belongs in the nav rather
+              than two clicks deep behind Overview. */}
+          {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
+            <div className="mb-1 mt-2">
+              <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                Positions
+              </div>
+              <div className="mt-0.5 space-y-0.5">
+                {jobs
+                  .filter((j) => j.parentSourceId == null)
+                  .map((j) => {
+                    const href = `/recruitment/${j.sourceId}`;
+                    const isActive = pathname === href;
+                    return (
+                      <Link
+                        key={j._id}
+                        href={href}
+                        onClick={onClose}
+                        className={`group flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${
+                          isActive
+                            ? "bg-[var(--accent-admin-dim)] font-medium text-[var(--accent-admin-text)]"
+                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                        }`}
+                      >
+                        <span className="flex-1 truncate">{j.name}</span>
+                        {j.moving > 0 ? (
+                          <span className="shrink-0 rounded-full bg-[var(--accent-admin-strong)] px-1.5 text-[9px] font-bold text-white">
+                            {j.moving}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+                            {j.inPlay}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Footer */}

@@ -92,6 +92,22 @@ export const NAV_COMMANDS: NavCommand[] = [
     visible: (u) => isHR(u) || u.isSuperAdmin === true,
   },
   {
+    label: "All Candidates",
+    href: "/recruitment/candidates",
+    icon: UserSearch,
+    keywords: ["cv", "resume", "applicants", "talent", "pool", "search"],
+    hint: "Recruitment",
+    visible: (u) => isHR(u) || u.isSuperAdmin === true,
+  },
+  {
+    label: "Campaigns",
+    href: "/recruitment/campaigns",
+    icon: UserSearch,
+    keywords: ["outreach", "batch", "mail", "recruitment"],
+    hint: "Recruitment",
+    visible: (u) => isHR(u) || u.isSuperAdmin === true,
+  },
+  {
     label: "History",
     href: "/history",
     icon: BookOpen,

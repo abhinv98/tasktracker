@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import {
   PageHeader,
-  Button,
   SkeletonPageHeader,
   SkeletonList,
 } from "@/components/ui";
@@ -15,9 +14,6 @@ import {
   UserSearch,
   Search,
   ChevronRight,
-  Mail,
-  FileText,
-  Megaphone,
   X,
 } from "lucide-react";
 
@@ -48,28 +44,6 @@ export default function RecruitmentPage() {
         title="Recruitment"
         subtitle="Open positions, candidates and outreach"
         icon={UserSearch}
-        actions={
-          <div className="flex items-center gap-2">
-            <Link href="/recruitment/campaigns">
-              <Button variant="secondary">
-                <Megaphone size={14} />
-                Campaigns
-              </Button>
-            </Link>
-            <Link href="/recruitment/templates">
-              <Button variant="secondary">
-                <FileText size={14} />
-                Templates
-              </Button>
-            </Link>
-            <Link href="/recruitment/activity">
-              <Button variant="secondary">
-                <Mail size={14} />
-                Email activity
-              </Button>
-            </Link>
-          </div>
-        }
       />
 
       {/* Reference counts, kept quiet — the positions below are the work. */}
