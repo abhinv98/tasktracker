@@ -20,6 +20,9 @@ import {
   useToast,
 } from "@/components/ui";
 import {
+  parseCtcLpa, formatLpa, parseYears, formatYears, parseNoticeDays, formatNotice,
+} from "@/lib/recruitParse";
+import {
   ArrowLeft,
   Search,
   FileText,
@@ -28,9 +31,29 @@ import {
   Trash2,
   UserSearch,
   Megaphone,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 type Status = "active" | "non_active" | "rejected" | "on_hold";
+type SortKey = "name" | "years" | "current" | "expected" | "notice" | "status" | "added";
+
+/** Every column is its own column. Numbers sit right-aligned and sortable —
+ *  the whole point of a recruitment table is comparing salary and experience
+ *  across candidates, which a merged text blob makes impossible. */
+const COLUMNS: { key: SortKey | null; label: string; align?: "right"; cls: string }[] = [
+  { key: "name", label: "Candidate", cls: "min-w-[190px]" },
+  { key: null, label: "Email", cls: "min-w-[210px]" },
+  { key: null, label: "Phone", cls: "min-w-[130px]" },
+  { key: null, label: "Applied for", cls: "min-w-[140px]" },
+  { key: "years", label: "Exp", align: "right", cls: "min-w-[80px]" },
+  { key: "current", label: "Current", align: "right", cls: "min-w-[90px]" },
+  { key: "expected", label: "Expected", align: "right", cls: "min-w-[95px]" },
+  { key: "notice", label: "Notice", align: "right", cls: "min-w-[85px]" },
+  { key: "status", label: "Status", cls: "min-w-[105px]" },
+  { key: "added", label: "Added", align: "right", cls: "min-w-[90px]" },
+  { key: null, label: "", cls: "min-w-[70px]" },
+];
 
 const STATUSES: { value: Status; label: string; color: string }[] = [
   { value: "active", label: "Active", color: "#059669" },
@@ -80,6 +103,7 @@ export default function RecruitmentJobPage() {
   const [campTarget, setCampTarget] = useState("new");
   const [campName, setCampName] = useState("");
   const [campNotes, setCampNotes] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "added", dir: -1 });
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
   const undatedCount = (candidates ?? []).filter((c) => c.createdAt == null).length;
@@ -156,6 +180,32 @@ export default function RecruitmentJobPage() {
       </div>
     );
   }
+
+  // Parse once, then sort on the parsed numbers — sorting the raw strings
+  // would put "900000 LPA" above "9 LPA" despite being the same salary.
+  const rows = candidates
+    .map((c) => ({
+      c,
+      years: parseYears(c.experience),
+      current: parseCtcLpa(c.currentCtc),
+      expected: parseCtcLpa(c.expectedCtc),
+      notice: parseNoticeDays(c.noticePeriod),
+    }))
+    .sort((a, b) => {
+      const dir = sort.dir;
+      // Missing values always sink, whichever way the column is sorted.
+      const nul = (v: number | null | undefined) =>
+        v == null ? (dir === 1 ? Infinity : -Infinity) : v;
+      switch (sort.key) {
+        case "name": return a.c.name.localeCompare(b.c.name) * dir;
+        case "years": return (nul(a.years) - nul(b.years)) * dir;
+        case "current": return (nul(a.current) - nul(b.current)) * dir;
+        case "expected": return (nul(a.expected) - nul(b.expected)) * dir;
+        case "notice": return (nul(a.notice) - nul(b.notice)) * dir;
+        case "status": return a.c.status.localeCompare(b.c.status) * dir;
+        default: return (nul(a.c.createdAt) - nul(b.c.createdAt)) * dir;
+      }
+    });
 
   const allSelected = candidates.length > 0 && selected.size === candidates.length;
 
@@ -261,7 +311,7 @@ export default function RecruitmentJobPage() {
         <>
           <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed border-collapse">
+              <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
                     <th className="px-3 py-2 w-8">
@@ -275,38 +325,44 @@ export default function RecruitmentJobPage() {
                         className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
                       />
                     </th>
-                    {/* Identical columns for every position. Adapting them
-                        per job made each position render a differently-shaped
-                        table, which reads as broken far more than an empty
-                        cell does. Widths are fixed so nothing stretches. */}
-                    {[
-                      { label: "Candidate", w: "w-[30%]" },
-                      { label: "Applied for", w: "w-[14%]" },
-                      { label: "Details", w: "w-[30%]" },
-                      { label: "Status", w: "w-[10%]" },
-                      { label: "Added", w: "w-[9%]" },
-                      { label: "", w: "w-[7%]" },
-                    ].map((h, i) => (
-                      <th
-                        key={h.label || i}
-                        className={`${h.w} px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap`}
-                      >
-                        {h.label}
-                      </th>
-                    ))}
+                    {COLUMNS.map((col, i) => {
+                      const active = col.key && sort.key === col.key;
+                      return (
+                        <th
+                          key={col.label || i}
+                          className={`${col.cls} px-3 py-2 font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap ${
+                            col.align === "right" ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {col.key ? (
+                            <button
+                              onClick={() =>
+                                setSort((p) =>
+                                  p.key === col.key
+                                    ? { key: p.key, dir: p.dir === 1 ? -1 : 1 }
+                                    : { key: col.key as SortKey, dir: 1 }
+                                )
+                              }
+                              className={`inline-flex items-center gap-1 hover:text-[var(--text-primary)] transition-colors ${
+                                active ? "text-[var(--text-primary)]" : ""
+                              }`}
+                            >
+                              {col.label}
+                              {active &&
+                                (sort.dir === 1 ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+                            </button>
+                          ) : (
+                            col.label
+                          )}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {candidates.map((c) => {
+                  {rows.map(({ c, years, current, expected, notice }) => {
                     const meta = statusMeta(c.status);
-                    // Whatever this candidate actually has, joined — beats
-                    // three columns each mostly showing a dash.
-                    const details = [
-                      c.experience && `${c.experience} yr`,
-                      c.currentCtc && `now ${c.currentCtc}`,
-                      c.expectedCtc && `want ${c.expectedCtc}`,
-                      c.noticePeriod,
-                    ].filter(Boolean).join(" · ");
+                    const dash = <span className="text-[var(--text-disabled)]">—</span>;
                     return (
                       <tr
                         key={c._id}
@@ -323,42 +379,52 @@ export default function RecruitmentJobPage() {
                             className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
                           />
                         </td>
-                        <td className="px-3 py-2 min-w-[220px]">
-                          <p className="text-[13px] font-medium text-[var(--text-primary)]">
-                            {c.name}
-                          </p>
-                          <p className="text-[11px] text-[var(--text-muted)]">
-                            <a href={`mailto:${c.email}`} className="hover:underline">{c.email}</a>
-                            {c.number && <span> · {c.number}</span>}
-                          </p>
+                        <td className="px-3 py-2 text-[13px] font-medium text-[var(--text-primary)] whitespace-nowrap">
+                          {c.name}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] truncate">
-                          {/* A blank position just means the old form didn't
-                              record a sub-position — they applied for the job
-                              itself, so name it rather than showing a dash. */}
-                          {c.position || job?.name || "—"}
+                        <td className="px-3 py-2 text-[12px] whitespace-nowrap">
+                          {c.email ? (
+                            <a href={`mailto:${c.email}`} className="text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] hover:underline">
+                              {c.email}
+                            </a>
+                          ) : dash}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
-                          {details || <span className="text-[var(--text-disabled)]">Not provided</span>}
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
+                          {c.number || dash}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                          {/* Blank position = the old form recorded no sub-position,
+                              so they applied for the job itself. */}
+                          {c.position || job?.name || dash}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                          {years == null ? dash : formatYears(years)}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                          {current == null ? dash : formatLpa(current)}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)] tabular-nums text-right whitespace-nowrap">
+                          {expected == null ? dash : formatLpa(expected)}
+                        </td>
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                          {notice == null ? dash : formatNotice(notice)}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <StatusBadge color={meta.color} label={meta.label} />
                         </td>
-                        <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
-                          {fmt(c.createdAt) || <span className="text-[var(--text-disabled)]">—</span>}
+                        <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums text-right whitespace-nowrap">
+                          {fmt(c.createdAt) || dash}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             {c.resume && (
-                              <a href={c.resume} target="_blank" rel="noreferrer"
-                                title="Open résumé"
+                              <a href={c.resume} target="_blank" rel="noreferrer" title="Open résumé"
                                 className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
                                 <FileText size={14} />
                               </a>
                             )}
                             {c.portfolioLink && (
-                              <a href={c.portfolioLink} target="_blank" rel="noreferrer"
-                                title="Open portfolio"
+                              <a href={c.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio"
                                 className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
                                 <ExternalLink size={14} />
                               </a>
