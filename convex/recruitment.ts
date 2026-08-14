@@ -61,22 +61,29 @@ export const listJobs = query({
     const jobs = await ctx.db.query("recruitJobs").collect();
     const candidates = await ctx.db.query("recruitCandidates").collect();
 
-    const counts = new Map<number, { total: number; active: number; rejected: number; inPlay: number }>();
+    const counts = new Map<number, { total: number; active: number; rejected: number; inPlay: number; moving: number }>();
     for (const c of candidates) {
-      const acc = counts.get(c.jobSourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0 };
+      const acc = counts.get(c.jobSourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0, moving: 0 };
       const st = c.stage ?? "applied";
       acc.total++;
       if (st === "rejected") acc.rejected++;
       else acc.active++;
-      // "In play" = past first contact and not closed out — the number that
-      // tells HR whether a position is actually moving.
-      if (st === "screened" || st === "interview" || st === "offer") acc.inPlay++;
+      // "In play" = still in the running. MUST match OPEN_STAGES in
+      // src/lib/recruitStages.ts, which is what the position page's "In play"
+      // tab filters on — when these two disagreed, the overview said "nobody
+      // in play" while the position itself listed 512 people.
+      if (st === "applied" || st === "screened" || st === "interview" || st === "offer") {
+        acc.inPlay++;
+      }
+      // Past first contact — surfaced separately so a position that's actually
+      // moving looks different from one where nobody has been touched yet.
+      if (st === "screened" || st === "interview" || st === "offer") acc.moving++;
       counts.set(c.jobSourceId, acc);
     }
 
     const withCounts = jobs.map((j) => ({
       ...j,
-      ...(counts.get(j.sourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0 }),
+      ...(counts.get(j.sourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0, moving: 0 }),
       parentName:
         j.parentSourceId != null
           ? jobs.find((p) => p.sourceId === j.parentSourceId)?.name ?? null

@@ -94,6 +94,14 @@ export default function RecruitmentPage() {
         </div>
       )}
 
+      {stats && (stats.byStage?.screened ?? 0) + (stats.byStage?.interview ?? 0) +
+        (stats.byStage?.offer ?? 0) + (stats.byStage?.hired ?? 0) === 0 && (
+        <p className="-mt-3 mb-6 text-[12px] text-[var(--text-muted)]">
+          Everyone imported starts at Applied. Open a position, tick the people
+          worth a look and move them along — the funnel fills as you triage.
+        </p>
+      )}
+
       {/* Global candidate search */}
       <div className="relative mb-6 max-w-[460px]">
         <Search
@@ -171,12 +179,17 @@ export default function RecruitmentPage() {
                   {job.total} candidate{job.total === 1 ? "" : "s"}
                 </span>
                 <div className="ml-auto flex items-center gap-3 shrink-0">
-                  {job.inPlay > 0 ? (
+                  {job.moving > 0 && (
                     <span className="text-[11px] font-medium text-[var(--accent-admin-text)] tabular-nums">
+                      {job.moving} moving
+                    </span>
+                  )}
+                  {job.inPlay > 0 ? (
+                    <span className="text-[11px] text-[var(--text-secondary)] tabular-nums">
                       {job.inPlay} in play
                     </span>
                   ) : (
-                    <span className="text-[11px] text-[var(--text-muted)]">nobody in play</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">all closed out</span>
                   )}
                   <ChevronRight
                     size={15}
