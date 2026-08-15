@@ -37,15 +37,12 @@ import {
   Send,
   UserSearch,
   Megaphone,
+  ArrowLeft,
   Users2,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
 import { getDisplayRole } from "@/lib/roles";
-import {
-  WorkspaceSwitcher,
-  workspaceForPath,
-} from "./WorkspaceSwitcher";
 
 interface SidebarProps {
   user: Doc<"users">;
@@ -155,10 +152,10 @@ const HR_NAV: NavCategory[] = [
   },
   {
     category: "People",
-    // Recruitment deliberately isn't here: it's a workspace, reached through
-    // the switcher above. A nav link that silently swaps the whole sidebar is
-    // the disorienting behaviour the switcher exists to replace.
-    items: [{ href: "/hr-requests", label: "Requests" }],
+    items: [
+      { href: "/hr-requests", label: "Requests" },
+      { href: "/recruitment", label: "Recruitment" },
+    ],
   },
   {
     category: "Management",
@@ -252,20 +249,18 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
+  const inRecruitment = pathname.startsWith("/recruitment");
   const canRecruit = user.isHR === true || user.isSuperAdmin === true;
-  const workspace = workspaceForPath(pathname);
-  const inRecruitment = workspace.key === "recruitment" && canRecruit;
-  const availableWorkspaces = canRecruit ? ["main", "recruitment"] : ["main"];
   // Positions are fetched only inside the workspace — no point paying for the
   // query on every other page in the app.
   const jobs = useQuery(
     api.recruitment.listJobs,
-    inRecruitment ? {} : "skip"
+    inRecruitment && canRecruit ? {} : "skip"
   );
 
   // Oversight lives as a tab inside Work Log (no standalone nav item).
   const baseNav: NavCategory[] =
-    inRecruitment
+    inRecruitment && canRecruit
       ? RECRUITMENT_NAV
       : user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
   const nav: NavCategory[] = baseNav
@@ -325,11 +320,19 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
           </button>
         </div>
 
-        <WorkspaceSwitcher available={availableWorkspaces} onNavigate={onClose} />
-
         {/* Nav with categories */}
         <nav className="flex flex-1 flex-col py-2 overflow-y-auto px-3">
-
+          {/* Leaving the workspace has to be the first thing you see. */}
+          {inRecruitment && canRecruit && (
+            <Link
+              href="/dashboard"
+              onClick={onClose}
+              className="mb-2 flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to workspace
+            </Link>
+          )}
           {nav.map((group) => {
             const isOpen = openCategories.has(group.category);
             const hasActiveItem = group.items.some(
@@ -425,7 +428,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
           {/* Live positions — jumping straight to a role is the single most
               common thing HR does in here, so it belongs in the nav rather
               than two clicks deep behind Overview. */}
-          {inRecruitment && jobs && jobs.length > 0 && (
+          {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
             <div className="mb-1 mt-2">
               <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                 Positions
