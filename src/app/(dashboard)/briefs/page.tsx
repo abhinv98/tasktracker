@@ -98,6 +98,8 @@ export default function BriefsPage() {
   const [creativesRequired, setCreativesRequired] = useState<number | string>(1);
 
   const allTeams = useQuery(api.teams.listTeams, {});
+  // Briefs routed to this team get their own folder instead of a brand's.
+  const hrTeam = (allTeams ?? []).find((t: any) => t.name === "HR");
 
   // ─── Individual Task unified flow state ───
   // One or more team blocks; first one is the primary assignee. When 2+ blocks
@@ -255,7 +257,13 @@ export default function BriefsPage() {
     const grouped = new Map<string, typeof sorted>();
 
     for (const brief of sorted) {
-      const key = (brief as any).brandId ?? "__no_brand__";
+      // Work routed to the HR team belongs to HR, not to whichever brand it
+      // was raised from — otherwise requests to HR scatter across every brand
+      // folder and nobody can see HR's queue in one place.
+      const key =
+        hrTeam && (brief as any).teamIds?.includes(hrTeam._id)
+          ? "__hr__"
+          : (brief as any).brandId ?? "__no_brand__";
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(brief);
     }
@@ -263,7 +271,7 @@ export default function BriefsPage() {
     const folders: { brandId: string; brandName: string; brandColor: string; briefs: typeof sorted }[] = [];
 
     for (const [key, folderBriefs] of grouped) {
-      if (key === "__no_brand__") continue;
+      if (key === "__no_brand__" || key === "__hr__") continue;
       const brand = (brands ?? []).find((b: any) => b._id === key);
       folders.push({
         brandId: key,
@@ -274,6 +282,17 @@ export default function BriefsPage() {
     }
 
     folders.sort((a, b) => a.brandName.localeCompare(b.brandName));
+
+    // Ordering is settled in sortedBrandFolders; this just adds the folder.
+    const hr = grouped.get("__hr__");
+    if (hr && hr.length > 0) {
+      folders.push({
+        brandId: "__hr__",
+        brandName: "HR",
+        brandColor: hrTeam?.color ?? "#788c5d",
+        briefs: hr,
+      });
+    }
 
     const noBrand = grouped.get("__no_brand__");
     if (noBrand && noBrand.length > 0) {
@@ -389,9 +408,9 @@ export default function BriefsPage() {
   const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
   const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
   const reviewBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "review"), [filteredBriefs]);
-  const activeFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands]);
-  const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands]);
-  const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands]);
+  const activeFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands, hrTeam]);
+  const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands, hrTeam]);
+  const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands, hrTeam]);
   const brandFolders = briefsTab === "active" ? activeFolders : briefsTab === "review" ? reviewFolders : completedFolders;
   const displayedBriefs = briefsTab === "active" ? activeBriefs : briefsTab === "review" ? reviewBriefs : completedBriefs;
   const tabCountLabel =
@@ -402,6 +421,10 @@ export default function BriefsPage() {
       const ao = folderCounts(a.briefs as any).overdue;
       const bo = folderCounts(b.briefs as any).overdue;
       if (ao !== bo) return bo - ao;
+      // "HR" is a standing internal destination rather than a client, and
+      // people come to it by name — keep it first among equals.
+      if (a.brandId === "__hr__") return -1;
+      if (b.brandId === "__hr__") return 1;
       // "No Brand" is a catch-all, not a client — keep it last.
       if (a.brandId === "__no_brand__") return 1;
       if (b.brandId === "__no_brand__") return -1;
@@ -859,7 +882,7 @@ export default function BriefsPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openCreateModalForBrand(folder.brandId === "__no_brand__" ? undefined : folder.brandId);
+                          openCreateModalForBrand(folder.brandId.startsWith("__") ? undefined : folder.brandId);
                         }}
                         // Hidden until the row is hovered or focused: it's on
                         // every row, and 15 identical buttons compete with the
@@ -1039,7 +1062,9 @@ export default function BriefsPage() {
                     style={{ backgroundColor: folder.brandColor }}
                     aria-hidden
                   />
-                  {folder.brandId !== "__no_brand__" ? (
+                  {/* "__"-prefixed ids are synthetic folders (No Brand, HR) —
+                      there's no brand page to link to. */}
+                  {!folder.brandId.startsWith("__") ? (
                     <Link
                       href={`/brands/${folder.brandId}?returnTo=${encodeURIComponent("/briefs")}`}
                       className="group inline-flex items-center gap-1 font-semibold text-[15px] text-[var(--text-primary)] hover:text-[var(--accent-admin-text)] hover:underline transition-colors"

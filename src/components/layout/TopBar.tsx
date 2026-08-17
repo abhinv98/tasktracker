@@ -8,6 +8,7 @@ import { Bell, Menu, X, Search } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui";
+import { getDisplayRole } from "@/lib/roles";
 
 interface TopBarProps {
   user: Doc<"users">;
@@ -210,7 +211,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           {user.name ?? user.email ?? "User"}
         </span>
 
-        <Badge variant={roleVariant}>{user.isHR ? "HR" : role}</Badge>
+        <Badge variant={roleVariant}>{getDisplayRole(user)}</Badge>
 
         <button
           onClick={() => signOut()}

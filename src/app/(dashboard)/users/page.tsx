@@ -732,7 +732,7 @@ export default function UsersPage() {
 
   async function handleRoleChange(
     userId: Id<"users">,
-    newRole: "admin" | "employee" | "freelancer" | "hr"
+    newRole: "admin" | "employee" | "freelancer" | "hr" | "accountant"
   ) {
     try {
       await updateRole({
@@ -740,11 +740,12 @@ export default function UsersPage() {
         newRole:
           newRole === "freelancer"
             ? "employee"
-            : newRole === "hr"
+            : newRole === "hr" || newRole === "accountant"
               ? "admin"
               : newRole,
         isFreelancer: newRole === "freelancer",
         isHR: newRole === "hr",
+        isAccountant: newRole === "accountant",
       });
       toast("success", "Role updated");
     } catch (err) {
@@ -846,9 +847,11 @@ export default function UsersPage() {
                       value={
                         (user as any).isHR
                           ? "hr"
-                          : (user as any).isFreelancer
-                            ? "freelancer"
-                            : user.role ?? "employee"
+                          : (user as any).isAccountant
+                            ? "accountant"
+                            : (user as any).isFreelancer
+                              ? "freelancer"
+                              : user.role ?? "employee"
                       }
                       onChange={(e) =>
                         handleRoleChange(
@@ -858,12 +861,14 @@ export default function UsersPage() {
                             | "employee"
                             | "freelancer"
                             | "hr"
+                            | "accountant"
                         )
                       }
                       className="bg-transparent rounded-md border border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-input)] text-[var(--text-primary)] px-2 py-1 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] transition-colors duration-150"
                     >
                       <option value="admin">Brand Manager</option>
                       <option value="hr">HR</option>
+                      <option value="accountant">Accountant</option>
                       <option value="employee">Employee</option>
                       <option value="freelancer">Freelancer</option>
                     </select>

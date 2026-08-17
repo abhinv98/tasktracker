@@ -124,8 +124,9 @@ export const updateUserRole = mutation({
     ),
     isFreelancer: v.optional(v.boolean()),
     isHR: v.optional(v.boolean()),
+    isAccountant: v.optional(v.boolean()),
   },
-  handler: async (ctx, { userId, newRole, isFreelancer, isHR }) => {
+  handler: async (ctx, { userId, newRole, isFreelancer, isHR, isAccountant }) => {
     const currentUserId = await getAuthUserId(ctx);
     if (!currentUserId) throw new Error("Not authenticated");
     const currentUser = await ctx.db.get(currentUserId);
@@ -153,6 +154,8 @@ export const updateUserRole = mutation({
       isFreelancer: newRole === "admin" ? false : isFreelancer ?? false,
       // HR rides on the admin role; demoting out of admin clears it.
       isHR: newRole === "admin" ? isHR ?? false : false,
+      // Same for Accountant.
+      isAccountant: newRole === "admin" ? isAccountant ?? false : false,
     });
   },
 });
@@ -345,6 +348,23 @@ export const generateProfileUploadUrl = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Tags the finance/accounts people. Run once after deploy:
+// `npx convex run users:setAccountants`.
+export const setAccountants = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const allUsers = await ctx.db.query("users").collect();
+    let updated = 0;
+    for (const u of allUsers) {
+      if ((u.name ?? "").toLowerCase().includes("janshi")) {
+        await ctx.db.patch(u._id, { isAccountant: true });
+        updated++;
+      }
+    }
+    return { updated };
   },
 });
 

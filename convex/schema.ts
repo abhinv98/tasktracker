@@ -30,6 +30,8 @@ export default defineSchema({
     isFreelancer: v.optional(v.boolean()),
     /** HR keeps role "admin" (same permissions) — this flag swaps their nav to the HR view & unlocks the HR Requests page */
     isHR: v.optional(v.boolean()),
+    /** Finance/accounts. Rides on role "admin" like isHR, but is a label only for now — the nav is still the brand-manager view. */
+    isAccountant: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
     clientBrandId: v.optional(v.id("brands")),
   })
