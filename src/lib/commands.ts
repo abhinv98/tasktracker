@@ -89,7 +89,7 @@ export const NAV_COMMANDS: NavCommand[] = [
     icon: UserSearch,
     keywords: ["hiring", "candidates", "applicants", "jobs", "cv", "resume"],
     hint: "Candidates",
-    visible: (u) => isHR(u) || u.isSuperAdmin === true,
+    visible: isHR,
   },
   {
     label: "All Candidates",
@@ -97,7 +97,7 @@ export const NAV_COMMANDS: NavCommand[] = [
     icon: UserSearch,
     keywords: ["cv", "resume", "applicants", "talent", "pool", "search"],
     hint: "Recruitment",
-    visible: (u) => isHR(u) || u.isSuperAdmin === true,
+    visible: isHR,
   },
   {
     label: "Campaigns",
@@ -105,7 +105,7 @@ export const NAV_COMMANDS: NavCommand[] = [
     icon: UserSearch,
     keywords: ["outreach", "batch", "mail", "recruitment"],
     hint: "Recruitment",
-    visible: (u) => isHR(u) || u.isSuperAdmin === true,
+    visible: isHR,
   },
   {
     label: "History",
