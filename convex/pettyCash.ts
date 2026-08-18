@@ -3,14 +3,18 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
- * Petty cash ledger. Cash moves allocator → giver → recipient; the recipient
- * spends some and returns the remainder.
+ * Petty cash, as a float.
  *
- * Access is deliberately narrow: this is money, and the row set is small
- * enough that "everyone with a login" would be a real disclosure. The same
- * rule is mirrored in src/lib/pettyCash.ts for the nav and route guard —
- * Convex bundles separately and can't import from src/, so the two copies are
- * kept in step by hand.
+ * HR and the accountant hold an allocated amount. They hand chunks of it to
+ * the office boys for errands; the office boy comes back with the remainder
+ * and an account of what he bought. Only at that point is anything "spent" —
+ * before it, the money is out of the drawer but still the company's.
+ *
+ *   in hand = allocated − handed out + returned
+ *
+ * Access is deliberately narrow: this is money. The same rule is mirrored in
+ * src/lib/pettyCash.ts for the nav and route guard — Convex bundles
+ * separately and can't import from src/.
  * ponytail: duplicated predicate, collapse into a shared module if a third
  * caller appears.
  */
@@ -34,29 +38,58 @@ async function requireAccess(ctx: any) {
   return { userId, user };
 }
 
-/** Every disbursement, newest given-date first. Returns [] without access. */
-export const listDisbursements = query({
+/** Rejects negatives and non-numbers — a bad amount stored as 0 is worse than a failed save. */
+function amount(n: number | undefined, field: string): number {
+  const value = Number(n ?? 0);
+  if (!isFinite(value) || value < 0) {
+    throw new Error(`${field} must be a number of 0 or more`);
+  }
+  return value;
+}
+
+function requireDate(d: string, field: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error(`${field} is required`);
+  return d;
+}
+
+/**
+ * Everything the page renders from, in one round trip: the float top-ups, the
+ * handouts, and who is allowed to hold a float. Returns empty without access.
+ */
+export const getLedger = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const user = await ctx.db.get(userId);
-    if (!hasAccess(user)) return [];
+    const me = userId ? await ctx.db.get(userId) : null;
+    if (!hasAccess(me)) {
+      return { allocations: [], disbursements: [], holders: [] };
+    }
 
-    const rows = await ctx.db.query("disbursements").collect();
     const users = await ctx.db.query("users").collect();
+    const nameOf = (id: string) =>
+      users.find((u) => u._id === id)?.name ??
+      users.find((u) => u._id === id)?.email ??
+      "Unknown";
 
-    return rows
+    const allocations = (await ctx.db.query("pettyCashAllocations").collect())
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((a) => ({ ...a, holderName: nameOf(a.holderId) }));
+
+    const disbursements = (await ctx.db.query("disbursements").collect())
       .sort((a, b) => b.givenDate.localeCompare(a.givenDate))
-      .map((d) => ({
-        ...d,
-        createdByName:
-          users.find((u) => u._id === d.createdBy)?.name ?? undefined,
-      }));
+      .map((d) => ({ ...d, holderName: nameOf(d.holderId) }));
+
+    // Anyone who may hold a float — the same people who can open this page.
+    const holders = users
+      .filter((u) => hasAccess(u))
+      .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unknown" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { allocations, disbursements, holders };
   },
 });
 
-/** Drives the nav item and the page's own guard. */
+/** Drives the nav item and the route guard. */
 export const canAccessPettyCash = query({
   args: {},
   handler: async (ctx) => {
@@ -66,53 +99,121 @@ export const canAccessPettyCash = query({
   },
 });
 
-function clean(s: string): string {
-  return s.trim();
-}
+// ── Allocations (float top-ups) ───────────────────────────────────
 
-/** Rejects negatives and non-numbers — a bad amount silently stored as 0 is worse than a failed save. */
-function amount(n: number | undefined, field: string): number {
-  const value = Number(n ?? 0);
-  if (!isFinite(value) || value < 0) {
-    throw new Error(`${field} must be a number of 0 or more`);
-  }
-  return value;
-}
-
-export const createDisbursement = mutation({
+export const createAllocation = mutation({
   args: {
-    allocator: v.string(),
-    giver: v.string(),
-    recipient: v.string(),
-    amountAllocated: v.optional(v.number()),
-    amountGiven: v.number(),
-    amountSpent: v.optional(v.number()),
-    givenDate: v.string(),
-    notes: v.optional(v.string()),
+    holderId: v.id("users"),
+    amount: v.number(),
+    date: v.string(),
+    note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireAccess(ctx);
-
-    const allocator = clean(args.allocator);
-    const giver = clean(args.giver);
-    const recipient = clean(args.recipient);
-    if (!allocator) throw new Error("Allocator is required");
-    if (!giver || !recipient) throw new Error("Giver and recipient are required");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.givenDate)) {
-      throw new Error("Given date is required");
+    const holder = await ctx.db.get(args.holderId);
+    if (!hasAccess(holder)) {
+      throw new Error("That person can't hold petty cash");
     }
+    const value = amount(args.amount, "Amount");
+    if (value <= 0) throw new Error("An allocation has to be more than zero");
+
+    return await ctx.db.insert("pettyCashAllocations", {
+      holderId: args.holderId,
+      amount: value,
+      date: requireDate(args.date, "Date"),
+      note: args.note?.trim() || undefined,
+      createdBy: userId,
+    });
+  },
+});
+
+export const deleteAllocation = mutation({
+  args: { id: v.id("pettyCashAllocations") },
+  handler: async (ctx, { id }) => {
+    await requireAccess(ctx);
+    await ctx.db.delete(id);
+  },
+});
+
+// ── Handouts ──────────────────────────────────────────────────────
+
+export const createDisbursement = mutation({
+  args: {
+    holderId: v.id("users"),
+    recipient: v.string(),
+    purpose: v.string(),
+    amountGiven: v.number(),
+    givenDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { userId } = await requireAccess(ctx);
+    const recipient = args.recipient.trim();
+    const purpose = args.purpose.trim();
+    if (!recipient) throw new Error("Who is the cash going to?");
+    if (!purpose) throw new Error("What is the cash for?");
+    const given = amount(args.amountGiven, "Amount given");
+    if (given <= 0) throw new Error("A handout has to be more than zero");
 
     return await ctx.db.insert("disbursements", {
-      allocator,
-      giver,
+      holderId: args.holderId,
       recipient,
-      amountAllocated: amount(args.amountAllocated, "Amount allocated"),
-      amountGiven: amount(args.amountGiven, "Amount given"),
-      amountSpent: amount(args.amountSpent, "Amount spent"),
-      givenDate: args.givenDate,
-      remainderReturned: false,
-      notes: args.notes?.trim() || undefined,
+      purpose,
+      amountGiven: given,
+      givenDate: requireDate(args.givenDate, "Given date"),
+      settled: false,
       createdBy: userId,
+    });
+  },
+});
+
+/**
+ * Close out a handout: the remainder came back and the spend is explained.
+ * The explanation is required — an unexplained settlement is exactly the hole
+ * this page exists to close.
+ */
+export const settleDisbursement = mutation({
+  args: {
+    id: v.id("disbursements"),
+    amountReturned: v.number(),
+    spentOn: v.string(),
+  },
+  handler: async (ctx, { id, amountReturned, spentOn }) => {
+    await requireAccess(ctx);
+    const d = await ctx.db.get(id);
+    if (!d) throw new Error("That handout no longer exists");
+
+    const returned = amount(amountReturned, "Amount returned");
+    if (returned > d.amountGiven) {
+      throw new Error(
+        `Can't return more than was handed out (₹${d.amountGiven})`
+      );
+    }
+    const explanation = spentOn.trim();
+    if (!explanation) {
+      throw new Error("Say what the money was spent on");
+    }
+
+    await ctx.db.patch(id, {
+      settled: true,
+      amountReturned: returned,
+      spentOn: explanation,
+      settledAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/** Undo a settlement — the cash goes back to being out. */
+export const reopenDisbursement = mutation({
+  args: { id: v.id("disbursements") },
+  handler: async (ctx, { id }) => {
+    await requireAccess(ctx);
+    await ctx.db.patch(id, {
+      settled: false,
+      amountReturned: undefined,
+      spentOn: undefined,
+      settledAt: undefined,
+      updatedAt: Date.now(),
     });
   },
 });
@@ -120,56 +221,52 @@ export const createDisbursement = mutation({
 export const updateDisbursement = mutation({
   args: {
     id: v.id("disbursements"),
-    allocator: v.optional(v.string()),
-    giver: v.optional(v.string()),
+    holderId: v.optional(v.id("users")),
     recipient: v.optional(v.string()),
-    amountAllocated: v.optional(v.number()),
+    purpose: v.optional(v.string()),
     amountGiven: v.optional(v.number()),
-    amountSpent: v.optional(v.number()),
     givenDate: v.optional(v.string()),
-    remainderReturned: v.optional(v.boolean()),
-    notes: v.optional(v.string()),
+    amountReturned: v.optional(v.number()),
+    spentOn: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...rest }) => {
     await requireAccess(ctx);
     const existing = await ctx.db.get(id);
-    if (!existing) throw new Error("That disbursement no longer exists");
+    if (!existing) throw new Error("That handout no longer exists");
 
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
-
-    if (rest.allocator !== undefined) {
-      const v2 = clean(rest.allocator);
-      if (!v2) throw new Error("Allocator is required");
-      patch.allocator = v2;
-    }
-    if (rest.giver !== undefined) {
-      const v2 = clean(rest.giver);
-      if (!v2) throw new Error("Giver is required");
-      patch.giver = v2;
-    }
+    if (rest.holderId !== undefined) patch.holderId = rest.holderId;
     if (rest.recipient !== undefined) {
-      const v2 = clean(rest.recipient);
-      if (!v2) throw new Error("Recipient is required");
+      const v2 = rest.recipient.trim();
+      if (!v2) throw new Error("Who is the cash going to?");
       patch.recipient = v2;
     }
-    if (rest.amountAllocated !== undefined)
-      patch.amountAllocated = amount(rest.amountAllocated, "Amount allocated");
-    if (rest.amountGiven !== undefined)
-      patch.amountGiven = amount(rest.amountGiven, "Amount given");
-    if (rest.amountSpent !== undefined)
-      patch.amountSpent = amount(rest.amountSpent, "Amount spent");
-    if (rest.givenDate !== undefined) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(rest.givenDate)) {
-        throw new Error("Given date must be a calendar date");
-      }
-      patch.givenDate = rest.givenDate;
+    if (rest.purpose !== undefined) {
+      const v2 = rest.purpose.trim();
+      if (!v2) throw new Error("What is the cash for?");
+      patch.purpose = v2;
     }
-    if (rest.notes !== undefined) patch.notes = rest.notes.trim() || undefined;
-    if (rest.remainderReturned !== undefined) {
-      patch.remainderReturned = rest.remainderReturned;
-      // Stamp when it came back, clear it when the toggle is undone — a
-      // returned_at left behind on an un-returned record reads as a fact.
-      patch.returnedAt = rest.remainderReturned ? Date.now() : undefined;
+    if (rest.amountGiven !== undefined) {
+      const given = amount(rest.amountGiven, "Amount given");
+      if (given <= 0) throw new Error("A handout has to be more than zero");
+      patch.amountGiven = given;
+    }
+    if (rest.givenDate !== undefined) {
+      patch.givenDate = requireDate(rest.givenDate, "Given date");
+    }
+    if (rest.amountReturned !== undefined) {
+      patch.amountReturned = amount(rest.amountReturned, "Amount returned");
+    }
+    if (rest.spentOn !== undefined) patch.spentOn = rest.spentOn.trim() || undefined;
+
+    // Editing a settled handout must not let the returned amount drift above
+    // what was given — that would mint cash into the float.
+    const given =
+      (patch.amountGiven as number | undefined) ?? existing.amountGiven;
+    const returned =
+      (patch.amountReturned as number | undefined) ?? existing.amountReturned ?? 0;
+    if (existing.settled && returned > given) {
+      throw new Error(`Returned can't be more than the ₹${given} handed out`);
     }
 
     await ctx.db.patch(id, patch);

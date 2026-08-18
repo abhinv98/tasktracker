@@ -1,16 +1,22 @@
 /**
- * Petty cash: shared types, money/date formatting, and the client-side
- * aggregation the page renders from. Totals are derived from the one records
- * list — there are no aggregate queries, same as the standalone app.
+ * Petty cash as a float.
+ *
+ * HR and the accountant hold cash. They hand chunks of it out for errands;
+ * the money comes back as a remainder plus an account of what was bought.
+ * Nothing counts as spent until that settlement happens — before it, the cash
+ * is out of the drawer but still the company's.
+ *
+ *   in hand = allocated − handed out + returned
+ *           = allocated − spent − outstanding
  *
  * The access rule lives here AND in convex/pettyCash.ts. Convex functions are
  * bundled separately and can't import from src/, so the two copies have to be
  * kept in step by hand.
- * ponytail: duplicated predicate, collapse into a shared convex/lib module if
- * a third caller appears.
+ * ponytail: duplicated predicate, collapse into a shared module if a third
+ * caller appears.
  */
 
-/** Not on a role flag because it's one person, not a job function. */
+/** Not a role flag because it's one person, not a job function. */
 export const PETTY_CASH_EMAILS = ["dhriti@ecultify.com"];
 
 export function canAccessPettyCash(user: {
@@ -28,95 +34,126 @@ export function canAccessPettyCash(user: {
   );
 }
 
-export type Disbursement = {
+export type Allocation = {
   _id: string;
-  allocator: string;
-  giver: string;
+  holderId: string;
+  holderName: string;
+  amount: number;
+  date: string; // "YYYY-MM-DD"
+  note?: string;
+};
+
+export type Handout = {
+  _id: string;
+  holderId: string;
+  holderName: string;
   recipient: string;
-  amountAllocated: number;
+  purpose: string;
   amountGiven: number;
-  amountSpent: number;
   givenDate: string; // "YYYY-MM-DD"
-  remainderReturned: boolean;
-  returnedAt?: number;
-  notes?: string;
-  createdByName?: string;
-  updatedAt?: number;
+  settled: boolean;
+  amountReturned?: number;
+  spentOn?: string;
+  settledAt?: number;
 };
 
-export type DisbursementStatus = "returned" | "outstanding" | "spent";
+export type Holder = { _id: string; name: string };
 
-export function statusOf(d: Disbursement): DisbursementStatus {
-  if (d.remainderReturned) return "returned";
-  if (d.amountGiven - d.amountSpent > 0) return "outstanding";
-  return "spent";
+/** Spent is only real once the remainder is back and accounted for. */
+export function spentOf(h: Handout): number {
+  if (!h.settled) return 0;
+  return Math.max(0, h.amountGiven - (h.amountReturned ?? 0));
 }
 
-export const STATUS_META: Record<
-  DisbursementStatus,
-  { label: string; color: string }
-> = {
-  outstanding: { label: "Outstanding", color: "#d97757" },
-  spent: { label: "Fully spent", color: "#6a9bcc" },
-  returned: { label: "Returned", color: "#788c5d" },
-};
-
-/** What this record still has out in the world. Zero once returned. */
-export function outstandingOf(d: Disbursement): number {
-  if (d.remainderReturned) return 0;
-  return Math.max(0, d.amountGiven - d.amountSpent);
+/** Cash still out with someone. The full handout until it's settled. */
+export function outstandingOf(h: Handout): number {
+  return h.settled ? 0 : h.amountGiven;
 }
 
-export function remainderOf(d: Disbursement): number {
-  return d.amountGiven - d.amountSpent;
+export function returnedOf(h: Handout): number {
+  return h.settled ? h.amountReturned ?? 0 : 0;
 }
 
 export type Totals = {
   allocated: number;
-  handedOff: number;
+  handedOut: number;
+  returned: number;
   spent: number;
   outstanding: number;
+  /** What should physically be in the drawer right now. */
+  inHand: number;
 };
 
-export function computeTotals(items: Disbursement[]): Totals {
-  return items.reduce<Totals>(
-    (t, d) => ({
-      allocated: t.allocated + d.amountAllocated,
-      handedOff: t.handedOff + d.amountGiven,
-      spent: t.spent + d.amountSpent,
-      outstanding: t.outstanding + outstandingOf(d),
-    }),
-    { allocated: 0, handedOff: 0, spent: 0, outstanding: 0 }
-  );
+export function computeTotals(
+  allocations: Allocation[],
+  handouts: Handout[]
+): Totals {
+  const allocated = allocations.reduce((n, a) => n + a.amount, 0);
+  let handedOut = 0;
+  let returned = 0;
+  let spent = 0;
+  let outstanding = 0;
+  for (const h of handouts) {
+    handedOut += h.amountGiven;
+    returned += returnedOf(h);
+    spent += spentOf(h);
+    outstanding += outstandingOf(h);
+  }
+  return {
+    allocated,
+    handedOut,
+    returned,
+    spent,
+    outstanding,
+    inHand: allocated - handedOut + returned,
+  };
 }
 
-export type AllocatorSummary = {
+export type HolderSummary = {
+  holderId: string;
   name: string;
   totals: Totals;
-  count: number;
+  openCount: number;
 };
 
-/** One row per allocator, biggest book first. */
-export function groupByAllocator(items: Disbursement[]): AllocatorSummary[] {
-  const map = new Map<string, Disbursement[]>();
-  for (const d of items) {
-    const key = d.allocator.trim() || "Unknown";
-    const arr = map.get(key);
-    if (arr) arr.push(d);
-    else map.set(key, [d]);
-  }
-  return [...map.entries()]
-    .map(([name, list]) => ({
-      name,
-      totals: computeTotals(list),
-      count: list.length,
-    }))
+/** One balance per person holding a float, biggest float first. */
+export function groupByHolder(
+  allocations: Allocation[],
+  handouts: Handout[],
+  holders: Holder[]
+): HolderSummary[] {
+  const ids = new Set<string>([
+    ...allocations.map((a) => a.holderId),
+    ...handouts.map((h) => h.holderId),
+  ]);
+  return [...ids]
+    .map((id) => {
+      const mine = handouts.filter((h) => h.holderId === id);
+      const name =
+        holders.find((h) => h._id === id)?.name ??
+        allocations.find((a) => a.holderId === id)?.holderName ??
+        handouts.find((h) => h.holderId === id)?.holderName ??
+        "Unknown";
+      return {
+        holderId: id,
+        name,
+        totals: computeTotals(
+          allocations.filter((a) => a.holderId === id),
+          mine
+        ),
+        openCount: mine.filter((h) => !h.settled).length,
+      };
+    })
     .sort((a, b) => b.totals.allocated - a.totals.allocated);
 }
 
-export function monthKey(givenDate: string): string {
-  return givenDate.slice(0, 7); // "YYYY-MM"
-}
+export type MonthGroup = {
+  key: string;
+  label: string;
+  items: Handout[];
+  given: number;
+  spent: number;
+};
 
 export function monthLabel(key: string): string {
   const [y, m] = key.split("-").map(Number);
@@ -127,40 +164,31 @@ export function monthLabel(key: string): string {
   });
 }
 
-export type MonthGroup = {
-  key: string;
-  label: string;
-  items: Disbursement[];
-  totals: Totals;
-};
-
-/** Newest month first, newest record first inside it. */
-export function groupByMonth(items: Disbursement[]): MonthGroup[] {
-  const map = new Map<string, Disbursement[]>();
-  for (const d of items) {
-    const key = monthKey(d.givenDate);
+/** Newest month first, newest handout first inside it. */
+export function groupByMonth(handouts: Handout[]): MonthGroup[] {
+  const map = new Map<string, Handout[]>();
+  for (const h of handouts) {
+    const key = h.givenDate.slice(0, 7);
     const arr = map.get(key);
-    if (arr) arr.push(d);
-    else map.set(key, [d]);
+    if (arr) arr.push(h);
+    else map.set(key, [h]);
   }
   return [...map.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([key, list]) => ({
+    .map(([key, items]) => ({
       key,
       label: monthLabel(key),
-      items: [...list].sort((a, b) => b.givenDate.localeCompare(a.givenDate)),
-      totals: computeTotals(list),
+      items: [...items].sort((a, b) => b.givenDate.localeCompare(a.givenDate)),
+      given: items.reduce((n, h) => n + h.amountGiven, 0),
+      spent: items.reduce((n, h) => n + spentOf(h), 0),
     }));
 }
 
-/** Existing names, for the add-form suggestions. */
-export function distinctNames(
-  items: Disbursement[],
-  field: "allocator" | "giver" | "recipient"
-): string[] {
+/** Names already in the ledger, for the handout form's suggestions. */
+export function distinctRecipients(handouts: Handout[]): string[] {
   const set = new Set<string>();
-  for (const d of items) {
-    const v = d[field]?.trim();
+  for (const h of handouts) {
+    const v = h.recipient?.trim();
     if (v) set.add(v);
   }
   return [...set].sort((a, b) => a.localeCompare(b));
@@ -168,10 +196,11 @@ export function distinctNames(
 
 /** Indian Rupees, no decimals — petty cash is never counted in paise. */
 export function money(n: number): string {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+  const sign = n < 0 ? "-" : "";
+  return `${sign}₹${Math.abs(Math.round(n)).toLocaleString("en-IN")}`;
 }
 
-export function formatGivenDate(d: string): string {
+export function formatDay(d: string): string {
   const [y, m, day] = d.split("-").map(Number);
   if (!y || !m || !day) return d;
   return new Date(y, m - 1, day).toLocaleDateString("en-US", {

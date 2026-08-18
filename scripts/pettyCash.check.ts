@@ -1,91 +1,126 @@
 /**
- * Self-check for the petty-cash maths. No framework — run it with:
+ * Self-check for the petty-cash float maths. No framework — run it with:
  *   node scripts/pettyCash.check.ts
  *
- * Covers the parts that are easy to get subtly wrong and expensive to get
- * wrong in a money ledger: the outstanding clamp, the status rules, and the
- * fact that a returned record stops counting as outstanding.
+ * The scenario in the middle is the one from the spec: a 14,900 float, 2,000
+ * handed to Gaurav for the ration, 650 returned, leaving 13,550 in hand.
  */
 import assert from "node:assert/strict";
 import {
   canAccessPettyCash,
   computeTotals,
-  groupByAllocator,
+  groupByHolder,
   groupByMonth,
   outstandingOf,
-  statusOf,
-  type Disbursement,
+  returnedOf,
+  spentOf,
+  type Allocation,
+  type Handout,
 } from "../src/lib/pettyCash.ts";
 
-function d(over: Partial<Disbursement>): Disbursement {
+function alloc(over: Partial<Allocation> = {}): Allocation {
   return {
     _id: Math.random().toString(36).slice(2),
-    allocator: "Vivek",
-    giver: "Dhriti",
-    recipient: "Driver",
-    amountAllocated: 0,
-    amountGiven: 0,
-    amountSpent: 0,
-    givenDate: "2026-08-01",
-    remainderReturned: false,
+    holderId: "hr",
+    holderName: "Sakshi",
+    amount: 0,
+    date: "2026-08-01",
     ...over,
   };
 }
 
-// Outstanding: unspent cash still in the wild.
-assert.equal(outstandingOf(d({ amountGiven: 1000, amountSpent: 400 })), 600);
-// Returned kills it, even with a remainder on paper.
-assert.equal(
-  outstandingOf(d({ amountGiven: 1000, amountSpent: 400, remainderReturned: true })),
-  0
+function hand(over: Partial<Handout> = {}): Handout {
+  return {
+    _id: Math.random().toString(36).slice(2),
+    holderId: "hr",
+    holderName: "Sakshi",
+    recipient: "Gaurav",
+    purpose: "Weekly ration",
+    amountGiven: 0,
+    givenDate: "2026-08-05",
+    settled: false,
+    ...over,
+  };
+}
+
+// An unsettled handout is OUT, not spent. This is the whole point of the
+// model — booking it as spent on the way out would overstate expenses and
+// understate what's owed back.
+const open = hand({ amountGiven: 2000 });
+assert.equal(spentOf(open), 0);
+assert.equal(outstandingOf(open), 2000);
+assert.equal(returnedOf(open), 0);
+
+// Once settled, spent = given − returned, and nothing is outstanding.
+const settled = hand({ amountGiven: 2000, settled: true, amountReturned: 650 });
+assert.equal(spentOf(settled), 1350);
+assert.equal(outstandingOf(settled), 0);
+assert.equal(returnedOf(settled), 650);
+
+// The spec's scenario, end to end.
+const t = computeTotals([alloc({ amount: 14900 })], [settled]);
+assert.equal(t.allocated, 14900);
+assert.equal(t.handedOut, 2000);
+assert.equal(t.returned, 650);
+assert.equal(t.spent, 1350);
+assert.equal(t.outstanding, 0);
+assert.equal(t.inHand, 13550); // 14900 − 1350
+
+// Mid-flight: the same float with the cash still out. In hand drops by the
+// full handout until the remainder comes back.
+const midFlight = computeTotals([alloc({ amount: 14900 })], [hand({ amountGiven: 2000 })]);
+assert.equal(midFlight.spent, 0);
+assert.equal(midFlight.outstanding, 2000);
+assert.equal(midFlight.inHand, 12900);
+
+// The two ways of stating in-hand must agree, or the page contradicts itself.
+for (const tt of [t, midFlight]) {
+  assert.equal(tt.inHand, tt.allocated - tt.spent - tt.outstanding);
+  assert.equal(tt.inHand, tt.allocated - tt.handedOut + tt.returned);
+}
+
+// Spending the lot: nothing returned, everything spent.
+const allSpent = computeTotals(
+  [alloc({ amount: 5000 })],
+  [hand({ amountGiven: 2000, settled: true, amountReturned: 0 })]
 );
-// Overspend must not read as negative outstanding — that would silently
-// cancel out another record's real outstanding in the headline total.
-assert.equal(outstandingOf(d({ amountGiven: 500, amountSpent: 900 })), 0);
+assert.equal(allSpent.spent, 2000);
+assert.equal(allSpent.inHand, 3000);
 
-// Status rules.
-assert.equal(statusOf(d({ amountGiven: 1000, amountSpent: 400 })), "outstanding");
-assert.equal(statusOf(d({ amountGiven: 1000, amountSpent: 1000 })), "spent");
-assert.equal(
-  statusOf(d({ amountGiven: 1000, amountSpent: 0, remainderReturned: true })),
-  "returned"
+// Floats are per holder and don't bleed into each other.
+const holders = groupByHolder(
+  [
+    alloc({ holderId: "hr", holderName: "Sakshi", amount: 14900 }),
+    alloc({ holderId: "acc", holderName: "Janshi", amount: 5000 }),
+  ],
+  [
+    hand({ holderId: "hr", amountGiven: 2000, settled: true, amountReturned: 650 }),
+    hand({ holderId: "acc", holderName: "Janshi", amountGiven: 1000 }),
+  ],
+  [
+    { _id: "hr", name: "Sakshi" },
+    { _id: "acc", name: "Janshi" },
+  ]
 );
+const sakshi = holders.find((h) => h.holderId === "hr")!;
+const janshi = holders.find((h) => h.holderId === "acc")!;
+assert.equal(sakshi.totals.inHand, 13550);
+assert.equal(sakshi.openCount, 0);
+assert.equal(janshi.totals.inHand, 4000); // 1000 still out
+assert.equal(janshi.openCount, 1);
+assert.equal(holders[0].name, "Sakshi"); // biggest float first
 
-// Totals add up across a mixed ledger.
-const ledger = [
-  d({ amountAllocated: 5000, amountGiven: 2000, amountSpent: 1200 }),
-  d({ amountAllocated: 0, amountGiven: 1000, amountSpent: 1000 }),
-  d({
-    amountAllocated: 3000,
-    amountGiven: 900,
-    amountSpent: 100,
-    remainderReturned: true,
-  }),
-];
-const t = computeTotals(ledger);
-assert.equal(t.allocated, 8000);
-assert.equal(t.handedOff, 3900);
-assert.equal(t.spent, 2300);
-assert.equal(t.outstanding, 800); // only the first record is still out
-
-// Grouping keeps every record and sorts newest month first.
-const grouped = groupByMonth([
-  d({ givenDate: "2026-07-15" }),
-  d({ givenDate: "2026-08-02" }),
-  d({ givenDate: "2026-08-20" }),
+// Month grouping keeps every row, newest month first.
+const months = groupByMonth([
+  hand({ givenDate: "2026-07-15", amountGiven: 100 }),
+  hand({ givenDate: "2026-08-02", amountGiven: 200 }),
+  hand({ givenDate: "2026-08-20", amountGiven: 300 }),
 ]);
-assert.deepEqual(grouped.map((g) => g.key), ["2026-08", "2026-07"]);
-assert.equal(grouped.reduce((n, g) => n + g.items.length, 0), 3);
+assert.deepEqual(months.map((m) => m.key), ["2026-08", "2026-07"]);
+assert.equal(months[0].given, 500);
+assert.equal(months.reduce((n, m) => n + m.items.length, 0), 3);
 
-const byAllocator = groupByAllocator([
-  d({ allocator: "Vivek", amountAllocated: 100 }),
-  d({ allocator: "Mayur", amountAllocated: 900 }),
-  d({ allocator: "Vivek", amountAllocated: 50 }),
-]);
-assert.deepEqual(byAllocator.map((a) => a.name), ["Mayur", "Vivek"]); // biggest book first
-assert.equal(byAllocator[1].count, 2);
-
-// Access: the whole point of the page being restricted.
+// Access: the reason this page is restricted at all.
 assert.equal(canAccessPettyCash({ isSuperAdmin: true }), true);
 assert.equal(canAccessPettyCash({ isAccountant: true }), true);
 assert.equal(canAccessPettyCash({ isHR: true }), true);
@@ -94,4 +129,4 @@ assert.equal(canAccessPettyCash({ email: "DHRITI@ecultify.com" }), true);
 assert.equal(canAccessPettyCash({ email: "someone@ecultify.com" }), false);
 assert.equal(canAccessPettyCash(null), false);
 
-console.log("petty cash checks passed");
+console.log("petty cash float checks passed");

@@ -41,27 +41,45 @@ export default defineSchema({
     .index("by_client_brand", ["clientBrandId"]),
 
   // ─── PETTY CASH ───────────────────────────────
-  // Cash moving through three people: an allocator hands money to a giver,
-  // the giver hands it to a recipient, the recipient spends some and returns
-  // the remainder. Names are free text, mirroring the standalone app — the
-  // people involved are often not tasktracker users (drivers, vendors, office
-  // staff), so an Id<"users"> reference would lock out half the ledger.
+  // A float model, not a per-record one. HR and the accountant hold cash;
+  // they hand chunks of it to the office boys for errands; the office boy
+  // brings back the remainder and says what he bought. Only then is anything
+  // "spent" — until it comes back it is merely out of the drawer.
+  //
+  //   in hand = allocated − handed out + returned
+  //           = allocated − spent − outstanding
+
+  /** A top-up: money placed into someone's float. */
+  pettyCashAllocations: defineTable({
+    holderId: v.id("users"),
+    amount: v.number(),
+    /** "YYYY-MM-DD" — a calendar day, not an instant. */
+    date: v.string(),
+    note: v.optional(v.string()),
+    createdBy: v.id("users"),
+  }).index("by_holder", ["holderId"]),
+
+  /** Cash handed from a holder's float to whoever is running the errand. */
   disbursements: defineTable({
-    allocator: v.string(),
-    giver: v.string(),
+    /** Whose float this came out of. */
+    holderId: v.id("users"),
+    /** Free text: the office boys aren't tasktracker users. */
     recipient: v.string(),
-    /** What the allocator released. Optional in practice — stored as 0. */
-    amountAllocated: v.number(),
+    /** What the money is for, agreed up front ("weekly ration"). */
+    purpose: v.string(),
     amountGiven: v.number(),
-    amountSpent: v.number(),
-    /** "YYYY-MM-DD" — a calendar day, not an instant; no timezone to get wrong. */
     givenDate: v.string(),
-    remainderReturned: v.boolean(),
-    returnedAt: v.optional(v.number()),
-    notes: v.optional(v.string()),
+    /** Settled = the remainder came back and the spend was explained. */
+    settled: v.boolean(),
+    amountReturned: v.optional(v.number()),
+    /** Required at settlement — the whole point of the return step. */
+    spentOn: v.optional(v.string()),
+    settledAt: v.optional(v.number()),
     createdBy: v.id("users"),
     updatedAt: v.optional(v.number()),
-  }).index("by_given_date", ["givenDate"]),
+  })
+    .index("by_holder", ["holderId"])
+    .index("by_settled", ["settled"]),
 
   // ─── TEAMS ────────────────────────────────────
   teams: defineTable({
