@@ -760,16 +760,14 @@ export default function PettyCashPage() {
                   <div className="border-t border-[var(--border)] overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>To</TableHead>
-                          <TableHead>For</TableHead>
-                          <TableHead className="text-right">Given</TableHead>
-                          <TableHead className="text-right">Returned</TableHead>
-                          <TableHead className="text-right">Spent</TableHead>
-                          <TableHead>Spent on</TableHead>
-                          <TableHead />
-                        </TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>To</TableHead>
+                        <TableHead>For</TableHead>
+                        <TableHead className="text-right">Given</TableHead>
+                        <TableHead className="text-right">Returned</TableHead>
+                        <TableHead className="text-right">Spent</TableHead>
+                        <TableHead className="w-full">Spent on</TableHead>
+                        <TableHead />
                       </TableHeader>
                       <TableBody>
                         {m.items.map((h) => (
@@ -895,13 +893,11 @@ export default function PettyCashPage() {
             <div className="border-t border-[var(--border)] overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Held by</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead />
-                  </TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Held by</TableHead>
+                  <TableHead>Note</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead />
                 </TableHeader>
                 <TableBody>
                   {allocations.map((a) => (
