@@ -244,7 +244,6 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const role = user.role ?? "employee";
   const unreadDmCount = useQuery(api.dm.getUnreadTotal) ?? 0;
-  const pendingCalendarCount = useQuery(api.contentCalendar.getPendingCalendarTaskCount) ?? 0;
   const pendingDeliverableCount = useQuery(api.approvals.getPendingDeliverableCount) ?? 0;
   const pendingClientRequestCount = useQuery(api.jsr.countPendingClientRequests) ?? 0;
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
@@ -396,11 +395,6 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           {item.href === "/messages" && unreadDmCount > 0 && (
                             <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold px-1">
                               {unreadDmCount}
-                            </span>
-                          )}
-                          {item.href === "/content-calendar" && pendingCalendarCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
-                              {pendingCalendarCount}
                             </span>
                           )}
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
