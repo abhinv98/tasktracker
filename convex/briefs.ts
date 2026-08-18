@@ -49,6 +49,22 @@ export const listBriefs = query({
       briefs = allBriefs.filter((b) => briefIds.includes(b._id));
     }
 
+    // HR work is confidential. Everyone else gets the board minus HR's
+    // briefs, HR gets HR's briefs and nothing else, super admins get both.
+    // This lives here rather than in the page so the rows never go over the
+    // wire — a client-side filter is a disclosure with extra steps.
+    const briefTeams = await ctx.db.query("briefTeams").collect();
+    const teams = await ctx.db.query("teams").collect();
+    const hrTeamId = teams.find((t) => t.name === "HR")?._id;
+    if (hrTeamId && user.isSuperAdmin !== true) {
+      const hrBriefIds = new Set(
+        briefTeams.filter((x) => x.teamId === hrTeamId).map((x) => x.briefId)
+      );
+      briefs = briefs.filter((b) =>
+        user.isHR === true ? hrBriefIds.has(b._id) : !hrBriefIds.has(b._id)
+      );
+    }
+
     if (args.status) {
       briefs = briefs.filter((b) => b.status === args.status);
     }
@@ -57,8 +73,6 @@ export const listBriefs = query({
     }
 
     const managers = await ctx.db.query("users").collect();
-    const briefTeams = await ctx.db.query("briefTeams").collect();
-    const teams = await ctx.db.query("teams").collect();
     const allTasks = await ctx.db.query("tasks").collect();
 
     return briefs.map((b) => {
