@@ -74,6 +74,7 @@ import type * as notifications from "../notifications.js";
 import type * as oversight from "../oversight.js";
 import type * as passwordChange from "../passwordChange.js";
 import type * as personalNotes from "../personalNotes.js";
+import type * as pettyCash from "../pettyCash.js";
 import type * as quotations from "../quotations.js";
 import type * as recruitment from "../recruitment.js";
 import type * as reminders from "../reminders.js";
@@ -163,6 +164,7 @@ declare const fullApi: ApiFromModules<{
   oversight: typeof oversight;
   passwordChange: typeof passwordChange;
   personalNotes: typeof personalNotes;
+  pettyCash: typeof pettyCash;
   quotations: typeof quotations;
   recruitment: typeof recruitment;
   reminders: typeof reminders;

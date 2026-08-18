@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { useNavDepthTracker } from "@/lib/useSmartBack";
+import { canAccessPettyCash } from "@/lib/pettyCash";
 
 // Note: /oversight is gated server-side by oversight access (super-admins,
 // oversight admins, brand managers, and team leads). Don't list it here or
@@ -82,6 +83,11 @@ export default function DashboardLayout({
       router.replace("/dashboard");
     }
     if (user.isHR !== true && pathname.startsWith("/hr-requests")) {
+      router.replace("/dashboard");
+    }
+    // Petty cash is the company's money. Accountant, HR, super admins and the
+    // named exceptions only — a nav item alone would still leave the URL open.
+    if (!canAccessPettyCash(user) && pathname.startsWith("/petty-cash")) {
       router.replace("/dashboard");
     }
     // Recruitment holds candidate PII — salaries, phone numbers, CVs. HR and

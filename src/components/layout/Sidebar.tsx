@@ -37,12 +37,14 @@ import {
   Send,
   UserSearch,
   Megaphone,
+  Wallet,
   ArrowLeft,
   Users2,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
 import { getDisplayRole } from "@/lib/roles";
+import { canAccessPettyCash } from "@/lib/pettyCash";
 
 interface SidebarProps {
   user: Doc<"users">;
@@ -84,11 +86,18 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/recruitment/templates": FileBarChart,
   "/recruitment/activity": MessageSquare,
   "/my-requests": Send,
+  "/petty-cash": Wallet,
 };
 
 interface NavCategory {
   category: string;
-  items: { href: string; label: string; superAdminOnly?: boolean }[];
+  items: {
+    href: string;
+    label: string;
+    superAdminOnly?: boolean;
+    /** Money — shown only to the few who are allowed in the ledger. */
+    pettyCashOnly?: boolean;
+  }[];
 }
 
 const ADMIN_NAV: NavCategory[] = [
@@ -121,6 +130,7 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/client-requests", label: "Client Requests" },
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
+      { href: "/petty-cash", label: "Petty Cash", pettyCashOnly: true },
       { href: "/users", label: "Users & Teams" },
       { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
@@ -162,6 +172,7 @@ const HR_NAV: NavCategory[] = [
     items: [
       { href: "/deliverables", label: "Deliverables" },
       { href: "/worklog", label: "Work Log" },
+      { href: "/petty-cash", label: "Petty Cash", pettyCashOnly: true },
       { href: "/users", label: "Users & Teams" },
       { href: "/freelancers", label: "Freelancers" },
     ],
@@ -267,7 +278,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
     .map((cat) => ({
       ...cat,
       items: cat.items.filter(
-        (i) => !i.superAdminOnly || user.isSuperAdmin === true
+        (i) =>
+          (!i.superAdminOnly || user.isSuperAdmin === true) &&
+          (!i.pettyCashOnly || canAccessPettyCash(user))
       ),
     }))
     .filter((cat) => cat.items.length > 0);

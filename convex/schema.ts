@@ -40,6 +40,29 @@ export default defineSchema({
     .index("by_role", ["role"])
     .index("by_client_brand", ["clientBrandId"]),
 
+  // ─── PETTY CASH ───────────────────────────────
+  // Cash moving through three people: an allocator hands money to a giver,
+  // the giver hands it to a recipient, the recipient spends some and returns
+  // the remainder. Names are free text, mirroring the standalone app — the
+  // people involved are often not tasktracker users (drivers, vendors, office
+  // staff), so an Id<"users"> reference would lock out half the ledger.
+  disbursements: defineTable({
+    allocator: v.string(),
+    giver: v.string(),
+    recipient: v.string(),
+    /** What the allocator released. Optional in practice — stored as 0. */
+    amountAllocated: v.number(),
+    amountGiven: v.number(),
+    amountSpent: v.number(),
+    /** "YYYY-MM-DD" — a calendar day, not an instant; no timezone to get wrong. */
+    givenDate: v.string(),
+    remainderReturned: v.boolean(),
+    returnedAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdBy: v.id("users"),
+    updatedAt: v.optional(v.number()),
+  }).index("by_given_date", ["givenDate"]),
+
   // ─── TEAMS ────────────────────────────────────
   teams: defineTable({
     name: v.string(),

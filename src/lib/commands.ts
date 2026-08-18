@@ -1,3 +1,4 @@
+import { canAccessPettyCash } from "./pettyCash";
 import {
   LayoutGrid,
   ListTodo,
@@ -19,13 +20,16 @@ import {
   Send,
   UserSearch,
   BookOpen,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
 type CommandUser = {
   role?: string;
+  email?: string;
   isSuperAdmin?: boolean;
   isHR?: boolean;
+  isAccountant?: boolean;
 };
 
 export interface NavCommand {
@@ -82,6 +86,14 @@ export const NAV_COMMANDS: NavCommand[] = [
     keywords: ["hr", "appraisal", "staff", "triage"],
     hint: "HR inbox",
     visible: isHR,
+  },
+  {
+    label: "Petty Cash",
+    href: "/petty-cash",
+    icon: Wallet,
+    keywords: ["cash", "money", "expense", "disbursement", "reimbursement", "spend"],
+    hint: "Finance",
+    visible: canAccessPettyCash,
   },
   {
     label: "Recruitment",
