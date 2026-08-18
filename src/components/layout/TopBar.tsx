@@ -41,6 +41,7 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/recruitment/templates": "Templates",
   "/recruitment/activity": "Email Activity",
   "/my-requests": "My Requests",
+  "/petty-cash": "Petty Cash",
 };
 
 function getPageTitle(pathname: string): string {

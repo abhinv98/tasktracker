@@ -393,7 +393,7 @@ export default function PettyCashPage() {
 
   if (rows === undefined) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="p-8 flex flex-col gap-4">
         <SkeletonPageHeader />
         <SkeletonCards />
       </div>
@@ -401,7 +401,7 @@ export default function PettyCashPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="p-8 flex flex-col gap-5">
       <PageHeader
         title="Petty Cash"
         subtitle="Cash moving from allocator to giver to recipient, and what's still out"
@@ -490,25 +490,29 @@ export default function PettyCashPage() {
         </div>
         {/* Not Select's `placeholder` — it renders a DISABLED option, so
             picking a filter would leave no way back to "all". */}
-        <Select
-          value={allocatorFilter}
-          onChange={(e) => setAllocatorFilter(e.target.value)}
-          options={[
-            { value: "", label: "All allocators" },
-            ...allocators.map((a) => ({ value: a.name, label: a.name })),
-          ]}
-        />
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          options={[
-            { value: "", label: "All statuses" },
-            ...Object.entries(STATUS_META).map(([value, m]) => ({
-              value,
-              label: m.label,
-            })),
-          ]}
-        />
+        <div className="w-[180px] shrink-0">
+          <Select
+            value={allocatorFilter}
+            onChange={(e) => setAllocatorFilter(e.target.value)}
+            options={[
+              { value: "", label: "All allocators" },
+              ...allocators.map((a) => ({ value: a.name, label: a.name })),
+            ]}
+          />
+        </div>
+        <div className="w-[160px] shrink-0">
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            options={[
+              { value: "", label: "All statuses" },
+              ...Object.entries(STATUS_META).map(([value, m]) => ({
+                value,
+                label: m.label,
+              })),
+            ]}
+          />
+        </div>
         {filtersOn && (
           <Button
             variant="secondary"
