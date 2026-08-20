@@ -1178,7 +1178,8 @@ export default defineSchema({
       v.literal("appointment_letter"),
       v.literal("appraisal_letter"),
       v.literal("reimbursement_comp_off"),
-      v.literal("attendance_regularization")
+      v.literal("attendance_regularization"),
+      v.literal("other")
     ),
     subject: v.string(),
     details: v.optional(v.string()),

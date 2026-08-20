@@ -10,7 +10,8 @@ const categoryValidator = v.union(
   v.literal("appointment_letter"),
   v.literal("appraisal_letter"),
   v.literal("reimbursement_comp_off"),
-  v.literal("attendance_regularization")
+  v.literal("attendance_regularization"),
+  v.literal("other")
 );
 
 const statusValidator = v.union(

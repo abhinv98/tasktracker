@@ -2,7 +2,8 @@ export type HrCategory =
   | "appointment_letter"
   | "appraisal_letter"
   | "reimbursement_comp_off"
-  | "attendance_regularization";
+  | "attendance_regularization"
+  | "other";
 
 export type HrStatus =
   | "pending"
@@ -16,6 +17,8 @@ export const HR_CATEGORIES: { value: HrCategory; label: string }[] = [
   { value: "appraisal_letter", label: "Appraisal Letter" },
   { value: "reimbursement_comp_off", label: "Reimbursement & Comp Off" },
   { value: "attendance_regularization", label: "Attendance Regularization" },
+  // Last on purpose: a catch-all offered first invites everything into it.
+  { value: "other", label: "Other" },
 ];
 
 export const HR_STATUSES: { value: HrStatus; label: string; color: string }[] = [
