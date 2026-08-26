@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast, useCelebrate } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2 } from "lucide-react";
+import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2, Palette } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
@@ -808,6 +808,43 @@ export default function BriefPage() {
                       <Pencil className="h-3 w-3 text-[var(--text-muted)]" />
                       Edit Brief Title & Description
                     </button>
+
+                    {/* Creatives required — designing briefs that already carry a count */}
+                    {brief.briefType === "designing" &&
+                      brief.creativesRequired != null &&
+                      brief.creativesRequired >= 1 && (
+                        <div className="px-3 py-2 flex items-center gap-2">
+                          <Palette className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
+                          <span className="text-[12px] text-[var(--text-primary)] flex-1">
+                            Creatives Required
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            defaultValue={brief.creativesRequired}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                            onBlur={async (e) => {
+                              const prev = brief.creativesRequired as number;
+                              const n = Math.floor(Number(e.target.value));
+                              if (!Number.isFinite(n) || n < 1 || n > 99 || n === prev) {
+                                e.target.value = String(prev);
+                                return;
+                              }
+                              try {
+                                await updateBrief({ briefId, creativesRequired: n });
+                                toast("success", `Now ${n} creative${n !== 1 ? "s" : ""} required`);
+                              } catch (err) {
+                                e.target.value = String(prev);
+                                toast("error", err instanceof Error ? err.message : "Failed to update");
+                              }
+                            }}
+                            className="w-14 bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text-primary)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          />
+                        </div>
+                      )}
 
                     {/* Tasks / Events */}
                     {allTasks.length > 0 && (
