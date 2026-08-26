@@ -20,7 +20,7 @@ export function Badge({ variant = "neutral", children, className = "" }: BadgePr
     <span
       className={`
         inline-flex items-center px-2 py-0.5
-        font-medium text-[11px] leading-[16px]
+        font-mono font-medium text-[10px] uppercase tracking-[0.07em] leading-[16px]
         rounded
         ${variantStyles[variant]}
         ${className}

@@ -26,14 +26,14 @@ export function PageHeader({
     >
       <div className="flex items-start gap-2.5">
         {Icon && (
-          <Icon className="h-5 w-5 mt-[3px] text-[var(--accent-admin-text)] shrink-0" />
+          <Icon className="h-5 w-5 mt-[5px] text-[var(--accent-admin-text)] shrink-0" />
         )}
         <div>
-          <h1 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight leading-snug">
+          <h1 className="font-semibold text-[24px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">
+            <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
               {subtitle}
             </p>
           )}
