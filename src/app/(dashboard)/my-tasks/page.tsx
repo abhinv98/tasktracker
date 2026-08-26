@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Card, PageHeader, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { Card, PageHeader, SegmentedTabs, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
@@ -154,25 +154,15 @@ export default function MyTasksPage() {
 
       {/* Filter bar */}
       <div className="rounded-xl border border-[var(--border)] bg-white p-3 mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)]">
-          {([
-            { k: "all", l: "All" },
-            { k: "mine", l: "Assigned to me" },
-            { k: "supervising", l: "Supervising" },
-          ] as const).map(({ k, l }) => (
-            <button
-              key={k}
-              onClick={() => setScope(k)}
-              className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-                scope === k
-                  ? "bg-white shadow-sm text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          value={scope}
+          onChange={setScope}
+          options={[
+            { value: "all", label: "All" },
+            { value: "mine", label: "Assigned to me" },
+            { value: "supervising", label: "Supervising" },
+          ]}
+        />
         <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" />
         </div>

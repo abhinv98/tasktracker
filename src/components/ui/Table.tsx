@@ -14,7 +14,7 @@ export function Table({ children, className = "" }: TableProps) {
 export function TableHeader({ children }: { children: React.ReactNode }) {
   return (
     <thead>
-      <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+      <tr className="border-b border-[var(--border)]">
         {children}
       </tr>
     </thead>
@@ -23,7 +23,7 @@ export function TableHeader({ children }: { children: React.ReactNode }) {
 
 export function TableHead({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <th className={`px-4 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap ${className}`}>
+    <th className={`px-4 py-2 text-left font-mono font-medium text-[10px] uppercase tracking-[0.07em] text-[var(--text-muted)] whitespace-nowrap ${className}`}>
       {children}
     </th>
   );
@@ -64,7 +64,7 @@ export function TableCell({
 }) {
   return (
     <td
-      className={`px-4 py-2 text-[13px] text-[var(--text-primary)] ${className}`}
+      className={`px-4 py-2.5 text-[13px] text-[var(--text-primary)] ${className}`}
     >
       {children}
     </td>

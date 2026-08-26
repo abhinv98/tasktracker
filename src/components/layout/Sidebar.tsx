@@ -359,7 +359,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                   onClick={() => toggleCategory(group.category)}
                   className={`
                     w-full flex items-center justify-between px-2 py-1.5 rounded-md
-                    text-[11px] font-semibold uppercase tracking-wider
+                    font-mono text-[10px] font-medium uppercase tracking-[0.08em]
                     transition-colors duration-150
                     ${hasActiveItem && !isOpen
                       ? "text-[var(--accent-admin-text)]"
@@ -392,7 +392,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             font-medium text-[13px] transition-colors duration-150
                             ${
                               isActive
-                                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-[var(--accent-admin)]"
+                                ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
                                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                             }
                           `}
@@ -438,7 +438,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               than two clicks deep behind Overview. */}
           {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
             <div className="mb-1 mt-2">
-              <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <div className="px-2 py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
                 Positions
               </div>
               <div className="mt-0.5 space-y-0.5">

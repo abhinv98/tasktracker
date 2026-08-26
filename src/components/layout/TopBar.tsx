@@ -112,7 +112,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search...</span>
-            <kbd className="ml-2 px-1 py-0.5 rounded bg-white border border-[var(--border)] text-[11px] font-mono">
+            <kbd className="ml-2 px-1.5 py-0.5 rounded-[5px] bg-white border border-[var(--border)] border-b-[2px] text-[10px] font-mono tracking-[0.04em] text-[var(--text-secondary)]">
               ⌘K
             </kbd>
           </button>

@@ -16,6 +16,7 @@ export { CelebrateProvider, useCelebrate } from "./Celebrate";
 export { Modal } from "./Modal";
 export { PromptModal } from "./PromptModal";
 export { Select } from "./Select";
+export { SegmentedTabs } from "./SegmentedTabs";
 export {
   Table,
   TableBody,

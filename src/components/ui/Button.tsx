@@ -17,10 +17,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  // -strong, not the base accent: white on #d97757 is 3.1:1 and every primary
-  // label in the app failed AA. Same hue, two steps down.
+  // Ink, not brand terracotta: the primary action is the darkest thing on
+  // the page (17:1 behind white). Terracotta stays for accents and links.
   primary:
-    "bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525]",
+    "bg-[var(--text-primary)] text-white hover:bg-[#2e2d2b]",
   secondary:
     "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]",
   destructive:

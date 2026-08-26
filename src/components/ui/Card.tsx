@@ -29,7 +29,7 @@ export function Card({
       className={`
         relative bg-white rounded-lg border border-[var(--border)]
         p-5 transition-all duration-150
-        ${hover || onClick ? "hover:shadow-sm hover:border-[var(--border-strong)] cursor-pointer" : ""}
+        ${hover || onClick ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}
         ${className}
       `}
       style={{
