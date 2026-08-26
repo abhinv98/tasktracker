@@ -68,12 +68,6 @@
   --warning: #b45309;
   --warning-dim: rgba(180, 83, 9, 0.12);
 
-  /* CTA — the one loud color. Vivid fill + near-black text (6.7:1), the
-     Relume pattern: the button glows, the label stays readable. */
-  --cta: #ff7d52;
-  --cta-hover: #ff6a38;
-  --cta-text: #20130c;
-
   /* Typography — Inter */
   --font-heading: var(--font-inter), system-ui, sans-serif;
   --font-body: var(--font-inter), system-ui, sans-serif;
