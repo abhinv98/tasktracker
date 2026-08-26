@@ -17,10 +17,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  // -strong, not the base accent: white on #d97757 is 3.1:1 and every primary
-  // label in the app failed AA. Same hue, two steps down.
+  // Vivid fill + near-black label (6.7:1) instead of white on muted — the
+  // bright-chip CTA pattern. The fill carries the energy, the text stays dark.
   primary:
-    "bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525]",
+    "bg-[var(--cta)] text-[var(--cta-text)] hover:bg-[var(--cta-hover)]",
   secondary:
     "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]",
   destructive:
@@ -77,9 +77,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         onClick={handleClick}
         className={`
-          relative inline-flex items-center justify-center gap-2 px-4 py-2
-          font-medium text-[14px] tracking-[-0.006em]
-          rounded-lg
+          relative inline-flex items-center justify-center gap-2 px-5 py-2
+          font-semibold text-[14px] tracking-[-0.01em]
+          rounded-full
           transition-all duration-150
           active:translate-y-[1px] active:duration-[50ms]
           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0
