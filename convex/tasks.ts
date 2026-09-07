@@ -64,6 +64,18 @@ export const listTasksForBrief = query({
   },
 });
 
+/** Linked calendar team tasks ([Design] / [Copy] …) created before the
+ *  entry had a description carry a "Linked to calendar entry:" placeholder.
+ *  Show the entry's real description in their place. */
+export function inheritedDescription(
+  task: { description?: string },
+  parent: { description?: string } | null | undefined
+): string | undefined {
+  const own = task.description;
+  const placeholder = !own || own.startsWith("Linked to calendar entry:");
+  return placeholder && parent?.description ? parent.description : own;
+}
+
 export const listTasksForUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
@@ -93,21 +105,21 @@ export const listTasksForUser = query({
       ),
     ];
     const parents = await Promise.all(parentIds.map((id) => ctx.db.get(id)));
-    const parentTitleMap = new Map(
-      parents.filter((p) => p !== null).map((p) => [p!._id, p!.title])
+    const parentMap = new Map(
+      parents.filter((p) => p !== null).map((p) => [p!._id, p!])
     );
 
     return visible.map((t) => {
       const brief = briefMap.get(t.briefId);
       const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
+      const parent = t.parentTaskId ? parentMap.get(t.parentTaskId) : null;
       return {
         ...t,
+        description: inheritedDescription(t, parent),
         briefName: brief?.title,
         briefStatus: brief?.status,
         briefDescription: brief?.description,
-        parentTaskTitle: t.parentTaskId
-          ? (parentTitleMap.get(t.parentTaskId) ?? null)
-          : null,
+        parentTaskTitle: parent?.title ?? null,
         brandName: brand?.name ?? null,
         brandColor: brand?.color ?? null,
       };
@@ -274,8 +286,10 @@ export const getTaskLocation = query({
 export const getTaskDetail = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {
-    const task = await ctx.db.get(taskId);
-    if (!task) return null;
+    const raw = await ctx.db.get(taskId);
+    if (!raw) return null;
+    const parent = raw.parentTaskId ? await ctx.db.get(raw.parentTaskId) : null;
+    const task = { ...raw, description: inheritedDescription(raw, parent) };
     const brief = await ctx.db.get(task.briefId);
     const assignee = await ctx.db.get(task.assigneeId);
     const assignedBy = await ctx.db.get(task.assignedBy);
