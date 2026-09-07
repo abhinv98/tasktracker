@@ -497,6 +497,36 @@ export const updateTask = mutation({
         }
       }
 
+      // Content calendar: linked team tasks ([Design] / [Copy] …) mirror
+      // their entry's title and description so assignees see the brief on
+      // their dashboard. Only overwrite what still matches the old entry —
+      // a description someone customised on the child is left alone.
+      if (
+        brief?.briefType === "content_calendar" &&
+        !task.parentTaskId &&
+        ("title" in updates || "description" in updates)
+      ) {
+        const children = await ctx.db
+          .query("tasks")
+          .withIndex("by_parent", (q) => q.eq("parentTaskId", taskId))
+          .collect();
+        for (const c of children) {
+          const cu: Record<string, unknown> = {};
+          if ("title" in updates && c.title.endsWith(task.title)) {
+            cu.title = c.title.slice(0, c.title.length - task.title.length) + updates.title;
+          }
+          if (
+            "description" in updates &&
+            (!c.description ||
+              c.description === task.description ||
+              c.description.startsWith("Linked to calendar entry:"))
+          ) {
+            cu.description = updates.description;
+          }
+          if (Object.keys(cu).length > 0) await ctx.db.patch(c._id, cu);
+        }
+      }
+
       await ctx.db.insert("activityLog", {
         briefId: task.briefId,
         taskId,

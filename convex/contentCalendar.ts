@@ -912,7 +912,7 @@ export const createCalendarEntryWithCopyTask = mutation({
       const copyTaskId = await ctx.db.insert("tasks", {
         briefId,
         title: copyTitle,
-        description: `Linked to calendar entry: ${args.title}`,
+        description: args.description ?? `Linked to calendar entry: ${args.title}`,
         assigneeId: args.copyAssigneeId,
         assignedBy: userId,
         status: "pending",
@@ -1435,8 +1435,11 @@ export const createLinkedCalendarTask = mutation({
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,
       title: fullTitle,
+      // Team tasks carry the entry's brief so assignees see it on their
+      // dashboard; updateTask keeps them in sync when the entry is edited.
       description:
         args.description ??
+        parent.description ??
         `Linked to calendar entry: ${parent.title}\n\nTags: Content Calendar, ${brandName}`,
       assigneeId: args.assigneeId,
       assignedBy: assignor,
