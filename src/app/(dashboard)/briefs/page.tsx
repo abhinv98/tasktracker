@@ -376,6 +376,7 @@ export default function BriefsPage() {
     developmental: "Developmental",
     designing: "Designing",
     video_editing: "Video Editing",
+    production: "Production",
     copywriting: "Copywriting",
     content_calendar: "Content Calendar",
     single_task: "Single Task",
@@ -531,7 +532,7 @@ export default function BriefsPage() {
     setIsSubmitting(true);
     try {
       const isIndividual = briefMode === "individual";
-      type BriefType = "developmental" | "designing" | "video_editing" | "copywriting";
+      type BriefType = "developmental" | "designing" | "video_editing" | "production" | "copywriting";
 
       const includeCreatives = showCreativesRequiredField(briefMode, briefType);
       const crNum =
@@ -731,6 +732,7 @@ export default function BriefsPage() {
                   { value: "developmental", label: "Developmental" },
                   { value: "designing", label: "Designing" },
                   { value: "video_editing", label: "Video Editing" },
+                  { value: "production", label: "Production" },
                   { value: "copywriting", label: "Copywriting" },
                   { value: "content_calendar", label: "Content Calendar" },
                   { value: "single_task", label: "Single Task" },
@@ -955,6 +957,7 @@ export default function BriefsPage() {
                                   <Badge variant="neutral">
                                     {(brief as any).briefType === "content_calendar" ? "Content Calendar" :
                                      (brief as any).briefType === "video_editing" ? "Video Editing" :
+                                     (brief as any).briefType === "production" ? "Production" :
                                      (brief as any).briefType === "developmental" ? "Developmental" :
                                      (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
                                   </Badge>
@@ -1156,6 +1159,7 @@ export default function BriefsPage() {
                                 <Badge variant="neutral">
                                   {(brief as any).briefType === "content_calendar" ? "Content Calendar" :
                                    (brief as any).briefType === "video_editing" ? "Video Editing" :
+                                     (brief as any).briefType === "production" ? "Production" :
                                    (brief as any).briefType === "developmental" ? "Developmental" :
                                    (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
                                 </Badge>
@@ -1327,6 +1331,7 @@ export default function BriefsPage() {
                     <option value="developmental">Developmental</option>
                     <option value="designing">Designing</option>
                     <option value="video_editing">Video Editing</option>
+              <option value="production">Production</option>
                     <option value="copywriting">Copywriting</option>
                   </select>
                 </div>
@@ -1746,6 +1751,7 @@ function IndividualTaskFields({
           <option value="developmental">Developmental</option>
           <option value="designing">Designing</option>
           <option value="video_editing">Video Editing</option>
+              <option value="production">Production</option>
           <option value="copywriting">Copywriting</option>
         </select>
       </div>

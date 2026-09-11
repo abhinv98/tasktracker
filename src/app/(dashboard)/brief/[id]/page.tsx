@@ -703,6 +703,7 @@ export default function BriefPage() {
             <Badge variant="neutral">
               {brief.briefType === "content_calendar" ? "Content Calendar" :
                brief.briefType === "video_editing" ? "Video Editing" :
+               brief.briefType === "production" ? "Production" :
                brief.briefType === "developmental" ? "Developmental" :
                brief.briefType === "designing" ? "Designing" : brief.briefType}
             </Badge>

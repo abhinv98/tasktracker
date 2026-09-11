@@ -120,6 +120,7 @@ export default defineSchema({
         v.literal("developmental"),
         v.literal("designing"),
         v.literal("video_editing"),
+        v.literal("production"),
         v.literal("content_calendar"),
         v.literal("copywriting"),
         v.literal("single_task")

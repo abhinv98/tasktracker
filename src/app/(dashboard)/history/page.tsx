@@ -279,6 +279,7 @@ export default function HistoryPage() {
                             <span className="text-[11px] text-[var(--text-muted)]">
                               {brief.briefType === "content_calendar" ? "Content Calendar"
                                 : brief.briefType === "video_editing" ? "Video Editing"
+                                : brief.briefType === "production" ? "Production"
                                 : brief.briefType === "developmental" ? "Developmental"
                                 : brief.briefType === "designing" ? "Designing"
                                 : brief.briefType}
