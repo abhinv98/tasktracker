@@ -184,9 +184,12 @@ export function groupByMonth(handouts: Handout[]): MonthGroup[] {
     }));
 }
 
-/** Names already in the ledger, for the handout form's suggestions. */
+/** The office boys who run errands — suggested even before their first handout. */
+const KNOWN_RECIPIENTS = ["Gaurav", "Anand", "Raju"];
+
+/** Known office boys plus names already in the ledger, for the handout form's suggestions. */
 export function distinctRecipients(handouts: Handout[]): string[] {
-  const set = new Set<string>();
+  const set = new Set<string>(KNOWN_RECIPIENTS);
   for (const h of handouts) {
     const v = h.recipient?.trim();
     if (v) set.add(v);
