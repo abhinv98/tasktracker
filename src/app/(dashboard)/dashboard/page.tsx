@@ -566,7 +566,7 @@ export default function DashboardPage() {
     ).length;
     const scopedOpenTasks = scopedBriefs.reduce(
       (acc, b) =>
-        acc +
+        b.status === "archived" ? acc : acc +
         ((b as { taskCount?: number }).taskCount ?? 0) -
         ((b as { doneCount?: number }).doneCount ?? 0),
       0

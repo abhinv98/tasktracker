@@ -1498,8 +1498,9 @@ export const listActionNeededTasks = query({
       briefs
         .filter(
           (b) =>
-            b.assignedManagerId === userId ||
-            (b.brandId && myBrandIds.has(b.brandId))
+            b.status !== "archived" &&
+            (b.assignedManagerId === userId ||
+              (b.brandId && myBrandIds.has(b.brandId)))
         )
         .map((b) => b._id)
     );
