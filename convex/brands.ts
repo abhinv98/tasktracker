@@ -1,7 +1,7 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 export const getManagersForBrand = query({
   args: { brandId: v.id("brands") },
@@ -52,7 +52,9 @@ export const listBrands = query({
         .filter((bm) => bm.brandId === brand._id)
         .map((bm) => users.find((u) => u._id === bm.managerId))
         .filter(Boolean);
-      const brandBriefs = briefs.filter((b) => b.brandId === brand._id);
+      const brandBriefs = briefs.filter(
+        (b) => b.brandId === brand._id && b.status !== "archived"
+      );
       const logoUrl = brand.logoId ? await ctx.storage.getUrl(brand.logoId) : null;
       return {
         ...brand,
@@ -138,7 +140,9 @@ export const getBrand = query({
       .filter(Boolean);
 
     const briefs = await ctx.db.query("briefs").collect();
-    const brandBriefs = briefs.filter((b) => b.brandId === brandId);
+    const brandBriefs = briefs.filter(
+      (b) => b.brandId === brandId && b.status !== "archived"
+    );
 
     const tasks = await ctx.db.query("tasks").collect();
     const brandTasks = tasks.filter((t) =>
@@ -215,7 +219,9 @@ export const getBrandOverview = query({
         .map((bm) => users.find((u) => u._id === bm.managerId))
         .filter(Boolean);
 
-      const brandBriefs = briefs.filter((b) => b.brandId === brand._id);
+      const brandBriefs = briefs.filter(
+        (b) => b.brandId === brand._id && b.status !== "archived"
+      );
       const brandTasks = tasks.filter((t) =>
         brandBriefs.some((b) => b._id === t.briefId)
       );
@@ -388,6 +394,49 @@ export const updateBrand = mutation({
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(brandId, updates);
     }
+  },
+});
+
+// Hold archives every live brief of the brand (remembering its status) so it
+// drops out of everyone's briefs, tasks and dashboards. Resume restores only
+// the briefs the hold archived.
+export const setBrandOnHold = mutation({
+  args: { brandId: v.id("brands"), onHold: v.boolean() },
+  handler: async (ctx, { brandId, onHold }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin")
+      throw new Error("Only admins can put a brand on hold");
+
+    const briefs = (await ctx.db.query("briefs").collect()).filter(
+      (b) => b.brandId === brandId
+    );
+    const now = Date.now();
+    for (const b of briefs) {
+      if (onHold && b.status !== "archived") {
+        await ctx.db.patch(b._id, {
+          status: "archived",
+          statusBeforeHold: b.status,
+          archivedAt: now,
+          archivedBy: userId,
+        });
+      } else if (!onHold && b.status === "archived" && b.statusBeforeHold) {
+        await ctx.db.patch(b._id, {
+          status: b.statusBeforeHold as Doc<"briefs">["status"],
+          statusBeforeHold: undefined,
+          archivedAt: undefined,
+          archivedBy: undefined,
+        });
+      } else continue;
+      await ctx.db.insert("activityLog", {
+        briefId: b._id,
+        userId,
+        action: onHold ? "archived" : "restored",
+        timestamp: now,
+      });
+    }
+    await ctx.db.patch(brandId, { onHold });
   },
 });
 

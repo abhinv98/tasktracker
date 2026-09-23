@@ -135,6 +135,9 @@ export default defineSchema({
     deadlineIsManual: v.optional(v.boolean()),
     archivedAt: v.optional(v.number()),
     archivedBy: v.optional(v.id("users")),
+    /** Status to restore when the brand's hold is lifted. Only set on briefs
+     *  archived by a brand hold, so manually archived briefs stay archived. */
+    statusBeforeHold: v.optional(v.string()),
     brandId: v.optional(v.id("brands")),
     /** Expected number of creative deliverables (e.g. 4 static posts). Default UI treats missing as 1. */
     creativesRequired: v.optional(v.number()),
@@ -431,6 +434,8 @@ export default defineSchema({
     logoId: v.optional(v.id("_storage")),
     createdBy: v.id("users"),
     createdAt: v.number(),
+    /** On hold: all briefs archived and no new briefs can be created. */
+    onHold: v.optional(v.boolean()),
   }),
 
   // ─── BRAND ↔ MANAGER (Many-to-Many) ─────────

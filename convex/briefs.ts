@@ -65,9 +65,10 @@ export const listBriefs = query({
       );
     }
 
-    if (args.status) {
-      briefs = briefs.filter((b) => b.status === args.status);
-    }
+    // Archived briefs live on the Archive page (listArchivedBriefs) only.
+    briefs = briefs.filter((b) =>
+      args.status ? b.status === args.status : b.status !== "archived"
+    );
     if (args.managerId) {
       briefs = briefs.filter((b) => b.assignedManagerId === args.managerId);
     }
@@ -222,6 +223,10 @@ export const createBrief = mutation({
     const user = await ctx.db.get(userId);
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can create briefs");
+    }
+
+    if (args.brandId && (await ctx.db.get(args.brandId))?.onHold) {
+      throw new Error("This brand is on hold. Resume it from the brand page first.");
     }
 
     const duplicateId = await findRecentDuplicateBrief(ctx, userId, args.title);
@@ -546,6 +551,9 @@ export const createIndividualTaskBrief = mutation({
 
     if (args.teams.length === 0) {
       throw new Error("At least one team assignment is required");
+    }
+    if (args.brandId && (await ctx.db.get(args.brandId))?.onHold) {
+      throw new Error("This brand is on hold. Resume it from the brand page first.");
     }
 
     const now = Date.now();

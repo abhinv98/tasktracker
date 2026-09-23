@@ -60,6 +60,9 @@ export const createFromTemplate = mutation({
 
     const template = await ctx.db.get(templateId);
     if (!template) throw new Error("Template not found");
+    if (brandId && (await ctx.db.get(brandId))?.onHold) {
+      throw new Error("This brand is on hold. Resume it from the brand page first.");
+    }
 
     const count = (await ctx.db.query("briefs").collect()).length;
 

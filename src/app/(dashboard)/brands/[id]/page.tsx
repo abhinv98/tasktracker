@@ -6,7 +6,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
-import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit, Pencil } from "lucide-react";
+import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit, Pencil, PauseCircle, PlayCircle } from "lucide-react";
 import ClientPortalTab from "@/components/brand/ClientPortalTab";
 import InternalJsrTab from "@/components/brand/InternalJsrTab";
 import MomTab from "@/components/brand/MomTab";
@@ -59,9 +59,11 @@ export default function BrandDetailPage() {
   const removeManager = useMutation(api.brands.removeManagerFromBrand);
   const deleteBrand = useMutation(api.brands.deleteBrand);
   const updateBrand = useMutation(api.brands.updateBrand);
+  const setBrandOnHold = useMutation(api.brands.setBrandOnHold);
 
   const [addManagerId, setAddManagerId] = useState<string>("");
   const [showDeleteBrand, setShowDeleteBrand] = useState(false);
+  const [showHoldBrand, setShowHoldBrand] = useState(false);
   const [removingManagerId, setRemovingManagerId] = useState<Id<"users"> | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -237,6 +239,17 @@ export default function BrandDetailPage() {
       toast("error", err instanceof Error ? err.message : "Failed to remove manager");
     }
     setRemovingManagerId(null);
+  }
+
+  async function handleToggleHold() {
+    const onHold = !brand?.onHold;
+    try {
+      await setBrandOnHold({ brandId, onHold });
+      toast("success", onHold ? "Brand on hold, briefs archived" : "Brand resumed, briefs restored");
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed to update brand");
+    }
+    setShowHoldBrand(false);
   }
 
   async function handleDelete() {
@@ -474,6 +487,7 @@ export default function BrandDetailPage() {
               <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight truncate">
                 {brand.name}
               </h1>
+              {brand.onHold && <Badge variant="neutral">On hold</Badge>}
               {/* Only Brand Managers (admins) can rename a brand. */}
               {isAdmin && (
                 <button
@@ -498,6 +512,12 @@ export default function BrandDetailPage() {
             </p>
           )}
         </div>
+        {isAdmin && (
+          <Button variant="secondary" onClick={() => setShowHoldBrand(true)} className="mr-2">
+            {brand.onHold ? <PlayCircle className="h-4 w-4 mr-1.5" /> : <PauseCircle className="h-4 w-4 mr-1.5" />}
+            {brand.onHold ? "Resume" : "Put on hold"}
+          </Button>
+        )}
         {isAdmin && (
           <Button variant="secondary" onClick={() => setShowDeleteBrand(true)}>
             <Trash2 className="h-4 w-4 mr-1.5" />
@@ -1445,6 +1465,21 @@ export default function BrandDetailPage() {
           setDeletingCredId(null);
         }}
         onCancel={() => setDeletingCredId(null)}
+      />
+
+      <ConfirmModal
+        open={showHoldBrand}
+        title={brand.onHold ? "Resume Brand" : "Put Brand on Hold"}
+        message={
+          brand.onHold
+            ? "Restore every brief this hold archived to its previous status? Tasks come back on everyone's dashboards."
+            : "Archive every brief of this brand? Its briefs and tasks disappear from everyone's views, and no new briefs can be created until you resume."
+        }
+        confirmLabel={brand.onHold ? "Resume" : "Put on hold"}
+        confirmingLabel="Saving..."
+        variant={brand.onHold ? undefined : "danger"}
+        onConfirm={handleToggleHold}
+        onCancel={() => setShowHoldBrand(false)}
       />
 
       <ConfirmModal

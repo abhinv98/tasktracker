@@ -47,6 +47,7 @@ import type * as lib_taskFlowResources from "../lib/taskFlowResources.js";
 import type * as managerWorklog from "../managerWorklog.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
 import type * as migrations from "../migrations.js";
+import type * as migrations_backfillBrandHold from "../migrations/backfillBrandHold.js";
 import type * as migrations_backfillReviewAt from "../migrations/backfillReviewAt.js";
 import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlineValues.js";
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
@@ -137,6 +138,7 @@ declare const fullApi: ApiFromModules<{
   managerWorklog: typeof managerWorklog;
   meetingMinutes: typeof meetingMinutes;
   migrations: typeof migrations;
+  "migrations/backfillBrandHold": typeof migrations_backfillBrandHold;
   "migrations/backfillReviewAt": typeof migrations_backfillReviewAt;
   "migrations/checkDeadlineValues": typeof migrations_checkDeadlineValues;
   "migrations/checkPremTask": typeof migrations_checkPremTask;
