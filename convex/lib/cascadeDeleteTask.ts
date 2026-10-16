@@ -4,8 +4,9 @@ import type { Id } from "../_generated/dataModel";
 /**
  * Recursively delete a task and EVERY artefact attached to it: child tasks
  * (via parentTaskId), deliverables, attachments, time entries, daily
- * summaries, comments, and read receipts. Used by deleteTask, deleteSheet,
- * and any flow that needs to ensure no orphan rows remain.
+ * summaries, comments, and read receipts, and unlinks client requests. Used
+ * by deleteTask, deleteSheet, and any flow that needs to ensure no orphan
+ * rows remain.
  *
  * Returns the ids that were deleted (useful for logging / migrations).
  */
@@ -121,5 +122,22 @@ export async function cascadeDeleteTask(
   }
 
   await walk(taskId);
+
+  // Client requests accepted into a deleted task go back to the review
+  // queue so they can be accepted again (finished ones just unlink).
+  // ponytail: full scan, jsrClientTasks has no linkedTaskId index.
+  const deleted = new Set<string>(deletedTasks);
+  const requests = await ctx.db.query("jsrClientTasks").collect();
+  for (const r of requests) {
+    if (!r.linkedTaskId || !deleted.has(r.linkedTaskId)) continue;
+    const reopen = r.status === "accepted" || r.status === "in_progress";
+    await ctx.db.patch(r._id, {
+      linkedTaskId: undefined,
+      linkedBriefId: undefined,
+      publishedTaskStatus: undefined,
+      ...(reopen ? { status: "pending_review" as const, acceptedDestination: undefined } : {}),
+    });
+  }
+
   return { tasks: deletedTasks, deliverables: deletedDeliverables };
 }

@@ -16,8 +16,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-const SITE_URL = "https://tasktracker-gilt-tau.vercel.app";
-
 // ─── Copyable Link ──────────────────────────
 export function CopyableLink({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
@@ -90,7 +88,7 @@ export function CreateUserForm() {
         role,
         ...(designation.trim() ? { designation: designation.trim() } : {}),
       });
-      const signupUrl = `${SITE_URL}/sign-up?invite=${res.token}`;
+      const signupUrl = `${window.location.origin}/sign-up?invite=${res.token}`;
       setResult({ signupUrl, name: name.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create invite");

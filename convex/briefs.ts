@@ -87,13 +87,10 @@ export const listBriefs = query({
         .filter(Boolean); 
       const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
       // Content-calendar entries are stored as a parent task plus
-      // `[Copy]`/`[Design]` children. The user-visible "task" is the entry,
-      // so progress should count parents only — otherwise 6 entries register
-      // as 12 (or 18) in the bar.
-      const countableTasks =
-        b.briefType === "content_calendar"
-          ? tasksInBrief.filter((t) => t.parentTaskId === undefined)
-          : tasksInBrief;
+      // `[Copy]`/`[Design]` children, and helper sub-tasks hang off their
+      // parent on every brief type. Count parents only (matching
+      // recomputeBriefDeadline) — otherwise 6 entries register as 12 or 18.
+      const countableTasks = tasksInBrief.filter((t) => t.parentTaskId === undefined);
       const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
       // b.deadline is authoritative: recomputeBriefDeadline keeps it rolled up
@@ -140,12 +137,9 @@ export const getBrief = query({
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
-    // Mirror listBriefs: content-calendar progress counts entries (parents)
-    // only, not their Copy/Design children.
-    const countableTasks =
-      brief.briefType === "content_calendar"
-        ? tasks.filter((t) => t.parentTaskId === undefined)
-        : tasks;
+    // Mirror listBriefs: progress counts parents only, not CC Copy/Design
+    // children or helper sub-tasks.
+    const countableTasks = tasks.filter((t) => t.parentTaskId === undefined);
     const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
     // brief.deadline is authoritative: recomputeBriefDeadline keeps it rolled
@@ -238,6 +232,21 @@ export const createBrief = mutation({
 
     const count = await ctx.db.query("briefs").collect();
     const globalPriority = count.length + 1;
+
+    // One live content calendar per brand: entries are filed under whichever
+    // CC brief .find() hits first, so a second one splits them unpredictably.
+    if (
+      args.briefType === "content_calendar" &&
+      args.brandId &&
+      count.some(
+        (b) =>
+          b.brandId === args.brandId &&
+          b.briefType === "content_calendar" &&
+          b.status !== "archived"
+      )
+    ) {
+      throw new Error("This brand already has a Content Calendar brief");
+    }
 
     let assignedManagerId = args.assignedManagerId;
     if (!assignedManagerId && args.brandId) {
@@ -922,6 +931,8 @@ export const updateBrief = mutation({
     status: v.optional(v.string()),
     assignedManagerId: v.optional(v.id("users")),
     deadline: v.optional(v.number()),
+    /** Remove the brief deadline (undefined `deadline` alone means "unchanged"). */
+    clearDeadline: v.optional(v.boolean()),
     briefType: v.optional(
       v.union(
         v.literal("developmental"),
@@ -974,6 +985,10 @@ export const updateBrief = mutation({
       if (brief.briefType !== "single_task") {
         updates.deadlineIsManual = true;
       }
+    }
+    if (fields.clearDeadline && !willBeContentCalendar) {
+      updates.deadline = undefined;
+      updates.deadlineIsManual = undefined;
     }
     if (fields.briefType !== undefined) updates.briefType = fields.briefType;
     if (fields.creativesRequired !== undefined) {
@@ -1145,7 +1160,8 @@ export const assignTeamsToBrief = mutation({
     const teams = await ctx.db.query("teams").collect();
     for (const teamId of teamIds) {
       const team = teams.find((t) => t._id === teamId);
-      if (team?.leadId) {
+      // Only notify leads of newly added teams, and never the caller.
+      if (team?.leadId && !existingOrderMap.has(teamId as string) && team.leadId !== userId) {
         await ctx.db.insert("notifications", {
           recipientId: team.leadId,
           type: "team_added",
@@ -1299,10 +1315,16 @@ export const restoreBrief = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can restore briefs");
     }
+    const brief = await ctx.db.get(briefId);
+    if (!brief) throw new Error("Brief not found");
+    if (brief.brandId && (await ctx.db.get(brief.brandId))?.onHold) {
+      throw new Error("This brand is on hold. Resume it from the brand page to restore its briefs.");
+    }
     await ctx.db.patch(briefId, {
       status: "draft",
       archivedAt: undefined,
       archivedBy: undefined,
+      statusBeforeHold: undefined,
     });
     await ctx.db.insert("activityLog", {
       briefId,
@@ -1518,7 +1540,10 @@ export const getArchivedBriefs = query({
     const allTasks = await ctx.db.query("tasks").collect();
     return briefs.map((b) => {
       const manager = managers.find((m) => m._id === b.archivedBy);
-      const tasks = allTasks.filter((t) => t.briefId === b._id);
+      // Parents only, matching listBriefs/getBrief.
+      const tasks = allTasks.filter(
+        (t) => t.briefId === b._id && t.parentTaskId === undefined
+      );
       const doneCount = tasks.filter((t) => t.status === "done").length;
       return {
         ...b,

@@ -262,7 +262,10 @@ export default function InvoicesPage() {
         />
         <button
           onClick={() => setShowSettings(true)}
-          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          // Wait for the profile: the modal snapshots its counters on open, and
+          // saving default counters of 1 would rewind invoice numbering.
+          disabled={profile === undefined}
+          className="shrink-0 disabled:opacity-40 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <Settings className="h-3.5 w-3.5" /> Agency profile
         </button>
@@ -1196,13 +1199,16 @@ function InvoiceDetailModal({
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
+    let success = false;
     try {
       await fn();
       toast("success", ok);
+      success = true;
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "Failed");
     }
     setBusy(false);
+    return success;
   }
 
   if (invoice === undefined)
@@ -1389,7 +1395,7 @@ function InvoiceDetailModal({
                   toast("error", "Enter a payment amount");
                   return;
                 }
-                await act(
+                const saved = await act(
                   () =>
                     recordPayment({
                       invoiceId: invoice._id,
@@ -1400,8 +1406,11 @@ function InvoiceDetailModal({
                     }),
                   "Payment recorded"
                 );
-                setPayAmount("");
-                setPayRef("");
+                // Keep the typed values when the save failed so they can retry.
+                if (saved) {
+                  setPayAmount("");
+                  setPayRef("");
+                }
               }}
               disabled={busy}
               className="px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40 whitespace-nowrap"

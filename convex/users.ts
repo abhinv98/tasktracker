@@ -54,11 +54,17 @@ export async function removeUserAndCleanup(
     await ctx.db.delete(session._id);
   }
 
+  // Drop the consumed invite rather than re-arming it: a removed user must
+  // not be able to sign up again with their old role/team. Re-inviting is
+  // an explicit admin action.
   if (targetUser.email) {
-    const allInvites = await ctx.db.query("invites").collect();
-    const invite = allInvites.find((inv: any) => inv.email === targetUser.email && inv.used);
-    if (invite) {
-      await ctx.db.patch(invite._id, { used: false } as any);
+    const email = targetUser.email;
+    const invites = await ctx.db
+      .query("invites")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .collect();
+    for (const inv of invites) {
+      if (inv.used) await ctx.db.delete(inv._id);
     }
   }
 
@@ -232,6 +238,16 @@ export const createInvite = mutation({
     if (!userId) throw new Error("Not authenticated");
     const user = await ctx.db.get(userId);
     if (!user || user.role !== "admin") throw new Error("Only admins can create invites");
+
+    // Sign-up applies the first unused invite for an email, so replace any
+    // older pending one instead of letting it win.
+    const pending = await ctx.db
+      .query("invites")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .collect();
+    for (const inv of pending) {
+      if (!inv.used) await ctx.db.delete(inv._id);
+    }
 
     // Generate a random token
     const token = Array.from({ length: 32 }, () =>
@@ -503,12 +519,13 @@ export const _cleanOrphanedAuthAccounts = internalMutation({
       }
     }
 
-    // Reset invites for emails of deleted users
+    // Drop consumed invites of deleted users (never re-arm them; see
+    // removeUserAndCleanup)
     const allInvites = await ctx.db.query("invites").collect();
     const existingEmails = new Set(allUsers.map((u) => u.email).filter(Boolean));
     for (const inv of allInvites) {
-      if ((inv as any).used && (inv as any).email && !existingEmails.has((inv as any).email)) {
-        await ctx.db.patch(inv._id, { used: false } as any);
+      if (inv.used && inv.email && !existingEmails.has(inv.email)) {
+        await ctx.db.delete(inv._id);
         cleaned++;
       }
     }

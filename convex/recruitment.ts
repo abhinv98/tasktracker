@@ -328,6 +328,13 @@ export const deleteCandidates = mutation({
   handler: async (ctx, { candidateIds }) => {
     await requireRecruiter(ctx);
     for (const id of candidateIds) await ctx.db.delete(id);
+    // Drop them from campaign member lists so memberCount stays right.
+    const del = new Set<string>(candidateIds);
+    for (const c of await ctx.db.query("recruitCampaigns").collect()) {
+      const ids = c.candidateIds ?? [];
+      const kept = ids.filter((i) => !del.has(i));
+      if (kept.length !== ids.length) await ctx.db.patch(c._id, { candidateIds: kept });
+    }
     return { deleted: candidateIds.length };
   },
 });

@@ -190,6 +190,8 @@ export const removeDocument = mutation({
     await requireHR(ctx);
     const req = await ctx.db.get(requestId);
     if (!req) throw new Error("Request not found");
+    if (!(req.documents ?? []).some((d) => d.fileId === fileId))
+      throw new Error("Document not on this request");
     await ctx.storage.delete(fileId);
     await ctx.db.patch(requestId, {
       documents: (req.documents ?? []).filter((d) => d.fileId !== fileId),

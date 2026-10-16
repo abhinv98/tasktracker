@@ -26,7 +26,8 @@ export const getContacts = query({
     }> = [];
 
     for (const u of allUsers) {
-      if (u._id === authId) continue;
+      // Portal client accounts aren't DM contacts
+      if (u._id === authId || u.role === "client") continue;
 
       // Unread: messages sent TO me by this user where readAt is undefined
       const unreadMessages = await ctx.db
@@ -284,6 +285,17 @@ export const markConversationRead = mutation({
     for (const msg of unreadMessages) {
       if (!msg.readAt) {
         await ctx.db.patch(msg._id, { readAt: now });
+      }
+    }
+
+    // Clear the bell entries for this conversation too
+    const unreadNotifs = await ctx.db
+      .query("notifications")
+      .withIndex("by_recipient_read", (q) => q.eq("recipientId", authId).eq("read", false))
+      .collect();
+    for (const n of unreadNotifs) {
+      if (n.type === "direct_message" && n.triggeredBy === otherUserId) {
+        await ctx.db.patch(n._id, { read: true });
       }
     }
   },

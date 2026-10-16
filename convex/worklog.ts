@@ -19,8 +19,9 @@ export const getEmployeeWorkLog = query({
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
     const allActivityLogs = await ctx.db.query("activityLog").collect();
 
-    const dayStart = new Date(date + "T00:00:00").getTime();
-    const dayEnd = new Date(date + "T23:59:59.999").getTime();
+    // IST calendar day; the Convex runtime is UTC.
+    const dayStart = new Date(date + "T00:00:00+05:30").getTime();
+    const dayEnd = new Date(date + "T23:59:59.999+05:30").getTime();
 
     const employeeWorkLogs = employees.map((emp) => {
       const taskIds = new Set<string>();
@@ -28,8 +29,7 @@ export const getEmployeeWorkLog = query({
       // Tasks with deadline on this date
       const tasksWithDeadline = allTasks.filter((t) => {
         if (t.assigneeId !== emp._id || !t.deadline) return false;
-        const dlDate = new Date(t.deadline).toISOString().split("T")[0];
-        return dlDate === date;
+        return t.deadline >= dayStart && t.deadline <= dayEnd;
       });
       tasksWithDeadline.forEach((t) => taskIds.add(t._id));
 
@@ -52,8 +52,7 @@ export const getEmployeeWorkLog = query({
       // Tasks completed on this date
       const completedToday = allTasks.filter((t) => {
         if (t.assigneeId !== emp._id || !t.completedAt) return false;
-        const cDate = new Date(t.completedAt).toISOString().split("T")[0];
-        return cDate === date;
+        return t.completedAt >= dayStart && t.completedAt <= dayEnd;
       });
       completedToday.forEach((t) => taskIds.add(t._id));
 

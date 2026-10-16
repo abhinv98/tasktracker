@@ -20,20 +20,16 @@ import {
 import {
   Megaphone, ArrowLeft, Mail, FileText, ExternalLink, UserMinus, Check, RotateCcw,
 } from "lucide-react";
-
-const STATUS_COLORS: Record<string, { label: string; color: string }> = {
-  active: { label: "Active", color: "#059669" },
-  on_hold: { label: "On Hold", color: "#d97706" },
-  non_active: { label: "Non Active", color: "#6b7280" },
-  rejected: { label: "Rejected", color: "#b91c1c" },
-};
+import { stageMeta, type Stage } from "@/lib/recruitStages";
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.campaignId as Id<"recruitCampaigns">;
   const campaign = useQuery(api.recruitment.getCampaign, { campaignId });
   const templates = useQuery(api.recruitment.listTemplates, {});
-  const logs = useQuery(api.recruitment.listEmailLogs, { limit: 200 });
+  // The server takes the newest N across every job, so a small limit drops
+  // this campaign's older sends out of the Mailed column.
+  const logs = useQuery(api.recruitment.listEmailLogs, { limit: 100000 });
 
   const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const closeCampaign = useMutation(api.recruitment.closeCampaign);
@@ -181,7 +177,7 @@ export default function CampaignDetailPage() {
               </thead>
               <tbody>
                 {members.map((m) => {
-                  const meta = STATUS_COLORS[m.status] ?? STATUS_COLORS.active;
+                  const meta = stageMeta((m.stage ?? "applied") as Stage);
                   const done = mailedTo.has(m.email.toLowerCase());
                   return (
                     <tr key={m._id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors">

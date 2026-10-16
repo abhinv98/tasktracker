@@ -177,7 +177,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const updateDailySummary = useMutation(api.taskDailySummaries.updateSummary);
   const deleteDailySummary = useMutation(api.taskDailySummaries.deleteSummary);
   const [showSummaryForm, setShowSummaryForm] = useState(false);
-  const [summaryDate, setSummaryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [summaryDate, setSummaryDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [summaryText, setSummaryText] = useState("");
   const [isAddingSummary, setIsAddingSummary] = useState(false);
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
@@ -232,7 +232,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           onClick={onClose}
         />
         <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[520px] bg-white shadow-2xl border-l border-[var(--border)] flex items-center justify-center animate-slidePanelIn">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
+          {detail === null ? (
+            <p className="p-6 text-sm text-[var(--text-secondary)]">This task no longer exists.</p>
+          ) : (
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
+          )}
         </div>
       </>
     );
@@ -316,13 +320,15 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ fileName: file.name, contentType: file.type }),
           });
+          if (!presignRes.ok) throw new Error("Could not prepare upload");
           const { uploadUrl, fileKey } = await presignRes.json();
           // PUT file directly to R2
-          await fetch(uploadUrl, {
+          const putRes = await fetch(uploadUrl, {
             method: "PUT",
             headers: { "Content-Type": file.type },
             body: file,
           });
+          if (!putRes.ok) throw new Error(`Upload failed for ${file.name}`);
           r2FileKeys.push(fileKey);
           r2FileNames.push(file.name);
         }
@@ -346,6 +352,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
       setDeliverableLink("");
       setDeliverableFiles([]);
       setShowDeliverableForm(false);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Upload failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -386,7 +394,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
       await updateTask({
         taskId: taskId as Id<"tasks">,
         title: editTitle,
-        description: editDesc || undefined,
+        description: editDesc,
         assigneeId: editAssignee as Id<"users">,
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : { clearDeadline: true }),
       });
@@ -953,7 +961,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               </h4>
               {isAssignee && task.status !== "done" && (
                 <button
-                  onClick={() => { setShowSummaryForm(!showSummaryForm); setSummaryDate(new Date().toISOString().slice(0, 10)); setSummaryText(""); }}
+                  onClick={() => { setShowSummaryForm(!showSummaryForm); setSummaryDate(new Date().toLocaleDateString("en-CA")); setSummaryText(""); }}
                   className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
                   <FileText className="h-3 w-3" />
@@ -1092,6 +1100,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         parentTaskId: taskId as Id<"tasks">,
                         assigneeId: helperAssignee as Id<"users">,
                         description: helperDesc.trim(),
+                        // Inherit the parent's deadline so reminders/overdue alerts fire.
+                        deadline: task.deadline ?? undefined,
                       });
                       setHelperAssignee("");
                       setHelperDesc("");

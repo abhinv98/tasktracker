@@ -202,6 +202,13 @@ export const deleteComment = mutation({
     if (comment.userId !== userId && user?.role !== "admin") {
       throw new Error("Not authorized");
     }
+    // Clean up reactions and the attachment so neither outlives the comment.
+    const reactions = await ctx.db
+      .query("commentReactions")
+      .withIndex("by_comment", (q) => q.eq("commentId", commentId))
+      .collect();
+    for (const r of reactions) await ctx.db.delete(r._id);
+    if (comment.attachmentId) await ctx.storage.delete(comment.attachmentId);
     await ctx.db.delete(commentId);
   },
 });
@@ -237,6 +244,19 @@ export const getUnreadCounts = query({
         .query("comments")
         .withIndex("by_parent", (q) => q.eq("parentType", "brief").eq("parentId", brief._id))
         .collect();
+      // The brief thread also shows task-level comments, so count those too.
+      const briefTasks = await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+        .collect();
+      for (const t of briefTasks) {
+        comments.push(
+          ...(await ctx.db
+            .query("comments")
+            .withIndex("by_parent", (q) => q.eq("parentType", "task").eq("parentId", t._id))
+            .collect())
+        );
+      }
       const unread = comments.filter((c) => c.createdAt > lastRead && c.userId !== userId).length;
       if (unread > 0) counts[brief._id] = unread;
     }
@@ -385,7 +405,8 @@ export const getTypingUsers = query({
 
     return active.map((i) => {
       const user = users.find((u) => u._id === i.userId);
-      return { userId: i.userId, name: user?.name ?? user?.email ?? "Someone" };
+      // lastTypedAt lets the client expire the indicator; this query only re-runs on row changes.
+      return { userId: i.userId, name: user?.name ?? user?.email ?? "Someone", lastTypedAt: i.lastTypedAt };
     });
   },
 });

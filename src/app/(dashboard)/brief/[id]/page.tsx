@@ -173,7 +173,9 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               };
               const next = nextMap[task.status];
               if (!next) return null;
-              if (next.status === "done" && !isAdmin) return null;
+              // Non-admins may only start their own task; Review comes from
+              // submitting a deliverable.
+              if (!isAdmin && (next.status !== "in-progress" || task.assigneeId !== user?._id)) return null;
               return (
                 <button
                   onClick={() => onUpdateStatus(task._id, next.status)}
@@ -542,6 +544,7 @@ export default function BriefPage() {
   const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
   const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [taskHandoffTeam, setTaskHandoffTeam] = useState<string>("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [autoEditTask, setAutoEditTask] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -778,13 +781,19 @@ export default function BriefPage() {
                 onChange={(deadline) => {
                   const tasks = tasksData?.tasks ?? [];
                   if (
-                    deadline !== undefined &&
                     brief.briefType !== "content_calendar" &&
+                    !brief.deadlineIsManual &&
                     tasks.length === 1
                   ) {
-                    updateTask({ taskId: tasks[0]._id, deadline });
+                    updateTask(
+                      deadline !== undefined
+                        ? { taskId: tasks[0]._id, deadline }
+                        : { taskId: tasks[0]._id, clearDeadline: true }
+                    );
                   } else {
-                    updateBrief({ briefId, deadline });
+                    updateBrief(
+                      deadline !== undefined ? { briefId, deadline } : { briefId, clearDeadline: true }
+                    );
                   }
                 }}
                 placeholder="Set deadline"
@@ -951,10 +960,13 @@ export default function BriefPage() {
             initialMonth={initialMonth}
           />
         </div>
-      ) : brief.briefType === "single_task" ? (
+      ) : brief.briefType === "single_task" &&
+        allTasks.filter((t) => !t.parentTaskId).length <= 1 ? (
+        // Multi-step individual tasks (one "Step N" per team) fall through
+        // to the canvas so steps 2..N stay visible.
         <SingleTaskBriefView
           brief={brief}
-          tasks={allTasks}
+          tasks={allTasks.filter((t) => !t.parentTaskId)}
           tasksData={tasksData}
           isAdmin={!!isAdmin}
           user={user}
@@ -1074,7 +1086,11 @@ export default function BriefPage() {
                     {team.name}
                     <button
                       type="button"
-                      onClick={() => removeTeamFromBrief({ briefId, teamId: team._id })}
+                      onClick={() => {
+                        if (confirm(`Remove ${team.name} from this brief? Its tasks will be hidden from the canvas.`)) {
+                          removeTeamFromBrief({ briefId, teamId: team._id });
+                        }
+                      }}
                       className="text-[var(--text-muted)] hover:text-[var(--danger)] ml-0.5"
                     >
                       <X className="h-2.5 w-2.5" />
@@ -1223,7 +1239,7 @@ export default function BriefPage() {
                             "on-hold": { label: "On Hold", dot: "#78716c" },
                           };
                           const sm = statusMeta[t.status] ?? statusMeta.pending;
-                          const overdue = t.deadline && t.deadline < Date.now() && t.status !== "done";
+                          const overdue = t.deadline && t.deadline < Date.now() && t.status !== "done" && t.status !== "review";
                           return (
                             <tr
                               key={t._id}
@@ -1271,7 +1287,7 @@ export default function BriefPage() {
             ) : (
               <BriefFlowCanvas
                 briefId={briefId}
-                teams={(graphData?.teams ?? []).map(({ team, members }, teamIdx, allTeamsInGraph) => ({
+                teams={[...(graphData?.teams ?? []).map(({ team, members }, teamIdx, allTeamsInGraph) => ({
                   teamId: team._id,
                   teamName: team.name,
                   teamColor: team.color,
@@ -1297,7 +1313,32 @@ export default function BriefPage() {
                         deadline: t.deadline,
                       };
                     }),
-                }))}
+                })),
+                // Tasks whose assignee is on none of the brief's teams still
+                // count toward progress, so draw them in their own lane.
+                ...(() => {
+                  const others = filteredTasks.filter(
+                    (t) => !(graphData?.teams ?? []).some(({ members }) => members.some((m) => m.user._id === t.assigneeId))
+                  );
+                  if (!graphData || others.length === 0) return [];
+                  return [{
+                    teamId: "other",
+                    teamName: "Other",
+                    teamColor: "#9ca3af",
+                    tasks: others.map((t) => {
+                      const assignee = tasksData?.users.find((u) => u._id === t.assigneeId);
+                      return {
+                        _id: t._id,
+                        title: t.title,
+                        status: t.status,
+                        assigneeName: (assignee?.name ?? assignee?.email ?? "Unassigned") as string,
+                        flowX: t.flowX,
+                        flowY: t.flowY,
+                        deadline: t.deadline,
+                      };
+                    }),
+                  }];
+                })()]}
                 connections={(taskConnections ?? []).map((c) => ({
                   _id: c._id,
                   sourceTaskId: c.sourceTaskId,
@@ -1446,7 +1487,8 @@ export default function BriefPage() {
                     toast("error", "Select a team");
                     return;
                   }
-                  if (!taskAssignee) return;
+                  if (!taskAssignee || isCreatingTask) return;
+                  setIsCreatingTask(true);
                   let finalDeadline = taskDeadline;
                   if (taskDeadline !== undefined && taskDeadlineTime) {
                     const [hh, mm] = taskDeadlineTime.split(":").map(Number);
@@ -1498,6 +1540,8 @@ export default function BriefPage() {
                     toast("success", "Task created");
                   } catch (err) {
                     toast("error", err instanceof Error ? err.message : "Failed to create task");
+                  } finally {
+                    setIsCreatingTask(false);
                   }
                 }}
                 className="flex flex-col gap-3"
@@ -1597,7 +1641,7 @@ export default function BriefPage() {
                   </select>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">On approval, deliverable handed off to this team</p>
                 </div>
-                <Button type="submit" variant="primary" className="mt-2">
+                <Button type="submit" variant="primary" className="mt-2" loading={isCreatingTask}>
                   Create Task
                 </Button>
               </form>

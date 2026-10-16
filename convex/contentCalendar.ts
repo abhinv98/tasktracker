@@ -119,6 +119,11 @@ export async function getOrCreateCalendarBrief(
 ) {
   const brand = await ctx.db.get(brandId);
   if (!brand) throw new Error("Brand not found");
+  // On hold, the brand's calendar brief is archived; creating a fresh one
+  // would leave two calendars once the brand is resumed.
+  if (brand.onHold) {
+    throw new Error("This brand is on hold. Resume it from the brand page first.");
+  }
 
   const allBriefs = await ctx.db.query("briefs").collect();
   const existing = allBriefs.find(
@@ -250,6 +255,12 @@ async function canViewBrandCalendar(
     .filter((q: any) => q.eq(q.field("briefId"), ccBrief._id))
     .first();
   return myTask != null;
+}
+
+/** `canViewBrandCalendar` for queries keyed by a calendar brief id. */
+async function canViewCalendarBrief(ctx: any, userId: any, briefId: any) {
+  const brief = await ctx.db.get(briefId);
+  return !!brief?.brandId && (await canViewBrandCalendar(ctx, userId, brief.brandId));
 }
 
 /**
@@ -758,12 +769,16 @@ export const duplicateEntry = mutation({
     );
     if (replay) return replay._id;
 
-    return await ctx.db.insert("tasks", {
+    // Keep an unassigned placeholder (assignee === assignedBy) unassigned.
+    const isPlaceholder = task.assigneeId === task.assignedBy;
+    const assignedBy = isPlaceholder ? task.assignedBy : userId;
+    const newId = await ctx.db.insert("tasks", {
       briefId: task.briefId,
       title: task.title,
       description: task.description,
       assigneeId: task.assigneeId,
-      assignedBy: userId,
+      assignedBy,
+      ...(isPlaceholder ? {} : { assignedAt: Date.now() }),
       status: "pending",
       sortOrder: maxOrder + 1000,
       duration: task.duration,
@@ -779,6 +794,30 @@ export const duplicateEntry = mutation({
         ? { handoffTargetTeamId: task.handoffTargetTeamId }
         : {}),
     });
+
+    await tagForOversight(ctx, {
+      taskId: newId,
+      briefId: task.briefId,
+      assigneeId: task.assigneeId,
+      assignedBy,
+      source: "content_calendar",
+    });
+
+    if (!isPlaceholder) {
+      await ctx.db.insert("notifications", {
+        recipientId: task.assigneeId,
+        type: "task_assigned",
+        title: "Content calendar task assigned",
+        message: `You were assigned: ${task.title}`,
+        briefId: task.briefId,
+        taskId: newId,
+        triggeredBy: assignedBy,
+        read: false,
+        createdAt: Date.now(),
+      });
+    }
+
+    return newId;
   },
 });
 
@@ -1071,6 +1110,7 @@ export const listSheets = query({
   handler: async (ctx, { briefId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    if (!(await canViewCalendarBrief(ctx, userId, briefId))) return [];
     return await ctx.db
       .query("contentCalendarSheets")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
@@ -1134,6 +1174,7 @@ export const deleteSheet = mutation({
     const monthParents = tasks.filter(
       (t) =>
         !t.parentTaskId &&
+        !t.stagedAt &&
         t.postDate &&
         t.postDate.startsWith(sheet.month)
     );
@@ -1158,14 +1199,16 @@ export const listTasksForSheet = query({
   handler: async (ctx, { briefId, month }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    if (!(await canViewCalendarBrief(ctx, userId, briefId))) return [];
 
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
 
+    // Staged (shelved) entries live in the staging tray, not the grid.
     const monthTasks = tasks.filter(
-      (t) => t.postDate && t.postDate.startsWith(month) && !t.parentTaskId
+      (t) => t.postDate && t.postDate.startsWith(month) && !t.parentTaskId && !t.stagedAt
     );
 
     const users = await ctx.db.query("users").collect();
@@ -1369,7 +1412,11 @@ export async function resolveCalendarTaskTeam(
   if (prefixMatch) {
     const raw = prefixMatch[1].trim();
     if (!/content calendar/i.test(raw)) {
-      const hit = teams.find((t) => t.name.toLowerCase() === raw.toLowerCase());
+      // `[Design]` / `[Copy]` prefixes name "Design Team" / "Copy Team".
+      const key = raw.toLowerCase();
+      const hit =
+        teams.find((t) => t.name.toLowerCase() === key) ??
+        teams.find((t) => t.name.toLowerCase() === `${key} team`);
       if (hit) return hit._id;
     }
   }
@@ -1591,6 +1638,7 @@ export const listLinkedTasksForEntry = query({
     if (!userId) return [];
 
     const parent = await ctx.db.get(parentTaskId);
+    if (!parent || !(await canViewCalendarBrief(ctx, userId, parent.briefId))) return [];
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_parent", (q) => q.eq("parentTaskId", parentTaskId))
@@ -1600,51 +1648,16 @@ export const listLinkedTasksForEntry = query({
     const teams = await ctx.db.query("teams").collect();
     const roleByUser = await buildRoleByUserMap(ctx);
 
-    // Resolve a team for each child task. Title prefix `[Team Name]` (set by
-    // createLinkedCalendarTask / createIndividualTaskBrief) is the cheapest
-    // signal; fall back to the assignee's primary userTeams row.
-    const teamByName = new Map(teams.map((t) => [t.name.toLowerCase(), t]));
-
     // Classify so legacy entries surface "Copy" / "Design" labels on the
     // right tasks regardless of which side the assignee sits on.
-    const classification = parent
-      ? classifyCalendarEntry(parent as any, tasks as any, roleByUser)
-      : { schema: "modern" as const, copyTaskId: null, designTaskId: null };
+    const classification = classifyCalendarEntry(parent as any, tasks as any, roleByUser);
 
     const enriched = await Promise.all(
       tasks.map(async (task) => {
         const assignee = users.find((u) => u._id === task.assigneeId);
 
-        let teamId: typeof teams[number]["_id"] | undefined;
-        let teamName: string | undefined;
-
-        const prefixMatch = task.title.match(/^\[([^\]]+)\]/);
-        if (prefixMatch) {
-          const raw = prefixMatch[1].trim();
-          // Discard generic envelope prefixes like "Content Calendar · Brand"
-          // so we fall through to the team lookup for legacy linked tasks.
-          if (!/content calendar/i.test(raw)) {
-            const hit = teamByName.get(raw.toLowerCase());
-            if (hit) {
-              teamId = hit._id;
-              teamName = hit.name;
-            }
-          }
-        }
-
-        if (!teamId && task.assigneeId) {
-          const userTeams = await ctx.db
-            .query("userTeams")
-            .withIndex("by_user", (q) => q.eq("userId", task.assigneeId))
-            .collect();
-          if (userTeams.length > 0) {
-            const t = teams.find((tm) => tm._id === userTeams[0].teamId);
-            if (t) {
-              teamId = t._id;
-              teamName = t.name;
-            }
-          }
-        }
+        const teamId = await resolveCalendarTaskTeam(ctx, task, teams);
+        const teamName = teams.find((t) => t._id === teamId)?.name;
 
         // Semantic role for this child relative to the entry's scheme. The
         // sidebar role-card builder uses this to label legacy children "Copy"

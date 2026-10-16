@@ -171,7 +171,7 @@ function HandoutModal({
   const create = useMutation(api.pettyCash.createDisbursement);
   const update = useMutation(api.pettyCash.updateDisbursement);
   const [holderId, setHolderId] = useState(
-    editing?.holderId ?? defaultHolderId ?? holders[0]?._id ?? ""
+    editing?.holderId || defaultHolderId || holders[0]?._id || ""
   );
   const [recipient, setRecipient] = useState(editing?.recipient ?? "");
   const [purpose, setPurpose] = useState(editing?.purpose ?? "");

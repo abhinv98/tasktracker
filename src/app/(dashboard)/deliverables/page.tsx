@@ -45,6 +45,7 @@ export default function DeliverablesPage() {
   const [showRejectForm, setShowRejectForm] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
   const [deletingDeliverableId, setDeletingDeliverableId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [reassignTarget, setReassignTarget] = useState<Record<string, string>>({});
   const [reassignNote, setReassignNote] = useState<Record<string, string>>({});
   const [forwardingDeliverableId, setForwardingDeliverableId] = useState<string | null>(null);
@@ -340,59 +341,68 @@ export default function DeliverablesPage() {
     routeTo: "tl" | "bm" | "as" = "tl"
   ) {
     if (e) e.preventDefault();
+    if (isSubmitting) return;
     if (!submitMessage.trim()) return;
     if (!editingDeliverableId && !submitTaskId) return;
-
-    let newFileIds: Id<"_storage">[] = [];
-    let newFileNames: string[] = [];
-    if (submitFiles.length > 0) {
-      for (const file of submitFiles) {
-        const url = await generateUploadUrl();
-        const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
-        const { storageId } = await res.json();
-        newFileIds.push(storageId);
-        newFileNames.push(file.name);
+    // One in-flight submit at a time: a double click or a second route button
+    // would otherwise create duplicate deliverables.
+    setIsSubmitting(true);
+    try {
+      let newFileIds: Id<"_storage">[] = [];
+      let newFileNames: string[] = [];
+      if (submitFiles.length > 0) {
+        for (const file of submitFiles) {
+          const url = await generateUploadUrl();
+          const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+          const { storageId } = await res.json();
+          newFileIds.push(storageId);
+          newFileNames.push(file.name);
+        }
       }
-    }
 
-    if (editingDeliverableId) {
-      // Edit mode: combined existing-kept files (filenames only — URLs are derived)
-      // are not included since we cannot recover Convex storageIds from URLs.
-      // To keep edit simple and predictable, an edit replaces the file set with
-      // exactly the newly uploaded files. If the submitter wants to keep an old
-      // file, they must re-upload. Trade-off documented in the plan.
-      try {
-        await editDeliverableMut({
-          deliverableId: editingDeliverableId as Id<"deliverables">,
-          message: submitMessage.trim(),
-          link: submitLink || undefined,
-          ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
-        });
-        toast("success", "Deliverable updated");
-        resetSubmitForm();
-      } catch (err) {
-        toast("error", err instanceof Error ? err.message : "Could not update deliverable");
+      if (editingDeliverableId) {
+        // Edit mode: combined existing-kept files (filenames only — URLs are derived)
+        // are not included since we cannot recover Convex storageIds from URLs.
+        // To keep edit simple and predictable, an edit replaces the file set with
+        // exactly the newly uploaded files. If the submitter wants to keep an old
+        // file, they must re-upload. Trade-off documented in the plan.
+        try {
+          await editDeliverableMut({
+            deliverableId: editingDeliverableId as Id<"deliverables">,
+            message: submitMessage.trim(),
+            link: submitLink || undefined,
+            ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
+          });
+          toast("success", "Deliverable updated");
+          resetSubmitForm();
+        } catch (err) {
+          toast("error", err instanceof Error ? err.message : "Could not update deliverable");
+        }
+        return;
       }
-      return;
-    }
 
-    const payload = {
-      taskId: submitTaskId as any,
-      message: submitMessage.trim(),
-      link: submitLink || undefined,
-      ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
-    };
-    if (routeTo === "bm") {
-      await submitDirectToManager(payload);
-      toast("success", "Sent directly to Brand Manager");
-    } else if (routeTo === "as") {
-      await submitDirectToAssignor(payload);
-      toast("success", "Sent directly to Assignor");
-    } else {
-      await submitDeliverable(payload);
-      toast("success", "Submitted for Team Lead review");
+      const payload = {
+        taskId: submitTaskId as any,
+        message: submitMessage.trim(),
+        link: submitLink || undefined,
+        ...(newFileIds.length > 0 ? { fileIds: newFileIds, fileNames: newFileNames } : {}),
+      };
+      if (routeTo === "bm") {
+        await submitDirectToManager(payload);
+        toast("success", "Sent directly to Brand Manager");
+      } else if (routeTo === "as") {
+        await submitDirectToAssignor(payload);
+        toast("success", "Sent directly to Assignor");
+      } else {
+        await submitDeliverable(payload);
+        toast("success", "Submitted for Team Lead review");
+      }
+      resetSubmitForm();
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Submit failed");
+    } finally {
+      setIsSubmitting(false);
     }
-    resetSubmitForm();
   }
 
   const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
@@ -592,7 +602,7 @@ export default function DeliverablesPage() {
             </div>
             {editingDeliverableId ? (
               <div className="flex gap-2">
-                <Button type="submit" variant="primary">Save Changes</Button>
+                <Button type="submit" variant="primary" disabled={isSubmitting}>Save Changes</Button>
                 <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
               </div>
             ) : (() => {
@@ -602,10 +612,10 @@ export default function DeliverablesPage() {
                 <div className="flex flex-col gap-2">
                   <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Submit to</p>
                   <div className="flex flex-wrap gap-2">
-                    <Button type="submit" variant="primary">Team Lead</Button>
+                    <Button type="submit" variant="primary" disabled={isSubmitting}>Team Lead</Button>
                     <button
                       type="button"
-                      disabled={!submitMessage.trim() || !submitTaskId}
+                      disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                       onClick={() => handleSubmit(null, "bm")}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                     >
@@ -614,7 +624,7 @@ export default function DeliverablesPage() {
                     {showAssignorBtn && (
                       <button
                         type="button"
-                        disabled={!submitMessage.trim() || !submitTaskId}
+                        disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                         onClick={() => handleSubmit(null, "as")}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
@@ -806,6 +816,8 @@ export default function DeliverablesPage() {
                 {(isAdmin || isBrandManager) && (status === "approved" || (d as any).clientStatus === "client_approved") && (() => {
                   const hctx = handoffContexts?.[d.taskId as string];
                   // Master brief WITH downstream connection → hide entirely; resources auto-flow.
+                  // Calendar tasks never have connections and auto-handoff on their own.
+                  if (hctx?.briefType === "content_calendar") return null;
                   if (hctx?.inMasterBrief && hctx?.hasDownstreamConnection) return null;
                   return (
                   <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
@@ -1530,6 +1542,8 @@ export default function DeliverablesPage() {
                       {(allApproved || d.taskHasHandoffTarget) && !allHandedOff && (() => {
                         const hctx = handoffContexts?.[group.taskId as string];
                         // Master brief WITH downstream connection → hide entirely; resources auto-flow.
+                        // Calendar tasks never have connections and auto-handoff on their own.
+                        if (hctx?.briefType === "content_calendar") return null;
                         if (hctx?.inMasterBrief && hctx?.hasDownstreamConnection) return null;
                         return (
                           <button
@@ -1550,7 +1564,7 @@ export default function DeliverablesPage() {
                     {/* Master-brief unconnected-node alert */}
                     {(() => {
                       const hctx = handoffContexts?.[group.taskId as string];
-                      if (!hctx?.inMasterBrief || hctx?.hasDownstreamConnection) return null;
+                      if (!hctx?.inMasterBrief || hctx?.hasDownstreamConnection || hctx?.briefType === "content_calendar") return null;
                       return (
                         <div className="mt-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
                           This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor. You can hand off manually below for now.

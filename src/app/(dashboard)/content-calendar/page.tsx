@@ -63,7 +63,12 @@ const STATUS_COLORS: Record<string, { bg: string; dot: string; label: string }> 
   "in-progress": { bg: "#fef3c7", dot: "#f59e0b", label: "In Progress" },
   review: { bg: "#ede9fe", dot: "#8b5cf6", label: "Review" },
   done: { bg: "#d1fae5", dot: "#10b981", label: "Completed" },
+  "on-hold": { bg: "#fee2e2", dot: "#ef4444", label: "On Hold" },
 };
+
+// New entries default the assignee to the assignor as a placeholder, so an
+// entry whose assignee is its assignor still needs someone assigned.
+const isUnassigned = (t: any) => !t.assigneeId || t.assigneeId === t.assignedBy;
 
 const BRAND_COLORS = [
   "#D5573B", "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6",
@@ -658,7 +663,7 @@ export default function ContentCalendarPage() {
         </div>
 
         {/* Month Nav */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <button
             onClick={() => {
               const n = new Date();
@@ -686,7 +691,7 @@ export default function ContentCalendarPage() {
           </button>
 
           {/* Status legend */}
-          <div className="hidden lg:flex items-center gap-3 pl-3 border-l border-[var(--border)]">
+          <div className="hidden lg:flex flex-wrap items-center gap-x-3 gap-y-1 pl-3 border-l border-[var(--border)]">
             {Object.entries(STATUS_COLORS).map(([key, sc]) => (
               <span key={key} className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }} />
@@ -729,8 +734,8 @@ export default function ContentCalendarPage() {
           {/* Calendar Grid */}
           <div className={`flex-1 overflow-auto p-4 ${selectedTask ? "border-r border-[var(--border)]" : ""}`}>
             {(() => {
-              const incomplete = (tasks ?? []).filter((t: any) => !t.assigneeId || !t.deadline);
-              const noAssignee = incomplete.filter((t: any) => !t.assigneeId).length;
+              const incomplete = (tasks ?? []).filter((t: any) => isUnassigned(t) || !t.deadline);
+              const noAssignee = incomplete.filter(isUnassigned).length;
               const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
               if (incomplete.length === 0) return null;
               return (
@@ -1462,8 +1467,8 @@ function DraggableTaskCard({
         <span className="text-[var(--text-muted)] truncate">
           {task.platform}
         </span>
-        {(!task.assigneeId || !task.deadline) && (
-          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={!task.assigneeId && !task.deadline ? "Unassigned & No Deadline" : !task.assigneeId ? "Unassigned" : "No Deadline"} />
+        {(isUnassigned(task) || !task.deadline) && (
+          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={isUnassigned(task) && !task.deadline ? "Unassigned & No Deadline" : isUnassigned(task) ? "Unassigned" : "No Deadline"} />
         )}
       </div>
     </button>

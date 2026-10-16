@@ -257,7 +257,12 @@ export const updateDisbursement = mutation({
     if (rest.amountReturned !== undefined) {
       patch.amountReturned = amount(rest.amountReturned, "Amount returned");
     }
-    if (rest.spentOn !== undefined) patch.spentOn = rest.spentOn.trim() || undefined;
+    if (rest.spentOn !== undefined) {
+      const s = rest.spentOn.trim();
+      // Settling requires this explanation, so a settled handout can't lose it.
+      if (existing.settled && !s) throw new Error("Say what the money was spent on");
+      patch.spentOn = s || undefined;
+    }
 
     // Editing a settled handout must not let the returned amount drift above
     // what was given — that would mint cash into the float.

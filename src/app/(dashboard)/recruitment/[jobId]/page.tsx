@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
@@ -91,6 +91,8 @@ export default function RecruitmentJobPage() {
   const { toast } = useToast();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Bulk delete/mail/move act on the whole set, so drop picks hidden by a new filter.
+  useEffect(() => setSelected(new Set()), [stage, search]);
   const [mailOpen, setMailOpen] = useState(false);
   const [campOpen, setCampOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");

@@ -71,6 +71,12 @@ function formatPostDate(dateStr: string) {
   return { display: `${month} ${day}`, weekday };
 }
 
+/** Local YYYY-MM-DD for a date input. Saves use local T23:59:59, so reading
+ *  the UTC date (toISOString) would shift the day before 05:30 IST. */
+function localYmd(ts?: number | null) {
+  return ts ? new Date(ts).toLocaleDateString("en-CA") : "";
+}
+
 /** Explicit deadline, or end-of-day go-live (postDate) when no deadline is set. */
 function effectiveDeadlineMs(task: {
   deadline?: number | null;
@@ -1136,11 +1142,7 @@ export function ContentCalendarEntrySidebar({
       ? String((task as any).designCreativesRequired)
       : ""
   );
-  const [editDeadline, setEditDeadline] = useState(
-    task.deadline
-      ? new Date(task.deadline).toISOString().split("T")[0]
-      : ""
-  );
+  const [editDeadline, setEditDeadline] = useState(localYmd(task.deadline));
   const [editAssignee, setEditAssignee] = useState(task.assigneeId ?? "");
   const [editAssignor, setEditAssignor] = useState(task.assignedBy ?? "");
   const [editDescription, setEditDescription] = useState(
@@ -1254,11 +1256,7 @@ export function ContentCalendarEntrySidebar({
     if (openTask) {
       setOTeam(""); // user can pick a different team; we don't infer the bound team
       setOAssignee(openTask.assigneeId ?? "");
-      setODeadline(
-        openTask.deadline
-          ? new Date(openTask.deadline).toISOString().split("T")[0]
-          : ""
-      );
+      setODeadline(localYmd(openTask.deadline));
       setOCreativeCopy(openTask.creativeCopy ?? "");
       setOCaption(openTask.caption ?? "");
     }
@@ -1330,9 +1328,11 @@ export function ContentCalendarEntrySidebar({
         updates.assigneeId = editAssignee;
       // Assignor edits removed from UI — assignor is always the brand manager
       // (auto-set on task creation). Leave existing task.assignedBy alone.
+      // Compare day strings, not timestamps: an untouched date must not rewrite
+      // a deadline whose stored time isn't exactly 23:59:59 local.
       if (editDeadline) {
-        const ts = new Date(editDeadline + "T23:59:59").getTime();
-        if (ts !== task.deadline) updates.deadline = ts;
+        if (editDeadline !== localYmd(task.deadline))
+          updates.deadline = new Date(editDeadline + "T23:59:59").getTime();
       } else if (task.deadline) {
         updates.clearDeadline = true;
       }
@@ -1428,7 +1428,7 @@ export function ContentCalendarEntrySidebar({
       const updates: Record<string, any> = {};
       if (oAssignee !== openTask.assigneeId) updates.assigneeId = oAssignee;
       if (deadlineMs !== undefined) {
-        if (deadlineMs !== openTask.deadline) updates.deadline = deadlineMs;
+        if (oDeadline !== localYmd(openTask.deadline)) updates.deadline = deadlineMs;
       } else if (openTask.deadline) {
         updates.clearDeadline = true;
       }
@@ -1473,9 +1473,13 @@ export function ContentCalendarEntrySidebar({
     setSubmittingTo(to);
     try {
       await handleSave();
+      // Downstream teams see the upstream copy read-only; their own fields stay empty.
+      const up = upstreamInfo.isFirstTeam ? null : upstreamInfo.upstream;
+      const copy = (editCreativeCopy?.trim() || up?.creativeCopy?.trim()) ?? "";
+      const caption = (editCaption?.trim() || up?.caption?.trim()) ?? "";
       const msg = [
-        editCreativeCopy?.trim() ? `**Creative Copy:**\n${editCreativeCopy.trim()}` : "",
-        editCaption?.trim() ? `**Caption:**\n${editCaption.trim()}` : "",
+        copy ? `**Creative Copy:**\n${copy}` : "",
+        caption ? `**Caption:**\n${caption}` : "",
       ].filter(Boolean).join("\n\n");
       if (to === "tl") {
         await submitDeliverable({ taskId: task._id, message: msg });
@@ -2657,14 +2661,14 @@ export function ContentCalendarEntrySidebar({
             <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
               Submit Deliverable
             </label>
-            {(!editCreativeCopy?.trim() && !editCaption?.trim()) ? (
+            {(upstreamInfo.isFirstTeam && !editCreativeCopy?.trim() && !editCaption?.trim()) ? (
               <p className="text-[11px] text-[var(--text-muted)] italic">
                 Fill in Creative Copy or Caption above to enable submission.
               </p>
             ) : (
               <div className="flex flex-col gap-2">
                 <button
-                  disabled={submittingTo === "tl"}
+                  disabled={submittingTo !== null}
                   onClick={() => handleSubmitCopyDeliverable("tl")}
                   className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
@@ -2676,7 +2680,7 @@ export function ContentCalendarEntrySidebar({
                   Send to Team Lead
                 </button>
                 <button
-                  disabled={submittingTo === "bm"}
+                  disabled={submittingTo !== null}
                   onClick={() => handleSubmitCopyDeliverable("bm")}
                   className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                 >
@@ -2689,7 +2693,7 @@ export function ContentCalendarEntrySidebar({
                 </button>
                 {task.assignedBy && task.assignedBy !== user?._id && (
                   <button
-                    disabled={submittingTo === "as"}
+                    disabled={submittingTo !== null}
                     onClick={() => handleSubmitCopyDeliverable("as")}
                     className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                   >

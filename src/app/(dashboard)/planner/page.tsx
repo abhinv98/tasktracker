@@ -881,11 +881,16 @@ export default function PlannerPage() {
                           )}
                         </div>
                         {/* Task status sync */}
-                        {block.completed && block.type === "brief_task" && block.taskId && block.taskStatus !== "done" && (
+                        {/* Only admins may set "done" (updateTaskStatus rejects everyone else). */}
+                        {isAdmin && block.completed && block.type === "brief_task" && block.taskId && block.taskStatus !== "done" && (
                           <button
                             onClick={async () => {
-                              await updateTaskStatus({ taskId: block.taskId as Id<"tasks">, newStatus: "done" });
-                              toast("success", "Task marked as Done");
+                              try {
+                                await updateTaskStatus({ taskId: block.taskId as Id<"tasks">, newStatus: "done" });
+                                toast("success", "Task marked as Done");
+                              } catch (e) {
+                                toast("error", e instanceof Error ? e.message : "Failed");
+                              }
                             }}
                             className="mt-2 w-full text-center py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] hover:bg-[var(--accent-employee)] hover:text-white transition-colors"
                           >
@@ -1023,7 +1028,12 @@ export default function PlannerPage() {
             <div className="grid grid-cols-2 gap-2.5 mt-3">
               <div>
                 <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-1 block">Start</label>
-                <select value={quickAddTime} onChange={(e) => setQuickAddTime(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]">
+                <select value={quickAddTime} onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setQuickAddTime(v);
+                  // End options only list times after Start; keep End valid.
+                  if (quickAddEndTime <= v) setQuickAddEndTime(Math.min(v + 60, gridEndHour * 60));
+                }} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]">
                   {dynamicTimeOptions.map((t) => <option key={t} value={t}>{formatMin(t)}</option>)}
                 </select>
               </div>

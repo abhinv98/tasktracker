@@ -1,5 +1,6 @@
 import { getAuthUserId } from "./lib/internalAuth";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // ─── Helpers ─────────────────────────────────
@@ -18,6 +19,13 @@ function overlaps(
   return a.startTime < b.endTime && a.endTime > b.startTime;
 }
 
+/** Planners are private: only the owner and admins can read one. */
+async function canReadSchedule(ctx: QueryCtx, authId: Id<"users">, userId: Id<"users">) {
+  if (userId === authId) return true;
+  const me = await ctx.db.get(authId);
+  return me?.role === "admin";
+}
+
 // ─── Queries ─────────────────────────────────
 
 export const getScheduleForDate = query({
@@ -25,6 +33,7 @@ export const getScheduleForDate = query({
   handler: async (ctx, { userId, date }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return [];
+    if (!(await canReadSchedule(ctx, authId, userId))) return [];
     const blocks = await ctx.db
       .query("scheduleBlocks")
       .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", date))
@@ -65,6 +74,7 @@ export const getScheduleForWeek = query({
   handler: async (ctx, { userId, weekStart }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return {};
+    if (!(await canReadSchedule(ctx, authId, userId))) return {};
 
     // Generate 7 dates
     const start = new Date(weekStart + "T00:00:00");
@@ -118,15 +128,17 @@ export const getEmployeesWithSchedule = query({
     const allBlocks = await ctx.db.query("scheduleBlocks").collect();
     const dayBlocks = allBlocks.filter((b) => b.date === date);
 
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    // Blocks are IST wall-clock minutes; the Convex runtime is UTC.
+    const ist = new Date(Date.now() + 330 * 60_000);
+    const currentMinutes = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+    const isToday = date === ist.toISOString().slice(0, 10);
 
     return employees
       .filter((e) => e.role === "employee")
       .map((emp) => {
         const empBlocks = dayBlocks.filter((b) => b.userId === emp._id);
         const totalMinutes = empBlocks.reduce((s, b) => s + (b.endTime - b.startTime), 0);
-        const isBusy = empBlocks.some(
+        const isBusy = isToday && empBlocks.some(
           (b) => b.startTime <= currentMinutes && b.endTime > currentMinutes
         );
         return {
@@ -147,6 +159,7 @@ export const getUnscheduledTasks = query({
   handler: async (ctx, { userId, date }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return [];
+    if (!(await canReadSchedule(ctx, authId, userId))) return [];
 
     // Get user's assigned tasks (non-done, non-archived briefs)
     const tasks = await ctx.db
@@ -195,6 +208,7 @@ export const getDailySummary = query({
   handler: async (ctx, { userId, date }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return null;
+    if (!(await canReadSchedule(ctx, authId, userId))) return null;
 
     const blocks = await ctx.db
       .query("scheduleBlocks")
@@ -247,6 +261,7 @@ export const getDailyNote = query({
   handler: async (ctx, { userId, date }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return null;
+    if (!(await canReadSchedule(ctx, authId, userId))) return null;
     const notes = await ctx.db
       .query("dailyNotes")
       .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", date))
@@ -269,6 +284,7 @@ export const checkConflicts = query({
   handler: async (ctx, { userId, date, startTime, endTime }) => {
     const authId = await getAuthUserId(ctx);
     if (!authId) return [];
+    if (!(await canReadSchedule(ctx, authId, userId))) return [];
 
     const existing = await ctx.db
       .query("scheduleBlocks")

@@ -201,7 +201,9 @@ export const getOversightBoard = query({
           t.deadline != null &&
           t.deadline < now &&
           t.status !== "done" &&
-          t.status !== "review",
+          t.status !== "review" &&
+          brief?.status !== "completed" &&
+          brief?.status !== "archived",
         briefId: t.briefId,
         briefTitle: brief?.title ?? "Unknown",
         briefType: (brief as any)?.briefType ?? null,
@@ -227,13 +229,16 @@ export const getOversightBoard = query({
           scope.employeeIds.has(r.assigneeId as unknown as string)
       );
     }
+    // Dropdown options come from the scope alone, not the user's filters,
+    // so picking a brand doesn't make the other choices vanish.
+    const scopeRows = rows;
 
     if (startDate || endDate) {
       const lo = startDate
-        ? new Date(startDate + "T00:00:00").getTime()
+        ? new Date(startDate + "T00:00:00+05:30").getTime()
         : -Infinity;
       const hi = endDate
-        ? new Date(endDate + "T23:59:59.999").getTime()
+        ? new Date(endDate + "T23:59:59.999+05:30").getTime()
         : Infinity;
       const inRange = (ts: number | null) =>
         ts != null && ts >= lo && ts <= hi;
@@ -271,7 +276,7 @@ export const getOversightBoard = query({
     rows.sort((a, b) => b.createdAt - a.createdAt);
 
     // Filter dropdowns: admins see every option; scoped users only see the
-    // brands / managers / employees that appear in their visible rows so the
+    // brands / managers / employees that appear in their in-scope rows so the
     // dropdowns can't reveal anything outside their scope.
     let filterOptions: {
       brands: { _id: any; name: string }[];
@@ -301,7 +306,7 @@ export const getOversightBoard = query({
       const scopedManagerIds = new Set<string>();
       const scopedAssigneeIds = new Set<string>();
       const scopedTeamIds = new Set<string>();
-      for (const r of rows) {
+      for (const r of scopeRows) {
         if (r.brandId) scopedBrandIds.add(r.brandId as unknown as string);
         if (r.managerId)
           scopedManagerIds.add(r.managerId as unknown as string);

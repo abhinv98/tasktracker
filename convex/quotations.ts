@@ -243,6 +243,13 @@ export const convertQuotationToInvoice = mutation({
     if (q.status !== "approved")
       throw new Error("Only approved quotations can be invoiced");
     if (q.invoiceId) throw new Error("Already invoiced");
+    // A revision supersedes this quote; invoicing both bills the client twice.
+    const siblings = await ctx.db
+      .query("quotations")
+      .withIndex("by_brand", (x) => x.eq("brandId", q.brandId))
+      .collect();
+    if (siblings.some((x) => x.revisionOf === quotationId))
+      throw new Error("A newer revision exists; convert that instead");
 
     const invoiceNumber = await allocateNumber(ctx, "invoice");
     const now = Date.now();

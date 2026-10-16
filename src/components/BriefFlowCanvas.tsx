@@ -453,7 +453,9 @@ function BriefFlowCanvasInner({
             })
           );
           if (positions.length > 0) {
-            updatePositions({ positions });
+            // Only admins / the brief's manager may move nodes; others just
+            // see their drag snap back.
+            updatePositions({ positions }).catch(() => {});
           }
           pendingPositions.current.clear();
         }, 500);

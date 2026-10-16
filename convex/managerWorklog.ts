@@ -42,10 +42,11 @@ async function canSupervise(
   return managerTeams.some((ut: any) => ledTeamIds.has(ut.teamId));
 }
 
+// IST calendar-day bounds; the Convex runtime is UTC.
 function dayBounds(date: string) {
   return {
-    start: new Date(date + "T00:00:00").getTime(),
-    end: new Date(date + "T23:59:59.999").getTime(),
+    start: new Date(date + "T00:00:00+05:30").getTime(),
+    end: new Date(date + "T23:59:59.999+05:30").getTime(),
   };
 }
 
@@ -395,10 +396,9 @@ export const rollWorklogDeadlines = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const todayStart = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
-    const todayEnd = todayStart + 24 * 60 * 60 * 1000 - 1;
-
-    const todayIso = new Date().toISOString().slice(0, 10);
+    // Today in IST (cron runs 05:45 IST), so rolled tasks are due at IST end of day.
+    const todayIso = new Date(now + 330 * 60 * 1000).toISOString().slice(0, 10);
+    const { start: todayStart, end: todayEnd } = dayBounds(todayIso);
 
     const entries = await ctx.db.query("managerWorklog").collect();
     let rolled = 0;
@@ -540,11 +540,8 @@ export const getManagerWorklogDay = query({
     const tasksToday = handled
       .filter((t) => {
         const completedOn =
-          t.completedAt &&
-          new Date(t.completedAt).toISOString().split("T")[0] === date;
-        const deadlineOn =
-          t.deadline &&
-          new Date(t.deadline).toISOString().split("T")[0] === date;
+          t.completedAt && t.completedAt >= start && t.completedAt <= end;
+        const deadlineOn = t.deadline && t.deadline >= start && t.deadline <= end;
         const assignedOn =
           (t.assignedAt ?? (t as any)._creationTime) >= start &&
           (t.assignedAt ?? (t as any)._creationTime) <= end;
@@ -675,8 +672,8 @@ export const getManagerWorklogReport = query({
     const manager = await ctx.db.get(managerId);
     if (!manager) return null;
 
-    const rangeStart = new Date(from + "T00:00:00").getTime();
-    const rangeEnd = new Date(to + "T23:59:59.999").getTime();
+    const rangeStart = dayBounds(from).start;
+    const rangeEnd = dayBounds(to).end;
 
     const allEntries = await ctx.db
       .query("managerWorklog")

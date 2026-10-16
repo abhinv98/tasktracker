@@ -79,7 +79,14 @@ export async function fillCreativeSlotsForTask(
     .query("deliverables")
     .withIndex("by_task", (q) => q.eq("taskId", taskId))
     .collect();
-  const missing = target - existing.length;
+  // Rejected / sent-back versions don't occupy a slot (same rule as walk()).
+  const live = existing.filter(
+    (d) =>
+      d.status !== "rejected" &&
+      d.teamLeadStatus !== "changes_requested" &&
+      d.mainAssigneeStatus !== "changes_requested"
+  );
+  const missing = target - live.length;
   if (missing <= 0) return [];
 
   const now = Date.now();

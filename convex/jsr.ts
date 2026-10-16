@@ -187,7 +187,8 @@ export const getJsrByToken = query({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive) return null;
+    // Intake links share this table but only grant request submission.
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake") return null;
 
     const brand = await ctx.db.get(jsrLink.brandId);
     if (!brand) return null;
@@ -207,7 +208,9 @@ export const getJsrByToken = query({
       brandBriefs.filter((b) => b.briefType === "content_calendar").map((b) => b._id)
     );
     const regularTasks = internalTasks.filter((t) => !ccBriefIds.has(t.briefId));
-    const calendarTasks = internalTasks.filter((t) => ccBriefIds.has(t.briefId));
+    const calendarTasks = internalTasks.filter(
+      (t) => ccBriefIds.has(t.briefId) && !t.parentTaskId && !t.stagedAt
+    );
 
     // Cumulative deadline = latest deadline among ALL internal tasks
     const taskDeadlines = internalTasks
@@ -473,7 +476,7 @@ export const addClientTask = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive)
+    if (!jsrLink || !jsrLink.isActive || !(await ctx.db.get(jsrLink.brandId)))
       throw new Error("Invalid or inactive intake link");
 
     const taskId = await ctx.db.insert("jsrClientTasks", {
@@ -567,7 +570,9 @@ export const reassignClientTask = mutation({
     if (!clientTask) throw new Error("Task not found");
     if (!clientTask.linkedTaskId) throw new Error("Task has not been accepted yet");
 
-    await ctx.db.patch(clientTask.linkedTaskId, { assigneeId, assignedBy: userId });
+    if (await ctx.db.get(clientTask.linkedTaskId)) {
+      await ctx.db.patch(clientTask.linkedTaskId, { assigneeId, assignedBy: userId });
+    }
     // Track the assignment explicitly so the Client Requests queue reflects it
     // regardless of the placeholder assignee used on accept.
     await ctx.db.patch(clientTaskId, { assignedTo: assigneeId });
@@ -604,7 +609,7 @@ export const updateClientTaskDeadline = mutation({
 
     // Sync deadline to linked real task
     const clientTask = await ctx.db.get(taskId);
-    if (clientTask?.linkedTaskId) {
+    if (clientTask?.linkedTaskId && (await ctx.db.get(clientTask.linkedTaskId))) {
       await ctx.db.patch(clientTask.linkedTaskId, { deadline: finalDeadline });
     }
   },
@@ -675,7 +680,13 @@ export const acceptClientRequest = mutation({
 
     const request = await ctx.db.get(requestId);
     if (!request) throw new Error("Request not found");
-    if (request.linkedTaskId) throw new Error("Already accepted");
+    // A request whose task was deleted from its brief can be accepted again.
+    if (request.linkedTaskId && (await ctx.db.get(request.linkedTaskId)))
+      throw new Error("Already accepted");
+    // Every destination creates work under the brand.
+    if ((await ctx.db.get(request.brandId))?.onHold) {
+      throw new Error("This brand is on hold. Resume it from the brand page first.");
+    }
 
     // Client references → links the assignee can open (R2 files via /api/r2-file).
     const referenceLinks = (request.references ?? [])
@@ -954,13 +965,18 @@ export const updateClientTaskStatus = mutation({
       await ctx.db.patch(taskId, { linkedTaskId: realTaskId, linkedBriefId: briefId });
     }
 
+    // The linked task may have been deleted from its brief since.
+    const linkedTask = clientTask.linkedTaskId
+      ? await ctx.db.get(clientTask.linkedTaskId)
+      : null;
+
     // Tag can also be set/updated when re-acting on an already-linked request
-    if (tag?.trim() && clientTask.linkedTaskId) {
+    if (tag?.trim() && clientTask.linkedTaskId && linkedTask) {
       await ctx.db.patch(clientTask.linkedTaskId, { tag: tag.trim() });
     }
 
     // Sync status to linked real task if it exists
-    if (clientTask.linkedTaskId) {
+    if (clientTask.linkedTaskId && linkedTask) {
       const statusMap: Record<string, string> = {
         accepted: "pending",
         in_progress: "in-progress",
@@ -1002,6 +1018,10 @@ export const publishClientTaskStatus = mutation({
       publishedTaskStatus: task.status,
       // Keep the request-level status coherent with what we just published.
       ...(task.status === "done" ? { status: "completed" as const } : {}),
+      // Task reopened after the request was completed.
+      ...(task.status !== "done" && clientTask.status === "completed"
+        ? { status: "in_progress" as const }
+        : {}),
       ...(task.status === "in-progress" && clientTask.status === "accepted"
         ? { status: "in_progress" as const }
         : {}),
@@ -1072,7 +1092,7 @@ export const sendClientMessage = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive)
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake")
       throw new Error("Invalid or inactive JSR link");
 
     await ctx.db.insert("jsrMessages", {
@@ -1154,7 +1174,7 @@ export const addJsrRemark = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive)
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake")
       throw new Error("Invalid or inactive JSR link");
 
     await ctx.db.insert("jsrRemarks", {
@@ -1267,7 +1287,8 @@ export const clientApproveDeliverable = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake")
+      throw new Error("Invalid or inactive JSR link");
 
     await applyClientApproval(ctx, {
       deliverableId,
@@ -1291,7 +1312,8 @@ export const clientRequestChanges = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake")
+      throw new Error("Invalid or inactive JSR link");
 
     await applyClientChangesRequested(ctx, {
       deliverableId,
@@ -1315,7 +1337,8 @@ export const clientDenyDeliverable = mutation({
       .withIndex("by_token", (q) => q.eq("token", token))
       .collect();
     const jsrLink = jsrLinks[0];
-    if (!jsrLink || !jsrLink.isActive) throw new Error("Invalid or inactive JSR link");
+    if (!jsrLink || !jsrLink.isActive || jsrLink.linkType === "intake")
+      throw new Error("Invalid or inactive JSR link");
 
     await applyClientDenial(ctx, {
       deliverableId,
@@ -1537,25 +1560,30 @@ export const listPendingClientRequests = query({
     const relevant = all.filter(
       (t) =>
         t.status !== "declined" &&
-        t.status !== "completed" &&
         (visible === null || visible.has(t.brandId))
     );
 
     const users = await ctx.db.query("users").collect();
     const result = [];
     for (const t of relevant) {
-      const brand = await ctx.db.get(t.brandId);
-      let assigneeName: string | null = null;
-      if (t.assignedTo) {
-        const a = users.find((u) => u._id === t.assignedTo);
-        assigneeName = a?.name ?? a?.email ?? null;
-      }
       // Live internal status of the linked task, so the panel can show when
       // it has drifted from what the client currently sees (publishedTaskStatus).
       let liveTaskStatus: string | null = null;
       if (t.linkedTaskId) {
         const task = await ctx.db.get(t.linkedTaskId);
         liveTaskStatus = task?.status ?? null;
+      }
+      // Completed requests drop off unless the task was reopened since.
+      if (
+        t.status === "completed" &&
+        (liveTaskStatus === null || liveTaskStatus === "done")
+      )
+        continue;
+      const brand = await ctx.db.get(t.brandId);
+      let assigneeName: string | null = null;
+      if (t.assignedTo) {
+        const a = users.find((u) => u._id === t.assignedTo);
+        assigneeName = a?.name ?? a?.email ?? null;
       }
       result.push({
         ...t,

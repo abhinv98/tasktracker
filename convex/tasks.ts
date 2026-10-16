@@ -1,6 +1,6 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { canViewBrief } from "./lib/guards";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
@@ -406,6 +406,13 @@ export const createTask = mutation({
       await recomputeBriefDeadline(ctx, args.briefId);
     }
 
+    // A new open task reopens a completed brief (only then: a draft brief
+    // must not be auto-activated just because tasks were added).
+    if (brief.status === "completed") {
+      await syncSingleTaskBriefStatus(ctx, args.briefId);
+      await syncBriefStatusFromTasks(ctx, args.briefId);
+    }
+
     return taskId;
   },
 });
@@ -484,6 +491,10 @@ export const updateTask = mutation({
       updates.assigneeId = fields.assigneeId;
       updates.assignedAt = Date.now();
       updates.status = "pending";
+      // The new assignee starts fresh: a reopened task must not keep counting
+      // as completed / submitted in worklogs and review timers.
+      updates.completedAt = undefined;
+      updates.submittedForReviewAt = undefined;
       await ctx.db.insert("notifications", {
         recipientId: task.assigneeId,
         type: "task_status_changed",
@@ -510,6 +521,13 @@ export const updateTask = mutation({
 
     if (Object.keys(updates).length > 0) {
       await ctx.db.patch(taskId, updates);
+
+      // Reassignment resets the task to pending; a completed brief reopens.
+      // Each helper no-ops on the brief type it doesn't own.
+      if ("status" in updates) {
+        await syncSingleTaskBriefStatus(ctx, task.briefId);
+        await syncBriefStatusFromTasks(ctx, task.briefId);
+      }
 
       // Recompute the brief's "ultimate" deadline whenever a task's deadline
       // moves. Master briefs roll up to the latest task deadline ("last node
@@ -581,6 +599,15 @@ export const updateTask = mutation({
   },
 });
 
+/** Canvas layout is edited by the same people who create tasks on it. */
+async function assertCanMoveFlowNode(ctx: MutationCtx, userId: Id<"users">, taskId: Id<"tasks">) {
+  const user = await ctx.db.get(userId);
+  if (user?.role === "admin") return;
+  const task = await ctx.db.get(taskId);
+  const brief = task ? await ctx.db.get(task.briefId) : null;
+  if (brief?.assignedManagerId !== userId) throw new Error("Not authorized");
+}
+
 export const updateTaskFlowPosition = mutation({
   args: {
     taskId: v.id("tasks"),
@@ -590,6 +617,7 @@ export const updateTaskFlowPosition = mutation({
   handler: async (ctx, { taskId, flowX, flowY }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    await assertCanMoveFlowNode(ctx, userId, taskId);
     await ctx.db.patch(taskId, { flowX, flowY });
   },
 });
@@ -606,6 +634,7 @@ export const updateTaskFlowPositions = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     for (const { taskId, flowX, flowY } of positions) {
+      await assertCanMoveFlowNode(ctx, userId, taskId);
       await ctx.db.patch(taskId, { flowX, flowY });
     }
   },
@@ -650,7 +679,8 @@ export const updateTaskStatus = mutation({
 
     await ctx.db.patch(taskId, {
       status: newStatus,
-      ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
+      // Reopening a done task clears completedAt so worklogs stop counting it.
+      ...(newStatus === "done" ? { completedAt: Date.now() } : task.completedAt ? { completedAt: undefined } : {}),
       ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
     });
 
@@ -934,6 +964,17 @@ export const reassignTask = mutation({
         throw new Error("This person is already the main assignee");
       }
     }
+    if (!task.isHelper) {
+      // Reverse case: the main task can't go to one of its own open helpers,
+      // or that helper's pending deliverable has no one left to review it.
+      const kids = await ctx.db
+        .query("tasks")
+        .withIndex("by_parent", (q) => q.eq("parentTaskId", taskId))
+        .collect();
+      if (kids.some((k) => k.isHelper && k.assigneeId === newAssigneeId && k.status !== "done")) {
+        throw new Error("This person is a helper on this task. Remove them as helper first.");
+      }
+    }
 
     const oldAssignee = task.assigneeId;
     await ctx.db.patch(taskId, { assigneeId: newAssigneeId });
@@ -1041,10 +1082,13 @@ export const bulkUpdateStatus = mutation({
       if (newStatus === "done" && user?.role !== "admin") {
         continue;
       }
+      // Same on-hold freeze as updateTaskStatus.
+      if (brief?.status === "on_hold" && user?.role !== "admin") continue;
 
       await ctx.db.patch(taskId, {
         status: newStatus,
-        ...(newStatus === "done" ? { completedAt: Date.now() } : {}),
+        ...(newStatus === "done" ? { completedAt: Date.now() } : task.completedAt ? { completedAt: undefined } : {}),
+        ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
       });
 
       // Mirror updateTaskStatus: propagate "done" down to all descendants
@@ -1292,6 +1336,11 @@ export const createEmployeeTask = mutation({
       source: "employee_task",
     });
 
+    if (brief.status === "completed") {
+      await syncSingleTaskBriefStatus(ctx, args.briefId);
+      await syncBriefStatusFromTasks(ctx, args.briefId);
+    }
+
     await ctx.db.insert("notifications", {
       recipientId: args.assignorId,
       type: "task_assigned",
@@ -1352,6 +1401,8 @@ export const getOverdueHaltStatus = query({
         t.deadline < now &&
         t.status !== "done" &&
         t.status !== "review" &&
+        // Paused work can't be acted on (updateTaskStatus rejects on-hold briefs).
+        t.status !== "on-hold" &&
         t.overdueAcknowledged !== true
     );
 
@@ -1370,7 +1421,7 @@ export const getOverdueHaltStatus = query({
     const filtered = overdueTasks.filter((task, i) => {
       const brief = briefs[i];
       if (!brief) return false;
-      if (brief.status === "completed" || brief.status === "archived") return false;
+      if (brief.status === "completed" || brief.status === "archived" || brief.status === "on_hold") return false;
       if (brief.brandId && myManagedBrandIds.has(brief.brandId)) return false;
       return true;
     });
@@ -1473,7 +1524,7 @@ export const extendTaskDeadline = mutation({
       recipientId: task.assigneeId,
       type: "deadline_extended",
       title: "Deadline extended",
-      message: `The deadline for "${task.title}" has been extended to ${new Date(newDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata" })} ${new Date(newDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })}`,
+      message: `The deadline for "${task.title}" has been extended to ${new Date(normalizedNewDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata" })} ${new Date(normalizedNewDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" })}`,
       briefId: task.briefId,
       taskId,
       triggeredBy: userId,
@@ -1527,6 +1578,7 @@ export const listOverdueTasksForManager = query({
           // Submitted-for-review tasks are out of the assignee's hands; don't
           // flag the manager either — it isn't the assignee's overdue work.
           t.status !== "review" &&
+          t.status !== "on-hold" &&
           t.overdueAcknowledged !== true &&
           myBriefIds.has(t.briefId)
         )
@@ -1534,7 +1586,7 @@ export const listOverdueTasksForManager = query({
         return false;
       }
       const brief = briefs.find((b) => b._id === t.briefId);
-      if (brief?.status === "completed" || brief?.status === "archived") return false;
+      if (brief?.status === "completed" || brief?.status === "archived" || brief?.status === "on_hold") return false;
       return true;
     });
 
@@ -1669,7 +1721,17 @@ export const contactManagerForOverdue = mutation({
     const user = await ctx.db.get(userId);
     const brief = await ctx.db.get(task.briefId);
 
-    const managerId = brief?.assignedManagerId;
+    // Fall back to the brand's manager when the brief has none assigned.
+    const managerId =
+      brief?.assignedManagerId ??
+      (brief?.brandId
+        ? (
+            await ctx.db
+              .query("brandManagers")
+              .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
+              .first()
+          )?.managerId
+        : undefined);
     if (!managerId) throw new Error("No brand manager found for this task");
 
     await ctx.db.patch(taskId, { overdueContacted: true, overdueContactDenied: false });

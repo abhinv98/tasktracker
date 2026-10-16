@@ -487,6 +487,8 @@ function ChatView({
   const [optimisticMessages, setOptimisticMessages] = useState<
     { role: "user" | "assistant"; content: string; createdAt: number }[]
   >([]);
+  // Set when the last send threw, so its error bubble survives until the next send.
+  const [sendFailed, setSendFailed] = useState(false);
 
   const convoMessages = useQuery(api.chat.getConversationMessages, { conversationId });
   const sendMessageAction = useAction(api.aiAction.sendMessage);
@@ -514,11 +516,11 @@ function ChatView({
           m.content === lastOptimistic.content &&
           Math.abs(m.createdAt - lastOptimistic.createdAt) < 5000
       );
-      if (serverHasIt || !isLoading) {
+      if (serverHasIt || (!isLoading && !sendFailed)) {
         setOptimisticMessages([]);
       }
     }
-  }, [convoMessages, optimisticMessages, isLoading]);
+  }, [convoMessages, optimisticMessages, isLoading, sendFailed]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -537,10 +539,11 @@ function ChatView({
 
     const userMsg = trimmed + (pendingFile ? ` [File: ${pendingFile.name}]` : "");
 
-    setOptimisticMessages((prev) => [
-      ...prev,
+    // Replaces any leftover failed message and its error bubble.
+    setOptimisticMessages([
       { role: "user", content: userMsg, createdAt: Date.now() },
     ]);
+    setSendFailed(false);
 
     setMessage("");
     setIsLoading(true);
@@ -561,6 +564,7 @@ function ChatView({
       await sendMessageAction(sendArgs);
     } catch (error) {
       console.error("Chat error:", error);
+      setSendFailed(true);
       setOptimisticMessages((prev) => [
         ...prev,
         {

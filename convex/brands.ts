@@ -171,12 +171,9 @@ export const getBrand = query({
       managers,
       briefs: brandBriefs.map((b) => {
         const briefTasks = tasks.filter((t) => t.briefId === b._id);
-        // Content-calendar entries are stored as a parent task + Copy/Design
-        // children; count parents only so each entry registers as one task.
-        const countable =
-          b.briefType === "content_calendar"
-            ? briefTasks.filter((t) => t.parentTaskId === undefined)
-            : briefTasks;
+        // Count top-level tasks only: calendar Copy/Design children and
+        // helper sub-tasks are part of their parent's work.
+        const countable = briefTasks.filter((t) => t.parentTaskId === undefined);
         const doneCount = countable.filter(
           (t) => t.status === "done"
         ).length;

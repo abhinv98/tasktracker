@@ -1,6 +1,7 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus } from "./syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./syncBriefStatus";
+import { cascadeDoneToChildren } from "./cascadeTaskStatus";
 
 /**
  * Shared bodies for the client deliverable-review actions (approve / request
@@ -11,10 +12,18 @@ import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus } from "./syncBrief
 
 async function getPendingDeliverable(
   ctx: MutationCtx,
-  deliverableId: Id<"deliverables">
+  deliverableId: Id<"deliverables">,
+  brandId: Id<"brands">
 ): Promise<Doc<"deliverables">> {
   const deliverable = await ctx.db.get(deliverableId);
   if (!deliverable || deliverable.clientStatus !== "pending_client") {
+    throw new Error("Deliverable not pending client review");
+  }
+  // The token-gated jsr.ts callers only know the link's brand; reject a
+  // deliverable that belongs to another brand.
+  const task = await ctx.db.get(deliverable.taskId);
+  const brief = task ? await ctx.db.get(task.briefId) : null;
+  if (!brief || brief.brandId !== brandId) {
     throw new Error("Deliverable not pending client review");
   }
   return deliverable;
@@ -37,7 +46,7 @@ export async function applyClientApproval(
   }
 ): Promise<Doc<"tasks"> | null> {
   const { deliverableId, brandId, note, reviewerName } = args;
-  const deliverable = await getPendingDeliverable(ctx, deliverableId);
+  const deliverable = await getPendingDeliverable(ctx, deliverableId, brandId);
 
   await ctx.db.patch(deliverableId, {
     clientStatus: "client_approved",
@@ -50,7 +59,11 @@ export async function applyClientApproval(
 
   await ctx.db.patch(task._id, { status: "done", completedAt: Date.now() });
   await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
-  await syncMultiTaskBriefStatus(ctx, task.briefId, task._id);
+  // Client-facing tasks skip the cascade in finalizeApprovedDeliverable, so
+  // close their sub-tasks here; then recompute (not just "all done?") so a
+  // brief parked at "review" moves on.
+  await cascadeDoneToChildren(ctx, task._id, null, "client_approved");
+  await syncBriefStatusFromTasks(ctx, task.briefId);
 
   const brief = await ctx.db.get(task.briefId);
   const brand = await ctx.db.get(brandId);
@@ -91,7 +104,7 @@ export async function applyClientChangesRequested(
   }
 ): Promise<Doc<"tasks"> | null> {
   const { deliverableId, brandId, note } = args;
-  const deliverable = await getPendingDeliverable(ctx, deliverableId);
+  const deliverable = await getPendingDeliverable(ctx, deliverableId, brandId);
 
   // Reset the whole internal review pipeline so the deliverable goes back
   // through team-lead/manager review after rework.
@@ -117,6 +130,8 @@ export async function applyClientChangesRequested(
   if (!task) return null;
 
   await ctx.db.patch(task._id, { status: "in-progress" });
+  await syncSingleTaskBriefStatus(ctx, task.briefId);
+  await syncBriefStatusFromTasks(ctx, task.briefId);
 
   const brandManagers = await getBrandManagers(ctx, brandId);
   for (const bm of brandManagers) {
@@ -166,7 +181,7 @@ export async function applyClientDenial(
   }
 ): Promise<Doc<"tasks"> | null> {
   const { deliverableId, brandId, note } = args;
-  const deliverable = await getPendingDeliverable(ctx, deliverableId);
+  const deliverable = await getPendingDeliverable(ctx, deliverableId, brandId);
 
   await ctx.db.patch(deliverableId, {
     clientStatus: "client_denied",

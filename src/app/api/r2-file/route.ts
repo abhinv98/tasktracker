@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
   if (!fileKey) {
     return NextResponse.json({ error: "key parameter required" }, { status: 400 });
   }
+  // Only sign keys our upload route creates; anything else in the bucket stays private.
+  // No session check: client-portal and intake viewers open these links without logging in.
+  if (!fileKey.startsWith("deliverables/")) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   try {
     const command = new GetObjectCommand({

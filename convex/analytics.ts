@@ -31,10 +31,15 @@ export const getDashboardAnalytics = query({
 
     const doneTasks = tasks.filter((t) => t.status === "done");
     // "review" tasks are already submitted and awaiting approval — they
-    // shouldn't count as overdue from the assignee's perspective.
+    // shouldn't count as overdue from the assignee's perspective. Tasks in
+    // completed/archived briefs are closed too.
+    const closedBriefIds = new Set(
+      briefs.filter((b) => b.status === "completed" || b.status === "archived").map((b) => b._id)
+    );
     const overdueTasks = tasks.filter(
       (t) =>
         t.deadline &&
+        !closedBriefIds.has(t.briefId) &&
         t.deadline < Date.now() &&
         t.status !== "done" &&
         t.status !== "review"

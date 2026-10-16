@@ -219,10 +219,10 @@ export const updateInvoice = mutation({
       )
         throw new Error("Finalized invoices can't change line items");
       const patch: Record<string, unknown> = { updatedAt: Date.now() };
-      if (updates.lineItems) {
+      if (updates.lineItems || updates.gstPercent !== undefined) {
         const gst = updates.gstPercent ?? inv.gstPercent ?? 0;
         const { subtotal, taxAmount, total, items } = computeTotals(
-          updates.lineItems,
+          updates.lineItems ?? inv.lineItems ?? [],
           gst
         );
         Object.assign(patch, {
@@ -245,7 +245,10 @@ export const updateInvoice = mutation({
     const patch: Record<string, unknown> = { updatedAt: Date.now() };
     if (updates.invoiceNumber !== undefined)
       patch.invoiceNumber = updates.invoiceNumber.trim();
-    if (updates.total !== undefined) patch.total = updates.total;
+    if (updates.total !== undefined) {
+      if (!(updates.total > 0)) throw new Error("Invoice amount required");
+      patch.total = updates.total;
+    }
     if (updates.issueDate !== undefined) patch.issueDate = updates.issueDate;
     if (updates.dueDate !== undefined) patch.dueDate = updates.dueDate;
     if (updates.notes !== undefined) patch.notes = updates.notes;

@@ -172,6 +172,8 @@ export function CommentThread({
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevLengthRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Text is cleared only after the await, so a second Enter would post twice.
+  const submittingRef = useRef(false);
   const mentionRef = useRef<HTMLDivElement>(null);
   const targetRef = useRef<HTMLDivElement>(null);
 
@@ -265,6 +267,8 @@ export function CommentThread({
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault();
     if (!text.trim() && !pendingFile) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setShowMentions(false);
 
     try {
@@ -299,6 +303,8 @@ export function CommentThread({
       }
     } catch {
       setUploading(false);
+    } finally {
+      submittingRef.current = false;
     }
   }
 

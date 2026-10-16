@@ -102,6 +102,41 @@ async function findTeamLeadForUser(ctx: any, userId: string) {
   return team ? { teamId: team._id, leadId: team.leadId, teamName: team.name } : null;
 }
 
+// ─── Helper: does leadId lead ANY of memberId's teams? ─────
+// findTeamLeadForUser only sees the member's first team; the TL queue lists
+// members of every team the caller leads, so the TL gates check all of them.
+async function isTeamLeadOf(ctx: any, leadId: string, memberId: string) {
+  const uts = await ctx.db
+    .query("userTeams")
+    .withIndex("by_user", (q: any) => q.eq("userId", memberId))
+    .collect();
+  for (const ut of uts) {
+    const t = await ctx.db.get(ut.teamId);
+    if (t?.leadId === leadId) return true;
+  }
+  return false;
+}
+
+// ─── Helper: who may submit a deliverable on a task ─────
+// The assignee, an admin, or a brand manager of the brief's brand (the
+// calendar Copy tab lets BMs submit copy they wrote). Closed tasks are
+// reopened through Request Changes, never by a fresh submission.
+async function assertCanSubmit(ctx: any, userId: Id<"users">, task: any, brief: any) {
+  if (task.status === "done") throw new Error("This task is already done");
+  if (task.assigneeId === userId) return;
+  const me = await ctx.db.get(userId);
+  if (me?.role === "admin") return;
+  if (brief?.brandId && (await isBrandManager(ctx, userId, brief.brandId))) return;
+  throw new Error("Only the task's assignee can submit a deliverable");
+}
+
+// ─── Helper: re-derive brief status after a task status change ─────
+// Both calls are no-ops for the other brief type.
+async function resyncBriefStatus(ctx: any, briefId: Id<"briefs">) {
+  await syncSingleTaskBriefStatus(ctx, briefId);
+  await syncBriefStatusFromTasks(ctx, briefId);
+}
+
 // ─── Helper: move a main-assignee-approved helper deliverable to the TL gate ──
 // Called by mainAssigneeApprove so helper work never stalls between gates.
 // Clears the TL gate itself when there is no reviewing lead (no team, or the
@@ -166,6 +201,196 @@ async function routeHelperDeliverableToTeamLead(
       read: false,
       createdAt: now,
     });
+  }
+}
+
+// ─── Helper: content-calendar auto-handoff after a BM-level approval ──
+// Shared by every path that lands a deliverable in "approved" so a normal
+// BM approval of a calendar Copy task hands off to the next team too.
+async function autoHandoffIfNeeded(
+  ctx: any,
+  task: any,
+  brief: any,
+  deliverable: any,
+  userId: Id<"users">,
+  now: number
+) {
+  // When a content calendar task's deliverable is approved and the task
+  // has handoffTargetTeamId set, the approved work flows to the NEXT
+  // team in the entry's sequential chain. If that team already has a
+  // linked task on the same entry (created via "+ Add team task"), the
+  // deliverable is attached to it as an upstream resource; only when no
+  // such task exists is a new handoff task created.
+  if (
+    brief?.briefType === "content_calendar" &&
+    task.handoffTargetTeamId &&
+    !task.clientFacing
+  ) {
+    const targetTeam = await ctx.db.get(task.handoffTargetTeamId);
+    if (targetTeam) {
+      // Find existing handoff task or create new one
+      const existingHandoffs = await ctx.db
+        .query("deliverableHandoffs")
+        .withIndex("by_source_task", (q: any) =>
+          q.eq("sourceTaskId", task._id)
+        )
+        .collect();
+      const alreadyHandedOff = existingHandoffs.some(
+        (h: any) => h.targetTeamId === task.handoffTargetTeamId
+      );
+
+      if (!alreadyHandedOff) {
+        // Build note with creative copy + caption
+        const handoffNote = [
+          task.creativeCopy ? `Creative Copy:\n${task.creativeCopy}` : "",
+          task.caption ? `Caption:\n${task.caption}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+
+        // Build reference links from deliverable
+        const referenceLinks: string[] = [];
+        if (deliverable.link) referenceLinks.push(deliverable.link);
+        if (deliverable.fileIds) {
+          for (const fid of deliverable.fileIds) {
+            const url = await ctx.storage.getUrl(fid);
+            if (url) referenceLinks.push(url);
+          }
+        }
+        for (const key of deliverable.r2FileKeys ?? []) {
+          referenceLinks.push(`/api/r2-file?key=${encodeURIComponent(key)}`);
+        }
+
+        // Look for the next team's EXISTING task on this entry: a
+        // sibling (or child, when the source is the parent entry) that
+        // belongs to the target team.
+        const entryRootId = task.parentTaskId ?? task._id;
+        const siblings = await ctx.db
+          .query("tasks")
+          .withIndex("by_parent", (q: any) =>
+            q.eq("parentTaskId", entryRootId)
+          )
+          .collect();
+        const allTeams = await ctx.db.query("teams").collect();
+        let existingTarget: any = null;
+        for (const sib of siblings.sort(
+          (a: any, b: any) => a._creationTime - b._creationTime
+        )) {
+          if (sib._id === task._id) continue;
+          const sibTeam = await resolveCalendarTaskTeam(ctx, sib, allTeams);
+          if (sibTeam === task.handoffTargetTeamId) {
+            existingTarget = sib;
+            break;
+          }
+        }
+
+        let handoffTaskId: Id<"tasks">;
+        let notifyUserId: Id<"users">;
+
+        if (existingTarget) {
+          // Feed the existing next-in-line task: merge the approved
+          // deliverable's links + upstream copy/caption onto it.
+          const mergedLinks = Array.from(
+            new Set([
+              ...(existingTarget.referenceLinks ?? []),
+              ...referenceLinks,
+            ])
+          );
+          await ctx.db.patch(existingTarget._id, {
+            handoffSourceTaskId: task._id,
+            ...(mergedLinks.length > 0
+              ? { referenceLinks: mergedLinks }
+              : {}),
+            ...(!existingTarget.creativeCopy && task.creativeCopy
+              ? { creativeCopy: task.creativeCopy }
+              : {}),
+            ...(!existingTarget.caption && task.caption
+              ? { caption: task.caption }
+              : {}),
+          });
+          handoffTaskId = existingTarget._id;
+          notifyUserId = existingTarget.assigneeId;
+        } else {
+          // No task for that team yet — create one, linked to the entry
+          // so it shows up as a team card on the calendar sidebar.
+          const targetAssigneeId = targetTeam.leadId;
+          const existingTasks = await ctx.db
+            .query("tasks")
+            .withIndex("by_assignee_sort", (q: any) =>
+              q.eq("assigneeId", targetAssigneeId)
+            )
+            .collect();
+          const maxOrder = existingTasks.length
+            ? Math.max(...existingTasks.map((t: any) => t.sortOrder))
+            : 0;
+
+          handoffTaskId = await ctx.db.insert("tasks", {
+            briefId: task.briefId,
+            title: `[${targetTeam.name}] ${task.title.replace(/^\[[^\]]+\]\s*/, "")}`,
+            description:
+              handoffNote || `${targetTeam.name} handoff for: ${task.title}`,
+            assigneeId: targetAssigneeId,
+            assignedBy: userId,
+            status: "pending",
+            sortOrder: maxOrder + 1000,
+            parentTaskId: entryRootId,
+            creativeCopy: task.creativeCopy,
+            caption: task.caption,
+            handoffSourceTaskId: task._id,
+            ...(task.platform ? { platform: task.platform } : {}),
+            ...(task.contentType ? { contentType: task.contentType } : {}),
+            ...(task.postDate ? { postDate: task.postDate } : {}),
+            ...(task.deadline ? { deadline: task.deadline } : {}),
+            ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
+          });
+          notifyUserId = targetAssigneeId;
+        }
+
+        // Record the handoff
+        await ctx.db.insert("deliverableHandoffs", {
+          sourceDeliverableId: deliverable._id,
+          sourceTaskId: task._id,
+          sourceBriefId: task.briefId,
+          targetTaskId: handoffTaskId,
+          targetBriefId: task.briefId,
+          targetTeamId: task.handoffTargetTeamId,
+          handedOffBy: userId,
+          handedOffAt: now,
+          note: handoffNote || undefined,
+        });
+
+        // Ensure target team is linked to brief
+        const existingBriefTeams = await ctx.db
+          .query("briefTeams")
+          .withIndex("by_brief", (q: any) =>
+            q.eq("briefId", task.briefId)
+          )
+          .collect();
+        if (
+          !existingBriefTeams.some(
+            (bt: any) => bt.teamId === task.handoffTargetTeamId
+          )
+        ) {
+          await ctx.db.insert("briefTeams", {
+            briefId: task.briefId,
+            teamId: task.handoffTargetTeamId!,
+          });
+        }
+
+        // Notify the next team's assignee
+        await ctx.db.insert("notifications", {
+          recipientId: notifyUserId,
+          type: "task_assigned",
+          title: `${targetTeam.name} handoff received`,
+          message: `Approved work for "${task.title}" has been passed to your task with its deliverable attached.`,
+          briefId: task.briefId,
+          taskId: handoffTaskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: now,
+        });
+      }
+    }
   }
 }
 
@@ -896,6 +1121,7 @@ export const submitDeliverable = mutation({
     if (brief?.status === "on_hold") {
       throw new Error("This brief is on hold. You cannot submit work until it is resumed.");
     }
+    await assertCanSubmit(ctx, userId, task, brief);
     const brandId = brief?.brandId ?? null;
     const submitterIsMainAssignee = isSubTask && parentTask?.assigneeId === userId;
     const teamInfo = await findTeamLeadForUser(ctx, userId);
@@ -980,6 +1206,9 @@ export const submitDeliverable = mutation({
     // Run the shared post-approval cascade if we just landed in approved state.
     if (fullAutoApprove) {
       await finalizeApprovedDeliverable(ctx, taskId, task.briefId, userId, now);
+      await autoHandoffIfNeeded(ctx, task, brief, await ctx.db.get(deliverableId), userId, now);
+    } else {
+      await resyncBriefStatus(ctx, task.briefId);
     }
 
     const user = await ctx.db.get(userId);
@@ -1161,8 +1390,7 @@ export const teamLeadApprove = mutation({
       throw new Error("You cannot review your own deliverable");
     }
 
-    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    if (!teamInfo || teamInfo.leadId !== userId) {
+    if (!(await isTeamLeadOf(ctx, userId, deliverable.submittedBy))) {
       throw new Error("Only the team lead can approve this deliverable");
     }
 
@@ -1263,8 +1491,7 @@ export const teamLeadReject = mutation({
       throw new Error("You cannot review your own deliverable");
     }
 
-    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    if (!teamInfo || teamInfo.leadId !== userId) {
+    if (!(await isTeamLeadOf(ctx, userId, deliverable.submittedBy))) {
       throw new Error("Only the team lead can reject this deliverable");
     }
 
@@ -1284,6 +1511,7 @@ export const teamLeadReject = mutation({
         updates.status = "in-progress";
       }
       await ctx.db.patch(deliverable.taskId, updates);
+      await resyncBriefStatus(ctx, task.briefId);
     }
 
     const user = await ctx.db.get(userId);
@@ -1323,8 +1551,7 @@ export const passToManager = mutation({
     const task = await ctx.db.get(deliverable.taskId);
     const brief = task ? await ctx.db.get(task.briefId) : null;
 
-    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    const isTeamLead = !!(teamInfo && teamInfo.leadId === userId);
+    const isTeamLead = await isTeamLeadOf(ctx, userId, deliverable.submittedBy);
     const isBm =
       brief?.brandId && (await isBrandManager(ctx, userId, brief.brandId));
 
@@ -1386,6 +1613,7 @@ export const submitDeliverableDirectToManager = mutation({
 
     const brief = await ctx.db.get(task.briefId);
     if (!brief) throw new Error("Brief not found");
+    await assertCanSubmit(ctx, userId, task, brief);
 
     // Create deliverable with TL auto-approved and already passed to manager
     const deliverableId = await ctx.db.insert("deliverables", {
@@ -1414,6 +1642,22 @@ export const submitDeliverableDirectToManager = mutation({
         ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
       });
     }
+
+    // A BM can't approve their own work, so clear the BM gate the same way
+    // submitDeliverable does (otherwise a sole BM's submission is stuck).
+    if (brief.brandId && (await isExplicitBrandManager(ctx, userId, brief.brandId))) {
+      const now = Date.now();
+      await ctx.db.patch(deliverableId, {
+        status: "approved",
+        reviewedBy: userId,
+        reviewNote: "Auto-cleared: submitter is a brand manager",
+        reviewedAt: now,
+      });
+      await finalizeApprovedDeliverable(ctx, taskId, task.briefId, userId, now);
+      await autoHandoffIfNeeded(ctx, task, brief, await ctx.db.get(deliverableId), userId, now);
+      return deliverableId;
+    }
+    await resyncBriefStatus(ctx, task.briefId);
 
     // Notify brand manager(s)
     const user = await ctx.db.get(userId);
@@ -1472,6 +1716,18 @@ export const submitDeliverableDirectToAssignor = mutation({
     if (task.assignedBy === userId) {
       throw new Error("You are the assignor of this task. Submit through the normal flow.");
     }
+    if (task.isHelper) throw new Error("Helpers submit to the main assignee. Use the normal flow.");
+    const brief = await ctx.db.get(task.briefId);
+    await assertCanSubmit(ctx, userId, task, brief);
+    // The assignor gives final approval via approveDeliverable, which needs a
+    // BM of the brand (or an admin when the brief has no brand).
+    const assignor = await ctx.db.get(task.assignedBy);
+    const assignorCanApprove = brief?.brandId
+      ? await isBrandManager(ctx, task.assignedBy, brief.brandId)
+      : assignor?.role === "admin";
+    if (!assignorCanApprove) {
+      throw new Error("The assignor can't give final approval on this task. Use the normal flow.");
+    }
 
     const deliverableId = await ctx.db.insert("deliverables", {
       taskId,
@@ -1498,6 +1754,7 @@ export const submitDeliverableDirectToAssignor = mutation({
         ...(!task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
       });
     }
+    await resyncBriefStatus(ctx, task.briefId);
 
     const submitter = await ctx.db.get(userId);
     await ctx.db.insert("notifications", {
@@ -1532,8 +1789,7 @@ export const teamLeadAndManagerApprove = mutation({
       throw new Error("You cannot review your own deliverable");
     }
 
-    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    if (!teamInfo || teamInfo.leadId !== userId) {
+    if (!(await isTeamLeadOf(ctx, userId, deliverable.submittedBy))) {
       throw new Error("Only the team lead can approve this deliverable");
     }
 
@@ -1595,6 +1851,8 @@ export const teamLeadAndManagerApprove = mutation({
         }),
         timestamp: now,
       });
+
+      await autoHandoffIfNeeded(ctx, task, brief, deliverable, userId, now);
     }
   },
 });
@@ -1675,181 +1933,7 @@ export const managerApproveFromTeamLead = mutation({
         timestamp: now,
       });
 
-      // ── Auto-handoff for content calendar tasks ──────────
-      // When a content calendar task's deliverable is approved and the task
-      // has handoffTargetTeamId set, the approved work flows to the NEXT
-      // team in the entry's sequential chain. If that team already has a
-      // linked task on the same entry (created via "+ Add team task"), the
-      // deliverable is attached to it as an upstream resource; only when no
-      // such task exists is a new handoff task created.
-      if (
-        brief?.briefType === "content_calendar" &&
-        task.handoffTargetTeamId &&
-        !task.clientFacing
-      ) {
-        const targetTeam = await ctx.db.get(task.handoffTargetTeamId);
-        if (targetTeam) {
-          // Find existing handoff task or create new one
-          const existingHandoffs = await ctx.db
-            .query("deliverableHandoffs")
-            .withIndex("by_source_task", (q: any) =>
-              q.eq("sourceTaskId", task._id)
-            )
-            .collect();
-          const alreadyHandedOff = existingHandoffs.some(
-            (h: any) => h.targetTeamId === task.handoffTargetTeamId
-          );
-
-          if (!alreadyHandedOff) {
-            // Build note with creative copy + caption
-            const handoffNote = [
-              task.creativeCopy ? `Creative Copy:\n${task.creativeCopy}` : "",
-              task.caption ? `Caption:\n${task.caption}` : "",
-            ]
-              .filter(Boolean)
-              .join("\n\n");
-
-            // Build reference links from deliverable
-            const referenceLinks: string[] = [];
-            if (deliverable.link) referenceLinks.push(deliverable.link);
-            if (deliverable.fileIds) {
-              for (const fid of deliverable.fileIds) {
-                const url = await ctx.storage.getUrl(fid);
-                if (url) referenceLinks.push(url);
-              }
-            }
-
-            // Look for the next team's EXISTING task on this entry: a
-            // sibling (or child, when the source is the parent entry) that
-            // belongs to the target team.
-            const entryRootId = task.parentTaskId ?? task._id;
-            const siblings = await ctx.db
-              .query("tasks")
-              .withIndex("by_parent", (q: any) =>
-                q.eq("parentTaskId", entryRootId)
-              )
-              .collect();
-            const allTeams = await ctx.db.query("teams").collect();
-            let existingTarget: any = null;
-            for (const sib of siblings.sort(
-              (a: any, b: any) => a._creationTime - b._creationTime
-            )) {
-              if (sib._id === task._id) continue;
-              const sibTeam = await resolveCalendarTaskTeam(ctx, sib, allTeams);
-              if (sibTeam === task.handoffTargetTeamId) {
-                existingTarget = sib;
-                break;
-              }
-            }
-
-            let handoffTaskId: Id<"tasks">;
-            let notifyUserId: Id<"users">;
-
-            if (existingTarget) {
-              // Feed the existing next-in-line task: merge the approved
-              // deliverable's links + upstream copy/caption onto it.
-              const mergedLinks = Array.from(
-                new Set([
-                  ...(existingTarget.referenceLinks ?? []),
-                  ...referenceLinks,
-                ])
-              );
-              await ctx.db.patch(existingTarget._id, {
-                handoffSourceTaskId: task._id,
-                ...(mergedLinks.length > 0
-                  ? { referenceLinks: mergedLinks }
-                  : {}),
-                ...(!existingTarget.creativeCopy && task.creativeCopy
-                  ? { creativeCopy: task.creativeCopy }
-                  : {}),
-                ...(!existingTarget.caption && task.caption
-                  ? { caption: task.caption }
-                  : {}),
-              });
-              handoffTaskId = existingTarget._id;
-              notifyUserId = existingTarget.assigneeId;
-            } else {
-              // No task for that team yet — create one, linked to the entry
-              // so it shows up as a team card on the calendar sidebar.
-              const targetAssigneeId = targetTeam.leadId;
-              const existingTasks = await ctx.db
-                .query("tasks")
-                .withIndex("by_assignee_sort", (q) =>
-                  q.eq("assigneeId", targetAssigneeId)
-                )
-                .collect();
-              const maxOrder = existingTasks.length
-                ? Math.max(...existingTasks.map((t) => t.sortOrder))
-                : 0;
-
-              handoffTaskId = await ctx.db.insert("tasks", {
-                briefId: task.briefId,
-                title: `[${targetTeam.name}] ${task.title.replace(/^\[[^\]]+\]\s*/, "")}`,
-                description:
-                  handoffNote || `${targetTeam.name} handoff for: ${task.title}`,
-                assigneeId: targetAssigneeId,
-                assignedBy: userId,
-                status: "pending",
-                sortOrder: maxOrder + 1000,
-                parentTaskId: entryRootId,
-                creativeCopy: task.creativeCopy,
-                caption: task.caption,
-                handoffSourceTaskId: task._id,
-                ...(task.platform ? { platform: task.platform } : {}),
-                ...(task.contentType ? { contentType: task.contentType } : {}),
-                ...(task.postDate ? { postDate: task.postDate } : {}),
-                ...(task.deadline ? { deadline: task.deadline } : {}),
-                ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
-              });
-              notifyUserId = targetAssigneeId;
-            }
-
-            // Record the handoff
-            await ctx.db.insert("deliverableHandoffs", {
-              sourceDeliverableId: deliverableId,
-              sourceTaskId: task._id,
-              sourceBriefId: task.briefId,
-              targetTaskId: handoffTaskId,
-              targetBriefId: task.briefId,
-              targetTeamId: task.handoffTargetTeamId,
-              handedOffBy: userId,
-              handedOffAt: now,
-              note: handoffNote || undefined,
-            });
-
-            // Ensure target team is linked to brief
-            const existingBriefTeams = await ctx.db
-              .query("briefTeams")
-              .withIndex("by_brief", (q: any) =>
-                q.eq("briefId", task.briefId)
-              )
-              .collect();
-            if (
-              !existingBriefTeams.some(
-                (bt: any) => bt.teamId === task.handoffTargetTeamId
-              )
-            ) {
-              await ctx.db.insert("briefTeams", {
-                briefId: task.briefId,
-                teamId: task.handoffTargetTeamId!,
-              });
-            }
-
-            // Notify the next team's assignee
-            await ctx.db.insert("notifications", {
-              recipientId: notifyUserId,
-              type: "task_assigned",
-              title: `${targetTeam.name} handoff received`,
-              message: `Approved work for "${task.title}" has been passed to your task with its deliverable attached.`,
-              briefId: task.briefId,
-              taskId: handoffTaskId,
-              triggeredBy: userId,
-              read: false,
-              createdAt: now,
-            });
-          }
-        }
-      }
+      await autoHandoffIfNeeded(ctx, task, brief, deliverable, userId, now);
     }
   },
 });
@@ -2017,6 +2101,7 @@ export const mainAssigneeReject = mutation({
         updates.status = "in-progress";
       }
       await ctx.db.patch(deliverable.taskId, updates);
+      await resyncBriefStatus(ctx, subTask.briefId);
     }
 
     const user = await ctx.db.get(userId);
@@ -2129,6 +2214,8 @@ export const approveDeliverable = mutation({
         details: JSON.stringify({ taskTitle: task.title, briefTitle: brief?.title, clientFacing: task.clientFacing }),
         timestamp: Date.now(),
       });
+
+      await autoHandoffIfNeeded(ctx, task, brief, deliverable, userId, Date.now());
     }
   },
 });
@@ -2233,6 +2320,7 @@ export const reassignAfterClientFeedback = mutation({
       status: "in-progress",
       assignedAt: Date.now(),
     });
+    await resyncBriefStatus(ctx, task.briefId);
 
     // Reset the latest deliverable so it goes through the flow again
     const deliverables = await ctx.db
@@ -2968,7 +3056,6 @@ export const getPendingDeliverableCount = query({
     if (!user) return 0;
 
     const isAdmin = user.role === "admin";
-    const isSuperAdmin = (user as any).isSuperAdmin === true;
 
     // Check if user leads any teams
     const ledTeams = await ctx.db
@@ -3004,20 +3091,15 @@ export const getPendingDeliverableCount = query({
       ).length;
     }
 
-    // ── Brand manager / super admin count: deliverables pending manager review ──
+    // ── Brand manager count: deliverables pending manager review ──
+    // Explicit brandManagers rows only, matching listManagerDeliverables, so
+    // a super admin's badge never counts rows their queue doesn't show.
     if (isAdmin) {
-      let managedBrandIds: Set<string>;
-      if (isSuperAdmin) {
-        managedBrandIds = new Set(
-          (await ctx.db.query("brands").collect()).map((b) => b._id)
-        );
-      } else {
-        const bms = await ctx.db
-          .query("brandManagers")
-          .withIndex("by_manager", (q) => q.eq("managerId", userId))
-          .collect();
-        managedBrandIds = new Set(bms.map((bm) => bm.brandId));
-      }
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_manager", (q) => q.eq("managerId", userId))
+        .collect();
+      const managedBrandIds = new Set<string>(bms.map((bm) => bm.brandId));
 
       if (managedBrandIds.size > 0) {
         const tasks = await ctx.db.query("tasks").collect();

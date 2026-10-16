@@ -163,7 +163,7 @@ export default function OversightBoard() {
     startDate && endDate && startDate > endDate
   );
 
-  const board = useQuery(api.oversight.getOversightBoard, {
+  const liveBoard = useQuery(api.oversight.getOversightBoard, {
     ...(status ? { status } : {}),
     ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
     ...(teamId ? { teamId: teamId as Id<"teams"> } : {}),
@@ -173,6 +173,11 @@ export default function OversightBoard() {
     ...(startDate && !rangeInvalid ? { startDate } : {}),
     ...(endDate && !rangeInvalid ? { endDate } : {}),
   });
+  // useQuery goes back to undefined on every arg change; keep showing the last
+  // result so the filter bar (and the focused search box) stays mounted.
+  const [lastBoard, setLastBoard] = useState(liveBoard);
+  if (liveBoard !== undefined && liveBoard !== lastBoard) setLastBoard(liveBoard);
+  const board = liveBoard ?? lastBoard;
 
   if (board === undefined)
     return (

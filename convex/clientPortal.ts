@@ -329,7 +329,7 @@ export const listBrandCalendarMonths = query({
     );
     const months = new Set<string>();
     for (const t of brandTasks) {
-      if (ccBriefIds.has(t.briefId) && t.postDate) months.add(t.postDate.substring(0, 7));
+      if (ccBriefIds.has(t.briefId) && !t.parentTaskId && !t.stagedAt && t.postDate) months.add(t.postDate.substring(0, 7));
     }
     return [...months].sort().reverse();
   },
@@ -425,6 +425,12 @@ export const deleteDeckItem = mutation({
   args: { deckItemId: v.id("clientDeckItems") },
   handler: async (ctx, { deckItemId }) => {
     await requireAdmin(ctx);
+    // Drop the item's comment thread too, or it lingers in the Feedback Log.
+    const remarks = await ctx.db
+      .query("jsrRemarks")
+      .withIndex("by_deck_item", (q) => q.eq("deckItemId", deckItemId))
+      .collect();
+    for (const r of remarks) await ctx.db.delete(r._id);
     await ctx.db.delete(deckItemId);
   },
 });
@@ -635,7 +641,12 @@ export const getPortalDashboard = query({
                 .filter((rem) => rem.taskId === task._id)
                 .sort((a, b) => a.createdAt - b.createdAt)
                 .map(remarkShape);
-              const dels = allDeliverables.filter((d) => d.taskId === task._id);
+              // Only approved or client-routed work; rejected/pending drafts stay internal.
+              const dels = allDeliverables.filter(
+                (d) =>
+                  d.taskId === task._id &&
+                  (d.status === "approved" || d.clientStatus !== undefined)
+              );
               deliverables = await Promise.all(
                 dels.map(async (d) => ({
                   _id: d._id,
@@ -734,7 +745,10 @@ export const getContentCalendar = query({
     const ccBriefIds = new Set(
       brandBriefs.filter((b) => b.briefType === "content_calendar").map((b) => b._id)
     );
-    const calendarTasks = brandTasks.filter((t) => ccBriefIds.has(t.briefId));
+    // Copy/Design children and staged (off-grid) entries are internal only.
+    const calendarTasks = brandTasks.filter(
+      (t) => ccBriefIds.has(t.briefId) && !t.parentTaskId && !t.stagedAt
+    );
 
     // Client-originated entries whose status is held: show the published
     // snapshot, not the live internal status.
@@ -1162,7 +1176,12 @@ export const getClientPendingWork = query({
       .collect();
     const pendingDeck = deckItems
       .filter((i) => i.isVisible && i.requiresApproval && i.approvalStatus === "pending_client")
-      .map((i) => ({ _id: i._id, title: i.title, url: i.url, category: i.category }));
+      .map((i) => ({
+        _id: i._id,
+        title: i.title,
+        url: i.fileKey ? `/api/r2-file?key=${encodeURIComponent(i.fileKey)}` : i.url,
+        category: i.category,
+      }));
 
     return { pendingDeliverables, inputRequests, pendingDeck };
   },
@@ -1375,7 +1394,16 @@ export const getFeedbackLog = query({
       .query("clientFeedback")
       .withIndex("by_brand", (q) => q.eq("brandId", brandId))
       .collect();
-    const authorIds = [...new Set(feedback.map((f) => f.clientUserId))];
+    const deckItems = await ctx.db
+      .query("clientDeckItems")
+      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
+      .collect();
+    const authorIds = [
+      ...new Set([
+        ...feedback.map((f) => f.clientUserId),
+        ...deckItems.flatMap((i) => (i.reviewedByClientId ? [i.reviewedByClientId] : [])),
+      ]),
+    ];
     const authors = await Promise.all(authorIds.map((id) => ctx.db.get(id)));
     const authorById = new Map(
       authors.filter(Boolean).map((u) => [u!._id, u!.name ?? u!.email ?? "Client"])
@@ -1434,10 +1462,6 @@ export const getFeedbackLog = query({
     }
 
     // Deck change requests
-    const deckItems = await ctx.db
-      .query("clientDeckItems")
-      .withIndex("by_brand", (q) => q.eq("brandId", brandId))
-      .collect();
     for (const i of deckItems) {
       if (i.approvalStatus === "client_changes_requested" && i.approvalNote) {
         entries.push({

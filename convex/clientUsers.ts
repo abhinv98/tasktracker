@@ -1,4 +1,4 @@
-import { createAccount, modifyAccountCredentials } from "@convex-dev/auth/server";
+import { createAccount, invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { makeFunctionReference } from "convex/server";
 import { action, mutation, query } from "./_generated/server";
@@ -92,6 +92,8 @@ export const adminResetClientPassword = action({
       provider: "password",
       account: { id: email, secret: newPassword },
     });
+    // Sign out sessions opened with the old password.
+    await invalidateSessions(ctx, { userId });
     return { success: true, email };
   },
 });

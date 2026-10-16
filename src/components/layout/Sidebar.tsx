@@ -285,13 +285,14 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
     }))
     .filter((cat) => cat.items.length > 0);
 
-  // All categories open by default
-  const [openCategories, setOpenCategories] = useState<Set<string>>(
-    () => new Set(nav.map((c) => c.category))
+  // All categories open by default. Track the collapsed ones, so categories
+  // from a nav set swapped in later (e.g. Recruitment) also start open.
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    () => new Set()
   );
 
   function toggleCategory(cat: string) {
-    setOpenCategories((prev) => {
+    setCollapsedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) {
         next.delete(cat);
@@ -347,7 +348,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
             </Link>
           )}
           {nav.map((group) => {
-            const isOpen = openCategories.has(group.category);
+            const isOpen = !collapsedCategories.has(group.category);
             const hasActiveItem = group.items.some(
               (item) => pathname === item.href || pathname.startsWith(item.href + "/")
             );

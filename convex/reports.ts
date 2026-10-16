@@ -35,7 +35,7 @@ export const getEmployeeReport = query({
     if (isAdmin) {
       // Admins see everyone
       visibleEmployeeIds = new Set(
-        allUsers.filter((u) => u.name || u.email).map((u) => u._id)
+        allUsers.filter((u) => (u.name || u.email) && u.role !== "client").map((u) => u._id)
       );
     } else {
       // Team leads see only members of the teams they lead
@@ -69,6 +69,11 @@ export const getEmployeeReport = query({
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
     const allDeliverables = await ctx.db.query("deliverables").collect();
 
+    // Tasks in completed/archived briefs never count as overdue.
+    const closedBriefIds = new Set<string>(
+      allBriefs.filter((b) => b.status === "completed" || b.status === "archived").map((b) => b._id)
+    );
+
     // Brand filter: get brief IDs for the selected brand
     let brandBriefIds: Set<string> | null = null;
     if (args.brandId) {
@@ -79,8 +84,9 @@ export const getEmployeeReport = query({
       );
     }
 
-    const startMs = args.startDate ? new Date(args.startDate + "T00:00:00").getTime() : 0;
-    const endMs = args.endDate ? new Date(args.endDate + "T23:59:59.999").getTime() : Date.now();
+    // Dates are IST calendar days; the Convex runtime is UTC.
+    const startMs = args.startDate ? new Date(args.startDate + "T00:00:00+05:30").getTime() : 0;
+    const endMs = args.endDate ? new Date(args.endDate + "T23:59:59.999+05:30").getTime() : Date.now();
 
     function buildEmployeeReport(empId: string) {
       const emp = allUsers.find((u) => u._id === empId);
@@ -107,6 +113,7 @@ export const getEmployeeReport = query({
       const overdueTasks = tasksInRange.filter(
         (t) =>
           t.deadline &&
+          !closedBriefIds.has(t.briefId) &&
           t.deadline < Date.now() &&
           t.status !== "done" &&
           t.status !== "review"
