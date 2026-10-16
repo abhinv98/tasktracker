@@ -619,6 +619,9 @@ function BriefFlowCanvasInner({
         minZoom={0.3}
         maxZoom={2}
         deleteKeyCode={["Backspace", "Delete"]}
+        // Nodes are tasks: deleting one locally would also delete every
+        // connection it has in the DB while the node itself comes back.
+        onBeforeDelete={async ({ nodes }) => nodes.length === 0}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="color-mix(in srgb, var(--accent-admin) 12%, transparent)" />
         <Controls

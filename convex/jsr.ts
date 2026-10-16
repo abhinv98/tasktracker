@@ -11,6 +11,7 @@ import {
   ensureSheetForMonth,
 } from "./contentCalendar";
 import type { Id } from "./_generated/dataModel";
+import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -120,30 +121,34 @@ export const deactivateJsrLink = mutation({
 
     await ctx.db.patch(jsrLinkId, { isActive: false });
 
-    const jsrMessages = await ctx.db
-      .query("jsrMessages")
-      .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLinkId))
-      .collect();
-    for (const msg of jsrMessages) {
-      await ctx.db.delete(msg._id);
+    const jsrLink = await ctx.db.get(jsrLinkId);
+    // Portal Messages and remark threads share these tables with the brand's
+    // client portal, which keeps its history while deactivated. Only purge
+    // when the brand has no portal at all.
+    const anyPortal = jsrLink
+      ? await ctx.db
+          .query("clientPortals")
+          .withIndex("by_brand_active", (q) => q.eq("brandId", jsrLink.brandId))
+          .first()
+      : null;
+
+    if (!anyPortal) {
+      const jsrMessages = await ctx.db
+        .query("jsrMessages")
+        .withIndex("by_jsr_link", (q) => q.eq("jsrLinkId", jsrLinkId))
+        .collect();
+      for (const msg of jsrMessages) {
+        await ctx.db.delete(msg._id);
+      }
     }
 
-    const jsrLink = await ctx.db.get(jsrLinkId);
     if (jsrLink) {
       const otherActiveLinks = await ctx.db
         .query("jsrLinks")
         .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
         .filter((q) => q.and(q.eq(q.field("isActive"), true), q.neq(q.field("_id"), jsrLinkId)))
         .collect();
-      // Don't wipe remark threads if the brand's authenticated portal is live —
-      // portal comments share this table.
-      const activePortal = await ctx.db
-        .query("clientPortals")
-        .withIndex("by_brand_active", (q) =>
-          q.eq("brandId", jsrLink.brandId).eq("isActive", true)
-        )
-        .first();
-      if (otherActiveLinks.length === 0 && !activePortal) {
+      if (otherActiveLinks.length === 0 && !anyPortal) {
         const jsrRemarks = await ctx.db
           .query("jsrRemarks")
           .withIndex("by_brand", (q) => q.eq("brandId", jsrLink.brandId))
@@ -164,7 +169,7 @@ export const deactivateJsrLink = mutation({
         if (ct.linkedTaskId) {
           const realTask = await ctx.db.get(ct.linkedTaskId);
           if (realTask) {
-            await ctx.db.delete(ct.linkedTaskId);
+            await cascadeDeleteTask(ctx, ct.linkedTaskId);
           }
         }
         await ctx.db.delete(ct._id);
@@ -1020,7 +1025,7 @@ export const deleteClientTask = mutation({
     if (clientTask.linkedTaskId) {
       const realTask = await ctx.db.get(clientTask.linkedTaskId);
       if (realTask) {
-        await ctx.db.delete(clientTask.linkedTaskId);
+        await cascadeDeleteTask(ctx, clientTask.linkedTaskId);
       }
     }
 

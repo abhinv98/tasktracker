@@ -109,8 +109,12 @@ export async function fillCreativeSlotsForTask(
 export async function autoApproveDeliverablesForTaskTree(
   ctx: MutationCtx,
   rootTaskId: Id<"tasks">,
-  triggeredByUserId: Id<"users">
+  triggeredByUserId: Id<"users">,
+  // Placeholder slot rows are for manager force-done overrides only; a
+  // normal approval must not invent approved creatives nobody submitted.
+  opts: { fillSlots?: boolean } = {}
 ): Promise<Id<"deliverables">[]> {
+  const fillSlots = opts.fillSlots ?? true;
   const touched: Id<"deliverables">[] = [];
   const now = Date.now();
 
@@ -158,7 +162,9 @@ export async function autoApproveDeliverablesForTaskTree(
     }
 
     // Close out the creative slots nobody ever submitted against.
-    touched.push(...(await fillCreativeSlotsForTask(ctx, taskId, triggeredByUserId)));
+    if (fillSlots) {
+      touched.push(...(await fillCreativeSlotsForTask(ctx, taskId, triggeredByUserId)));
+    }
 
     const children = await ctx.db
       .query("tasks")

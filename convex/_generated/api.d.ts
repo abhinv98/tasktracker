@@ -48,6 +48,7 @@ import type * as managerWorklog from "../managerWorklog.js";
 import type * as meetingMinutes from "../meetingMinutes.js";
 import type * as migrations from "../migrations.js";
 import type * as migrations_backfillBrandHold from "../migrations/backfillBrandHold.js";
+import type * as migrations_backfillIsHelper from "../migrations/backfillIsHelper.js";
 import type * as migrations_backfillReviewAt from "../migrations/backfillReviewAt.js";
 import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlineValues.js";
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
@@ -58,6 +59,7 @@ import type * as migrations_findDuplicateUsers from "../migrations/findDuplicate
 import type * as migrations_findFaizOrphanTasks from "../migrations/findFaizOrphanTasks.js";
 import type * as migrations_findUser from "../migrations/findUser.js";
 import type * as migrations_fixAdminDoneBriefs from "../migrations/fixAdminDoneBriefs.js";
+import type * as migrations_fixCalendarPlaceholderAssignor from "../migrations/fixCalendarPlaceholderAssignor.js";
 import type * as migrations_fixCompletedBriefsWithOpenTasks from "../migrations/fixCompletedBriefsWithOpenTasks.js";
 import type * as migrations_fixDeadlines from "../migrations/fixDeadlines.js";
 import type * as migrations_fixSingleTaskBriefStatus from "../migrations/fixSingleTaskBriefStatus.js";
@@ -139,6 +141,7 @@ declare const fullApi: ApiFromModules<{
   meetingMinutes: typeof meetingMinutes;
   migrations: typeof migrations;
   "migrations/backfillBrandHold": typeof migrations_backfillBrandHold;
+  "migrations/backfillIsHelper": typeof migrations_backfillIsHelper;
   "migrations/backfillReviewAt": typeof migrations_backfillReviewAt;
   "migrations/checkDeadlineValues": typeof migrations_checkDeadlineValues;
   "migrations/checkPremTask": typeof migrations_checkPremTask;
@@ -149,6 +152,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/findFaizOrphanTasks": typeof migrations_findFaizOrphanTasks;
   "migrations/findUser": typeof migrations_findUser;
   "migrations/fixAdminDoneBriefs": typeof migrations_fixAdminDoneBriefs;
+  "migrations/fixCalendarPlaceholderAssignor": typeof migrations_fixCalendarPlaceholderAssignor;
   "migrations/fixCompletedBriefsWithOpenTasks": typeof migrations_fixCompletedBriefsWithOpenTasks;
   "migrations/fixDeadlines": typeof migrations_fixDeadlines;
   "migrations/fixSingleTaskBriefStatus": typeof migrations_fixSingleTaskBriefStatus;

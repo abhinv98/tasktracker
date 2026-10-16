@@ -89,6 +89,7 @@ function EmployeeTaskCard({
   const sc = statusColors[task.status] ?? statusColors.pending;
   const t = task as EmployeeTask & {
     parentTaskId?: string;
+    isHelper?: boolean;
     parentTaskTitle?: string | null;
     brandName?: string | null;
     brandColor?: string | null;
@@ -108,7 +109,7 @@ function EmployeeTaskCard({
       <div className={compact ? "flex flex-col gap-2" : "flex justify-between items-start gap-2"}>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {!!t.parentTaskId && (
+            {!!t.isHelper && (
               <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                 HELPER
               </span>

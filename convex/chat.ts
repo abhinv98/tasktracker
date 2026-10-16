@@ -73,6 +73,8 @@ export const getConversationMessages = query({
   handler: async (ctx, { conversationId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    const convo = await ctx.db.get(conversationId);
+    if (!convo || convo.userId !== userId) return [];
 
     const messages = await ctx.db
       .query("chatMessages")
@@ -91,6 +93,8 @@ export const getChatHistory = query({
     if (!userId) return [];
 
     if (args.conversationId) {
+      const convo = await ctx.db.get(args.conversationId);
+      if (!convo || convo.userId !== userId) return [];
       const messages = await ctx.db
         .query("chatMessages")
         .withIndex("by_conversation", (q) =>
@@ -121,6 +125,10 @@ export const storeChatMessage = internalMutation({
     toolSteps: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (args.conversationId) {
+      const owner = await ctx.db.get(args.conversationId);
+      if (!owner || owner.userId !== args.userId) throw new Error("Conversation not found");
+    }
     const msgId = await ctx.db.insert("chatMessages", {
       ...args,
       createdAt: Date.now(),
@@ -151,6 +159,8 @@ export const clearChatHistory = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     if (args.conversationId) {
+      const convo = await ctx.db.get(args.conversationId);
+      if (!convo || convo.userId !== userId) throw new Error("Conversation not found");
       const msgs = await ctx.db
         .query("chatMessages")
         .withIndex("by_conversation", (q) =>

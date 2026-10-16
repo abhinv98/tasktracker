@@ -692,6 +692,8 @@ export const _loadSendContext = internalQuery({
     templateId: v.id("recruitTemplates"),
   },
   handler: async (ctx, { candidateIds, templateId }) => {
+    // Auth carries over from the calling action; gates sendTemplateEmail.
+    await requireRecruiter(ctx);
     const template = await ctx.db.get(templateId);
     if (!template) throw new Error("Template not found");
     const jobs = await ctx.db.query("recruitJobs").collect();

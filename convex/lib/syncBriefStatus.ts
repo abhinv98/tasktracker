@@ -1,28 +1,42 @@
 import { MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
 
-const TASK_TO_BRIEF_STATUS: Record<string, string> = {
-  "pending": "active",
-  "in-progress": "in-progress",
-  "review": "review",
-  "done": "completed",
-};
-
 /**
- * For single-task briefs, keeps the parent brief status in sync with
- * the task status. No-op for non-single-task briefs.
+ * For single-task briefs, keeps the brief status in sync with its tasks.
+ * No-op for other brief types. Callers patch the task first; the status is
+ * derived from all main tasks (multi-team chains have several), never from
+ * helper sub-tasks, so a helper finishing can't complete the brief.
+ * Archived briefs (incl. brand on-hold) and manual on_hold are left alone.
+ * The status argument is kept for call-site compatibility and ignored.
  */
 export async function syncSingleTaskBriefStatus(
   ctx: MutationCtx,
   briefId: Id<"briefs">,
-  newTaskStatus: string
+  _newTaskStatus?: string
 ) {
   const brief = await ctx.db.get(briefId);
   if (!brief || brief.briefType !== "single_task") return;
+  if (brief.status === "archived" || brief.status === "on_hold") return;
 
-  const mappedStatus = TASK_TO_BRIEF_STATUS[newTaskStatus];
-  if (mappedStatus && brief.status !== mappedStatus) {
-    await ctx.db.patch(briefId, { status: mappedStatus as any });
+  const tasks = (
+    await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect()
+  ).filter((t) => !t.isHelper);
+  if (tasks.length === 0) return;
+
+  const done = tasks.filter((t) => t.status === "done").length;
+  // Paused tasks don't move the brief (matches the old status mapping).
+  if (done < tasks.length && tasks.every((t) => t.status === "done" || t.status === "on-hold")) return;
+  let next: string;
+  if (done === tasks.length) next = "completed";
+  else if (tasks.some((t) => t.status === "review")) next = "review";
+  else if (done > 0 || tasks.some((t) => t.status === "in-progress")) next = "in-progress";
+  else next = "active";
+
+  if (brief.status !== next) {
+    await ctx.db.patch(briefId, { status: next as any });
   }
 }
 

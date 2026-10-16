@@ -47,3 +47,24 @@ export async function requireClientForBrand(
   if (client.clientBrandId !== brandId) throw new Error("Not authorized");
   return client;
 }
+
+/**
+ * HR briefs are confidential (same rule as briefs.listBriefs): HR sees only
+ * HR's briefs, everyone else sees everything but HR's, super admins see all.
+ */
+export async function canViewBrief(
+  ctx: Ctx,
+  user: Doc<"users">,
+  briefId: Id<"briefs">
+): Promise<boolean> {
+  if (user.role === "client") return false;
+  if (user.isSuperAdmin === true) return true;
+  const hrTeam = (await ctx.db.query("teams").collect()).find((t) => t.name === "HR");
+  if (!hrTeam) return true;
+  const links = await ctx.db
+    .query("briefTeams")
+    .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+    .collect();
+  const isHRBrief = links.some((l) => l.teamId === hrTeam._id);
+  return user.isHR === true ? isHRBrief : !isHRBrief;
+}

@@ -52,6 +52,18 @@ async function getActivePortalForBrand(
     .first();
 }
 
+/** A portal client whose brand portal is still active. Deactivation is
+ *  otherwise only a UI screen; every data read/write goes through this.
+ *  getPortalSession keeps plain requireClient so the layout can show the
+ *  "deactivated" state. */
+async function requireActivePortalClient(ctx: QueryCtx | MutationCtx): Promise<ClientUser> {
+  const client = await requireClient(ctx);
+  if (!(await getActivePortalForBrand(ctx, client.clientBrandId))) {
+    throw new Error("This portal has been deactivated");
+  }
+  return client;
+}
+
 /** Non-archived briefs + their tasks for a brand (same scan approach as jsr.ts). */
 async function brandBriefsAndTasks(ctx: QueryCtx | MutationCtx, brandId: Id<"brands">) {
   const briefs = await ctx.db.query("briefs").collect();
@@ -590,7 +602,7 @@ export const logPortalEvent = mutation({
 export const getPortalDashboard = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const brandId = client.clientBrandId;
 
     const requests = await ctx.db
@@ -694,7 +706,7 @@ export const getPortalDashboard = query({
 export const getPortalMessages = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const messages = await ctx.db
       .query("jsrMessages")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
@@ -715,7 +727,7 @@ export const getPortalMessages = query({
 export const getContentCalendar = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const portal = await getActivePortalForBrand(ctx, client.clientBrandId);
     const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, client.clientBrandId);
 
@@ -763,7 +775,7 @@ export const getContentCalendar = query({
 export const getDeckItems = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const items = await ctx.db
       .query("clientDeckItems")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
@@ -806,7 +818,7 @@ export const addClientDeckItem = mutation({
     comment: v.optional(v.string()),
   },
   handler: async (ctx, { title, url, fileKey, fileName, comment }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     if (!url && !fileKey) throw new Error("Add a link or upload a file");
 
     const existing = await ctx.db
@@ -861,7 +873,7 @@ export const addClientDeckItem = mutation({
 export const addDeckRemark = mutation({
   args: { deckItemId: v.id("clientDeckItems"), content: v.string() },
   handler: async (ctx, { deckItemId, content }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const item = await ctx.db.get(deckItemId);
     if (!item || item.brandId !== client.clientBrandId) throw new Error("Not authorized");
     const clientName = client.name ?? client.email ?? "Client";
@@ -912,7 +924,7 @@ export const addManagerDeckRemark = mutation({
 export const approveDeckItem = mutation({
   args: { deckItemId: v.id("clientDeckItems") },
   handler: async (ctx, { deckItemId }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const item = await ctx.db.get(deckItemId);
     if (!item || item.brandId !== client.clientBrandId) throw new Error("Not authorized");
     if (!item.requiresApproval || item.approvalStatus !== "pending_client")
@@ -943,7 +955,7 @@ export const approveDeckItem = mutation({
 export const requestDeckChanges = mutation({
   args: { deckItemId: v.id("clientDeckItems"), note: v.string() },
   handler: async (ctx, { deckItemId, note }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const item = await ctx.db.get(deckItemId);
     if (!item || item.brandId !== client.clientBrandId) throw new Error("Not authorized");
     if (!item.requiresApproval || item.approvalStatus !== "pending_client")
@@ -995,7 +1007,7 @@ export const submitTaskRequest = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const portal = await getActivePortalForBrand(ctx, client.clientBrandId);
     if (!portal) throw new Error("Portal is not active");
 
@@ -1033,7 +1045,7 @@ export const submitTaskRequest = mutation({
 export const listMyRequests = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const tasks = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
@@ -1067,7 +1079,7 @@ export const listMyRequests = query({
 export const getMonthlyLog = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const requests = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
@@ -1103,7 +1115,7 @@ export const getMonthlyLog = query({
 export const getClientPendingWork = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const { brandBriefs, brandTasks } = await brandBriefsAndTasks(ctx, client.clientBrandId);
     const taskById = new Map(brandTasks.map((t) => [t._id, t]));
 
@@ -1164,7 +1176,7 @@ export const getClientPendingWork = query({
 export const getEcultifyPendingWork = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const requests = await ctx.db
       .query("jsrClientTasks")
       .withIndex("by_brand", (q) => q.eq("brandId", client.clientBrandId))
@@ -1197,7 +1209,7 @@ export const getEcultifyPendingWork = query({
 export const approveDeliverable = mutation({
   args: { deliverableId: v.id("deliverables"), note: v.optional(v.string()) },
   handler: async (ctx, { deliverableId, note }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     await getDeliverableInBrand(ctx, deliverableId, client.clientBrandId);
     const clientName = client.name ?? client.email ?? "Client";
     const task = await applyClientApproval(ctx, {
@@ -1217,7 +1229,7 @@ export const approveDeliverable = mutation({
 export const requestChanges = mutation({
   args: { deliverableId: v.id("deliverables"), note: v.string() },
   handler: async (ctx, { deliverableId, note }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     await getDeliverableInBrand(ctx, deliverableId, client.clientBrandId);
     const clientName = client.name ?? client.email ?? "Client";
     const task = await applyClientChangesRequested(ctx, {
@@ -1237,7 +1249,7 @@ export const requestChanges = mutation({
 export const denyDeliverable = mutation({
   args: { deliverableId: v.id("deliverables"), note: v.string() },
   handler: async (ctx, { deliverableId, note }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     await getDeliverableInBrand(ctx, deliverableId, client.clientBrandId);
     const clientName = client.name ?? client.email ?? "Client";
     const task = await applyClientDenial(ctx, {
@@ -1258,7 +1270,7 @@ export const denyDeliverable = mutation({
 export const addTaskRemark = mutation({
   args: { taskId: v.id("tasks"), content: v.string() },
   handler: async (ctx, { taskId, content }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const { task } = await getTaskInBrand(ctx, taskId, client.clientBrandId);
     const clientName = client.name ?? client.email ?? "Client";
 
@@ -1290,7 +1302,7 @@ export const addTaskRemark = mutation({
 export const addDeliverableRemark = mutation({
   args: { deliverableId: v.id("deliverables"), content: v.string() },
   handler: async (ctx, { deliverableId, content }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const { task } = await getDeliverableInBrand(ctx, deliverableId, client.clientBrandId);
     const clientName = client.name ?? client.email ?? "Client";
 
@@ -1324,7 +1336,7 @@ export const addDeliverableRemark = mutation({
 export const sendPortalMessage = mutation({
   args: { content: v.string() },
   handler: async (ctx, { content }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const portal = await getActivePortalForBrand(ctx, client.clientBrandId);
     if (!portal) throw new Error("Portal is not active");
 
@@ -1344,7 +1356,7 @@ export const sendPortalMessage = mutation({
 export const getFeedbackLog = query({
   args: {},
   handler: async (ctx) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     const brandId = client.clientBrandId;
     const { brandTasks } = await brandBriefsAndTasks(ctx, brandId);
     const taskById = new Map(brandTasks.map((t) => [t._id, t]));
@@ -1447,7 +1459,7 @@ export const getFeedbackLog = query({
 export const submitFeedback = mutation({
   args: { content: v.string(), taskId: v.optional(v.id("tasks")) },
   handler: async (ctx, { content, taskId }) => {
-    const client = await requireClient(ctx);
+    const client = await requireActivePortalClient(ctx);
     if (taskId) await getTaskInBrand(ctx, taskId, client.clientBrandId);
 
     await ctx.db.insert("clientFeedback", {

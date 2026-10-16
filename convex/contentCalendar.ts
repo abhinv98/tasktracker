@@ -615,6 +615,7 @@ export const stageEntries = mutation({
     for (const taskId of taskIds) {
       const task = await ctx.db.get(taskId);
       if (!task || task.stagedAt) continue;
+      if (task.briefId !== first.briefId) throw new Error("All entries must belong to the same calendar");
       await ctx.db.patch(taskId, { stagedAt: now, stagedBy: userId });
     }
   },
@@ -653,6 +654,9 @@ export const bulkShiftDates = mutation({
     ).filter((t): t is NonNullable<typeof t> => !!t && !!t.postDate);
     if (tasks.length === 0) return;
     const userId = await requireCalendarEditor(ctx, tasks[0].briefId);
+    for (const task of tasks) {
+      if (task.briefId !== tasks[0].briefId) throw new Error("All entries must belong to the same calendar");
+    }
 
     let delta: number;
     if (deltaDays !== undefined) {
@@ -696,6 +700,7 @@ export const bulkMoveToMonth = mutation({
     for (const taskId of taskIds) {
       const task = await ctx.db.get(taskId);
       if (!task || !task.postDate) continue;
+      if (task.briefId !== first.briefId) throw new Error("All entries must belong to the same calendar");
       const day = Math.min(Number(task.postDate.slice(8, 10)), maxDay);
       await ctx.db.patch(taskId, {
         postDate: `${month}-${String(day).padStart(2, "0")}`,

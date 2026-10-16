@@ -22,6 +22,14 @@ export async function removeUserAndCleanup(
     await ctx.db.delete(ut._id);
   }
 
+  const managed = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_manager", (q) => q.eq("managerId", targetUserId))
+    .collect();
+  for (const bm of managed) {
+    await ctx.db.delete(bm._id);
+  }
+
   const notifs = await ctx.db
     .query("notifications")
     .withIndex("by_recipient", (q) => q.eq("recipientId", targetUserId))
@@ -148,14 +156,23 @@ export const updateUserRole = mutation({
         throw new Error("Cannot demote the last admin");
       }
     }
+    // HR rides on the admin role; demoting out of admin clears it. Same for
+    // Accountant. An omitted flag keeps its current value.
+    const nextHR = newRole === "admin" ? isHR ?? targetUser?.isHR ?? false : false;
+    const nextAccountant =
+      newRole === "admin" ? isAccountant ?? targetUser?.isAccountant ?? false : false;
+    // Both flags unlock petty cash (money), so only super admins may grant them.
+    const granting =
+      (nextHR && !targetUser?.isHR) || (nextAccountant && !targetUser?.isAccountant);
+    if (granting && !currentUser.isSuperAdmin) {
+      throw new Error("Only super admins can grant HR or Accountant access");
+    }
     await ctx.db.patch(userId, {
       role: newRole,
       // Admins are never freelancers — clear the flag on promotion.
       isFreelancer: newRole === "admin" ? false : isFreelancer ?? false,
-      // HR rides on the admin role; demoting out of admin clears it.
-      isHR: newRole === "admin" ? isHR ?? false : false,
-      // Same for Accountant.
-      isAccountant: newRole === "admin" ? isAccountant ?? false : false,
+      isHR: nextHR,
+      isAccountant: nextAccountant,
     });
   },
 });
@@ -265,6 +282,26 @@ export const deleteUser = mutation({
       if (admins.length <= 1) throw new Error("Cannot delete the last admin");
     }
 
+    // A team's leadId is required and gates every review; open tasks would
+    // be stranded on a deleted assignee. Make the admin hand these over first.
+    const ledTeams = await ctx.db
+      .query("teams")
+      .withIndex("by_lead", (q) => q.eq("leadId", targetUserId))
+      .collect();
+    if (ledTeams.length > 0) {
+      throw new Error(
+        `Assign a new team lead for ${ledTeams.map((t) => t.name).join(", ")} before deleting this user`
+      );
+    }
+    const openTasks = (
+      await ctx.db
+        .query("tasks")
+        .withIndex("by_assignee", (q) => q.eq("assigneeId", targetUserId))
+        .collect()
+    ).filter((t) => t.status !== "done");
+    if (openTasks.length > 0) {
+      throw new Error(`Reassign this user's ${openTasks.length} open task(s) before deleting them`);
+    }
     await removeUserAndCleanup(ctx, targetUserId);
   },
 });

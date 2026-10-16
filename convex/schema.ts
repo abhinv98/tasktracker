@@ -196,6 +196,8 @@ export default defineSchema({
     postDate: v.optional(v.string()),
     assignedAt: v.optional(v.number()),
     parentTaskId: v.optional(v.id("tasks")),
+    /** Helper sub-task (createSubTask). Calendar Copy/Design and handoff children also use parentTaskId but are not helpers. */
+    isHelper: v.optional(v.boolean()),
     referenceLinks: v.optional(v.array(v.string())),
     clientFacing: v.optional(v.boolean()),
     needsClientInput: v.optional(v.boolean()),

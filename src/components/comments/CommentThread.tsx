@@ -157,6 +157,11 @@ export function CommentThread({
     label: "Brief",
   });
   const [showTargetPicker, setShowTargetPicker] = useState(false);
+  // The same thread instance is reused when the parent changes (e.g. picking
+  // another brief on Discussions) — never post to the previous parent.
+  useEffect(() => {
+    setPostTarget({ type: parentType, id: parentId, label: "Brief" });
+  }, [parentType, parentId]);
 
   // @mention state
   const [showMentions, setShowMentions] = useState(false);

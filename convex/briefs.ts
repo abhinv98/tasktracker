@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { canViewBrief } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -118,6 +119,8 @@ export const getBrief = query({
   handler: async (ctx, { briefId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || !(await canViewBrief(ctx, me, briefId))) return null;
     const brief = await ctx.db.get(briefId);
     if (!brief) return null;
     const manager = brief.assignedManagerId
@@ -816,14 +819,16 @@ export const createIndividualTaskBrief = mutation({
     const calendarAssignor =
       ccBriefRecord?.assignedManagerId ?? args.assignedManagerId ?? userId;
 
-    const firstHandoff =
-      normalizedTeams.length > 1 ? normalizedTeams[1].teamId : undefined;
+    // The parent is a placeholder owned by the admin. Calendar code detects
+    // placeholders by assigneeId === assignedBy, so keep both on the admin;
+    // otherwise the parent reads as a second "Copy" task. Children carry the
+    // manager attribution and the Copy → Design chain.
     const parentTaskId = await ctx.db.insert("tasks", {
       briefId: ccBriefId,
       title: args.title,
       description: args.description,
       assigneeId: userId,
-      assignedBy: calendarAssignor,
+      assignedBy: userId,
       status: "pending",
       sortOrder: maxTaskOrder + 1000,
       duration: "1d",
@@ -832,7 +837,6 @@ export const createIndividualTaskBrief = mutation({
       contentType: "Post",
       ...(postDate ? { postDate } : {}),
       ...(normalizedOverall !== undefined ? { deadline: normalizedOverall } : {}),
-      ...(firstHandoff ? { handoffTargetTeamId: firstHandoff } : {}),
       assignedAt: now,
     });
 
@@ -840,7 +844,7 @@ export const createIndividualTaskBrief = mutation({
       taskId: parentTaskId,
       briefId: ccBriefId,
       assigneeId: userId,
-      assignedBy: calendarAssignor,
+      assignedBy: userId,
       source: "content_calendar",
     });
 
@@ -987,14 +991,19 @@ export const updateBrief = mutation({
           .withIndex("by_brief", (q) => q.eq("briefId", briefId))
           .collect();
 
-        if (brief.briefType === "single_task") {
-          // Symmetric sync for single_task briefs: mirror the brief's deadline
-          // onto the lone task so task-level views (task modal, task cards)
-          // don't go stale.
-          for (const t of tasksInBrief) {
-            if (t.deadline !== newDeadline) {
-              await ctx.db.patch(t._id, { deadline: newDeadline });
-            }
+        const mainTasks = tasksInBrief.filter((t) => !t.parentTaskId);
+        if (brief.briefType === "single_task" && mainTasks.length === 1) {
+          // Symmetric sync for a lone-task brief: mirror the brief's deadline
+          // onto the task so task-level views don't go stale. Multi-step
+          // single_task briefs keep each step's own deadline (ceiling below).
+          const t = mainTasks[0];
+          if (t.deadline !== newDeadline) {
+            await ctx.db.patch(t._id, {
+              deadline: newDeadline,
+              overdueAcknowledged: undefined,
+              overdueContacted: undefined,
+              overdueContactDenied: undefined,
+            });
           }
         } else if (newDeadline !== undefined) {
           // Multi-task briefs: the brief deadline is a ceiling. Nothing inside
@@ -1300,6 +1309,7 @@ export const restoreBrief = mutation({
 export const getTeamsForBrief = query({
   args: { briefId: v.id("briefs") },
   handler: async (ctx, { briefId }) => {
+    if (!(await getAuthUserId(ctx))) return [];
     const briefTeams = await ctx.db
       .query("briefTeams")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
@@ -1318,6 +1328,10 @@ export const getTeamsForBrief = query({
 export const getBriefGraphData = query({
   args: { briefId: v.id("briefs") },
   handler: async (ctx, { briefId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const me = await ctx.db.get(userId);
+    if (!me || !(await canViewBrief(ctx, me, briefId))) return null;
     const brief = await ctx.db.get(briefId);
     if (!brief) return null;
     const briefTeams = await ctx.db
@@ -1412,6 +1426,7 @@ export const updateTeamOrder = mutation({
 export const listTaskConnections = query({
   args: { briefId: v.id("briefs") },
   handler: async (ctx, { briefId }) => {
+    if (!(await getAuthUserId(ctx))) return [];
     return await ctx.db
       .query("taskConnections")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))

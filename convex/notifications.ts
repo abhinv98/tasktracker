@@ -2,34 +2,6 @@ import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const createNotification = mutation({
-  args: {
-    recipientId: v.id("users"),
-    type: v.union(
-      v.literal("task_assigned"),
-      v.literal("task_status_changed"),
-      v.literal("brief_assigned"),
-      v.literal("deliverable_submitted"),
-      v.literal("priority_changed"),
-      v.literal("brief_completed"),
-      v.literal("team_added"),
-      v.literal("comment")
-    ),
-    title: v.string(),
-    message: v.string(),
-    briefId: v.optional(v.id("briefs")),
-    taskId: v.optional(v.id("tasks")),
-    triggeredBy: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("notifications", {
-      ...args,
-      read: false,
-      createdAt: Date.now(),
-    });
-  },
-});
-
 export const getNotifications = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit = 20 }) => {

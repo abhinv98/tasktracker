@@ -9,7 +9,11 @@ export const checkDeadlines = internalMutation({
     // Check task deadlines
     const tasks = await ctx.db.query("tasks").collect();
     for (const task of tasks) {
-      if (!task.deadline || task.status === "done") continue;
+      // Overdue applies to pending / in-progress / on-hold only, and not to
+      // tasks inside completed or archived briefs (see STATUSES.txt).
+      if (!task.deadline || task.status === "done" || task.status === "review") continue;
+      const brief = await ctx.db.get(task.briefId);
+      if (!brief || brief.status === "completed" || brief.status === "archived") continue;
 
       // 24h reminder
       if (task.deadline > now && task.deadline <= in24h) {
@@ -41,14 +45,13 @@ export const checkDeadlines = internalMutation({
 
       // Overdue - notify the manager, assignor, and team lead
       if (task.deadline < now) {
-        const brief = await ctx.db.get(task.briefId);
         const recipientIds = new Set<string>();
 
         if (brief?.assignedManagerId) recipientIds.add(brief.assignedManagerId);
         if (task.assignedBy) recipientIds.add(task.assignedBy);
 
         // For helper tasks, also notify team lead
-        if (task.parentTaskId) {
+        if (task.isHelper) {
           const assigneeTeams = await ctx.db
             .query("userTeams")
             .withIndex("by_user", (q) => q.eq("userId", task.assigneeId))

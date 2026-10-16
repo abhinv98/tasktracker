@@ -42,6 +42,7 @@ export const getTeamMembers = query({
 export const getTeamsForUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
+    if (!(await getAuthUserId(ctx))) return [];
     const userTeams = await ctx.db
       .query("userTeams")
       .withIndex("by_user", (q) => q.eq("userId", userId))

@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
-import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
+import { autoApproveDeliverablesForTaskTree, creativeSlotTarget } from "./lib/autoApproveDeliverables";
 import { resolveCalendarTaskTeam } from "./contentCalendar";
 import type { Id } from "./_generated/dataModel";
 
@@ -52,10 +52,22 @@ async function finalizeApprovedDeliverable(
     .query("deliverables")
     .withIndex("by_task", (q: any) => q.eq("taskId", taskId))
     .collect();
-  const allApproved = allTaskDeliverables.every((d: any) => d.status === "approved");
+  // Rejected / sent-back rows stay on the task after a resubmission; they
+  // must not block completion forever. A task with creative slots closes
+  // only once every slot has an approved deliverable.
+  const live = allTaskDeliverables.filter(
+    (d: any) =>
+      d.status !== "rejected" &&
+      d.teamLeadStatus !== "changes_requested" &&
+      d.mainAssigneeStatus !== "changes_requested"
+  );
+  const task = await ctx.db.get(taskId);
+  const brief = task ? await ctx.db.get(task.briefId) : null;
+  const slotTarget = task && !task.handoffSourceTaskId ? creativeSlotTarget(task, brief) : 1;
+  const allApproved =
+    live.length >= slotTarget && live.every((d: any) => d.status === "approved");
 
   if (allApproved) {
-    const task = await ctx.db.get(taskId);
     if (task?.clientFacing) {
       await ctx.db.patch(taskId, { status: "review" });
       await syncSingleTaskBriefStatus(ctx, briefId, "review");
@@ -68,7 +80,7 @@ async function finalizeApprovedDeliverable(
       await syncMultiTaskBriefStatus(ctx, briefId, taskId);
 
       await cascadeDoneToChildren(ctx, taskId, triggeredByUserId);
-      await autoApproveDeliverablesForTaskTree(ctx, taskId, triggeredByUserId);
+      await autoApproveDeliverablesForTaskTree(ctx, taskId, triggeredByUserId, { fillSlots: false });
     }
     await propagateResourcesToDownstreamTasks(ctx, taskId, briefId);
   }
@@ -88,6 +100,88 @@ async function findTeamLeadForUser(ctx: any, userId: string) {
   );
   const team = teams.find((t: any) => t);
   return team ? { teamId: team._id, leadId: team.leadId, teamName: team.name } : null;
+}
+
+// ─── Helper: move a main-assignee-approved helper deliverable to the TL gate ──
+// Called by mainAssigneeApprove so helper work never stalls between gates.
+// Clears the TL gate itself when there is no reviewing lead (no team, or the
+// lead is the helper or the main assignee who just approved) and hands the
+// deliverable to the brand managers instead.
+async function routeHelperDeliverableToTeamLead(
+  ctx: any,
+  deliverable: any,
+  subTask: any,
+  parentTask: any,
+  reviewerId: any
+) {
+  if (deliverable.teamLeadStatus) return;
+  const now = Date.now();
+  const reviewer = await ctx.db.get(reviewerId);
+  const reviewerName = reviewer?.name ?? "Main assignee";
+  const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
+  const leadId = teamInfo?.leadId;
+
+  if (leadId && leadId !== deliverable.submittedBy && leadId !== reviewerId) {
+    await ctx.db.patch(deliverable._id, { teamLeadStatus: "pending" });
+    await ctx.db.insert("notifications", {
+      recipientId: leadId,
+      type: "deliverable_submitted",
+      title: "Sub-task deliverable for review",
+      message: `${reviewerName} passed a helper deliverable for "${subTask.title}" on "${parentTask.title}" for your review`,
+      briefId: subTask.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: reviewerId,
+      read: false,
+      createdAt: now,
+    });
+    return;
+  }
+
+  await ctx.db.patch(deliverable._id, {
+    teamLeadStatus: "approved",
+    teamLeadReviewedBy: reviewerId,
+    teamLeadReviewNote: leadId
+      ? "Auto-cleared: the team lead already reviewed this as main assignee or submitter"
+      : "Auto-cleared: helper has no team lead",
+    teamLeadReviewedAt: now,
+    passedToManagerBy: reviewerId,
+    passedToManagerAt: now,
+  });
+  const brief = await ctx.db.get(subTask.briefId);
+  if (!brief?.brandId) return;
+  const bms = await ctx.db
+    .query("brandManagers")
+    .withIndex("by_brand", (q: any) => q.eq("brandId", brief.brandId))
+    .collect();
+  for (const bm of bms) {
+    if (bm.managerId === reviewerId) continue;
+    await ctx.db.insert("notifications", {
+      recipientId: bm.managerId,
+      type: "deliverable_submitted",
+      title: "Deliverable ready for brand-manager review",
+      message: `${reviewerName} approved a helper deliverable for "${subTask.title}" on "${parentTask.title}"`,
+      briefId: subTask.briefId,
+      taskId: deliverable.taskId,
+      triggeredBy: reviewerId,
+      read: false,
+      createdAt: now,
+    });
+  }
+}
+
+// ─── Helper: a deliverable's files (Convex storage + R2 uploads) ──────
+async function deliverableFiles(ctx: any, d: any): Promise<{ name: string; url: string }[]> {
+  const convexFiles = await Promise.all(
+    (d.fileIds ?? []).map(async (fileId: any, idx: number) => ({
+      name: d.fileNames?.[idx] ?? "file",
+      url: (await ctx.storage.getUrl(fileId)) ?? "",
+    }))
+  );
+  const r2Files = (d.r2FileKeys ?? []).map((key: string, idx: number) => ({
+    name: d.r2FileNames?.[idx] ?? "file",
+    url: `/api/r2-file?key=${encodeURIComponent(key)}`,
+  }));
+  return [...convexFiles.filter((f) => f.url), ...r2Files];
 }
 
 // ─── Helper: check if user is brand manager ────────
@@ -149,27 +243,7 @@ export const listDeliverables = query({
         const task = tasks.find((t) => t._id === d.taskId);
         const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          const convexFiles = await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return {
-                name: d.fileNames?.[idx] ?? "file",
-                url: url ?? "",
-              };
-            })
-          );
-          files = convexFiles.filter((f) => f.url);
-        }
-        // Also include R2-stored files
-        if (d.r2FileKeys && d.r2FileKeys.length > 0) {
-          const r2Files = d.r2FileKeys.map((key, idx) => ({
-            name: d.r2FileNames?.[idx] ?? "file",
-            url: `/api/r2-file?key=${encodeURIComponent(key)}`,
-          }));
-          files = [...files, ...r2Files];
-        }
+        const files = await deliverableFiles(ctx, d);
 
         // Find submitter's team and lead
         let teamLeadName: string | null = null;
@@ -189,7 +263,7 @@ export const listDeliverables = query({
           }
         }
 
-        const isSubTask = !!task?.parentTaskId;
+        const isSubTask = !!task?.isHelper;
         let parentTaskTitle: string | null = null;
         let mainAssigneeName: string | null = null;
         const mainAssigneeReviewer = d.mainAssigneeReviewedBy
@@ -289,18 +363,9 @@ export const listTeamLeadPendingApprovals = query({
           (bm) => bm.managerId === userId
         );
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-            })
-          );
-          files = files.filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
 
-        const isSubTask = !!task?.parentTaskId;
+        const isSubTask = !!task?.isHelper;
         let mainAssigneeName: string | null = null;
         let parentTaskTitle: string | null = null;
         if (isSubTask && task?.parentTaskId) {
@@ -424,16 +489,7 @@ export const listManagerDeliverables = query({
           }
         }
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-            })
-          );
-          files = files.filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
 
         // Check if this deliverable has been handed off already
         const handoffs = await ctx.db
@@ -531,15 +587,7 @@ export const listManagerDeliverables = query({
           return u ? { _id: u._id, name: u.name ?? u.email ?? "Unknown" } : null;
         }).filter(Boolean);
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = (await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-            })
-          )).filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
 
         return {
           ...d,
@@ -574,15 +622,7 @@ export const listManagerDeliverables = query({
         const task = tasks.find((t) => t._id === d.taskId);
         const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
         const brand = brief?.brandId ? brands.find((b) => b._id === brief.brandId) : null;
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = (await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-            })
-          )).filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
         return {
           ...d,
           submitterName: submitter?.name ?? submitter?.email ?? "Unknown",
@@ -717,17 +757,7 @@ export const listClientApprovedDeliverables = query({
           .filter((t): t is NonNullable<typeof t> => !!t)
           .map((t) => ({ id: t._id as string, name: t.name }));
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = (
-            await Promise.all(
-              d.fileIds.map(async (fileId, idx) => {
-                const url = await ctx.storage.getUrl(fileId);
-                return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-              })
-            )
-          ).filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
 
         // Approval source: client (JSR) vs internal (BM only). Used by the
         // UI so internally-approved items don't claim a phantom client.
@@ -853,7 +883,7 @@ export const submitDeliverable = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
 
-    const isSubTask = !!task.parentTaskId;
+    const isSubTask = !!task.isHelper;
     let parentTask: any = null;
     if (isSubTask) {
       parentTask = await ctx.db.get(task.parentTaskId!);
@@ -1834,7 +1864,9 @@ export const listMainAssigneePendingReviews = query({
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
     const subTaskDeliverables = allDeliverables.filter((d) => {
-      if (d.mainAssigneeStatus !== "pending") return false;
+      const awaitingMain = d.mainAssigneeStatus === "pending";
+      const stuckAfterMain = d.mainAssigneeStatus === "approved" && !d.teamLeadStatus;
+      if (!awaitingMain && !stuckAfterMain) return false;
       if (d.submittedBy === userId) return false;
       return true;
     });
@@ -1846,22 +1878,13 @@ export const listMainAssigneePendingReviews = query({
     const results = await Promise.all(
       subTaskDeliverables.map(async (d) => {
         const subTask = tasks.find((t) => t._id === d.taskId);
-        if (!subTask?.parentTaskId || !myTaskIds.has(subTask.parentTaskId)) return null;
+        if (!subTask?.isHelper || !subTask.parentTaskId || !myTaskIds.has(subTask.parentTaskId)) return null;
 
         const parentTask = tasks.find((t) => t._id === subTask.parentTaskId);
         const submitter = users.find((u) => u._id === d.submittedBy);
         const brief = subTask ? briefs.find((b) => b._id === subTask.briefId) : null;
 
-        let files: { name: string; url: string }[] = [];
-        if (d.fileIds && d.fileIds.length > 0) {
-          files = await Promise.all(
-            d.fileIds.map(async (fileId, idx) => {
-              const url = await ctx.storage.getUrl(fileId);
-              return { name: d.fileNames?.[idx] ?? "file", url: url ?? "" };
-            })
-          );
-          files = files.filter((f) => f.url);
-        }
+        const files = await deliverableFiles(ctx, d);
 
         return {
           ...d,
@@ -1895,10 +1918,12 @@ export const getMainAssigneePendingCount = query({
     const tasks = await ctx.db.query("tasks").collect();
 
     return allDeliverables.filter((d) => {
-      if (d.mainAssigneeStatus !== "pending") return false;
+      const awaitingMain = d.mainAssigneeStatus === "pending";
+      const stuckAfterMain = d.mainAssigneeStatus === "approved" && !d.teamLeadStatus;
+      if (!awaitingMain && !stuckAfterMain) return false;
       if (d.submittedBy === userId) return false;
       const subTask = tasks.find((t) => t._id === d.taskId);
-      return subTask?.parentTaskId && myTaskIds.has(subTask.parentTaskId);
+      return subTask?.isHelper && subTask.parentTaskId && myTaskIds.has(subTask.parentTaskId);
     }).length;
   },
 });
@@ -1920,7 +1945,7 @@ export const mainAssigneeApprove = mutation({
     }
 
     const subTask = await ctx.db.get(deliverable.taskId);
-    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+    if (!subTask?.isHelper || !subTask.parentTaskId) throw new Error("Not a sub-task deliverable");
 
     const parentTask = await ctx.db.get(subTask.parentTaskId);
     if (!parentTask || parentTask.assigneeId !== userId) {
@@ -1933,6 +1958,7 @@ export const mainAssigneeApprove = mutation({
       mainAssigneeReviewNote: note,
       mainAssigneeReviewedAt: Date.now(),
     });
+    await routeHelperDeliverableToTeamLead(ctx, deliverable, subTask, parentTask, userId);
 
     const user = await ctx.db.get(userId);
     await ctx.db.insert("notifications", {
@@ -1966,7 +1992,7 @@ export const mainAssigneeReject = mutation({
     }
 
     const subTask = await ctx.db.get(deliverable.taskId);
-    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+    if (!subTask?.isHelper || !subTask.parentTaskId) throw new Error("Not a sub-task deliverable");
 
     const parentTask = await ctx.db.get(subTask.parentTaskId);
     if (!parentTask || parentTask.assigneeId !== userId) {
@@ -2025,32 +2051,15 @@ export const passSubTaskToTeamLead = mutation({
     }
 
     const subTask = await ctx.db.get(deliverable.taskId);
-    if (!subTask?.parentTaskId) throw new Error("Not a sub-task deliverable");
+    if (!subTask?.isHelper || !subTask.parentTaskId) throw new Error("Not a sub-task deliverable");
 
     const parentTask = await ctx.db.get(subTask.parentTaskId);
     if (!parentTask || parentTask.assigneeId !== userId) {
       throw new Error("Only the main task assignee can pass this to the team lead");
     }
 
-    await ctx.db.patch(deliverableId, {
-      teamLeadStatus: "pending",
-    });
-
-    const teamInfo = await findTeamLeadForUser(ctx, deliverable.submittedBy);
-    if (teamInfo?.leadId) {
-      const user = await ctx.db.get(userId);
-      await ctx.db.insert("notifications", {
-        recipientId: teamInfo.leadId,
-        type: "deliverable_submitted",
-        title: "Sub-task deliverable for review",
-        message: `${user?.name ?? "Main assignee"} passed a helper deliverable for "${subTask.title}" on "${parentTask.title}" for your review`,
-        briefId: subTask.briefId,
-        taskId: deliverable.taskId,
-        triggeredBy: userId,
-        read: false,
-        createdAt: Date.now(),
-      });
-    }
+    if (deliverable.teamLeadStatus) throw new Error("Already passed to the team lead");
+    await routeHelperDeliverableToTeamLead(ctx, deliverable, subTask, parentTask, userId);
   },
 });
 
@@ -2637,6 +2646,35 @@ export const handoffDeliverable = mutation({
     const isSingleTask = sourceBrief.briefType === "single_task";
     let targetBriefId: any;
 
+    const existingHandoffs = await ctx.db
+      .query("deliverableHandoffs")
+      .withIndex("by_source_task", (q: any) => q.eq("sourceTaskId", sourceTask._id))
+      .collect();
+
+    // Idempotency: a double-clicked Hand off resends the same deliverable → team.
+    // Return the handoff we just made instead of creating a second task.
+    const recentSame = existingHandoffs.find(
+      (h: any) =>
+        h.sourceDeliverableId === deliverableId &&
+        h.targetTeamId === targetTeamId &&
+        Date.now() - h.handedOffAt < 15_000
+    );
+    if (recentSame) return { targetTaskId: recentSame.targetTaskId, targetBriefId: recentSame.targetBriefId };
+
+    // Single-task sources spawn a new brief per handoff. Reuse the open handoff
+    // brief for this team so N deliverables don't become N briefs + N tasks.
+    let openSingleTaskHandoff: any = null;
+    if (!targetExistingTaskId && isSingleTask && !forceNewHandoffTask) {
+      for (const h of existingHandoffs) {
+        if (h.targetTeamId !== targetTeamId) continue;
+        const t = await ctx.db.get(h.targetTaskId);
+        if (t && t.status !== "done") {
+          openSingleTaskHandoff = h;
+          break;
+        }
+      }
+    }
+
     if (targetExistingTaskId) {
       // Pre-fetch chosen task so we can use its brief as the target brief.
       const chosenForBrief = await ctx.db.get(targetExistingTaskId);
@@ -2652,6 +2690,8 @@ export const handoffDeliverable = mutation({
       if (!teamAlreadyLinked) {
         await ctx.db.insert("briefTeams", { briefId: targetBriefId, teamId: targetTeamId });
       }
+    } else if (openSingleTaskHandoff) {
+      targetBriefId = openSingleTaskHandoff.targetBriefId;
     } else if (isSingleTask) {
       // Create a new single_task brief
       const allBriefs = await ctx.db.query("briefs").collect();
@@ -2702,12 +2742,8 @@ export const handoffDeliverable = mutation({
       }
     }
 
-    // Check if a handoff task already exists for the same source task + target team
+    // Reuse the handoff task already made for this source task + target team
     // (prevents duplication when handing off multiple creative deliverables)
-    const existingHandoffs = await ctx.db
-      .query("deliverableHandoffs")
-      .withIndex("by_source_task", (q: any) => q.eq("sourceTaskId", sourceTask._id))
-      .collect();
     const existingHandoffForTeam = existingHandoffs.find(
       (h: any) => h.targetTeamId === targetTeamId && h.targetBriefId === targetBriefId
     );

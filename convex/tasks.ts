@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { canViewBrief } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -32,6 +33,11 @@ function normalizeDeadlineToEndOfDay(deadline: number): number {
 export const listTasksForBrief = query({
   args: { briefId: v.id("briefs") },
   handler: async (ctx, { briefId }) => {
+    const me = await getAuthUserId(ctx);
+    const meDoc = me ? await ctx.db.get(me) : null;
+    if (!meDoc || !(await canViewBrief(ctx, meDoc, briefId))) {
+      return { tasks: [], byTeam: {}, users: [] };
+    }
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
@@ -79,6 +85,7 @@ export function inheritedDescription(
 export const listTasksForUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
+    if (!(await getAuthUserId(ctx))) return [];
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
@@ -286,8 +293,12 @@ export const getTaskLocation = query({
 export const getTaskDetail = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {
+    const me = await getAuthUserId(ctx);
+    const meDoc = me ? await ctx.db.get(me) : null;
+    if (!meDoc) return null;
     const raw = await ctx.db.get(taskId);
     if (!raw) return null;
+    if (!(await canViewBrief(ctx, meDoc, raw.briefId))) return null;
     const parent = raw.parentTaskId ? await ctx.db.get(raw.parentTaskId) : null;
     const task = { ...raw, description: inheritedDescription(raw, parent) };
     const brief = await ctx.db.get(task.briefId);
@@ -435,6 +446,11 @@ export const updateTask = mutation({
     if (fields.durationMinutes !== undefined) updates.durationMinutes = fields.durationMinutes;
     if (fields.deadline !== undefined) updates.deadline = normalizeDeadlineToEndOfDay(fields.deadline);
     if (clearDeadline) updates.deadline = undefined;
+    if ("deadline" in updates) {
+      updates.overdueAcknowledged = undefined;
+      updates.overdueContacted = undefined;
+      updates.overdueContactDenied = undefined;
+    }
     if (fields.assignedBy !== undefined) updates.assignedBy = fields.assignedBy;
     if (fields.platform !== undefined) updates.platform = fields.platform;
     if (fields.contentType !== undefined) updates.contentType = fields.contentType;
@@ -1044,6 +1060,18 @@ export const createSubTask = mutation({
 
     const parentTask = await ctx.db.get(args.parentTaskId);
     if (!parentTask) throw new Error("Parent task not found");
+    if (parentTask.isHelper) throw new Error("Helpers can only be added to a main task");
+    if (parentTask.status === "done") throw new Error("This task is already done");
+    if (parentTask.assigneeId === args.assigneeId) {
+      throw new Error("This person is already the main assignee");
+    }
+    const siblings = await ctx.db
+      .query("tasks")
+      .withIndex("by_parent", (q) => q.eq("parentTaskId", args.parentTaskId))
+      .collect();
+    if (siblings.some((t) => t.isHelper && t.assigneeId === args.assigneeId && t.status !== "done")) {
+      throw new Error("This person is already a helper on this task");
+    }
 
     // Verify current user is a team lead of the assignee's team
     const assigneeTeams = await ctx.db
@@ -1079,6 +1107,8 @@ export const createSubTask = mutation({
       ...(args.durationMinutes ? { durationMinutes: args.durationMinutes } : {}),
       ...(subDeadline ? { deadline: subDeadline } : {}),
       parentTaskId: args.parentTaskId,
+      isHelper: true,
+      assignedAt: Date.now(),
     });
 
     await tagForOversight(ctx, {
@@ -1087,6 +1117,15 @@ export const createSubTask = mutation({
       assigneeId: args.assigneeId,
       assignedBy: userId,
       source: "sub_task",
+    });
+
+    await ctx.db.insert("activityLog", {
+      briefId: parentTask.briefId,
+      taskId: args.parentTaskId,
+      userId,
+      action: "added_helper",
+      details: JSON.stringify({ helperTaskId: taskId, assigneeId: args.assigneeId }),
+      timestamp: Date.now(),
     });
 
     await ctx.db.insert("notifications", {
@@ -1117,7 +1156,7 @@ export const getSubTasks = query({
       .collect();
 
     const users = await ctx.db.query("users").collect();
-    return subTasks.map((t) => {
+    return subTasks.filter((t) => t.isHelper).map((t) => {
       const assignee = users.find((u) => u._id === t.assigneeId);
       return {
         ...t,
@@ -1351,7 +1390,11 @@ export const extendTaskDeadline = mutation({
       deadline: normalizedNewDeadline,
       deadlineExtended: true,
       originalDeadline,
-      overdueAcknowledged: true,
+      // New deadline → fresh overdue tracking; an old acknowledgement must
+      // not mute alerts if this one is missed too.
+      overdueAcknowledged: undefined,
+      overdueContacted: undefined,
+      overdueContactDenied: undefined,
     });
 
     // Roll the new task deadline up to the brief (latest task deadline wins
