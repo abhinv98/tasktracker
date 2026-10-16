@@ -893,6 +893,9 @@ export const submitDeliverable = mutation({
     // would otherwise pass through. Any gate the submitter would own gets
     // auto-cleared with an audit note so nobody approves their own work.
     const brief = await ctx.db.get(task.briefId);
+    if (brief?.status === "on_hold") {
+      throw new Error("This brief is on hold. You cannot submit work until it is resumed.");
+    }
     const brandId = brief?.brandId ?? null;
     const submitterIsMainAssignee = isSubTask && parentTask?.assigneeId === userId;
     const teamInfo = await findTeamLeadForUser(ctx, userId);

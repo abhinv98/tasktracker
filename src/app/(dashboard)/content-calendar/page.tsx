@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -175,6 +175,7 @@ export default function ContentCalendarPage() {
   const stageEntriesMut = useMutation(api.contentCalendar.stageEntries);
   const unstageEntryMut = useMutation(api.contentCalendar.unstageEntry);
   const bulkShiftMut = useMutation(api.contentCalendar.bulkShiftDates);
+  const shiftInFlight = useRef(false);
   const bulkMoveMonthMut = useMutation(api.contentCalendar.bulkMoveToMonth);
   const duplicateEntryMut = useMutation(api.contentCalendar.duplicateEntry);
 
@@ -476,12 +477,14 @@ export default function ContentCalendarPage() {
   }
 
   async function handleBulkShift() {
-    if (selectedIds.size === 0) return;
+    // A shift is relative, so a double-click would apply it twice.
+    if (selectedIds.size === 0 || shiftInFlight.current) return;
     const delta = shiftStartDate ? undefined : parseInt(shiftDays, 10);
     if (!shiftStartDate && (delta === undefined || Number.isNaN(delta) || delta === 0)) {
       toast("error", "Enter days to shift, or pick a new start date");
       return;
     }
+    shiftInFlight.current = true;
     try {
       await bulkShiftMut({
         taskIds: [...selectedIds] as Id<"tasks">[],
@@ -493,6 +496,8 @@ export default function ContentCalendarPage() {
       setShiftStartDate("");
     } catch (err: any) {
       toast("error", err.message ?? "Failed to reschedule");
+    } finally {
+      shiftInFlight.current = false;
     }
   }
 
@@ -575,17 +580,17 @@ export default function ContentCalendarPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-white shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)] bg-white shrink-0">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-5 w-5 text-[var(--accent-admin-text)]" />
-            <h1 className="font-semibold text-[20px] text-[var(--text-primary)]">
+            <h1 className="font-semibold text-[18px] sm:text-[20px] text-[var(--text-primary)] whitespace-nowrap">
               Content Calendar
             </h1>
           </div>
 
           {/* Brand Selector */}
-          <div className="flex items-center gap-2 ml-4">
+          <div className="flex items-center gap-2 sm:ml-4">
             {selectedBrand && (
               <div
                 className="w-6 h-6 rounded-md flex items-center justify-center overflow-hidden shrink-0"

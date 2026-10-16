@@ -161,6 +161,23 @@ export async function getOrCreateCalendarBrief(
 }
 
 /** Ensure a month sheet exists for this brief (YYYY-MM). Used by create entry mutations. */
+/** Linked team tasks carry their entry's postDate (for "open in calendar"
+ *  and month filters). Move the ones still on the entry's old date with it. */
+export async function moveEntryChildrenPostDate(
+  ctx: any,
+  entry: { _id: any; postDate?: string },
+  newPostDate: string
+) {
+  if (!entry.postDate || entry.postDate === newPostDate) return;
+  const children = await ctx.db
+    .query("tasks")
+    .withIndex("by_parent", (q: any) => q.eq("parentTaskId", entry._id))
+    .collect();
+  for (const c of children) {
+    if (c.postDate === entry.postDate) await ctx.db.patch(c._id, { postDate: newPostDate });
+  }
+}
+
 export async function ensureSheetForMonth(
   ctx: any,
   briefId: any,
@@ -631,6 +648,7 @@ export const unstageEntry = mutation({
     const userId = await requireCalendarEditor(ctx, task.briefId);
     if (postDate) {
       await ensureSheetForMonth(ctx, task.briefId, postDate.substring(0, 7), userId);
+      await moveEntryChildrenPostDate(ctx, task, postDate);
     }
     await ctx.db.patch(taskId, {
       stagedAt: undefined,
@@ -678,6 +696,7 @@ export const bulkShiftDates = mutation({
     const monthsTouched = new Set<string>();
     for (const task of tasks) {
       const next = shiftDateString(task.postDate!, delta);
+      await moveEntryChildrenPostDate(ctx, task, next);
       await ctx.db.patch(task._id, { postDate: next });
       monthsTouched.add(next.substring(0, 7));
     }
@@ -702,9 +721,9 @@ export const bulkMoveToMonth = mutation({
       if (!task || !task.postDate) continue;
       if (task.briefId !== first.briefId) throw new Error("All entries must belong to the same calendar");
       const day = Math.min(Number(task.postDate.slice(8, 10)), maxDay);
-      await ctx.db.patch(taskId, {
-        postDate: `${month}-${String(day).padStart(2, "0")}`,
-      });
+      const next = `${month}-${String(day).padStart(2, "0")}`;
+      await moveEntryChildrenPostDate(ctx, task, next);
+      await ctx.db.patch(taskId, { postDate: next });
       briefId = task.briefId;
     }
     if (briefId) await ensureSheetForMonth(ctx, briefId, month, userId);
@@ -729,6 +748,15 @@ export const duplicateEntry = mutation({
     const maxOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
+
+    const replay = existingTasks.find(
+      (t) =>
+        !t.parentTaskId &&
+        t.title === task.title &&
+        t.postDate === postDate &&
+        Date.now() - t._creationTime < 10_000
+    );
+    if (replay) return replay._id;
 
     return await ctx.db.insert("tasks", {
       briefId: task.briefId,
@@ -1436,6 +1464,25 @@ export const createLinkedCalendarTask = mutation({
     // Sequential chain: whoever is currently last in line hands off to the
     // new task's team once their deliverable is approved.
     const chainBefore = await calendarEntryChain(ctx, args.parentTaskId);
+
+    // One task per team (or person) per entry: a second one duplicates the
+    // assignee's work and turns the handoff chain into a loop.
+    // (The chain already leaves out an admin-owned placeholder parent, except
+    // when it is the only member.)
+    const linked = chainBefore.filter(
+      (t: any) => t._id !== args.parentTaskId || parent.assigneeId !== parent.assignedBy
+    );
+    if (linked.some((t: any) => t.assigneeId === args.assigneeId)) {
+      throw new Error("This person already has a task on this entry");
+    }
+    if (args.teamId) {
+      const teams = await ctx.db.query("teams").collect();
+      for (const t of linked) {
+        if ((await resolveCalendarTaskTeam(ctx, t, teams)) === args.teamId) {
+          throw new Error("This team already has a task on this entry");
+        }
+      }
+    }
 
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,

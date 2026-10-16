@@ -17,7 +17,7 @@ interface TopBarProps {
 }
 
 const PATH_TO_TITLE: Record<string, string> = {
-  "/dashboard": "Overview",
+  "/dashboard": "Dashboard",
   "/my-tasks": "My Tasks",
   "/briefs": "Briefs",
   "/brief": "Brief Details",
@@ -42,15 +42,27 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/recruitment/activity": "Email Activity",
   "/my-requests": "My Requests",
   "/petty-cash": "Petty Cash",
+  "/content-calendar": "Content Calendar",
+  "/planner": "Planner",
+  "/discussions": "Discussions",
+  "/messages": "Messages",
+  "/freelancers": "Freelancers",
+  "/invoices": "Invoices",
+  "/approved-work": "Approved Work",
+  "/history": "History",
+  "/my-brands": "My Brands",
+  "/reports": "Reports",
 };
 
 function getPageTitle(pathname: string): string {
-  for (const [path, title] of Object.entries(PATH_TO_TITLE)) {
-    if (pathname === path || pathname.startsWith(path + "/")) {
-      return title;
+  // Longest matching prefix wins, so /recruitment/candidates beats /recruitment.
+  let best = "";
+  for (const path of Object.keys(PATH_TO_TITLE)) {
+    if ((pathname === path || pathname.startsWith(path + "/")) && path.length > best.length) {
+      best = path;
     }
   }
-  return "Overview";
+  return best ? PATH_TO_TITLE[best] : "";
 }
 
 export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {

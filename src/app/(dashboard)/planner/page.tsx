@@ -592,9 +592,9 @@ export default function PlannerPage() {
   const availableTasks = unscheduledTasks ?? [];
 
   return (
-    <div className="flex h-full bg-[var(--bg-primary)]">
-      {/* LEFT PANEL */}
-      <div className="w-72 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
+    <div className="flex flex-col md:flex-row h-full bg-[var(--bg-primary)]">
+      {/* LEFT PANEL — stacks above the schedule on phones */}
+      <div className="w-full md:w-72 max-h-[40vh] md:max-h-none shrink-0 flex flex-col border-b md:border-b-0 md:border-r border-[var(--border)] bg-white overflow-y-auto">
         {/* Header */}
         <div className="px-3 py-3 border-b border-[var(--border)]">
           <div className="flex items-center gap-2 mb-2">

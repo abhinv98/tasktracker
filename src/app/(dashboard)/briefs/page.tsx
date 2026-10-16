@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Modal, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 
 // The date filters store YYYY-MM-DD (they always have; the filtering below
 // parses that). DatePicker speaks timestamps. Convert at the boundary rather
@@ -1257,28 +1257,8 @@ export default function BriefsPage() {
       )}
 
       {/* Create Brief Modal */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          role="presentation"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeCreateModal();
-          }}
-        >
-          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto relative">
-            <div className="flex items-start justify-between gap-2 mb-4">
-              <h2 className="font-semibold text-[20px] text-[var(--text-primary)]">
-                Create Brief
-              </h2>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      {/* Native <dialog> via Modal: focus trap, inert page behind, Escape. */}
+      <Modal open={showModal} onClose={closeCreateModal} title="Create Brief" size="sm">
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               {/* Brief Mode Toggle */}
               <div>
@@ -1413,6 +1393,8 @@ export default function BriefsPage() {
                   )}
                 </div>
               )}
+              {/* Master briefs set client review per task, on the brief page. */}
+              {briefMode === "individual" && (
               <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                 <input
                   type="checkbox"
@@ -1425,6 +1407,7 @@ export default function BriefsPage() {
                   <p className="text-[11px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
                 </div>
               </label>
+              )}
               {showCreativesRequiredField(briefMode, briefType) && (
                 <div>
                   <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
@@ -1460,9 +1443,7 @@ export default function BriefsPage() {
                 <Button type="button" variant="secondary" onClick={closeCreateModal}>Cancel</Button>
               </div>
             </form>
-          </Card>
-        </div>
-      )}
+      </Modal>
 
       {/* Delete Brief Confirmation */}
       <ConfirmModal

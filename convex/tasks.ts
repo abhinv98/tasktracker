@@ -9,7 +9,7 @@ import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverable
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 import { tagForOversight } from "./lib/tagForOversight";
-import { ensureSheetForMonth, canEditCalendarBrief } from "./contentCalendar";
+import { ensureSheetForMonth, canEditCalendarBrief, moveEntryChildrenPostDate } from "./contentCalendar";
 import { parseArgs } from "util";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -345,6 +345,17 @@ export const createTask = mutation({
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", args.assigneeId))
       .collect();
+
+    // A re-clicked Create (slow round-trip, nothing changed on screen) sends
+    // the same task again. Return the one just made instead of a duplicate.
+    const replay = existingTasks.find(
+      (t) =>
+        t.briefId === args.briefId &&
+        t.title === args.title &&
+        Date.now() - t._creationTime < 10_000
+    );
+    if (replay) return replay._id;
+
     const maxOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
@@ -524,6 +535,7 @@ export const updateTask = mutation({
         if (newPostDate && /^\d{4}-\d{2}-\d{2}$/.test(newPostDate)) {
           const newMonth = newPostDate.slice(0, 7);
           await ensureSheetForMonth(ctx, task.briefId, newMonth, userId);
+          await moveEntryChildrenPostDate(ctx, task, newPostDate);
         }
       }
 
@@ -916,6 +928,13 @@ export const reassignTask = mutation({
       throw new Error("Not authorized");
     }
 
+    if (task.isHelper && task.parentTaskId) {
+      const parent = await ctx.db.get(task.parentTaskId);
+      if (parent?.assigneeId === newAssigneeId) {
+        throw new Error("This person is already the main assignee");
+      }
+    }
+
     const oldAssignee = task.assigneeId;
     await ctx.db.patch(taskId, { assigneeId: newAssigneeId });
 
@@ -1061,6 +1080,10 @@ export const createSubTask = mutation({
     const parentTask = await ctx.db.get(args.parentTaskId);
     if (!parentTask) throw new Error("Parent task not found");
     if (parentTask.isHelper) throw new Error("Helpers can only be added to a main task");
+    const parentBrief = await ctx.db.get(parentTask.briefId);
+    if (parentBrief?.status === "on_hold" || parentTask.status === "on-hold") {
+      throw new Error("This task is on hold. Resume it before adding helpers.");
+    }
     if (parentTask.status === "done") throw new Error("This task is already done");
     if (parentTask.assigneeId === args.assigneeId) {
       throw new Error("This person is already the main assignee");

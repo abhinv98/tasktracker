@@ -92,12 +92,20 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   const [helperDeadlineTime, setHelperDeadlineTime] = useState("");
   const [isCreatingSubTask, setIsCreatingSubTask] = useState(false);
 
+  // People can sit on several of the brief's teams; list each once, and
+  // never offer the main assignee as their own helper.
   const teamMembers = useMemo(() => {
     if (!graphData?.teams) return [];
-    return graphData.teams.flatMap((t: any) =>
+    const all = graphData.teams.flatMap((t: any) =>
       t.members.map((m: any) => m.user).filter(Boolean)
     );
-  }, [graphData]);
+    return [...new Map(all.map((u: any) => [u._id, u])).values()].filter(
+      (u: any) => u._id !== task?.assigneeId
+    );
+  }, [graphData, task?.assigneeId]);
+  const { toast } = useToast();
+  const myTeams = useQuery(api.teams.getTeamsForUser, user?._id ? { userId: user._id } : "skip");
+  const canAddHelper = isAdmin || (myTeams ?? []).some((t: any) => t?.leadId === user?._id);
 
   const assigneeName = useMemo(() => {
     if (!task || !tasksData?.byTeam) return "Unassigned";
@@ -222,7 +230,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
             <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide flex items-center gap-1.5">
               <ClipboardList className="w-3.5 h-3.5" /> Sub-Tasks ({subTasks?.length ?? 0})
             </p>
-            {isAdmin && task.status !== "done" && (
+            {canAddHelper && task.status !== "done" && (
               <button
                 onClick={() => setShowAddHelper(!showAddHelper)}
                 className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
@@ -258,6 +266,9 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
                   setHelperDeadline(undefined);
                   setHelperDeadlineTime("");
                   setShowAddHelper(false);
+                  toast("success", "Helper added");
+                } catch (err) {
+                  toast("error", err instanceof Error ? err.message : "Couldn't add helper");
                 } finally {
                   setIsCreatingSubTask(false);
                 }
@@ -697,7 +708,7 @@ export default function BriefPage() {
                   : "neutral"
             }
           >
-            {brief.status}
+            {brief.status.replace(/[-_]/g, " ")}
           </Badge>
           {brief.briefType && (
             <Badge variant="neutral">
@@ -928,8 +939,8 @@ export default function BriefPage() {
         {/* ── FLOW CANVAS (React Flow) ─────────────────────── */}
         <div className={`flex-1 overflow-hidden transition-all duration-300 ${panelMode !== "hidden" ? "mr-[420px]" : ""}`}>
           {/* Top toolbar */}
-          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-white z-10 relative">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-white z-10 relative">
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
               <span className="text-[11px] font-medium text-[var(--text-secondary)]">Progress</span>
               <div className="w-24 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
                 <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${progressPct}%` }} />
@@ -939,7 +950,7 @@ export default function BriefPage() {
             </div>
 
             {/* Canvas | List toggle */}
-            <div className="flex items-center rounded-lg border border-[var(--border)] overflow-hidden">
+            <div className="flex shrink-0 items-center rounded-lg border border-[var(--border)] overflow-hidden">
               {(["canvas", "list"] as const).map((v) => (
                 <button
                   key={v}
@@ -960,7 +971,7 @@ export default function BriefPage() {
                 type="button"
                 onClick={handleAutoLayout}
                 title="Re-arrange nodes into columns following the task flow"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Wand2 className="h-3 w-3" /> Auto-layout
               </button>
@@ -976,7 +987,7 @@ export default function BriefPage() {
                     setShowTeamPicker(false);
                     setShowAddTaskTeamPicker(false);
                   }}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+                  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
                     viewTeamFilter
                       ? "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
                       : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"

@@ -8,6 +8,7 @@ import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 import { tagForOversight } from "./lib/tagForOversight";
+import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
   const d = new Date(deadline);
@@ -1227,21 +1228,27 @@ export const deleteBrief = mutation({
     const brief = await ctx.db.get(briefId);
     if (!brief) throw new Error("Brief not found");
 
-    // Delete all tasks in this brief
+    // Delete every task with its full cascade (children, deliverables,
+    // comments, attachments, time entries, summaries…). Roots first; the
+    // cascade walks their children, so skip anything already gone.
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
-    for (const task of tasks) {
-      // Delete deliverables for each task
-      const deliverables = await ctx.db
-        .query("deliverables")
-        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+    for (const task of tasks.filter((t) => !t.parentTaskId)) {
+      await cascadeDeleteTask(ctx, task._id);
+    }
+    for (const task of tasks.filter((t) => t.parentTaskId)) {
+      if (await ctx.db.get(task._id)) await cascadeDeleteTask(ctx, task._id);
+    }
+
+    // Brief-level discussion and files
+    for (const table of ["comments", "attachments"] as const) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_parent", (q: any) => q.eq("parentType", "brief").eq("parentId", briefId))
         .collect();
-      for (const d of deliverables) {
-        await ctx.db.delete(d._id);
-      }
-      await ctx.db.delete(task._id);
+      for (const r of rows) await ctx.db.delete(r._id);
     }
 
     // Delete brief-team links

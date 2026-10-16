@@ -57,7 +57,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {/* Not aria-hidden: it holds a real dismiss button, and hiding focusable
           content from AT is its own bug. It sits outside any live region, so
           it stays silent on insert and the regions above do the announcing. */}
-      <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
+      {/* Top-right, under the top bar: bottom-right sat on top of side panels' sticky Save buttons. */}
+      <div className="fixed top-16 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <ToastMessage key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
         ))}

@@ -125,7 +125,12 @@ export async function autoApproveDeliverablesForTaskTree(
       .collect();
 
     for (const d of dels) {
-      if (d.status === "rejected") continue;
+      // Rejected and sent-back versions are history, not pending work.
+      if (
+        d.status === "rejected" ||
+        d.teamLeadStatus === "changes_requested" ||
+        d.mainAssigneeStatus === "changes_requested"
+      ) continue;
       if (
         d.status === "approved" &&
         d.teamLeadStatus === "approved" &&

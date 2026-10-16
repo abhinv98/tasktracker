@@ -602,7 +602,8 @@ function BriefFlowCanvasInner({
         onEdgesDelete={handleEdgesDelete}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        // Keep card text readable on first load; users can zoom out further.
+        fitViewOptions={{ padding: 0.15, minZoom: 0.7 }}
         connectionLineStyle={{ stroke: accentStroke, strokeWidth: 2 }}
         defaultEdgeOptions={{
           type: "smoothstep",
@@ -635,7 +636,7 @@ function BriefFlowCanvasInner({
             return (STATUS_CONFIG[taskData?.status]?.color) ?? "#94a3b8";
           }}
           maskColor="rgba(241, 245, 249, 0.7)"
-          className="!bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
+          className="!hidden md:!block !bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
           pannable
           zoomable
         />

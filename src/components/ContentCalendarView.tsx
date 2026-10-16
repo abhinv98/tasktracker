@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, useToast } from "@/components/ui";
 import {
   Plus,
   Trash2,
@@ -1379,11 +1379,17 @@ export function ContentCalendarEntrySidebar({
     }
   }
 
+  // A linked team task is removed through removeLinkedTask so the entry's
+  // handoff chain is repaired; the entry itself goes with all its tasks.
+  const isLinkedTask = !!task.parentTaskId;
+  const [confirmDelete, setConfirmDelete] = useState(false);
   async function handleDelete() {
     try {
-      await deleteTask({ taskId: task._id });
+      if (isLinkedTask) await removeLinkedTask({ taskId: task._id });
+      else await deleteTask({ taskId: task._id });
+      setConfirmDelete(false);
       onClose();
-      toast("success", "Entry deleted");
+      toast("success", isLinkedTask ? "Team task removed" : "Entry deleted");
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to delete");
     }
@@ -1622,13 +1628,28 @@ export function ContentCalendarEntrySidebar({
         <div className="flex items-center gap-1">
           {user?.role === "admin" && (
             <button
-              onClick={handleDelete}
+              onClick={() => setConfirmDelete(true)}
               className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
-              title="Delete entry"
+              title={isLinkedTask ? "Remove team task" : "Delete entry"}
+              aria-label={isLinkedTask ? "Remove team task" : "Delete entry"}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
+          <ConfirmModal
+            open={confirmDelete}
+            title={isLinkedTask ? "Remove team task?" : "Delete entry?"}
+            message={
+              isLinkedTask
+                ? `"${task.title}" will be removed from this entry. The entry and its other team tasks stay.`
+                : `"${task.title}" and all of its team tasks will be deleted.`
+            }
+            confirmLabel={isLinkedTask ? "Remove" : "Delete"}
+            confirmingLabel={isLinkedTask ? "Removing…" : "Deleting…"}
+            variant="danger"
+            onConfirm={handleDelete}
+            onCancel={() => setConfirmDelete(false)}
+          />
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"

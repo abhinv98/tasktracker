@@ -106,6 +106,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const deleteDeliverable = useMutation(api.approvals.deleteDeliverable);
 
   const subTasks = useQuery(api.tasks.getSubTasks, { parentTaskId: taskId as Id<"tasks"> });
+  const myTeams = useQuery(api.teams.getTeamsForUser, user ? { userId: user._id } : "skip");
   const createSubTask = useMutation(api.tasks.createSubTask);
   const { toast } = useToast();
   const requestTaskRedo = useMutation(api.tasks.requestTaskRedo);
@@ -241,6 +242,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
   const isAssignee = user._id === task.assigneeId;
   const isAdmin = user.role === "admin";
+  // Team leads can add helpers from their own team (server enforces which).
+  const canAddHelper = isAdmin || (myTeams ?? []).some((t: any) => t?.leadId === user._id);
   // Tasks already in "review" have been submitted by the assignee — the ball
   // is in the reviewer's court, so the overdue flag should clear.
   const isOverdue =
@@ -364,6 +367,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (isSavingEdit || !task) return;
+    if (!editAssignee) {
+      toast("error", "Select an assignee");
+      return;
+    }
     setIsSavingEdit(true);
     try {
       let finalDeadline = editDeadline;
@@ -381,6 +388,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         ...(finalDeadline !== undefined ? { deadline: finalDeadline } : { clearDeadline: true }),
       });
       setShowEditForm(false);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Couldn't save changes");
     } finally {
       setIsSavingEdit(false);
     }
@@ -1052,13 +1061,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           </div>
 
           {/* Sub-Tasks Section */}
-          {((subTasks ?? []).length > 0 || isAdmin) && (
+          {((subTasks ?? []).length > 0 || canAddHelper) && (
             <div className="p-5 space-y-3 border-t border-[var(--border)]">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
                   Sub-Tasks ({subTasks?.length ?? 0})
                 </h4>
-                {isAdmin && task.status !== "done" && (
+                {canAddHelper && task.status !== "done" && (
                   <button
                     onClick={() => setShowAddHelper(!showAddHelper)}
                     className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
@@ -1084,6 +1093,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       setHelperAssignee("");
                       setHelperDesc("");
                       setShowAddHelper(false);
+                      toast("success", "Helper added");
+                    } catch (err) {
+                      toast("error", err instanceof Error ? err.message : "Couldn't add helper");
                     } finally {
                       setIsCreatingSubTask(false);
                     }

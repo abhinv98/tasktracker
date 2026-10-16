@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
@@ -31,6 +31,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = useQuery(api.users.getCurrentUser);
+  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,12 +47,14 @@ export default function DashboardLayout({
   // full page load resets).
   useNavDepthTracker(pathname);
 
-  // Redirect unauthenticated users to sign-in
+  // Redirect unauthenticated users to sign-in. getCurrentUser answers null
+  // before the auth token is attached on a cold load, so trust the auth
+  // state, not the query, or a refresh logs people out.
   useEffect(() => {
-    if (user === null) {
+    if (!authLoading && !isAuthenticated) {
       router.replace("/sign-in");
     }
-  }, [user, router]);
+  }, [authLoading, isAuthenticated, router]);
 
   // Role-based route protection
   useEffect(() => {
