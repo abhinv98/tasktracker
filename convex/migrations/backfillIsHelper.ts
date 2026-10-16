@@ -19,7 +19,7 @@ export const run = internalMutation({
     const marked: string[] = [];
     for (const t of tasks) {
       if (!t.parentTaskId || t.isHelper) continue;
-      if (!taggedSubTasks.has(t._id) && !t.title.endsWith(" - Sub-task")) continue;
+      if (!taggedSubTasks.has(t._id) && !/ [-—] Sub-task$/.test(t.title)) continue;
       marked.push(`${t._id} ${t.title}`);
       if (!dryRun) await ctx.db.patch(t._id, { isHelper: true });
     }
