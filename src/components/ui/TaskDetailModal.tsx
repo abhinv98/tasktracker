@@ -34,6 +34,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
+import { ConfirmModal } from "./ConfirmModal";
 import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
@@ -108,6 +109,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const subTasks = useQuery(api.tasks.getSubTasks, { parentTaskId: taskId as Id<"tasks"> });
   const myTeams = useQuery(api.teams.getTeamsForUser, user ? { userId: user._id } : "skip");
   const createSubTask = useMutation(api.tasks.createSubTask);
+  const removeHelper = useMutation(api.tasks.removeHelper);
+  const [helperToRemove, setHelperToRemove] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
   const requestTaskRedo = useMutation(api.tasks.requestTaskRedo);
   const canRedo =
@@ -1167,10 +1170,40 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       >
                         {stStatus.label}
                       </span>
+                      {canAddHelper && st.status !== "done" && (
+                        <button
+                          type="button"
+                          onClick={() => setHelperToRemove({ id: st._id, name: st.assigneeName })}
+                          className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors shrink-0"
+                          aria-label={`Remove helper ${st.assigneeName}`}
+                          title="Remove helper"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
               </div>
+              <ConfirmModal
+                open={!!helperToRemove}
+                title="Remove helper?"
+                message={`${helperToRemove?.name ?? "This person"} will be removed from this task, along with any work they submitted on it.`}
+                confirmLabel="Remove"
+                confirmingLabel="Removing…"
+                variant="danger"
+                onConfirm={async () => {
+                  if (!helperToRemove) return;
+                  try {
+                    await removeHelper({ taskId: helperToRemove.id as Id<"tasks"> });
+                    toast("success", "Helper removed");
+                  } catch (err) {
+                    toast("error", err instanceof Error ? err.message : "Couldn't remove helper");
+                  }
+                  setHelperToRemove(null);
+                }}
+                onCancel={() => setHelperToRemove(null)}
+              />
             </div>
           )}
 

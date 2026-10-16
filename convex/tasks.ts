@@ -1120,7 +1120,8 @@ export const createSubTask = mutation({
     const subDeadline = args.deadline ? normalizeDeadlineToEndOfDay(args.deadline) : undefined;
     const taskId = await ctx.db.insert("tasks", {
       briefId: parentTask.briefId,
-      title: `${parentTask.title} - Sub-task`,
+      // Name the help itself so helper rows and review queues are tellable apart.
+      title: `${args.description.trim().split("\n")[0].slice(0, 60)} · helping on ${parentTask.title}`,
       description: args.description,
       assigneeId: args.assigneeId,
       assignedBy: userId,
@@ -1164,6 +1165,50 @@ export const createSubTask = mutation({
     });
 
     return taskId;
+  },
+});
+
+/** Remove a helper from a task. Admins, or a team lead of the helper's team
+ *  (the same people who may add one). Cascades the helper sub-task. */
+export const removeHelper = mutation({
+  args: { taskId: v.id("tasks") },
+  handler: async (ctx, { taskId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const helper = await ctx.db.get(taskId);
+    if (!helper?.isHelper || !helper.parentTaskId) throw new Error("Not a helper task");
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "admin") {
+      const memberships = await ctx.db
+        .query("userTeams")
+        .withIndex("by_user", (q) => q.eq("userId", helper.assigneeId))
+        .collect();
+      const teams = await Promise.all(memberships.map((m) => ctx.db.get(m.teamId)));
+      if (!teams.some((t) => t?.leadId === userId)) {
+        throw new Error("Only admins or the helper's team lead can remove helpers");
+      }
+    }
+    const parent = await ctx.db.get(helper.parentTaskId);
+    await cascadeDeleteTask(ctx, taskId);
+    await ctx.db.insert("notifications", {
+      recipientId: helper.assigneeId,
+      type: "task_status_changed",
+      title: "Removed as helper",
+      message: `You are no longer helping on "${parent?.title ?? helper.title}"`,
+      briefId: helper.briefId,
+      ...(parent ? { taskId: parent._id } : {}),
+      triggeredBy: userId,
+      read: false,
+      createdAt: Date.now(),
+    });
+    await ctx.db.insert("activityLog", {
+      briefId: helper.briefId,
+      taskId: helper.parentTaskId,
+      userId,
+      action: "removed_helper",
+      details: JSON.stringify({ assigneeId: helper.assigneeId }),
+      timestamp: Date.now(),
+    });
   },
 });
 

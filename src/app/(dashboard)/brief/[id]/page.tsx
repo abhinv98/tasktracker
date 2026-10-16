@@ -84,6 +84,8 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
   const subTasks = useQuery(api.tasks.getSubTasks, taskId ? { parentTaskId: taskId } : "skip");
   const graphData = useQuery(api.briefs.getBriefGraphData, { briefId: brief._id });
   const createSubTask = useMutation(api.tasks.createSubTask);
+  const removeHelper = useMutation(api.tasks.removeHelper);
+  const [helperToRemove, setHelperToRemove] = useState<{ id: string; name: string } | null>(null);
 
   const [showAddHelper, setShowAddHelper] = useState(false);
   const [helperAssignee, setHelperAssignee] = useState("");
@@ -332,17 +334,49 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
           {subTasks && subTasks.length > 0 ? (
             <div className="space-y-1.5">
               {subTasks.map((st: any) => (
-                <div key={st._id} className="flex items-center justify-between bg-[var(--bg-primary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)]">
-                  <div>
-                    <p className="text-[12px] font-medium text-[var(--text-primary)]">{st.title}</p>
+                <div key={st._id} className="flex items-center justify-between gap-2 bg-[var(--bg-primary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)]">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-[var(--text-primary)]">{st.description || st.title}</p>
                     <p className="text-[11px] text-[var(--text-muted)]">{st.assigneeName}</p>
                   </div>
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 font-medium text-[11px] rounded-full"
-                    style={{ color: STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)", backgroundColor: `color-mix(in srgb, ${STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)"} 12%, transparent)` }}
-                  >{STATUS_LABELS[st.status]?.label ?? st.status}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 font-medium text-[11px] rounded-full"
+                      style={{ color: STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)", backgroundColor: `color-mix(in srgb, ${STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)"} 12%, transparent)` }}
+                    >{STATUS_LABELS[st.status]?.label ?? st.status}</span>
+                    {canAddHelper && st.status !== "done" && (
+                      <button
+                        type="button"
+                        onClick={() => setHelperToRemove({ id: st._id, name: st.assigneeName })}
+                        className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+                        aria-label={`Remove helper ${st.assigneeName}`}
+                        title="Remove helper"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
+              <ConfirmModal
+                open={!!helperToRemove}
+                title="Remove helper?"
+                message={`${helperToRemove?.name ?? "This person"} will be removed from this task, along with any work they submitted on it.`}
+                confirmLabel="Remove"
+                confirmingLabel="Removing…"
+                variant="danger"
+                onConfirm={async () => {
+                  if (!helperToRemove) return;
+                  try {
+                    await removeHelper({ taskId: helperToRemove.id as Id<"tasks"> });
+                    toast("success", "Helper removed");
+                  } catch (err) {
+                    toast("error", err instanceof Error ? err.message : "Couldn't remove helper");
+                  }
+                  setHelperToRemove(null);
+                }}
+                onCancel={() => setHelperToRemove(null)}
+              />
             </div>
           ) : (
             <p className="text-[12px] text-[var(--text-muted)]">No helpers added yet.</p>
@@ -1237,12 +1271,20 @@ export default function BriefPage() {
             ) : (
               <BriefFlowCanvas
                 briefId={briefId}
-                teams={(graphData?.teams ?? []).map(({ team, members }) => ({
+                teams={(graphData?.teams ?? []).map(({ team, members }, teamIdx, allTeamsInGraph) => ({
                   teamId: team._id,
                   teamName: team.name,
                   teamColor: team.color,
+                  // Someone on two of the brief's teams would otherwise get
+                  // their task drawn in both lanes; the first team wins.
                   tasks: filteredTasks
                     .filter((t) => members.some((m) => m.user._id === t.assigneeId))
+                    .filter(
+                      (t) =>
+                        !allTeamsInGraph
+                          .slice(0, teamIdx)
+                          .some((g) => g.members.some((m) => m.user._id === t.assigneeId))
+                    )
                     .map((t) => {
                       const assignee = members.find((m) => m.user._id === t.assigneeId)?.user;
                       return {
