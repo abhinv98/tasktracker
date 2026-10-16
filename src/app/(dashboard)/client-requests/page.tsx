@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, useToast, SkeletonList } from "@/components/ui";
+import { ConfirmModal, PageHeader, useToast, SkeletonList } from "@/components/ui";
 import {
   Inbox,
   X,
@@ -354,7 +354,9 @@ export default function ClientRequestsPage() {
     setBusyAction(null);
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
   async function handleDelete() {
+    setConfirmDelete(false);
     if (!selected) return;
     setBusyAction("delete");
     try {
@@ -367,8 +369,26 @@ export default function ClientRequestsPage() {
     setBusyAction(null);
   }
 
+  const deleteDialog = (
+    <ConfirmModal
+      open={confirmDelete}
+      title="Delete this request?"
+      message={
+        selected?.linkedTaskId
+          ? "The request and the task created from it will be deleted, including any work submitted on it."
+          : "The request will be deleted."
+      }
+      confirmLabel="Delete"
+      confirmingLabel="Deleting…"
+      variant="danger"
+      onConfirm={handleDelete}
+      onCancel={() => setConfirmDelete(false)}
+    />
+  );
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
+      {deleteDialog}
       <PageHeader
         title="Client Requests"
         subtitle="Tasks submitted by clients through brand intake links. Review, set a completion date, then take action."
@@ -975,7 +995,7 @@ export default function ClientRequestsPage() {
                 )
               ) : (
                 <button
-                  onClick={handleDelete}
+                  onClick={() => setConfirmDelete(true)}
                   disabled={busy}
                   className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
                 >

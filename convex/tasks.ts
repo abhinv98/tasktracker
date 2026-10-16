@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { canViewBrief } from "./lib/guards";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -683,6 +684,7 @@ export const updateTaskStatus = mutation({
       ...(newStatus === "done" ? { completedAt: Date.now() } : task.completedAt ? { completedAt: undefined } : {}),
       ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
     });
+    if (newStatus === "done") await stopTaskTimers(ctx, taskId);
 
     // If parent task is marked done, cascade to all descendant child tasks
     // (e.g. Content Calendar parent entry → [Copy] + [Design] children).
@@ -1090,6 +1092,7 @@ export const bulkUpdateStatus = mutation({
         ...(newStatus === "done" ? { completedAt: Date.now() } : task.completedAt ? { completedAt: undefined } : {}),
         ...(newStatus === "review" && !task.submittedForReviewAt ? { submittedForReviewAt: Date.now() } : {}),
       });
+      if (newStatus === "done") await stopTaskTimers(ctx, taskId);
 
       // Mirror updateTaskStatus: propagate "done" down to all descendants
       // and auto-approve deliverables on the whole tree when an admin is

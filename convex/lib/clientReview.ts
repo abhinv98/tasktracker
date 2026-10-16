@@ -1,4 +1,5 @@
 import type { MutationCtx } from "../_generated/server";
+import { stopTaskTimers } from "./stopTaskTimers";
 import type { Doc, Id } from "../_generated/dataModel";
 import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./syncBriefStatus";
 import { cascadeDoneToChildren } from "./cascadeTaskStatus";
@@ -58,6 +59,7 @@ export async function applyClientApproval(
   if (!task) return null;
 
   await ctx.db.patch(task._id, { status: "done", completedAt: Date.now() });
+  await stopTaskTimers(ctx, task._id);
   await syncSingleTaskBriefStatus(ctx, task.briefId, "done");
   // Client-facing tasks skip the cascade in finalizeApprovedDeliverable, so
   // close their sub-tasks here; then recompute (not just "all done?") so a

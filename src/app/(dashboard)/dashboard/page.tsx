@@ -1,12 +1,13 @@
 "use client";
 
 import { useQuery, useMutation } from "convex/react";
+import { isTaskOverdue } from "@/lib/status";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, PageHeader, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
+import { Card, EmptyState, PageHeader, SegmentedTabs, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
 import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
@@ -112,6 +113,11 @@ function EmployeeTaskCard({
             {!!t.isHelper && (
               <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
                 HELPER
+              </span>
+            )}
+            {isTaskOverdue(task) && (
+              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-[var(--danger)] shrink-0">
+                OVERDUE
               </span>
             )}
             {t.deadlineExtended && (
@@ -307,11 +313,11 @@ function EmployeeTaskViews({
 
   if (tasks.length === 0) {
     return (
-      <Card>
-        <p className="text-[13px] text-[var(--text-muted)] text-center py-4">
-          No tasks assigned to you yet.
-        </p>
-      </Card>
+      <EmptyState
+        icon={ListIcon}
+        title="No tasks assigned to you yet"
+        description="New tasks appear here as soon as someone assigns them to you."
+      />
     );
   }
 
@@ -364,32 +370,14 @@ function EmployeeTaskViews({
         <div className="text-[12px] text-[var(--text-muted)] tabular-nums">
           {activeTasks.length} task{activeTasks.length !== 1 ? "s" : ""}
         </div>
-        <div className="inline-flex items-center rounded-lg border border-[var(--border)] bg-white p-0.5 shadow-sm">
-          <button
-            onClick={() => setViewMode("kanban")}
-            aria-pressed={viewMode === "kanban"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-              viewMode === "kanban"
-                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Kanban
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            aria-pressed={viewMode === "list"}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-              viewMode === "list"
-                ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <ListIcon className="h-3.5 w-3.5" />
-            List
-          </button>
-        </div>
+        <SegmentedTabs
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: "kanban", label: "Kanban", icon: LayoutGrid },
+            { value: "list", label: "List", icon: ListIcon },
+          ]}
+        />
       </div>
 
       {viewMode === "kanban" ? (

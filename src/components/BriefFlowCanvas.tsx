@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
+import { isTaskOverdue } from "@/lib/status";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -170,11 +171,12 @@ function TaskNode({ data }: { data: TaskData }) {
           </div>
 
           {data.deadline && (
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+            <p className={`text-[11px] mt-1 ${isTaskOverdue(data) ? "text-[var(--danger)] font-semibold" : "text-[var(--text-muted)]"}`}>
               {new Date(data.deadline).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
               })}
+              {isTaskOverdue(data) && " · Overdue"}
             </p>
           )}
         </div>

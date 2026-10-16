@@ -13,6 +13,15 @@ import "../portal-theme.css";
  * Public branded login for a brand's client portal. The token is the
  * shareable link; only client accounts created for this brand can enter.
  */
+/** Where to land after login: the deep link that bounced here, if it's a
+ *  page of this portal; otherwise the JSR home. Read from location to avoid a
+ *  Suspense boundary for useSearchParams. */
+function landingPath(token: string) {
+  const next =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("next") : null;
+  return next && next.startsWith(`/portal/${token}/`) ? next : `/portal/${token}/jsr`;
+}
+
 export default function PortalLoginPage() {
   const params = useParams();
   const router = useRouter();
@@ -41,7 +50,7 @@ export default function PortalLoginPage() {
   useEffect(() => {
     if (!currentUser) return;
     if (currentUser.role === "client") {
-      router.replace(`/portal/${token}/jsr`);
+      router.replace(landingPath(token));
     }
   }, [currentUser, router, token]);
 
@@ -56,7 +65,7 @@ export default function PortalLoginPage() {
       const user = await convex.query(api.users.getCurrentUser, {});
       if (user?.role === "client") {
         // "login" activity is recorded by the portal layout once the session loads
-        router.push(`/portal/${token}/jsr`);
+        router.push(landingPath(token));
       } else if (user) {
         // Internal account logged in through the portal link — send them home.
         router.push("/dashboard");

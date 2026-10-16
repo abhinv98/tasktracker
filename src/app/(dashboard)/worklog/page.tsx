@@ -49,7 +49,7 @@ function shiftDate(dateStr: string, days: number): string {
 
 const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
   "in-progress": { color: "#f59e0b", label: "In Progress", order: 1 },
-  pending: { color: "#6b7280", label: "To Do", order: 2 },
+  pending: { color: "#6b7280", label: "Pending", order: 2 },
   review: { color: "#8b5cf6", label: "Review", order: 3 },
   done: { color: "#10b981", label: "Done", order: 4 },
 };

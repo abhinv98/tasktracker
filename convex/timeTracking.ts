@@ -1,6 +1,19 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+/** Time is logged by the task's assignee (or an admin), on open tasks only. */
+async function assertCanLogTime(ctx: MutationCtx, userId: Id<"users">, taskId: Id<"tasks">) {
+  const task = await ctx.db.get(taskId);
+  if (!task) throw new Error("Task not found");
+  if (task.status === "done") throw new Error("This task is already done");
+  if (task.assigneeId !== userId) {
+    const user = await ctx.db.get(userId);
+    if (user?.role !== "admin") throw new Error("Only the assignee can log time on this task");
+  }
+}
 
 export const getTimeEntries = query({
   args: { taskId: v.id("tasks") },
@@ -50,6 +63,7 @@ export const startTimer = mutation({
   handler: async (ctx, { taskId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    await assertCanLogTime(ctx, userId, taskId);
 
     // Stop any active timer first
     const entries = await ctx.db
@@ -99,6 +113,10 @@ export const addManualEntry = mutation({
   handler: async (ctx, { taskId, durationMinutes }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    await assertCanLogTime(ctx, userId, taskId);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 24 * 60) {
+      throw new Error("Enter between 1 minute and 24 hours");
+    }
 
     return await ctx.db.insert("timeEntries", {
       taskId,
@@ -114,6 +132,7 @@ export const addManualEntry = mutation({
 export const getTaskTimeTotal = query({
   args: { taskId: v.id("tasks") },
   handler: async (ctx, { taskId }) => {
+    if (!(await getAuthUserId(ctx))) return 0;
     const entries = await ctx.db
       .query("timeEntries")
       .withIndex("by_task", (q) => q.eq("taskId", taskId))

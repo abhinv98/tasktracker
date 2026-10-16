@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { canViewBrief } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
@@ -1054,6 +1055,7 @@ export const updateBrief = mutation({
               status: "done",
               completedAt: now,
             });
+            await stopTaskTimers(ctx, t._id);
             if (t.assigneeId !== userId) {
               await ctx.db.insert("notifications", {
                 recipientId: t.assigneeId,

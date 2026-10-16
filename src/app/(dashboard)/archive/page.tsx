@@ -4,7 +4,8 @@ import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, PageHeader, useToast } from "@/components/ui";
+import { Button, Card, EmptyState, PageHeader, SkeletonList, useToast } from "@/components/ui";
+import { Archive } from "lucide-react";
 
 export default function ArchivePage() {
   const router = useRouter();
@@ -24,9 +25,18 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <PageHeader title="Archive" subtitle="Restore archived briefs" />
 
+      {archived === undefined ? (
+        <SkeletonList />
+      ) : archived.length === 0 ? (
+        <EmptyState
+          icon={Archive}
+          title="Nothing archived"
+          description="Archived briefs show up here, and can be restored at any time."
+        />
+      ) : (
       <div className="flex flex-col gap-4">
         {(archived ?? []).map((brief) => (
           <Card key={brief._id} className="flex flex-row justify-between items-center">
@@ -46,6 +56,7 @@ export default function ArchivePage() {
           </Card>
         ))}
       </div>
+      )}
     </div>
   );
 }

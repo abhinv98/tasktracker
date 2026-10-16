@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -24,14 +24,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Logged out: back to this brand's login. Internal users: back to the dashboard.
+  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
+
+  // Logged out: back to this brand's login, remembering the page asked for.
+  // Trust the auth state, not getCurrentUser: on a cold load or deep link that
+  // query answers null before the token attaches. Internal users: dashboard.
   useEffect(() => {
-    if (user === null) {
-      router.replace(`/portal/${urlToken}`);
+    if (!authLoading && !isAuthenticated) {
+      router.replace(`/portal/${urlToken}?next=${encodeURIComponent(pathname)}`);
     } else if (user && user.role !== "client") {
       router.replace("/dashboard");
     }
-  }, [user, urlToken, router]);
+  }, [authLoading, isAuthenticated, user, urlToken, pathname, router]);
 
   // Canonical URL: the signed-in client's own brand slug. Visiting another
   // brand's slug (or a stale one) lands them on their own portal.

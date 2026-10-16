@@ -1,4 +1,5 @@
 import type { MutationCtx } from "../_generated/server";
+import { stopTaskTimers } from "./stopTaskTimers";
 import type { Id } from "../_generated/dataModel";
 
 /**
@@ -37,6 +38,7 @@ export async function cascadeDoneToChildren(
         status: "done",
         completedAt: now,
       });
+      await stopTaskTimers(ctx, child._id);
       cascaded.push(child._id);
 
       if (triggeredByUserId && child.assigneeId !== triggeredByUserId) {

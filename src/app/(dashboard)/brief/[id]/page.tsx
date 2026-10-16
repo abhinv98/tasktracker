@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Textarea, useToast, useCelebrate } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, SegmentedTabs, Textarea, useToast, useCelebrate } from "@/components/ui";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
 import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2, Palette } from "lucide-react";
@@ -996,22 +996,15 @@ export default function BriefPage() {
             </div>
 
             {/* Canvas | List toggle */}
-            <div className="flex shrink-0 items-center rounded-lg border border-[var(--border)] overflow-hidden">
-              {(["canvas", "list"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setBriefView(v)}
-                  className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    briefView === v
-                      ? "bg-[var(--text-primary)] text-white"
-                      : "bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                  }`}
-                >
-                  {v === "canvas" ? "Canvas" : "List"}
-                </button>
-              ))}
-            </div>
+            <SegmentedTabs
+              className="shrink-0"
+              value={briefView}
+              onChange={setBriefView}
+              options={[
+                { value: "canvas", label: "Canvas" },
+                { value: "list", label: "List" },
+              ]}
+            />
             {isAdmin && briefView === "canvas" && totalTasks > 1 && (
               <button
                 type="button"
@@ -1207,7 +1200,11 @@ export default function BriefPage() {
             ) : briefView === "list" ? (
               <div className="h-full overflow-y-auto p-4">
                 {filteredTasks.length === 0 ? (
-                  <p className="text-[13px] text-[var(--text-muted)] text-center py-12">No tasks yet.</p>
+                  <EmptyState
+                    icon={ClipboardList}
+                    title="No tasks yet"
+                    description={isAdmin ? "Add a task to get this brief moving." : undefined}
+                  />
                 ) : (
                   <table className="w-full border-collapse bg-white rounded-xl overflow-hidden border border-[var(--border-subtle)]">
                     <thead>
@@ -1232,10 +1229,10 @@ export default function BriefPage() {
                             .flatMap((g) => g.members)
                             .find((m) => m.user._id === t.assigneeId)?.user;
                           const statusMeta: Record<string, { label: string; dot: string }> = {
-                            pending: { label: "Planned", dot: "#6b7280" },
+                            pending: { label: "Pending", dot: "#6b7280" },
                             "in-progress": { label: "In Progress", dot: "#f59e0b" },
-                            review: { label: "In Review", dot: "#8b5cf6" },
-                            done: { label: "Completed", dot: "#10b981" },
+                            review: { label: "Review", dot: "#8b5cf6" },
+                            done: { label: "Done", dot: "#10b981" },
                             "on-hold": { label: "On Hold", dot: "#78716c" },
                           };
                           const sm = statusMeta[t.status] ?? statusMeta.pending;

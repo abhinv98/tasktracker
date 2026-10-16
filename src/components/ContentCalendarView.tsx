@@ -46,11 +46,11 @@ const CONTENT_TYPES = [
 ];
 
 const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
-  { value: "pending", label: "Planned", color: "#6b7280" },
+  { value: "pending", label: "Pending", color: "#6b7280" },
   { value: "in-progress", label: "In Progress", color: "#f59e0b" },
   { value: "on-hold", label: "On Hold", color: "#ef4444" },
   { value: "review", label: "Review", color: "#8b5cf6" },
-  { value: "done", label: "Completed", color: "#10b981" },
+  { value: "done", label: "Done", color: "#10b981" },
 ];
 
 function statusInfo(status: string) {
@@ -1595,7 +1595,7 @@ export function ContentCalendarEntrySidebar({
     const map: Record<string, { label: string; bg: string; fg: string }> = {
       pending: { label: "Pending", bg: "#fef3c7", fg: "#92400e" },
       "in-progress": { label: "In Progress", bg: "#dbeafe", fg: "#1e40af" },
-      review: { label: "In Review", bg: "#fae8ff", fg: "#86198f" },
+      review: { label: "Review", bg: "#fae8ff", fg: "#86198f" },
       done: { label: "Approved", bg: "#dcfce7", fg: "#166534" },
       "on-hold": { label: "On Hold", bg: "#f3f4f6", fg: "#374151" },
     };

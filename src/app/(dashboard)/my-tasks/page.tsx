@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isTaskOverdue } from "@/lib/status";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
@@ -272,8 +273,9 @@ export default function MyTasksPage() {
                     <td className="px-4 py-3">
                       <StatusPill status={t.status} />
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    <td className={`px-4 py-3 ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                       {fmt(t.deadline)}
+                      {isTaskOverdue(t) && <span className="ml-1.5 text-[11px] font-semibold text-[var(--danger)]">Overdue</span>}
                     </td>
                   </tr>
                 ))}
@@ -348,8 +350,9 @@ export default function MyTasksPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    <td className={`px-4 py-3 ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                       {fmt(t.deadline)}
+                      {isTaskOverdue(t) && <span className="ml-1.5 text-[11px] font-semibold text-[var(--danger)]">Overdue</span>}
                     </td>
                     <td className="px-4 py-3">
                       {t.needsReview && (

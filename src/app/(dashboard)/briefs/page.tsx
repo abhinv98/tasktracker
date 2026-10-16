@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, Input, Modal, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, Modal, PageHeader, SegmentedTabs, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 
 // The date filters store YYYY-MM-DD (they always have; the filtering below
 // parses that). DatePicker speaks timestamps. Convert at the boundary rather
@@ -646,44 +646,16 @@ export default function BriefsPage() {
       />
 
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-4">
-        <button
-          onClick={() => setBriefsTab("active")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-            briefsTab === "active"
-              ? "bg-white shadow-sm text-[var(--text-primary)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <Briefcase className="h-3.5 w-3.5" />
-          Active
-          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{activeBriefs.length}</span>
-        </button>
-        <button
-          onClick={() => setBriefsTab("review")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-            briefsTab === "review"
-              ? "bg-white shadow-sm text-[var(--text-primary)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <Eye className="h-3.5 w-3.5" />
-          Review
-          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{reviewBriefs.length}</span>
-        </button>
-        <button
-          onClick={() => setBriefsTab("completed")}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
-            briefsTab === "completed"
-              ? "bg-white shadow-sm text-[var(--text-primary)]"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          Completed
-          <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{completedBriefs.length}</span>
-        </button>
-      </div>
+      <SegmentedTabs
+        className="mb-4"
+        value={briefsTab}
+        onChange={setBriefsTab}
+        options={[
+          { value: "active", label: "Active", icon: Briefcase, count: activeBriefs.length },
+          { value: "review", label: "Review", icon: Eye, count: reviewBriefs.length },
+          { value: "completed", label: "Completed", icon: CheckCircle2, count: completedBriefs.length },
+        ]}
+      />
 
       {/* Filter Bar — five always-on controls became one button. They're used
           occasionally; the rows below are used constantly, so the rows get the
@@ -1040,11 +1012,11 @@ export default function BriefsPage() {
           })}
 
           {brandFolders.length === 0 && briefs !== undefined && (
-            <Card>
-              <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
-                {filterManagerId ? "No briefs found for this manager." : "No briefs yet. Create one to get started."}
-              </p>
-            </Card>
+            <EmptyState
+              icon={Briefcase}
+              title={filterManagerId ? "No briefs for this manager" : "No briefs yet"}
+              description={filterManagerId ? "Try another manager or clear the filter." : "Create a brief to get started."}
+            />
           )}
 
         </div>
@@ -1247,11 +1219,11 @@ export default function BriefsPage() {
           })}
 
           {brandFolders.length === 0 && briefs !== undefined && (
-            <Card>
-              <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
-                {filterManagerId ? "No briefs found for this manager." : "No briefs yet. Create one to get started."}
-              </p>
-            </Card>
+            <EmptyState
+              icon={Briefcase}
+              title={filterManagerId ? "No briefs for this manager" : "No briefs yet"}
+              description={filterManagerId ? "Try another manager or clear the filter." : "Create a brief to get started."}
+            />
           )}
         </div>
       )}
@@ -1622,9 +1594,7 @@ function BriefSubRowsPanel({
                           ? "On Hold"
                           : t.status === "review"
                             ? "Review"
-                            : briefType === "content_calendar"
-                              ? "Planned"
-                              : "Pending"}
+                            : "Pending"}
                   </span>
                   <span
                     className={`text-[11px] tabular-nums w-[80px] text-right ${

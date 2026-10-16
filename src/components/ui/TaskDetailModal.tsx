@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { ConfirmModal } from "./ConfirmModal";
+import { TaskTimeSection } from "./TaskTimeSection";
 import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
@@ -59,7 +60,7 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; bg: string }
 > = {
   pending: {
-    label: "To Do",
+    label: "Pending",
     color: "#6b7280",
     bg: "rgba(107,114,128,0.1)",
   },
@@ -69,7 +70,7 @@ const STATUS_CONFIG: Record<
     bg: "#EFF6FF",
   },
   review: {
-    label: "In Review",
+    label: "Review",
     color: "#F59E0B",
     bg: "#FFFBEB",
   },
@@ -1070,6 +1071,12 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               <p className="text-[12px] text-[var(--text-muted)]">No daily summaries yet.</p>
             )}
           </div>
+
+          <TaskTimeSection
+            taskId={taskId as Id<"tasks">}
+            canLog={isAssignee || isAdmin}
+            taskDone={task.status === "done"}
+          />
 
           {/* Sub-Tasks Section */}
           {((subTasks ?? []).length > 0 || canAddHelper) && (

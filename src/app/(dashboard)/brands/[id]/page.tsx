@@ -401,9 +401,9 @@ export default function BrandDetailPage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 mb-8">
         <button
           onClick={goBack}
           className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
@@ -468,7 +468,7 @@ export default function BrandDetailPage() {
             </button>
           )}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[180px]">
           {editingName ? (
             <input
               autoFocus
@@ -484,7 +484,7 @@ export default function BrandDetailPage() {
             />
           ) : (
             <div className="flex items-center gap-2 group">
-              <h1 className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight truncate">
+              <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight truncate">
                 {brand.name}
               </h1>
               {brand.onHold && <Badge variant="neutral">On hold</Badge>}
@@ -513,13 +513,13 @@ export default function BrandDetailPage() {
           )}
         </div>
         {isAdmin && (
-          <Button variant="secondary" onClick={() => setShowHoldBrand(true)} className="mr-2">
+          <Button variant="secondary" onClick={() => setShowHoldBrand(true)} className="whitespace-nowrap">
             {brand.onHold ? <PlayCircle className="h-4 w-4 mr-1.5" /> : <PauseCircle className="h-4 w-4 mr-1.5" />}
             {brand.onHold ? "Resume" : "Put on hold"}
           </Button>
         )}
         {isAdmin && (
-          <Button variant="secondary" onClick={() => setShowDeleteBrand(true)}>
+          <Button variant="secondary" onClick={() => setShowDeleteBrand(true)} className="whitespace-nowrap">
             <Trash2 className="h-4 w-4 mr-1.5" />
             Delete
           </Button>
@@ -527,7 +527,8 @@ export default function BrandDetailPage() {
       </div>
 
       {/* ═══ TAB BAR ═══ */}
-      <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-8 px-8">
+      {/* Scrolls sideways on phones instead of cutting tabs off. */}
+      <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-4 px-4 sm:-mx-8 sm:px-8 overflow-x-auto">
         {([
           { id: "overview" as BrandTab, label: "Overview", icon: Briefcase },
           { id: "client-jsr" as BrandTab, label: "Client Portal", icon: ExternalLink },
@@ -538,7 +539,7 @@ export default function BrandDetailPage() {
             key={tab.id}
             type="button"
             onClick={() => navigateToTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
+            className={`flex shrink-0 whitespace-nowrap items-center gap-2 px-3 sm:px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
                 ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
                 : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"

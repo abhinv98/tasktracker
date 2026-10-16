@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: "To Do", color: "#6b7280" },
+  pending: { label: "Pending", color: "#6b7280" },
   "in-progress": { label: "In Progress", color: "#f59e0b" },
   review: { label: "Review", color: "#8b5cf6" },
   done: { label: "Done", color: "#10b981" },

@@ -28,3 +28,4 @@ export {
 export { TaskDetailModal } from "./TaskDetailModal";
 export { Textarea } from "./Textarea";
 export { ToastProvider, useToast } from "./Toast";
+export { EmptyState } from "./EmptyState";

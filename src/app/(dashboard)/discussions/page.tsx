@@ -13,6 +13,7 @@ import {
   Users,
   ChevronRight,
   Hash,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function DiscussionsPage() {
@@ -76,7 +77,8 @@ export default function DiscussionsPage() {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] bg-[var(--bg-primary)]">
       {/* Left Panel - Brief List */}
-      <div className="w-80 shrink-0 flex flex-col border-r border-[var(--border)] bg-white">
+      {/* Phones show one pane at a time: the list, or the open thread. */}
+      <div className={`${selectedBriefId ? "hidden md:flex" : "flex"} w-full md:w-80 shrink-0 flex-col border-r border-[var(--border)] bg-white`}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-[var(--border)]">
           <div className="flex items-center gap-2 mb-3">
@@ -189,11 +191,19 @@ export default function DiscussionsPage() {
       </div>
 
       {/* Right Panel - Chat Thread */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`${selectedBriefId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0`}>
         {selectedBrief ? (
           <>
             {/* Chat Header */}
             <div className="px-5 py-3 border-b border-[var(--border)] bg-white flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedBriefId(null)}
+                className="md:hidden -ml-1 p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                aria-label="Back to list"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
               <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
                 <Hash className="h-4 w-4 text-[var(--accent-admin-text)]" />
               </div>

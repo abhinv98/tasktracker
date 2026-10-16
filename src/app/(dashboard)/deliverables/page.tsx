@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button, ConfirmModal, PageHeader, useToast, useCelebrate } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal, EmptyState, PageHeader, useToast, useCelebrate } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
   Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
@@ -1052,9 +1052,11 @@ export default function DeliverablesPage() {
             );
           })}
           {filteredDeliverables.length === 0 && (
-            <Card className="p-6 text-center">
-              <p className="text-[13px] text-[var(--text-muted)]">No deliverables yet.</p>
-            </Card>
+            <EmptyState
+              icon={FileText}
+              title="No deliverables yet"
+              description="Submitted work waiting for review will show up here."
+            />
           )}
         </div>
       )}

@@ -40,9 +40,13 @@ export const getEmployeeWorkLog = query({
       });
       timeEntriesForDay.forEach((te) => taskIds.add(te.taskId));
 
-      // Tasks with activity (status changes) on this date
+      // Tasks with activity (status changes) on this date. Only their own
+      // tasks: creating or approving someone else's task isn't their work.
+      const ownTaskIds = new Set(
+        allTasks.filter((t) => t.assigneeId === emp._id).map((t) => t._id as string)
+      );
       const activityForDay = allActivityLogs.filter((al) => {
-        if (al.userId !== emp._id) return false;
+        if (al.userId !== emp._id || !al.taskId || !ownTaskIds.has(al.taskId)) return false;
         return al.timestamp >= dayStart && al.timestamp <= dayEnd;
       });
       activityForDay.forEach((al) => {
@@ -90,7 +94,9 @@ export const getEmployeeWorkLog = query({
         },
         tasks,
         totalTasks: tasks.length,
-        completedTasks: tasks.filter((t) => t?.status === "done").length,
+        // Completed = their own tasks finished that day, not anything done
+        // that merely appears in their list.
+        completedTasks: completedToday.length,
       };
     });
 

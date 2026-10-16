@@ -59,10 +59,10 @@ const CONTENT_TYPES = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; dot: string; label: string }> = {
-  pending: { bg: "#f3f4f6", dot: "#6b7280", label: "Planned" },
+  pending: { bg: "#f3f4f6", dot: "#6b7280", label: "Pending" },
   "in-progress": { bg: "#fef3c7", dot: "#f59e0b", label: "In Progress" },
   review: { bg: "#ede9fe", dot: "#8b5cf6", label: "Review" },
-  done: { bg: "#d1fae5", dot: "#10b981", label: "Completed" },
+  done: { bg: "#d1fae5", dot: "#10b981", label: "Done" },
   "on-hold": { bg: "#fee2e2", dot: "#ef4444", label: "On Hold" },
 };
 

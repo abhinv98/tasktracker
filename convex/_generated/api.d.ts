@@ -41,6 +41,7 @@ import type * as lib_clientReview from "../lib/clientReview.js";
 import type * as lib_guards from "../lib/guards.js";
 import type * as lib_internalAuth from "../lib/internalAuth.js";
 import type * as lib_recomputeBriefDeadline from "../lib/recomputeBriefDeadline.js";
+import type * as lib_stopTaskTimers from "../lib/stopTaskTimers.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as lib_tagForOversight from "../lib/tagForOversight.js";
 import type * as lib_taskFlowResources from "../lib/taskFlowResources.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   "lib/guards": typeof lib_guards;
   "lib/internalAuth": typeof lib_internalAuth;
   "lib/recomputeBriefDeadline": typeof lib_recomputeBriefDeadline;
+  "lib/stopTaskTimers": typeof lib_stopTaskTimers;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   "lib/tagForOversight": typeof lib_tagForOversight;
   "lib/taskFlowResources": typeof lib_taskFlowResources;

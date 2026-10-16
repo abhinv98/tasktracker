@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
@@ -76,6 +77,7 @@ async function finalizeApprovedDeliverable(
         status: "done",
         completedAt: now,
       });
+      await stopTaskTimers(ctx, taskId);
       await syncSingleTaskBriefStatus(ctx, briefId, "done");
       await syncMultiTaskBriefStatus(ctx, briefId, taskId);
 

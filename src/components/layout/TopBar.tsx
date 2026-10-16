@@ -4,10 +4,11 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery, useMutation } from "convex/react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { Bell, Menu, X, Search } from "lucide-react";
+import { Bell, Menu, X, Search, Square } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
 import { Badge } from "@/components/ui";
+import { formatMinutes } from "@/components/ui/TaskTimeSection";
 import { getDisplayRole } from "@/lib/roles";
 
 interface TopBarProps {
@@ -106,15 +107,15 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between px-6 bg-white/70 backdrop-blur-xl border-b border-[var(--border)]">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 px-4 sm:px-6 bg-white/70 backdrop-blur-xl border-b border-[var(--border)]">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <button
           onClick={onMenuToggle}
           className="md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <span className="font-semibold text-[15px] text-[var(--text-primary)]">
+        <span className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
           {pageTitle}
         </span>
         {onSearchClick && (
@@ -131,7 +132,8 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <RunningTimerPill />
         {/* Notifications */}
         <div className="relative" ref={panelRef}>
           <button
@@ -152,7 +154,9 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
 
           {/* Notifications Dropdown */}
           {showNotifs && (
-            <div className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden">
+            // Phones: pin to the viewport (the bell isn't at the right edge, so
+            // anchoring to it pushed the panel off-screen).
+            <div className="fixed left-4 right-4 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-full mt-2 sm:w-[24rem] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
                 <span className="font-semibold text-[13px] text-[var(--text-primary)]">
                   Notifications
@@ -224,15 +228,42 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           {user.name ?? user.email ?? "User"}
         </span>
 
-        <Badge variant={roleVariant}>{getDisplayRole(user)}</Badge>
+        <span className="hidden sm:inline-flex">
+          <Badge variant={roleVariant}>{getDisplayRole(user)}</Badge>
+        </span>
 
         <button
           onClick={() => signOut()}
-          className="rounded-lg px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
+          className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
         >
           Sign out
         </button>
       </div>
     </header>
+  );
+}
+
+/** A running timer is easy to forget; keep it visible from every page. */
+function RunningTimerPill() {
+  const active = useQuery(api.timeTracking.getActiveTimer);
+  const stopTimer = useMutation(api.timeTracking.stopTimer);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [active]);
+  if (!active) return null;
+  const mins = Math.max(0, Math.round((now - active.startedAt) / 60000));
+  return (
+    <button
+      onClick={() => void stopTimer({ entryId: active._id })}
+      title={`Stop timer on "${active.taskTitle ?? "task"}"`}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:opacity-90"
+    >
+      <Square className="h-3 w-3" />
+      <span className="tabular-nums">{formatMinutes(mins)}</span>
+      <span className="hidden md:inline max-w-[140px] truncate">{active.taskTitle}</span>
+    </button>
   );
 }

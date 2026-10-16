@@ -631,6 +631,8 @@ export const listCampaignBriefsForBrand = query({
         (b) =>
           b.brandId === brandId &&
           b.status !== "archived" &&
+          b.status !== "completed" &&
+          b.status !== "on_hold" &&
           b.briefType !== "content_calendar" &&
           b.briefType !== "single_task"
       )
@@ -741,6 +743,11 @@ export const acceptClientRequest = mutation({
         if (!brief || brief.brandId !== request.brandId)
           throw new Error("Brief not found for this brand");
         if (brief.status === "archived") throw new Error("Brief is archived");
+        if (brief.status === "completed" || brief.status === "on_hold") {
+          throw new Error(
+            `That brief is ${brief.status === "completed" ? "completed" : "on hold"}. Pick an open brief or create a new one.`
+          );
+        }
         if (
           brief.briefType === "content_calendar" ||
           brief.briefType === "single_task"
@@ -1046,6 +1053,21 @@ export const deleteClientTask = mutation({
       const realTask = await ctx.db.get(clientTask.linkedTaskId);
       if (realTask) {
         await cascadeDeleteTask(ctx, clientTask.linkedTaskId);
+        // An Individual Task request got its own brief on accept; don't leave
+        // it behind empty.
+        const brief = await ctx.db.get(realTask.briefId);
+        const left = await ctx.db
+          .query("tasks")
+          .withIndex("by_brief", (q) => q.eq("briefId", realTask.briefId))
+          .first();
+        if (brief?.briefType === "single_task" && !left) {
+          const links = await ctx.db
+            .query("briefTeams")
+            .withIndex("by_brief", (q) => q.eq("briefId", brief._id))
+            .collect();
+          for (const l of links) await ctx.db.delete(l._id);
+          await ctx.db.delete(brief._id);
+        }
       }
     }
 
