@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, EmptyState, PageHeader, SegmentedTabs, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
+import { Card, EmptyState, PageHeader, SectionHeader, SegmentedTabs, StatTile, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
+import { TodayList } from "@/components/dashboard/TodayList";
 import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
@@ -572,6 +573,10 @@ function AdminDashboard() {
   );
 
   const adminActiveTasks = (tasks ?? []).filter((t) => t.status !== "done");
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const newBriefsThisWeek = scopedBriefs.filter(
+    (b) => b._creationTime > weekAgo && !["archived", "completed"].includes(b.status)
+  ).length;
 
   // ── Hero digest + attention strip (derived from queries above only) ──
   const firstName = displayName.split(" ")[0];
@@ -615,13 +620,55 @@ function AdminDashboard() {
     title: string;
     context: string;
     href: string;
+    /** Inline action next to the row (e.g. Contact manager). */
+    action?: React.ReactNode;
   };
   const attentionLoaded =
+    adminOverdueHalt !== undefined &&
     overdueTasksForManager !== undefined &&
     actionNeededTasks !== undefined &&
     pendingClientRequests !== undefined;
+  const needsReview = myWork?.counts.needsReview ?? 0;
   const attentionRows: AttentionRow[] = [
-    // Prioritized: overdue first, then action-needed, then pending client requests
+    // Your own overdue work first: it needs you, not someone you manage.
+    ...(adminOverdueHalt ?? []).map((ot): AttentionRow => {
+      const contacted = ot.overdueContacted || adminContactedTasks.has(ot._id);
+      return {
+        key: `mine-${ot._id}`,
+        icon: AlertTriangle,
+        iconClass: "text-red-500",
+        title: ot.title,
+        context: `Your task · ${ot.briefTitle} · was due ${new Date(ot.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}${contacted ? " · waiting on " + ot.managerName : ""}`,
+        href: `/brief/${ot.briefId}`,
+        action: contacted ? undefined : (
+          <button
+            onClick={async () => {
+              try {
+                await adminContactManager({ taskId: ot._id as Id<"tasks"> });
+                setAdminContactedTasks((prev) => new Set(prev).add(ot._id));
+                adminToast("success", `${ot.managerName} has been asked to follow up`);
+              } catch (err) {
+                adminToast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
+              }
+            }}
+            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+          >
+            <Phone className="h-3 w-3" /> Contact {ot.managerName.split(" ")[0]}
+          </button>
+        ),
+      };
+    }),
+    ...(needsReview > 0
+      ? [{
+          key: "review-queue",
+          icon: ClipboardCheck,
+          iconClass: "text-[var(--accent-manager-text)]",
+          title: `${needsReview} deliverable${needsReview !== 1 ? "s" : ""} waiting on your review`,
+          context: "Approve or send back so work keeps moving",
+          href: "/deliverables",
+        } as AttentionRow]
+      : []),
+    // Then overdue work across your team, action-needed, and client requests
     ...(overdueTasksForManager ?? []).map((ot: any): AttentionRow => ({
       key: `overdue-${ot._id}`,
       icon: AlertTriangle,
@@ -669,16 +716,16 @@ function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 relative">
-      {/* Hero header: greeting, date, and a linked digest of what needs doing */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-5 mb-6 border-b border-[var(--border-subtle)]">
+      {/* Header: one tight row — greeting + today's digest, brand shortcut */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
             {todayLine}
           </p>
-          <h1 className="font-semibold text-[24px] text-[var(--text-primary)] tracking-tight leading-snug mt-0.5">
+          <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-tight leading-tight">
             {greeting}, {firstName}
           </h1>
-          <p className="mt-1.5 text-[13px] text-[var(--text-secondary)]">
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
             {!heroLoaded ? (
               <span className="text-[var(--text-muted)]">Pulling up your day…</span>
             ) : digestSegments.length === 0 ? (
@@ -701,7 +748,7 @@ function AdminDashboard() {
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => router.push("/brands-overview?filter=mine")}
-            className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
+            className="shrink-0 self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[var(--text-primary)] text-white text-[13px] font-medium hover:bg-[#2e2d2b] transition-colors"
           >
             <Briefcase className="h-4 w-4" />
             My Brands
@@ -710,18 +757,46 @@ function AdminDashboard() {
         )}
       </div>
 
+      {/* Numbers that go somewhere */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <StatTile
+          label="Active briefs"
+          value={scopedActiveBriefs}
+          hint={newBriefsThisWeek > 0 ? `+${newBriefsThisWeek} new this week` : "None new this week"}
+          hintTone={newBriefsThisWeek > 0 ? "good" : "muted"}
+          href="/briefs"
+          icon={Briefcase}
+        />
+        <StatTile
+          label="Open tasks"
+          value={scopedOpenTasks}
+          hint={overdueCount > 0 ? `${overdueCount} overdue` : "Nothing overdue"}
+          hintTone={overdueCount > 0 ? "bad" : "good"}
+          href="/worklog"
+          icon={ListChecks}
+        />
+        <StatTile
+          label="Client requests"
+          value={pendingRequests.length}
+          hint={pendingRequests.length > 0 ? "Waiting for review" : "Queue is clear"}
+          hintTone={pendingRequests.length > 0 ? "bad" : "good"}
+          href="/client-requests"
+          icon={Inbox}
+        />
+        <StatTile
+          label={isSuperAdmin ? "Teams" : "My brands"}
+          value={isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
+          hint={`${employeeCount} people`}
+          href={isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine"}
+          icon={isSuperAdmin ? Layers : Users}
+        />
+      </div>
+
       {/* Needs attention — the page's lead. Everything below it is reference;
           this is the only block that asks the reader to DO something, so it
           carries the largest heading, the tinted surface and the room. */}
       <div className="mb-8 sm:mb-10">
-        <h2 className="font-semibold text-[20px] text-[var(--text-primary)] tracking-tight mb-3 flex items-center gap-2.5">
-          Needs attention
-          {attentionLoaded && attentionTotal > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[26px] h-[24px] px-2 rounded-full bg-[var(--danger-dim)] border border-[var(--danger)]/25 text-[13px] font-semibold text-[var(--danger)] tabular-nums">
-              {attentionTotal}
-            </span>
-          )}
-        </h2>
+        <SectionHeader title="Needs attention" count={attentionLoaded ? attentionTotal : undefined} tone="danger" />
         {!attentionLoaded ? (
           <div className="rounded-lg border border-[var(--border)] bg-white p-5 flex flex-col gap-3">
             <Skeleton className="h-[13px] w-[60%]" />
@@ -745,12 +820,12 @@ function AdminDashboard() {
               {attentionVisible.map((row) => {
                 const RowIcon = row.icon;
                 return (
+                  <div key={row.key} className="flex items-center gap-2 pr-4 hover:bg-[var(--bg-hover)] transition-colors">
                   <Link
-                    key={row.key}
                     href={row.href}
                     // The whole row is the target, not a 40px "View" link at
                     // the end of it — this is the thing you're here to click.
-                    className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-[var(--bg-hover)] transition-colors"
+                    className="group flex-1 min-w-0 flex items-center gap-3.5 pl-5 pr-1 py-3.5"
                   >
                     <RowIcon className={`h-4 w-4 shrink-0 ${row.iconClass}`} />
                     <div className="min-w-0 flex-1">
@@ -763,6 +838,8 @@ function AdminDashboard() {
                     </div>
                     <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] group-hover:translate-x-0.5 transition-all" />
                   </Link>
+                  {row.action}
+                  </div>
                 );
               })}
               {attentionTotal > attentionVisible.length && (
@@ -775,87 +852,7 @@ function AdminDashboard() {
         )}
       </div>
 
-      {/* Reference counts, deliberately quiet. These are orientation, not
-          work — four 20px numbers competing with the page heading is exactly
-          why the old dashboard had no lead. One strip, small figures. */}
-      <div className="mb-8 sm:mb-10 flex flex-wrap items-stretch divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border)] bg-white">
-        {[
-          { label: "Active Briefs", value: scopedActiveBriefs, href: "/briefs", Icon: Briefcase },
-          { label: "Open Tasks", value: scopedOpenTasks, href: "/worklog", Icon: ListChecks },
-          {
-            label: isSuperAdmin ? "Teams" : "My Brands",
-            value: isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size,
-            href: isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine",
-            Icon: Layers,
-          },
-          { label: "Employees", value: employeeCount, href: "/users", Icon: Users },
-        ].map(({ label, value, href, Icon }) => (
-          <button
-            key={label}
-            onClick={() => router.push(href)}
-            className="group flex-1 min-w-[140px] flex items-center gap-2.5 px-4 py-3 text-left hover:bg-[var(--bg-hover)] transition-colors first:rounded-l-lg last:rounded-r-lg"
-          >
-            <Icon className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] transition-colors" />
-            <div className="min-w-0">
-              <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums leading-none">
-                {value}
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)] truncate">
-                {label}
-              </p>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {/* Brand Overview & Briefs Overview Shortcuts */}
-      <div className="mb-6 sm:mb-8">
-      <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Quick links</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Card
-          hover
-          accent="admin"
-          onClick={() => router.push("/brands-overview?tab=work-data")}
-          className="cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-[var(--accent-admin-text)]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                Brand Overview
-              </h3>
-              <p className="text-[12px] text-[var(--text-secondary)]">
-                View all brands, managers, and task progress
-              </p>
-            </div>
-            <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-          </div>
-        </Card>
-        <Card
-          hover
-          accent="employee"
-          onClick={() => router.push("/briefs")}
-          className="cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[var(--accent-employee-dim)] flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-[var(--accent-employee-text)]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                Briefs Overview
-              </h3>
-              <p className="text-[12px] text-[var(--text-secondary)]">
-                Browse all briefs, tasks, and deadlines
-              </p>
-            </div>
-            <ArrowRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-          </div>
-        </Card>
-      </div>
-      </div>
+      <TodayList tasks={tasks as any} onOpen={(id) => setAdminSelectedTaskId(id)} />
 
       {/* Client Approval Status */}
       {clientApprovalCounts && (clientApprovalCounts.approved > 0 || clientApprovalCounts.pendingClient > 0 || clientApprovalCounts.changesRequested > 0 || clientApprovalCounts.denied > 0) && (
@@ -899,62 +896,6 @@ function AdminDashboard() {
                 <p className="font-bold text-[24px] text-red-600 mt-1 tabular-nums">{clientApprovalCounts.denied}</p>
               </Card>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Reminders Section (admin assigned to overdue tasks but not the brand manager) */}
-      {adminIsHalted && (
-        <div className="mb-6 sm:mb-8">
-          <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            Reminders{" "}
-            <span className="font-normal text-[var(--text-muted)] tabular-nums">
-              ({adminOverdueHalt!.length})
-            </span>
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {adminOverdueHalt!.map((ot) => {
-              const isContacted = ot.overdueContacted || adminContactedTasks.has(ot._id);
-              return (
-                <Card key={ot._id} className="p-4 border-l-4 border-l-red-500">
-                  <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">{ot.title}</p>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                    {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
-                  </p>
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <p className="text-[11px] text-[var(--text-secondary)]">
-                      Manager: <span className="font-semibold">{ot.managerName}</span>
-                    </p>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await adminContactManager({ taskId: ot._id as Id<"tasks"> });
-                          setAdminContactedTasks((prev) => new Set(prev).add(ot._id));
-                        } catch (err) {
-                          adminToast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
-                        }
-                      }}
-                      disabled={isContacted}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {isContacted ? "Contacted" : "Contact Manager"}
-                    </button>
-                  </div>
-                  {isContacted && (
-                    <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
-                      Waiting for the brand manager to confirm.
-                    </p>
-                  )}
-                  {!isContacted && ot.overdueContactDenied && (
-                    <p className="text-[11px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
-                      It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
-                    </p>
-                  )}
-                </Card>
-              );
-            })}
           </div>
         </div>
       )}
@@ -1517,67 +1458,88 @@ function EmployeeDashboard() {
   };
 
   const isHalted = overdueStatus && overdueStatus.length > 0;
+  const nowMs = Date.now();
+  const myOpen = (tasks ?? []).filter((t) => t.status !== "done" && t.briefStatus !== "archived");
+  const myOverdue = myOpen.filter((t) => isTaskOverdue(t, nowMs)).length;
+  const dueThisWeek = myOpen.filter((t) => t.deadline && t.deadline >= nowMs && t.deadline <= nowMs + 7 * 86_400_000).length;
+  const doneThisWeek = (tasks ?? []).filter((t) => t.completedAt && t.completedAt > nowMs - 7 * 86_400_000).length;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 relative">
-      <PageHeader
-        title={`${greeting}, ${displayName}`}
-        subtitle="Here are your active tasks. Click a task for details"
-      />
+      {/* Header */}
+      <div className="mb-6">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
+          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        </p>
+        <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-tight leading-tight">
+          {greeting}, {displayName.split(" ")[0]}
+        </h1>
+        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+          {myOverdue > 0
+            ? `${myOverdue} overdue · ${dueThisWeek} due this week`
+            : dueThisWeek > 0
+              ? `${dueThisWeek} due this week. Click a task for details.`
+              : "Nothing due this week."}
+        </p>
+      </div>
 
-      {/* Reminders Section */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <StatTile label="Open tasks" value={myOpen.length} href="/my-tasks" icon={ListChecks}
+          hint={myOverdue > 0 ? `${myOverdue} overdue` : "Nothing overdue"} hintTone={myOverdue > 0 ? "bad" : "good"} />
+        <StatTile label="In progress" value={myOpen.filter((t) => t.status === "in-progress").length} href="/my-tasks" icon={Play} />
+        <StatTile label="In review" value={myOpen.filter((t) => t.status === "review").length} href="/my-tasks" icon={ClipboardCheck}
+          hint="Waiting on a reviewer" />
+        <StatTile label="Done this week" value={doneThisWeek} href="/worklog" icon={CheckCircle2}
+          hintTone="good" hint={doneThisWeek > 0 ? "Nice work" : undefined} />
+      </div>
+
+      {/* Needs attention: your overdue tasks, each with its next step */}
       {isHalted && (
-        <div className="mb-6">
-          <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            Reminders ({overdueStatus.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <section className="mb-8">
+          <SectionHeader title="Needs attention" count={overdueStatus.length} tone="danger" />
+          <ul className="rounded-xl border border-[var(--danger)]/25 bg-white divide-y divide-[var(--border-subtle)] overflow-hidden shadow-sm">
             {overdueStatus.map((ot) => {
               const isContacted = ot.overdueContacted || justContactedTasks.has(ot._id);
               return (
-                <Card key={ot._id} className="p-4 border-l-4 border-l-red-500">
-                  <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">{ot.title}</p>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                    {ot.briefTitle} &middot; Deadline was {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
-                  </p>
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-[var(--border-subtle)]">
-                    <p className="text-[11px] text-[var(--text-secondary)]">
-                      Manager: <span className="font-semibold">{ot.managerName}</span>
-                    </p>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await contactManager({ taskId: ot._id as Id<"tasks"> });
-                          setJustContactedTasks((prev) => new Set(prev).add(ot._id));
-                        } catch (err) {
-                          toast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
-                        }
-                      }}
-                      disabled={isContacted}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {isContacted ? "Contacted" : "Contact Manager"}
-                    </button>
-                  </div>
-                  {isContacted && (
-                    <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 rounded px-2 py-1">
-                      Waiting for the brand manager to confirm.
-                    </p>
-                  )}
-                  {!isContacted && ot.overdueContactDenied && (
-                    <p className="text-[11px] text-red-700 mt-2 bg-red-100 rounded px-2 py-1">
-                      It seems you still have not had the meeting with the brand manager. Please contact them regarding this overdue task.
-                    </p>
-                  )}
-                </Card>
+                <li key={ot._id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                  <button type="button" onClick={() => setSelectedTaskId(ot._id)} className="min-w-0 flex-1 text-left">
+                    <span className="block text-[15px] font-medium text-[var(--text-primary)] truncate">{ot.title}</span>
+                    <span className="block text-[12px] text-[var(--text-secondary)] truncate">
+                      {ot.briefTitle} · was due {new Date(ot.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · Manager {ot.managerName}
+                    </span>
+                    {isContacted && (
+                      <span className="block text-[11px] text-amber-700 mt-0.5">Waiting for {ot.managerName} to confirm.</span>
+                    )}
+                    {!isContacted && ot.overdueContactDenied && (
+                      <span className="block text-[11px] text-red-700 mt-0.5">You haven&apos;t met the brand manager about this yet. Please contact them.</span>
+                    )}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await contactManager({ taskId: ot._id as Id<"tasks"> });
+                        setJustContactedTasks((prev) => new Set(prev).add(ot._id));
+                      } catch (err) {
+                        toast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
+                      }
+                    }}
+                    disabled={isContacted}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2e2d2b] transition-colors disabled:opacity-50"
+                  >
+                    <Phone className="h-3 w-3" />
+                    {isContacted ? "Contacted" : "Contact manager"}
+                  </button>
+                </li>
               );
             })}
-          </div>
-        </div>
+          </ul>
+        </section>
       )}
 
+      <TodayList tasks={tasks as any} onOpen={setSelectedTaskId} />
+
+      <SectionHeader title="All my tasks" />
       <EmployeeTaskViews
         tasks={tasks ?? []}
         onSelectTask={setSelectedTaskId}

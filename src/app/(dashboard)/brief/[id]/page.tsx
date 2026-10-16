@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, SegmentedTabs, Textarea, useToast, useCelebrate } from "@/components/ui";
+import { isTaskOverdue } from "@/lib/status";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
 import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2, Palette } from "lucide-react";
@@ -599,6 +600,8 @@ export default function BriefPage() {
   const briefTeamsList = graphData?.teams ?? [];
 
   const allTasks = tasksData?.tasks ?? [];
+  const overdueTaskCount = allTasks.filter((t) => !t.parentTaskId && isTaskOverdue(t)).length;
+  const reviewTaskCount = allTasks.filter((t) => !t.parentTaskId && t.status === "review").length;
 
   // Apply team-wise filter: find which user IDs belong to the selected team
   const filteredTasks = useMemo(() => {
@@ -723,7 +726,7 @@ export default function BriefPage() {
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" aria-hidden />
           {isAdmin && brief.status !== "archived" ? (
             <input
-              className="font-semibold text-[15px] sm:text-[15px] text-[var(--text-primary)] truncate bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--accent-admin)] focus:outline-none px-1 -ml-1 min-w-0"
+              className="font-semibold text-[17px] sm:text-[20px] tracking-tight text-[var(--text-primary)] truncate bg-transparent border-b border-transparent hover:border-[var(--border)] focus:border-[var(--accent-admin)] focus:outline-none px-1 -ml-1 min-w-0"
               defaultValue={brief.title}
               onBlur={(e) => {
                 const val = e.target.value.trim();
@@ -732,7 +735,7 @@ export default function BriefPage() {
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
             />
           ) : (
-            <h1 className="font-semibold text-[15px] sm:text-[15px] text-[var(--text-primary)] truncate">
+            <h1 className="font-semibold text-[17px] sm:text-[20px] tracking-tight text-[var(--text-primary)] truncate">
               {brief.title}
             </h1>
           )}
@@ -993,6 +996,16 @@ export default function BriefPage() {
               </div>
               <span className="text-[11px] font-semibold text-[var(--accent-admin-text)] tabular-nums">{progressPct}%</span>
               <span className="text-[11px] text-[var(--text-muted)]">({doneTasks}/{totalTasks})</span>
+              {overdueTaskCount > 0 && (
+                <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--danger-dim)] text-[11px] font-semibold text-[var(--danger)]">
+                  <AlertTriangle className="h-3 w-3" /> {overdueTaskCount} overdue
+                </span>
+              )}
+              {reviewTaskCount > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--accent-manager-dim)] text-[11px] font-semibold text-[var(--accent-manager-text)]">
+                  {reviewTaskCount} in review
+                </span>
+              )}
             </div>
 
             {/* Canvas | List toggle */}

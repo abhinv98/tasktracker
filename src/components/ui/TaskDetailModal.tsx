@@ -36,6 +36,7 @@ import {
 import { FilePreviewModal } from "./FilePreviewModal";
 import { ConfirmModal } from "./ConfirmModal";
 import { TaskTimeSection } from "./TaskTimeSection";
+import { isTaskOverdue } from "@/lib/status";
 import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
 
 function parseDuration(str: string): number {
@@ -448,12 +449,44 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-5 border-b border-[var(--border)]">
           <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-[15px] text-[var(--text-primary)] leading-snug">
+            <h2 className="font-semibold text-[18px] tracking-tight text-[var(--text-primary)] leading-snug">
               {task.title}
             </h2>
             <p className="text-[12px] text-[var(--text-secondary)] mt-1">
               {brief?.title ?? "Unknown brief"}
             </p>
+            {/* At a glance: status, due date, who has it */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                style={{
+                  color: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).color,
+                  backgroundColor: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).bg,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).color }} />
+                {(STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).label}
+              </span>
+              {task.deadline && (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                    isTaskOverdue(task)
+                      ? "bg-[var(--danger-dim)] text-[var(--danger)] font-semibold"
+                      : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  <Calendar className="h-3 w-3" />
+                  {isTaskOverdue(task) ? "Overdue · " : "Due "}
+                  {new Date(task.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                </span>
+              )}
+              {assignee && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-hover)] text-[11px] font-medium text-[var(--text-secondary)]">
+                  <User className="h-3 w-3" />
+                  {assignee.name ?? assignee.email}
+                </span>
+              )}
+            </div>
             <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
               {editingTag ? (
                 <input

@@ -409,6 +409,18 @@ export default function BriefsPage() {
   const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
   const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
   const reviewBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "review"), [filteredBriefs]);
+  // One-line digest in the header: what's open, what's late, what's next.
+  const briefsDigest = (() => {
+    const now = Date.now();
+    const open = activeBriefs.length + reviewBriefs.length;
+    const late = [...activeBriefs, ...reviewBriefs].filter((b) => b.deadline && b.deadline < now).length;
+    const soon = [...activeBriefs, ...reviewBriefs].filter(
+      (b) => b.deadline && b.deadline >= now && b.deadline <= now + 7 * 86_400_000
+    ).length;
+    return [`${open} open`, late ? `${late} past deadline` : null, soon ? `${soon} due this week` : null]
+      .filter(Boolean)
+      .join(" · ");
+  })();
   const activeFolders = useMemo(() => buildFolders(activeBriefs), [activeBriefs, brands, hrTeam]);
   const completedFolders = useMemo(() => buildFolders(completedBriefs), [completedBriefs, brands, hrTeam]);
   const reviewFolders = useMemo(() => buildFolders(reviewBriefs), [reviewBriefs, brands, hrTeam]);
@@ -634,7 +646,7 @@ export default function BriefsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Briefs"
-        subtitle="Manage your briefs and priorities"
+        subtitle={briefsDigest}
         actions={
           isAdmin && (
             <Button variant="primary" onClick={() => openCreateModalForBrand()}>

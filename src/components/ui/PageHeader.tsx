@@ -10,7 +10,8 @@ interface PageHeaderProps {
 }
 
 /**
- * Standard page header: title + subtitle left, actions right, hairline below.
+ * Standard page header: title + subtitle left, actions right. Matches the
+ * dashboard header (no hairline; spacing does the separating).
  * Keeps every page's top edge identical — use instead of hand-rolled headers.
  */
 export function PageHeader({
@@ -22,18 +23,18 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-6 border-b border-[var(--border-subtle)] ${className}`}
+      className={`flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 ${className}`}
     >
       <div className="flex items-start gap-2.5">
         {Icon && (
           <Icon className="h-5 w-5 mt-[5px] text-[var(--accent-admin-text)] shrink-0" />
         )}
         <div>
-          <h1 className="font-semibold text-[24px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight">
+          <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 text-[14px] text-[var(--text-secondary)]">
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
               {subtitle}
             </p>
           )}
