@@ -279,9 +279,11 @@ export function ContentCalendarView({
     }
   }
 
+  const [addingEntry, setAddingEntry] = useState(false);
   async function handleAddEntry(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentSheetMonth) return;
+    // One save at a time: a slow round-trip must not become a second entry.
+    if (!currentSheetMonth || addingEntry) return;
     if (newPostDate && !newPostDate.startsWith(currentSheetMonth)) {
       toast(
         "error",
@@ -290,6 +292,7 @@ export function ContentCalendarView({
       return;
     }
     const assignor = newAssignor || (defaultAssignor as string) || undefined;
+    setAddingEntry(true);
     try {
       await createEntry({
         briefId,
@@ -315,6 +318,8 @@ export function ContentCalendarView({
         "error",
         err instanceof Error ? err.message : "Failed to add entry"
       );
+    } finally {
+      setAddingEntry(false);
     }
   }
 
@@ -1046,7 +1051,7 @@ export function ContentCalendarView({
                 />
               </div>
               <div className="flex gap-2 mt-1">
-                <Button type="submit" variant="primary">
+                <Button type="submit" variant="primary" loading={addingEntry} disabled={addingEntry}>
                   Add Entry
                 </Button>
                 <Button

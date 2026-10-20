@@ -821,6 +821,25 @@ export const duplicateEntry = mutation({
   },
 });
 
+/** A slow save tempts a second click on "Add Entry"; the second request
+ *  must not become a second entry. Same calendar + title + go-live date
+ *  within 30s is treated as the same submission. */
+const ENTRY_REPLAY_WINDOW_MS = 30_000;
+function findReplayedEntry(
+  existingTasks: Array<{ _id: any; parentTaskId?: any; title: string; postDate?: string; _creationTime: number }>,
+  title: string,
+  postDate: string
+) {
+  const now = Date.now();
+  return existingTasks.find(
+    (t) =>
+      !t.parentTaskId &&
+      t.title.trim() === title.trim() &&
+      t.postDate === postDate &&
+      now - t._creationTime < ENTRY_REPLAY_WINDOW_MS
+  );
+}
+
 export const createEntryForBrand = mutation({
   args: {
     brandId: v.id("brands"),
@@ -851,6 +870,8 @@ export const createEntryForBrand = mutation({
     const maxOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
+    const replay = findReplayedEntry(existingTasks, args.title, args.postDate);
+    if (replay) return replay._id;
 
     const taskId = await ctx.db.insert("tasks", {
       briefId,
@@ -930,6 +951,8 @@ export const createCalendarEntryWithCopyTask = mutation({
     const maxOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
+    const replay = findReplayedEntry(existingTasks, args.title, args.goLiveDate);
+    if (replay) return replay._id;
 
     const platform = args.platform ?? "Other";
     const contentType = args.contentType ?? "Post";
@@ -1336,6 +1359,8 @@ export const createCalendarEntry = mutation({
     const maxOrder = existingTasks.length
       ? Math.max(...existingTasks.map((t) => t.sortOrder))
       : 0;
+    const replay = findReplayedEntry(existingTasks, args.title, args.postDate);
+    if (replay) return replay._id;
 
     const taskId = await ctx.db.insert("tasks", {
       briefId: args.briefId,

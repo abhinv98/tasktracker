@@ -382,10 +382,13 @@ export default function ContentCalendarPage() {
     }
   }
 
+  const [addingEntry, setAddingEntry] = useState(false);
   async function handleAddEntry(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedBrandId || !addingDate) return;
+    // One save at a time: a slow round-trip must not become a second entry.
+    if (!selectedBrandId || !addingDate || addingEntry) return;
     const assignor = newAssignor || defaultAssignor || undefined;
+    setAddingEntry(true);
     try {
       await createEntry({
         brandId: selectedBrandId as Id<"brands">,
@@ -407,6 +410,8 @@ export default function ContentCalendarPage() {
       toast("success", "Entry added");
     } catch (err: any) {
       toast("error", err.message ?? "Failed to add entry");
+    } finally {
+      setAddingEntry(false);
     }
   }
 
@@ -1268,7 +1273,7 @@ export default function ContentCalendarPage() {
                 />
               </div>
               <div className="flex gap-2 mt-1">
-                <Button type="submit" variant="primary">Add Entry</Button>
+                <Button type="submit" variant="primary" loading={addingEntry} disabled={addingEntry}>Add Entry</Button>
                 <Button type="button" variant="secondary" onClick={() => setAddingDate(null)}>Cancel</Button>
               </div>
             </form>
