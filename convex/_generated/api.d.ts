@@ -55,6 +55,7 @@ import type * as migrations_checkDeadlineValues from "../migrations/checkDeadlin
 import type * as migrations_checkPremTask from "../migrations/checkPremTask.js";
 import type * as migrations_checkTimeEntries from "../migrations/checkTimeEntries.js";
 import type * as migrations_clearContentCalendarDeadlines from "../migrations/clearContentCalendarDeadlines.js";
+import type * as migrations_deleteDuplicateTask from "../migrations/deleteDuplicateTask.js";
 import type * as migrations_fillCreativeSlots from "../migrations/fillCreativeSlots.js";
 import type * as migrations_findDuplicateUsers from "../migrations/findDuplicateUsers.js";
 import type * as migrations_findFaizOrphanTasks from "../migrations/findFaizOrphanTasks.js";
@@ -149,6 +150,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/checkPremTask": typeof migrations_checkPremTask;
   "migrations/checkTimeEntries": typeof migrations_checkTimeEntries;
   "migrations/clearContentCalendarDeadlines": typeof migrations_clearContentCalendarDeadlines;
+  "migrations/deleteDuplicateTask": typeof migrations_deleteDuplicateTask;
   "migrations/fillCreativeSlots": typeof migrations_fillCreativeSlots;
   "migrations/findDuplicateUsers": typeof migrations_findDuplicateUsers;
   "migrations/findFaizOrphanTasks": typeof migrations_findFaizOrphanTasks;

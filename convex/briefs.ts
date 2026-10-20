@@ -165,7 +165,7 @@ export const getBrief = query({
 // Guard against accidental double-submission (double-click / Enter+click):
 // if this creator just made a brief with the same title, treat the second
 // call as a replay and hand back the existing brief.
-const DUPLICATE_SUBMIT_WINDOW_MS = 10_000;
+const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
 
 async function findRecentDuplicateBrief(
   ctx: { db: { query: (table: "briefs") => any } },

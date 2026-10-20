@@ -353,7 +353,7 @@ export const createTask = mutation({
       (t) =>
         t.briefId === args.briefId &&
         t.title === args.title &&
-        Date.now() - t._creationTime < 10_000
+        Date.now() - t._creationTime < 30_000
     );
     if (replay) return replay._id;
 
