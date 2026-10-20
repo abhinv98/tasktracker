@@ -411,6 +411,18 @@ async function deliverableFiles(ctx: any, d: any): Promise<{ name: string; url: 
   return [...convexFiles.filter((f) => f.url), ...r2Files];
 }
 
+// ─── Helper: "Send to Assignor" deliverables ────────
+// A deliverable sent straight to the task's assignor carries this note. The
+// assignor (if an admin) may approve or send it back even when they aren't a
+// listed brand manager of the brand — that's the point of the route.
+const ASSIGNOR_ROUTE_NOTE = "Sent directly to Assignor";
+async function isAssignorReviewer(ctx: any, userId: any, deliverable: any, task: any) {
+  if (deliverable?.teamLeadReviewNote !== ASSIGNOR_ROUTE_NOTE) return false;
+  if (!task || task.assignedBy !== userId) return false;
+  const user = await ctx.db.get(userId);
+  return user?.role === "admin";
+}
+
 // ─── Helper: check if user is brand manager ────────
 // Super Admins are treated as managers of every brand so they can approve
 // or reject deliverables across the org without being explicitly listed in
@@ -647,8 +659,6 @@ export const listManagerDeliverables = query({
       .query("brandManagers")
       .withIndex("by_manager", (q) => q.eq("managerId", userId))
       .collect();
-    if (myBrandAssignments.length === 0) return [];
-
     const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
@@ -688,7 +698,9 @@ export const listManagerDeliverables = query({
       }
       const task = tasks.find((t) => t._id === d.taskId);
       const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
-      return !!(brief?.brandId && myBrandIds.has(brief.brandId));
+      // Your brands, plus anything sent straight to you as the assignor.
+      const sentToMe = d.teamLeadReviewNote === ASSIGNOR_ROUTE_NOTE && task?.assignedBy === userId;
+      return !!(brief?.brandId && myBrandIds.has(brief.brandId)) || sentToMe;
     });
 
     const results = await Promise.all(
@@ -1721,14 +1733,9 @@ export const submitDeliverableDirectToAssignor = mutation({
     if (task.isHelper) throw new Error("Helpers submit to the main assignee. Use the normal flow.");
     const brief = await ctx.db.get(task.briefId);
     await assertCanSubmit(ctx, userId, task, brief);
-    // The assignor gives final approval via approveDeliverable, which needs a
-    // BM of the brand (or an admin when the brief has no brand).
     const assignor = await ctx.db.get(task.assignedBy);
-    const assignorCanApprove = brief?.brandId
-      ? await isBrandManager(ctx, task.assignedBy, brief.brandId)
-      : assignor?.role === "admin";
-    if (!assignorCanApprove) {
-      throw new Error("The assignor can't give final approval on this task. Use the normal flow.");
+    if (assignor?.role !== "admin") {
+      throw new Error("The assignor can't review deliverables. Use the normal flow.");
     }
 
     const deliverableId = await ctx.db.insert("deliverables", {
@@ -1741,7 +1748,7 @@ export const submitDeliverableDirectToAssignor = mutation({
       teamLeadStatus: "approved" as const,
       teamLeadReviewedBy: userId,
       teamLeadReviewedAt: Date.now(),
-      teamLeadReviewNote: "Sent directly to Assignor",
+      teamLeadReviewNote: ASSIGNOR_ROUTE_NOTE,
       passedToManagerBy: userId,
       passedToManagerAt: Date.now(),
       ...(fileIds && fileIds.length > 0 ? { fileIds } : {}),
@@ -1770,6 +1777,27 @@ export const submitDeliverableDirectToAssignor = mutation({
       read: false,
       createdAt: Date.now(),
     });
+    // Brand managers can act on it too, so it never waits on one person.
+    if (brief?.brandId) {
+      const bms = await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
+        .collect();
+      for (const bm of bms) {
+        if (bm.managerId === task.assignedBy || bm.managerId === userId) continue;
+        await ctx.db.insert("notifications", {
+          recipientId: bm.managerId,
+          type: "deliverable_submitted",
+          title: "Deliverable ready for review",
+          message: `${submitter?.name ?? "Someone"} sent "${task.title}" to ${assignor?.name ?? "the assignor"} for review`,
+          briefId: task.briefId,
+          taskId,
+          triggeredBy: userId,
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+    }
 
     return deliverableId;
   },
@@ -2173,7 +2201,9 @@ export const approveDeliverable = mutation({
     const brief = task ? await ctx.db.get(task.briefId) : null;
 
     if (brief?.brandId) {
-      const isManager = await isBrandManager(ctx, userId, brief.brandId);
+      const isManager =
+        (await isBrandManager(ctx, userId, brief.brandId)) ||
+        (await isAssignorReviewer(ctx, userId, deliverable, task));
       if (!isManager) {
         throw new Error("Only brand managers can give final approval");
       }
@@ -2242,7 +2272,9 @@ export const rejectDeliverable = mutation({
     const brief = task ? await ctx.db.get(task.briefId) : null;
 
     if (brief?.brandId) {
-      const isManager = await isBrandManager(ctx, userId, brief.brandId);
+      const isManager =
+        (await isBrandManager(ctx, userId, brief.brandId)) ||
+        (await isAssignorReviewer(ctx, userId, deliverable, task));
       if (!isManager) {
         throw new Error("Only brand managers can reject deliverables");
       }

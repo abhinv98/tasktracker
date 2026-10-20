@@ -131,7 +131,9 @@ export default function DeliverablesPage() {
     });
   }
 
-  if (isBrandManager) {
+  // Also shown to an admin who isn't a brand manager but has work sent
+  // straight to them as the task's assignor.
+  if (isBrandManager || (isAdmin && (managerDeliverables ?? []).length > 0)) {
     availableTabs.push({
       id: "brand_deliverables",
       label: "Brand Deliverables",
