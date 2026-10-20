@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${geistMono.variable}`} style={{ colorScheme: "light" }}>
-      <body className="antialiased bg-[#faf9f5] text-[#141413]">
+      <body className="antialiased bg-[#f6f6f5] text-[#171717]">
         <ConvexClientProvider>{children}</ConvexClientProvider>
       </body>
     </html>

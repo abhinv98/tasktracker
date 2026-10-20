@@ -5,19 +5,28 @@
 /* FORCE LIGHT MODE */
 
 @theme inline {
-  --color-background: #faf9f5;
-  --color-foreground: #141413;
+  --color-background: #f6f6f5;
+  --color-foreground: #171717;
+  /* Compact density: every spacing utility (p-*, gap-*, h-*, …) runs ~10%
+     tighter than Tailwind's 0.25rem default, app-wide, in one place. */
+  --spacing: 0.225rem;
+  /* Crisper corners across the ~1,000 rounded-* uses. */
+  --radius-sm: 0.1875rem;
+  --radius-md: 0.3125rem;
+  --radius-lg: 0.4375rem;
+  --radius-xl: 0.5625rem;
+  --radius-2xl: 0.75rem;
 }
 
 :root {
   color-scheme: light;
 
   /* Backgrounds — Anthropic warm cream */
-  --bg-primary: #faf9f5;
+  --bg-primary: #f6f6f5;
   --bg-secondary: #FFFFFF;
   --bg-panel: #FFFFFF;
-  --bg-hover: #f3f1eb;
-  --bg-input: #f3f1eb;
+  --bg-hover: #efefed;
+  --bg-input: #f3f3f2;
   --bg-elevated: #FFFFFF;
 
   /* Text — Anthropic dark.
@@ -26,17 +35,17 @@
      the same. The ramp shifted down a notch instead of just darkening muted,
      which keeps the three readable steps visually distinct.
      Contrast on --bg-primary: 17.4 / 7.3 / 5.2 / 2.5. */
-  --text-primary: #141413;
-  --text-secondary: #55534d;
-  --text-muted: #6b6963;
+  --text-primary: #171717;
+  --text-secondary: #4e4e4b;
+  --text-muted: #6a6a66;
   /* Disabled is intentionally below AA — WCAG exempts inactive controls, and it
      has to read as unavailable next to --text-muted. Never use it for content. */
-  --text-disabled: #a3a199;
+  --text-disabled: #a3a3a0;
 
   /* Borders — Anthropic warm gray */
-  --border: #e8e6dc;
-  --border-strong: #d5d3c9;
-  --border-subtle: #f0eee6;
+  --border: #e3e3e0;
+  --border-strong: #cfcfcb;
+  --border-subtle: #ececea;
 
   /* Accents — Anthropic brand.
      Each hue has three roles. The base is the identity colour and stays on
@@ -57,8 +66,8 @@
   --accent-employee-dim: rgba(120, 140, 93, 0.12);
 
   /* Surfaces */
-  --surface-light: #f3f1eb;
-  --surface-cream: #faf9f5;
+  --surface-light: #efefed;
+  --surface-cream: #f6f6f5;
 
   /* Semantic */
   --danger: #c0392b;
@@ -87,13 +96,13 @@ html {
 }
 
 body {
-  background-color: #faf9f5;
-  color: #141413;
+  background-color: #f6f6f5;
+  color: #171717;
   font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   /* Counts, dates and money sit in tables everywhere — keep digits from
      wobbling column widths as values change. */
   font-variant-numeric: tabular-nums;
@@ -141,11 +150,11 @@ input, textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: #faf9f5;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d5d3c9;
+  background: #cfcfcb;
   border-radius: 9999px;
 }
 
@@ -156,7 +165,7 @@ input, textarea {
 /* Selection — Anthropic orange tint */
 ::selection {
   background: rgba(217, 119, 87, 0.15);
-  color: #141413;
+  color: #171717;
 }
 
 /* Chat bubble pulse animation */
@@ -270,4 +279,25 @@ input, textarea {
   * {
     box-shadow: none !important;
   }
+}
+
+/* ─── Compact defaults for hand-rolled tables ───
+   Most pages write raw <table>s. :where() keeps these at zero specificity,
+   so any Tailwind class on the element still wins — this only fills gaps. */
+:where(table) { border-collapse: collapse; }
+:where(thead th) {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  white-space: nowrap;
+}
+:where(tbody tr) { transition: background-color 120ms; }
+:where(tbody tr:hover) { background-color: var(--bg-primary); }
+/* Focus is always visible, and the same everywhere. */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent-admin);
+  outline-offset: 1px;
 }

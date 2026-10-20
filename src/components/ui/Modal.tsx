@@ -76,7 +76,7 @@ export function Modal({
       className={`
         m-auto w-[calc(100%-2rem)] ${SIZES[size]} max-h-[calc(100dvh-4rem)]
         p-0 bg-transparent overflow-visible
-        backdrop:bg-[#141413]/40 backdrop:backdrop-blur-[2px]
+        backdrop:bg-[#171717]/40 backdrop:backdrop-blur-[2px]
         open:animate-scaleIn
       `}
     >

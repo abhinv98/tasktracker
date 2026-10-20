@@ -70,7 +70,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   return (
     /* overlay */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -262,7 +262,7 @@ function ResetPasswordModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -438,7 +438,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

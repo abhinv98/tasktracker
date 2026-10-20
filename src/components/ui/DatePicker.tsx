@@ -113,7 +113,7 @@ export function DatePicker({
         id={id}
         disabled={disabled}
         onClick={() => !disabled && setOpen(!open)}
-        className="flex items-center gap-2 w-full min-w-[140px] bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 w-full min-w-[140px] bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] h-8 px-2.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <CalendarIcon className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
         <span className="truncate">{displayLabel}</span>

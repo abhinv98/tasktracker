@@ -11,6 +11,8 @@ type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  /** sm = 28px, for toolbars and dense rows; md = 32px default. */
+  size?: "sm" | "md";
   /** Force the spinner on. Omit and an async onClick drives it automatically. */
   loading?: boolean;
   children: React.ReactNode;
@@ -20,7 +22,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   // Ink, not brand terracotta: the primary action is the darkest thing on
   // the page (17:1 behind white). Terracotta stays for accents and links.
   primary:
-    "bg-[var(--text-primary)] text-white hover:bg-[#2e2d2b]",
+    "bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a]",
   secondary:
     "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]",
   destructive:
@@ -38,7 +40,7 @@ const variantStyles: Record<ButtonVariant, string> = {
 const RESUBMIT_WINDOW_MS = 2500;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", className = "", children, disabled, loading, onClick, ...props }, ref) => {
+  ({ variant = "primary", size = "md", className = "", children, disabled, loading, onClick, ...props }, ref) => {
     const lastSubmit = useRef(0);
     // An async onClick drives the spinner on its own, so every action button
     // gets one without touching its call site. `loading` overrides for forms,
@@ -77,9 +79,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         onClick={handleClick}
         className={`
-          relative inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5
-          font-medium text-[13px] tracking-[-0.003em]
-          rounded-lg
+          relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap
+          ${size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-8 px-3 text-[13px]"}
+          font-medium tracking-[-0.003em]
+          rounded-md shadow-[0_1px_0_rgba(0,0,0,0.03)]
           transition-all duration-150
           active:translate-y-[1px] active:duration-[50ms]
           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0

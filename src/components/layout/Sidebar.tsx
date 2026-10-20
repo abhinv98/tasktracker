@@ -324,7 +324,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="flex shrink-0 items-center justify-between h-14 border-b border-[var(--border)] px-5">
           <div className="flex items-center flex-1 min-w-0">
-            <img src="/ecultify.png" alt="Ecultify" className="w-full h-auto object-contain" />
+            <img src="/ecultify.png" alt="Ecultify" className="h-8 w-auto max-w-full object-contain" />
           </div>
           <button
             onClick={onClose}
@@ -335,7 +335,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
         </div>
 
         {/* Nav with categories */}
-        <nav className="flex flex-1 flex-col py-2 overflow-y-auto px-3">
+        <nav className="flex flex-1 flex-col py-1 overflow-y-auto px-2.5">
           {/* Leaving the workspace has to be the first thing you see. */}
           {inRecruitment && canRecruit && (
             <Link
@@ -359,8 +359,8 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                 <button
                   onClick={() => toggleCategory(group.category)}
                   className={`
-                    w-full flex items-center justify-between px-2 py-1.5 rounded-md
-                    font-mono text-[10px] font-medium uppercase tracking-[0.08em]
+                    w-full flex items-center justify-between px-2.5 pt-3 pb-1 rounded-md
+                    text-[11px] font-semibold uppercase tracking-[0.05em]
                     transition-colors duration-150
                     ${hasActiveItem && !isOpen
                       ? "text-[var(--accent-admin-text)]"
@@ -389,20 +389,20 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                           href={item.href}
                           onClick={onClose}
                           className={`
-                            group flex items-center gap-2.5 rounded-md px-3 py-1.5 relative
-                            font-medium text-[13px] transition-colors duration-150
+                            group flex items-center gap-2.5 rounded-md h-8 px-2.5 relative
+                            text-[13px] transition-colors duration-150
                             ${
                               isActive
-                                ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-[var(--bg-hover)] text-[var(--text-primary)] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[var(--accent-admin)]"
+                                : "font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                             }
                           `}
                         >
                           <Icon
                             className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
                               isActive
-                                ? ""
-                                : "group-hover:text-[var(--accent-admin-text)]"
+                                ? "text-[var(--accent-admin-text)]"
+                                : "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]"
                             }`}
                           />
                           <span className="flex-1">{item.label}</span>
@@ -439,7 +439,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               than two clicks deep behind Overview. */}
           {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
             <div className="mb-1 mt-2">
-              <div className="px-2 py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+              <div className="px-2.5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
                 Positions
               </div>
               <div className="mt-0.5 space-y-0.5">

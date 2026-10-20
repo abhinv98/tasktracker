@@ -65,7 +65,7 @@ export function DocumentPrintView({
       <div className="max-w-[210mm] mx-auto mb-4 flex justify-end print:hidden px-4">
         <button
           onClick={() => window.print()}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#141413] text-white text-[13px] font-semibold"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#171717] text-white text-[13px] font-semibold"
         >
           <Printer className="h-4 w-4" /> Print / Save as PDF
         </button>

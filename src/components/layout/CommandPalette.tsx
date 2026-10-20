@@ -158,7 +158,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#141413]/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-[#171717]/30 z-50" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"

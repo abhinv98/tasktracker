@@ -28,7 +28,7 @@ export function Card({
     <div
       className={`
         relative bg-white rounded-lg border border-[var(--border)]
-        p-5 transition-all duration-150
+        p-4 transition-all duration-150
         ${hover || onClick ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}
         ${className}
       `}

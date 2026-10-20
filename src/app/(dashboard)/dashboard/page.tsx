@@ -748,7 +748,7 @@ function AdminDashboard() {
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => router.push("/brands-overview?filter=mine")}
-            className="shrink-0 self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[var(--text-primary)] text-white text-[13px] font-medium hover:bg-[#2e2d2b] transition-colors"
+            className="shrink-0 self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[var(--text-primary)] text-white text-[13px] font-medium hover:bg-[#2a2a2a] transition-colors"
           >
             <Briefcase className="h-4 w-4" />
             My Brands
@@ -1525,7 +1525,7 @@ function EmployeeDashboard() {
                       }
                     }}
                     disabled={isContacted}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2e2d2b] transition-colors disabled:opacity-50"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
                   >
                     <Phone className="h-3 w-3" />
                     {isContacted ? "Contacted" : "Contact manager"}

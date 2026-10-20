@@ -81,7 +81,7 @@ export function CandidatePanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-[#141413]/40" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-[#171717]/40" onClick={onClose} />
       <aside
         role="dialog"
         aria-modal="true"
