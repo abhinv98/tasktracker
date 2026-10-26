@@ -778,19 +778,19 @@ export default function PettyCashPage() {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <div className="text-[13px]">{h.recipient}</div>
-                              <div className="text-[11px] text-[var(--text-muted)]">
+                              <div className="text-[13px] whitespace-nowrap">{h.recipient}</div>
+                              <div className="text-[12px] text-[var(--text-muted)] whitespace-nowrap">
                                 from {h.holderName}
                               </div>
                             </TableCell>
-                            <TableCell>{h.purpose}</TableCell>
+                            <TableCell className="whitespace-nowrap">{h.purpose}</TableCell>
                             <TableCell className="text-right tabular-nums">
                               {money(h.amountGiven)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-[var(--text-secondary)]">
                               {h.settled ? money(returnedOf(h)) : "—"}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums">
+                            <TableCell className="text-right tabular-nums whitespace-nowrap">
                               {h.settled ? (
                                 money(spentOf(h))
                               ) : (
@@ -801,7 +801,7 @@ export default function PettyCashPage() {
                             </TableCell>
                             <TableCell>
                               {h.settled ? (
-                                <span className="text-[12px] text-[var(--text-secondary)] line-clamp-2 max-w-[260px]">
+                                <span className="text-[12px] text-[var(--text-secondary)] line-clamp-2">
                                   {h.spentOn}
                                 </span>
                               ) : (

@@ -419,7 +419,8 @@ export default defineSchema({
     timestamp: v.number(),
   })
     .index("by_brief", ["briefId"])
-    .index("by_brief_time", ["briefId", "timestamp"]),
+    .index("by_brief_time", ["briefId", "timestamp"])
+    .index("by_time", ["timestamp"]),
 
   // ─── INVITES ─────────────────────────────────
   invites: defineTable({

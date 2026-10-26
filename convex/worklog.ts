@@ -15,22 +15,40 @@ export const getEmployeeWorkLog = query({
     // Include ALL users (employees, admins, super admins) — not just employees
     const employees = allUsers.filter((u) => u.name || u.email);
     const allTasks = await ctx.db.query("tasks").collect();
-    const allBriefs = await ctx.db.query("briefs").collect();
     const allTimeEntries = await ctx.db.query("timeEntries").collect();
-    const allActivityLogs = await ctx.db.query("activityLog").collect();
 
     // IST calendar day; the Convex runtime is UTC.
     const dayStart = new Date(date + "T00:00:00+05:30").getTime();
     const dayEnd = new Date(date + "T23:59:59.999+05:30").getTime();
 
-    const employeeWorkLogs = employees.map((emp) => {
+    // Only the chosen day's activity. Reading the whole log (thousands of
+    // rows, every event ever) took 8-16s and re-ran on every status change.
+    const dayActivity = await ctx.db
+      .query("activityLog")
+      .withIndex("by_time", (q) => q.gte("timestamp", dayStart).lte("timestamp", dayEnd))
+      .collect();
+
+    const taskById = new Map<string, (typeof allTasks)[number]>(allTasks.map((t) => [t._id, t]));
+    const tasksByAssignee = new Map<string, typeof allTasks>();
+    for (const t of allTasks) {
+      const arr = tasksByAssignee.get(t.assigneeId);
+      if (arr) arr.push(t);
+      else tasksByAssignee.set(t.assigneeId, [t]);
+    }
+    const briefCache = new Map<string, any>();
+    const getBrief = async (id: Id<"briefs">) => {
+      if (!briefCache.has(id)) briefCache.set(id, await ctx.db.get(id));
+      return briefCache.get(id);
+    };
+
+    const employeeWorkLogs = await Promise.all(employees.map(async (emp) => {
       const taskIds = new Set<string>();
+      const ownTasks = tasksByAssignee.get(emp._id) ?? [];
 
       // Tasks with deadline on this date
-      const tasksWithDeadline = allTasks.filter((t) => {
-        if (t.assigneeId !== emp._id || !t.deadline) return false;
-        return t.deadline >= dayStart && t.deadline <= dayEnd;
-      });
+      const tasksWithDeadline = ownTasks.filter(
+        (t) => t.deadline && t.deadline >= dayStart && t.deadline <= dayEnd
+      );
       tasksWithDeadline.forEach((t) => taskIds.add(t._id));
 
       // Tasks with time entries on this date
@@ -42,29 +60,22 @@ export const getEmployeeWorkLog = query({
 
       // Tasks with activity (status changes) on this date. Only their own
       // tasks: creating or approving someone else's task isn't their work.
-      const ownTaskIds = new Set(
-        allTasks.filter((t) => t.assigneeId === emp._id).map((t) => t._id as string)
-      );
-      const activityForDay = allActivityLogs.filter((al) => {
-        if (al.userId !== emp._id || !al.taskId || !ownTaskIds.has(al.taskId)) return false;
-        return al.timestamp >= dayStart && al.timestamp <= dayEnd;
-      });
-      activityForDay.forEach((al) => {
-        if (al.taskId) taskIds.add(al.taskId);
-      });
+      const ownTaskIds = new Set(ownTasks.map((t) => t._id as string));
+      for (const al of dayActivity) {
+        if (al.userId === emp._id && al.taskId && ownTaskIds.has(al.taskId)) taskIds.add(al.taskId);
+      }
 
       // Tasks completed on this date
-      const completedToday = allTasks.filter((t) => {
-        if (t.assigneeId !== emp._id || !t.completedAt) return false;
-        return t.completedAt >= dayStart && t.completedAt <= dayEnd;
-      });
+      const completedToday = ownTasks.filter(
+        (t) => t.completedAt && t.completedAt >= dayStart && t.completedAt <= dayEnd
+      );
       completedToday.forEach((t) => taskIds.add(t._id));
 
-      const tasks = [...taskIds]
-        .map((id) => {
-          const task = allTasks.find((t) => t._id === id);
+      const tasks = (await Promise.all([...taskIds]
+        .map(async (id) => {
+          const task = taskById.get(id);
           if (!task) return null;
-          const brief = allBriefs.find((b) => b._id === task.briefId);
+          const brief = await getBrief(task.briefId);
           const timeSpent = timeEntriesForDay
             .filter((te) => te.taskId === id)
             .reduce((sum, te) => sum + (te.durationMinutes ?? 0), 0);
@@ -79,8 +90,7 @@ export const getEmployeeWorkLog = query({
             deadline: task.deadline,
             changesCount: task.changesCount ?? 0,
           };
-        })
-        .filter(Boolean);
+        }))).filter(Boolean);
 
       return {
         user: {
@@ -98,7 +108,7 @@ export const getEmployeeWorkLog = query({
         // that merely appears in their list.
         completedTasks: completedToday.length,
       };
-    });
+    }));
 
     // Only show employees with tasks
     const withTasks = employeeWorkLogs.filter((e) => e.totalTasks > 0);
@@ -317,12 +327,9 @@ export const getTeamLoadView = query({
     const activeBriefs = allBriefs.filter(
       (b) => !["archived", "completed"].includes(b.status)
     );
-    const activeTaskIds = new Set(
-      allTasks
-        .filter((t) => activeBriefs.some((b) => b._id === t.briefId))
-        .map((t) => t._id)
-    );
-    const activeTasks = allTasks.filter((t) => activeTaskIds.has(t._id));
+    // A Set, not activeBriefs.some() per task: that was tasks × briefs work.
+    const activeBriefIds = new Set<string>(activeBriefs.map((b) => b._id));
+    const activeTasks = allTasks.filter((t) => activeBriefIds.has(t.briefId));
 
     return teams.map((team) => {
       const memberLinks = userTeams.filter((ut) => ut.teamId === team._id);
