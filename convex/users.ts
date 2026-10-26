@@ -129,6 +129,54 @@ export const listManagers = query({
   },
 });
 
+/** Only the owner reads the user audit log. Not a role flag: it's one person. */
+const AUDIT_LOG_EMAILS = ["98abrai@gmail.com"];
+
+/** Mirrors getDisplayRole in src/lib/roles.ts (Convex can't import from src/). */
+function roleLabel(u: any): string {
+  if (!u) return "Unknown";
+  if (u.isSuperAdmin) return "Super Admin";
+  if (u.isHR) return "HR";
+  if (u.isAccountant) return "Accountant";
+  if (u.role === "admin") return "Brand Manager";
+  if (u.isFreelancer) return "Freelancer";
+  return "Employee";
+}
+
+async function logUserChange(
+  ctx: MutationCtx,
+  actor: any,
+  target: any,
+  action: "role_changed" | "user_deleted",
+  from?: string,
+  to?: string
+) {
+  await ctx.db.insert("userAuditLog", {
+    actorId: actor._id,
+    actorName: actor.name ?? actor.email ?? "Unknown",
+    targetName: target?.name ?? target?.email ?? "Unknown",
+    action,
+    from,
+    to,
+    timestamp: Date.now(),
+  });
+}
+
+/** Newest first. Null for anyone but the owner. */
+export const listUserAuditLog = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const me = userId ? await ctx.db.get(userId) : null;
+    if (!AUDIT_LOG_EMAILS.includes((me?.email ?? "").toLowerCase())) return null;
+    return await ctx.db
+      .query("userAuditLog")
+      .withIndex("by_time")
+      .order("desc")
+      .take(200);
+  },
+});
+
 export const updateUserRole = mutation({
   args: {
     userId: v.id("users"),
@@ -167,19 +215,26 @@ export const updateUserRole = mutation({
     const nextHR = newRole === "admin" ? isHR ?? targetUser?.isHR ?? false : false;
     const nextAccountant =
       newRole === "admin" ? isAccountant ?? targetUser?.isAccountant ?? false : false;
-    // Both flags unlock petty cash (money), so only super admins may grant them.
-    const granting =
-      (nextHR && !targetUser?.isHR) || (nextAccountant && !targetUser?.isAccountant);
-    if (granting && !currentUser.isSuperAdmin) {
-      throw new Error("Only super admins can grant HR or Accountant access");
+    // Both flags unlock petty cash (money), so only super admins may grant or
+    // remove them — a stray dropdown click once cut HR off from petty cash.
+    const hrChanged = nextHR !== (targetUser?.isHR === true);
+    const accountantChanged = nextAccountant !== (targetUser?.isAccountant === true);
+    if ((hrChanged || accountantChanged) && !currentUser.isSuperAdmin) {
+      throw new Error("Only super admins can change HR or Accountant access");
     }
-    await ctx.db.patch(userId, {
+    const next = {
       role: newRole,
       // Admins are never freelancers — clear the flag on promotion.
       isFreelancer: newRole === "admin" ? false : isFreelancer ?? false,
       isHR: nextHR,
       isAccountant: nextAccountant,
-    });
+    };
+    await ctx.db.patch(userId, next);
+    const from = roleLabel(targetUser);
+    const to = roleLabel({ ...targetUser, ...next });
+    if (from !== to) {
+      await logUserChange(ctx, currentUser, targetUser, "role_changed", from, to);
+    }
   },
 });
 
@@ -318,6 +373,7 @@ export const deleteUser = mutation({
     if (openTasks.length > 0) {
       throw new Error(`Reassign this user's ${openTasks.length} open task(s) before deleting them`);
     }
+    await logUserChange(ctx, currentUser, targetUser, "user_deleted", roleLabel(targetUser));
     await removeUserAndCleanup(ctx, targetUserId);
   },
 });

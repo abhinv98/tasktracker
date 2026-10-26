@@ -692,6 +692,46 @@ function ClientsPanel() {
 }
 
 /* ─── Main Page ─── */
+/* ─── Audit Log (owner only; the query returns null for everyone else) ─── */
+function AuditLogPanel() {
+  const log = useQuery(api.users.listUserAuditLog);
+  if (!log) return null;
+  return (
+    <div className="mt-6 rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--border)]">
+        <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">Audit log</h2>
+        <p className="text-[12px] text-[var(--text-muted)]">Role changes and deletions. Only you can see this.</p>
+      </div>
+      {log.length === 0 ? (
+        <p className="px-4 py-6 text-[12px] text-[var(--text-muted)]">Nothing changed yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableHead>When</TableHead>
+            <TableHead>Who</TableHead>
+            <TableHead>What</TableHead>
+          </TableHeader>
+          <TableBody>
+            {log.map((e) => (
+              <TableRow key={e._id}>
+                <TableCell className="whitespace-nowrap">
+                  {new Date(e.timestamp).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </TableCell>
+                <TableCell>{e.actorName}</TableCell>
+                <TableCell>
+                  {e.action === "user_deleted"
+                    ? `Deleted ${e.targetName} (${e.from})`
+                    : `${e.targetName}: ${e.from} → ${e.to}`}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
+
 export default function UsersPage() {
   const users = useQuery(api.users.listAllUsers);
   const currentUser = useQuery(api.users.getCurrentUser);
@@ -918,6 +958,8 @@ export default function UsersPage() {
         </Table>
       </div>
       )}
+
+      {tab === "users" && <AuditLogPanel />}
 
       {/* Create User Modal */}
       {showCreateModal && (

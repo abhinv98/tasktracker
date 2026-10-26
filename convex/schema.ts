@@ -397,6 +397,18 @@ export default defineSchema({
     .index("by_recipient_read", ["recipientId", "read"])
     .index("by_recipient_time", ["recipientId", "createdAt"]),
 
+  // ─── USER AUDIT LOG ──────────────────────────
+  // Who changed whose role / deleted whom. Readable only by the owner.
+  userAuditLog: defineTable({
+    actorId: v.id("users"),
+    actorName: v.string(),
+    targetName: v.string(),
+    action: v.string(), // "role_changed" | "user_deleted"
+    from: v.optional(v.string()),
+    to: v.optional(v.string()),
+    timestamp: v.number(),
+  }).index("by_time", ["timestamp"]),
+
   // ─── ACTIVITY LOG ────────────────────────────
   activityLog: defineTable({
     briefId: v.id("briefs"),
