@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
@@ -174,7 +175,7 @@ export default function ContentCalendarPage() {
   const createBrand = useMutation(api.brands.createBrand);
   const createEntry = useMutation(api.contentCalendar.createEntryForBrand);
   const updateTask = useMutation(api.tasks.updateTask);
-  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const updateTaskStatus = useUpdateTaskStatus();
   const deleteTask = useMutation(api.tasks.deleteTask);
   const toggleBreakDayMut = useMutation(api.contentCalendar.toggleBreakDay);
   const stageEntriesMut = useMutation(api.contentCalendar.stageEntries);

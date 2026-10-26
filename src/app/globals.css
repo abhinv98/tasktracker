@@ -77,10 +77,12 @@
   --warning: #b45309;
   --warning-dim: rgba(180, 83, 9, 0.12);
 
-  /* Typography — Inter */
-  --font-heading: var(--font-inter), system-ui, sans-serif;
-  --font-body: var(--font-inter), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  /* Typography — the system face, as in the Claude desktop app: SF Pro on a
+     Mac, Segoe UI on Windows. Nothing to download. Mono is for real values
+     only (usernames, links, keyboard keys). */
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Motion */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -119,6 +121,17 @@ h1, h2, h3 {
    harder than section headings. */
 h1 {
   letter-spacing: -0.02em;
+}
+
+/* Icons: one fine, even line at every size, like the Claude desktop app.
+   Lucide's stroke scales with the icon, so 12px and 20px icons drew at
+   different weights; a non-scaling stroke pins it to 1.25 screen px. Icons
+   given an explicit strokeWidth (bold checkmarks) keep it. */
+svg.lucide[stroke-width="2"] :where(path, line, circle, rect, polyline, polygon, ellipse) {
+  vector-effect: non-scaling-stroke;
+}
+svg.lucide[stroke-width="2"] {
+  stroke-width: 1.25px;
 }
 
 /* Browser surfaces carry the palette too, not just the components. */
@@ -286,10 +299,8 @@ input, textarea {
    so any Tailwind class on the element still wins — this only fills gaps. */
 :where(table) { border-collapse: collapse; }
 :where(thead th) {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-muted);
   background: var(--bg-primary);
   white-space: nowrap;

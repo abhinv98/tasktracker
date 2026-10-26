@@ -56,7 +56,7 @@ export function TaskTimeSection({
   return (
     <div className="p-5 space-y-3 border-t border-[var(--border)]">
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+        <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
           Time
         </h4>
         <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">

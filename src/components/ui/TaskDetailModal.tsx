@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AttachmentList } from "./AttachmentList";
@@ -32,6 +33,8 @@ import {
   UserPlus,
   Play,
   RotateCcw,
+  Lock,
+  Pause,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { ConfirmModal } from "./ConfirmModal";
@@ -93,7 +96,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     taskId: taskId as Id<"tasks">,
   });
   const user = useQuery(api.users.getCurrentUser);
-  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const updateTaskStatus = useUpdateTaskStatus();
   const submitDeliverable = useMutation(api.approvals.submitDeliverable);
   const submitDirectToManager = useMutation(api.approvals.submitDeliverableDirectToManager);
   const submitDirectToAssignor = useMutation(api.approvals.submitDeliverableDirectToAssignor);
@@ -159,7 +162,6 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const [deliverableLink, setDeliverableLink] = useState("");
   const [deliverableFiles, setDeliverableFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDeleteDeliverableId, setConfirmDeleteDeliverableId] = useState<string | null>(null);
@@ -278,17 +280,18 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const rawNext = STATUS_FLOW[status];
   const nextStatus = isDelivered ? null : (rawNext === "done" && !isAdmin) ? null : rawNext;
 
-  async function handleStatusUpdate() {
-    if (!nextStatus || isUpdatingStatus) return;
-    setIsUpdatingStatus(true);
-    try {
-      await updateTaskStatus({
-        taskId: taskId as Id<"tasks">,
-        newStatus: nextStatus as "pending" | "in-progress" | "review" | "done",
-      });
-    } finally {
-      setIsUpdatingStatus(false);
-    }
+  // The status is patched locally (useUpdateTaskStatus), so don't hold the
+  // button behind a spinner while the server catches up; a failure rolls the
+  // status back and says why.
+  function setStatus(newStatus: "pending" | "in-progress" | "review" | "done") {
+    updateTaskStatus({ taskId: taskId as Id<"tasks">, newStatus }).catch((err) =>
+      toast("error", err instanceof Error ? err.message : "Couldn't update the status")
+    );
+  }
+
+  function handleStatusUpdate() {
+    if (!nextStatus) return;
+    setStatus(nextStatus as "pending" | "in-progress" | "review" | "done");
   }
 
   async function handleDeleteTask() {
@@ -708,7 +711,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               </span>
               {isDelivered && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
-                  🔒 Task Done by Employee
+                  <Lock className="h-3 w-3" />
+                  Task done by employee
                 </span>
               )}
               {isDelivered && canRedo && !showRedoForm && (
@@ -724,32 +728,17 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               )}
               {isBriefOnHold && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
-                  ⏸ Brief On Hold
+                  <Pause className="h-3 w-3" />
+                  Brief on hold
                 </span>
               )}
               {/* Employees: only show a "Start" button when task is pending */}
               {canUpdateStatus && isAssignee && !isAdmin && status === "pending" && (
                 <button
-                  onClick={async () => {
-                    if (isUpdatingStatus) return;
-                    setIsUpdatingStatus(true);
-                    try {
-                      await updateTaskStatus({
-                        taskId: taskId as Id<"tasks">,
-                        newStatus: "in-progress",
-                      });
-                    } finally {
-                      setIsUpdatingStatus(false);
-                    }
-                  }}
-                  disabled={isUpdatingStatus}
+                  onClick={() => setStatus("in-progress")}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
                 >
-                  {isUpdatingStatus ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Play className="h-3 w-3" />
-                  )}
+                  <Play className="h-3 w-3" />
                   Start Task
                 </button>
               )}
@@ -757,14 +746,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               {canUpdateStatus && isAdmin && nextStatus && status !== "done" && (
                 <button
                   onClick={handleStatusUpdate}
-                  disabled={isUpdatingStatus}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-60"
                 >
-                  {isUpdatingStatus ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" />
-                  )}
+                  <ChevronRight className="h-3 w-3" />
                   Move to {STATUS_CONFIG[nextStatus]?.label}
                 </button>
               )}
@@ -955,7 +939,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {/* Description */}
             {(task.description || brief?.description) && (
               <div>
-                <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
+                <h4 className="font-medium text-[12px] text-[var(--text-muted)] mb-1.5">
                   Description
                 </h4>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
@@ -967,7 +951,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {/* Creative Copy & Caption (content calendar tasks) */}
             {task.creativeCopy && (
               <div>
-                <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
+                <h4 className="font-medium text-[12px] text-[var(--text-muted)] mb-1.5">
                   Creative Copy
                 </h4>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
@@ -977,7 +961,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             )}
             {task.caption && (
               <div>
-                <h4 className="font-semibold text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-1.5">
+                <h4 className="font-medium text-[12px] text-[var(--text-muted)] mb-1.5">
                   Caption
                 </h4>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
@@ -990,7 +974,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           {/* Daily Summaries Section */}
           <div className="p-5 space-y-3 border-t border-[var(--border)]">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+              <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
                 Daily Summaries ({dailySummaries?.length ?? 0})
               </h4>
               {isAssignee && task.status !== "done" && (
@@ -1115,7 +1099,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           {((subTasks ?? []).length > 0 || canAddHelper) && (
             <div className="p-5 space-y-3 border-t border-[var(--border)]">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
                   Sub-Tasks ({subTasks?.length ?? 0})
                 </h4>
                 {canAddHelper && task.status !== "done" && (
@@ -1262,7 +1246,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             <>
               <div className="border-t border-[var(--border)]" />
               <div className="p-5 space-y-3">
-                <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
                   Resources from upstream tasks
                 </h4>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1306,7 +1290,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           <div className="p-5 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
                   Deliverables
                 </h4>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
@@ -1387,7 +1371,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   )}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Route to</p>
+                  <p className="text-[12px] text-[var(--text-muted)]">Route to</p>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="submit"
@@ -1405,7 +1389,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       type="button"
                       disabled={!deliverableMessage.trim() || isSubmitting}
                       onClick={() => handleSubmitDeliverable(null, "bm")}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-primary)] bg-white border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
                     >
                       <Send className="h-3 w-3" />
                       Brand Manager
@@ -1444,7 +1428,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     key={d._id}
                     className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
                   >
-                    <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">
                       {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                     </p>
                     <div className="flex items-start justify-between gap-2 mb-1.5">
@@ -1556,7 +1540,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     key={`empty-creative-${n}`}
                     className="p-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)]/40"
                   >
-                    <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">
                       Creative {n}
                     </p>
                     <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>

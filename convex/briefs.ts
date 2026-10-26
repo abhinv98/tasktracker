@@ -47,9 +47,8 @@ export const listBriefs = query({
         .query("tasks")
         .withIndex("by_assignee", (q) => q.eq("assigneeId", userId))
         .collect();
-      const briefIds = [...new Set(tasks.map((t) => t.briefId))];
-      const allBriefs = await ctx.db.query("briefs").collect();
-      briefs = allBriefs.filter((b) => briefIds.includes(b._id));
+      const briefIds = new Set<string>(tasks.map((t) => t.briefId));
+      briefs = briefs.filter((b) => briefIds.has(b._id));
     }
 
     // HR work is confidential. Everyone else gets the board minus HR's
@@ -76,17 +75,33 @@ export const listBriefs = query({
       briefs = briefs.filter((b) => b.assignedManagerId === args.managerId);
     }
 
-    const managers = await ctx.db.query("users").collect();
-    const allTasks = await ctx.db.query("tasks").collect();
+    const managers = new Map<string, any>(
+      (await ctx.db.query("users").collect()).map((u) => [u._id, u])
+    );
+    const teamName = new Map<string, string>(teams.map((t) => [t._id, t.name]));
+    // Group once: filtering every table per brief was briefs × tasks work on
+    // a query that re-runs for every viewer on every task write.
+    const group = <T,>(rows: T[], key: (r: T) => string) => {
+      const m = new Map<string, T[]>();
+      for (const r of rows) {
+        const k = key(r);
+        const arr = m.get(k);
+        if (arr) arr.push(r);
+        else m.set(k, [r]);
+      }
+      return m;
+    };
+    const teamsByBrief = group(briefTeams, (x) => x.briefId);
+    const tasksByBrief = group(await ctx.db.query("tasks").collect(), (t) => t.briefId);
 
     return briefs.map((b) => {
-      const manager = managers.find((m) => m._id === b.assignedManagerId);
-      const bt = briefTeams.filter((x) => x.briefId === b._id);
+      const manager = b.assignedManagerId ? managers.get(b.assignedManagerId) : undefined;
+      const bt = teamsByBrief.get(b._id) ?? [];
       const teamIds = bt.map((x) => x.teamId);
       const teamNames = bt
-        .map((x) => teams.find((t) => t._id === x.teamId)?.name)
+        .map((x) => teamName.get(x.teamId))
         .filter(Boolean); 
-      const tasksInBrief = allTasks.filter((t) => t.briefId === b._id);
+      const tasksInBrief = tasksByBrief.get(b._id) ?? [];
       // Content-calendar entries are stored as a parent task plus
       // `[Copy]`/`[Design]` children, and helper sub-tasks hang off their
       // parent on every brief type. Count parents only (matching

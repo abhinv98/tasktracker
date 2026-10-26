@@ -205,7 +205,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 return (
                   <div key={`${item.type}-${item.label}-${i}`}>
                     {startsSearch && (
-                      <div className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      <div className="px-4 pt-2 pb-1 text-[12px] font-mediumr text-[var(--text-muted)]">
                         Results
                       </div>
                     )}

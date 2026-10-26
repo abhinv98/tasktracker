@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
@@ -590,7 +591,7 @@ export default function BriefPage() {
 
   const { toast } = useToast();
   const { celebrate } = useCelebrate();
-  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const updateTaskStatus = useUpdateTaskStatus();
   const setFlowPositions = useMutation(api.tasks.updateTaskFlowPositions);
 
   // Canvas ↔ List toggle for the flow-canvas brief types.

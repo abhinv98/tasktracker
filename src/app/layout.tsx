@@ -1,21 +1,9 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
-/* The data voice: statuses, counts, dates. Caps + tracking live at the
-   call sites; the face loads once here. */
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
+/* No web fonts: like the Claude desktop app, the interface uses the system
+   face (SF Pro on a Mac, Segoe UI on Windows). See --font-body. */
 
 export const metadata: Metadata = {
   title: "The Ecultify",
@@ -28,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${geistMono.variable}`} style={{ colorScheme: "light" }}>
+    <html lang="en" style={{ colorScheme: "light" }}>
       <body className="antialiased bg-[#f6f6f5] text-[#171717]">
         <ConvexClientProvider>{children}</ConvexClientProvider>
       </body>

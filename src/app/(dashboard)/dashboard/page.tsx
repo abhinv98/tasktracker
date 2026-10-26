@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation } from "convex/react";
+import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { isTaskOverdue } from "@/lib/status";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -1446,9 +1447,9 @@ function EmployeeDashboard() {
   const overdueStatus = useQuery(api.tasks.getOverdueHaltStatus);
   const contactManager = useMutation(api.tasks.contactManagerForOverdue);
   const { toast } = useToast();
-  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const updateTaskStatus = useUpdateTaskStatus();
   const [justContactedTasks, setJustContactedTasks] = useState<Set<string>>(new Set());
-  const [startingTaskId, setStartingTaskId] = useState<string | null>(null);
+  const startingTaskId: string | null = null;
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -1543,13 +1544,11 @@ function EmployeeDashboard() {
       <EmployeeTaskViews
         tasks={tasks ?? []}
         onSelectTask={setSelectedTaskId}
-        onStartTask={async (taskId) => {
-          setStartingTaskId(taskId);
-          try {
-            await updateTaskStatus({ taskId: taskId as Id<"tasks">, newStatus: "in-progress" });
-          } finally {
-            setStartingTaskId(null);
-          }
+        onStartTask={(taskId) => {
+          // Shown as started at once (useUpdateTaskStatus); rolled back on error.
+          updateTaskStatus({ taskId: taskId as Id<"tasks">, newStatus: "in-progress" }).catch((err) =>
+            toast("error", err instanceof Error ? err.message : "Couldn't start the task")
+          );
         }}
         startingTaskId={startingTaskId}
         statusColors={STATUS_COLORS}

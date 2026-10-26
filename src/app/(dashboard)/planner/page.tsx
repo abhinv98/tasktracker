@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
+import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -244,7 +245,7 @@ export default function PlannerPage() {
   const copyDayMut = useMutation(api.schedule.copyDay);
   const saveDailyNote = useMutation(api.schedule.saveDailyNote);
   const reorderPriority = useMutation(api.schedule.reorderTaskPriority);
-  const updateTaskStatus = useMutation(api.tasks.updateTaskStatus);
+  const updateTaskStatus = useUpdateTaskStatus();
 
   // Auto-set selected user for admin/manager
   useEffect(() => {

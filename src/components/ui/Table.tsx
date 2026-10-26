@@ -23,7 +23,7 @@ export function TableHeader({ children }: { children: React.ReactNode }) {
 
 export function TableHead({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
-    <th className={`h-8 px-3 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-muted)] whitespace-nowrap ${className}`}>
+    <th className={`h-8 px-3 text-left font-medium text-[12px] text-[var(--text-muted)] whitespace-nowrap ${className}`}>
       {children}
     </th>
   );

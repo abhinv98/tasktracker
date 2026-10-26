@@ -49,7 +49,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
+        <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
           Files ({attachments?.length ?? 0})
         </h4>
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />

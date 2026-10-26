@@ -3101,12 +3101,20 @@ export const getPendingDeliverableCount = query({
     if (!isAdmin && !isTeamLead) return 0;
 
     const allDeliverables = await ctx.db.query("deliverables").collect();
-    const allTasksForDone = await ctx.db.query("tasks").collect();
-    const doneTaskIds = new Set(
-      allTasksForDone
-        .filter((t) => t.status === "done")
-        .map((t) => t._id as string)
-    );
+    // This badge sits in every admin's sidebar. Reading only the tasks and
+    // briefs behind pending deliverables (not whole tables) keeps it cheap and
+    // stops every unrelated task write from re-running it for every admin —
+    // that fan-out is what made status changes take seconds.
+    const taskCache = new Map<string, any>();
+    const getTask = async (id: string) => {
+      if (!taskCache.has(id)) taskCache.set(id, await ctx.db.get(id as Id<"tasks">));
+      return taskCache.get(id);
+    };
+    const briefCache = new Map<string, any>();
+    const getBrief = async (id: string) => {
+      if (!briefCache.has(id)) briefCache.set(id, await ctx.db.get(id as Id<"briefs">));
+      return briefCache.get(id);
+    };
     let count = 0;
 
     // ── Team lead count: deliverables pending TL review from their team members ──
@@ -3116,13 +3124,13 @@ export const getPendingDeliverableCount = query({
       const teamMemberIds = new Set(
         allUserTeams.filter((ut) => ledTeamIds.has(ut.teamId)).map((ut) => ut.userId)
       );
-      count += allDeliverables.filter(
-        (d) =>
-          d.teamLeadStatus === "pending" &&
-          teamMemberIds.has(d.submittedBy) &&
-          d.submittedBy !== userId &&
-          !doneTaskIds.has(d.taskId as string)
-      ).length;
+      for (const d of allDeliverables) {
+        if (d.teamLeadStatus !== "pending") continue;
+        if (!teamMemberIds.has(d.submittedBy) || d.submittedBy === userId) continue;
+        const task = await getTask(d.taskId);
+        if (task?.status === "done") continue;
+        count++;
+      }
     }
 
     // ── Brand manager count: deliverables pending manager review ──
@@ -3136,18 +3144,15 @@ export const getPendingDeliverableCount = query({
       const managedBrandIds = new Set<string>(bms.map((bm) => bm.brandId));
 
       if (managedBrandIds.size > 0) {
-        const tasks = await ctx.db.query("tasks").collect();
-        const briefs = await ctx.db.query("briefs").collect();
-
         for (const d of allDeliverables) {
           if (d.submittedBy === userId) continue;
           if (d.teamLeadStatus !== "approved") continue;
           if (d.status === "approved" || d.status === "rejected") continue;
 
-          const task = tasks.find((t) => t._id === d.taskId);
+          const task = await getTask(d.taskId);
           if (!task) continue;
           if (task.status === "done") continue;
-          const brief = briefs.find((b) => b._id === task.briefId);
+          const brief = await getBrief(task.briefId);
           if (!brief?.brandId || !managedBrandIds.has(brief.brandId)) continue;
 
           count++;

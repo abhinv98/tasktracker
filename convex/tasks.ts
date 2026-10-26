@@ -91,10 +91,15 @@ export const listTasksForUser = query({
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
       .collect();
-    const briefs = await ctx.db.query("briefs").collect();
-    const briefMap = new Map(briefs.map((b) => [b._id, b]));
-    const brands = await ctx.db.query("brands").collect();
-    const brandMap = new Map(brands.map((b) => [b._id, b]));
+    // Only this person's briefs and brands — not whole tables, so a write to
+    // someone else's brief doesn't re-run this for every open dashboard.
+    const briefs = await Promise.all(
+      [...new Set(tasks.map((t) => t.briefId))].map((id) => ctx.db.get(id))
+    );
+    const briefMap = new Map(briefs.filter((b) => b !== null).map((b) => [b!._id, b!]));
+    const brandIds = [...new Set(briefs.map((b) => b?.brandId).filter((id): id is Id<"brands"> => !!id))];
+    const brands = await Promise.all(brandIds.map((id) => ctx.db.get(id)));
+    const brandMap = new Map(brands.filter((b) => b !== null).map((b) => [b!._id, b!]));
 
     const visible = tasks
       .filter((t) => {

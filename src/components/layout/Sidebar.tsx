@@ -360,7 +360,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                   onClick={() => toggleCategory(group.category)}
                   className={`
                     w-full flex items-center justify-between px-2.5 pt-3 pb-1 rounded-md
-                    text-[11px] font-semibold uppercase tracking-[0.05em]
+                    text-[12px] font-medium
                     transition-colors duration-150
                     ${hasActiveItem && !isOpen
                       ? "text-[var(--accent-admin-text)]"
@@ -393,36 +393,36 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                             text-[13px] transition-colors duration-150
                             ${
                               isActive
-                                ? "bg-[var(--bg-hover)] text-[var(--text-primary)] font-semibold before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[var(--accent-admin)]"
-                                : "font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-[var(--bg-hover)] text-[var(--text-primary)] font-medium"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                             }
                           `}
                         >
                           <Icon
                             className={`h-4 w-4 shrink-0 transition-colors duration-150 ${
                               isActive
-                                ? "text-[var(--accent-admin-text)]"
+                                ? "text-[var(--text-primary)]"
                                 : "text-[var(--text-muted)] group-hover:text-[var(--text-primary)]"
                             }`}
                           />
                           <span className="flex-1">{item.label}</span>
                           {item.href === "/messages" && unreadDmCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#c4242a] text-white text-[11px] font-semibold px-1 tabular-nums">
                               {unreadDmCount}
                             </span>
                           )}
                           {item.href === "/deliverables" && pendingDeliverableCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-purple-500 text-white text-[11px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#c4242a] text-white text-[11px] font-semibold px-1 tabular-nums">
                               {pendingDeliverableCount}
                             </span>
                           )}
                           {item.href === "/hr-requests" && pendingHrRequestCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#c4242a] text-white text-[11px] font-semibold px-1 tabular-nums">
                               {pendingHrRequestCount}
                             </span>
                           )}
                           {item.href === "/client-requests" && pendingClientRequestCount > 0 && (
-                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-amber-500 text-white text-[11px] font-bold px-1">
+                            <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#c4242a] text-white text-[11px] font-semibold px-1 tabular-nums">
                               {pendingClientRequestCount}
                             </span>
                           )}
@@ -439,7 +439,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               than two clicks deep behind Overview. */}
           {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
             <div className="mb-1 mt-2">
-              <div className="px-2.5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--text-muted)]">
+              <div className="px-2.5 pt-3 pb-1 text-[12px] font-medium text-[var(--text-muted)]">
                 Positions
               </div>
               <div className="mt-0.5 space-y-0.5">
@@ -455,17 +455,17 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                         onClick={onClose}
                         className={`group flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${
                           isActive
-                            ? "bg-[var(--accent-admin-dim)] font-medium text-[var(--accent-admin-text)]"
+                            ? "bg-[var(--bg-hover)] font-medium text-[var(--text-primary)]"
                             : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                         }`}
                       >
                         <span className="flex-1 truncate">{j.name}</span>
                         {j.moving > 0 ? (
-                          <span className="shrink-0 rounded-full bg-[var(--accent-admin-strong)] px-1.5 text-[9px] font-bold text-white">
+                          <span className="shrink-0 rounded-full bg-[#c4242a] px-1.5 text-[11px] font-semibold tabular-nums text-white">
                             {j.moving}
                           </span>
                         ) : (
-                          <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+                          <span className="shrink-0 text-[11px] tabular-nums text-[var(--text-muted)]">
                             {j.inPlay}
                           </span>
                         )}
