@@ -576,6 +576,130 @@ export const createBrief = mutation({
  *        auto-found / auto-created content_calendar brief — CC opt-in.
  *        Teams are inserted as Copy → Design via handoffTargetTeamId.
  */
+/** Brands (not on hold) and their brand managers, for the "New task for
+ *  myself" form. Open to every internal user, unlike listBrands. */
+export const listBrandsForSelfTask = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const brands = (await ctx.db.query("brands").collect()).filter((b) => !b.onHold);
+    const links = await ctx.db.query("brandManagers").collect();
+    const users = new Map((await ctx.db.query("users").collect()).map((u) => [u._id, u]));
+    return brands
+      .map((b) => ({
+        _id: b._id,
+        name: b.name,
+        managers: links
+          .filter((l) => l.brandId === b._id)
+          .map((l) => ({ _id: l.managerId, name: users.get(l.managerId)?.name ?? users.get(l.managerId)?.email ?? "Unknown" })),
+      }))
+      .filter((b) => b.managers.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+/**
+ * Anyone can create a task for themselves under a brand, attaching that
+ * brand's manager. It is a one-task brief like an admin's individual task:
+ * the creator is the assignee, the brand manager is the brief's manager and
+ * the task's assigner. The creator can take it as far as Review by
+ * submitting a deliverable; only a brand manager or admin can mark it done
+ * (updateTaskStatus already enforces that).
+ */
+export const createSelfTask = mutation({
+  args: {
+    title: v.string(),
+    description: v.optional(v.string()),
+    brandId: v.id("brands"),
+    managerId: v.id("users"),
+    deadline: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const title = args.title.trim();
+    if (!title) throw new Error("Give the task a title");
+
+    const brand = await ctx.db.get(args.brandId);
+    if (!brand) throw new Error("Brand not found");
+    if (brand.onHold) throw new Error("This brand is on hold");
+    const isBrandManager = (
+      await ctx.db
+        .query("brandManagers")
+        .withIndex("by_brand", (q) => q.eq("brandId", args.brandId))
+        .collect()
+    ).some((l) => l.managerId === args.managerId);
+    if (!isBrandManager) throw new Error("Pick one of this brand's managers");
+
+    const duplicateId = await findRecentDuplicateBrief(ctx, userId, title);
+    if (duplicateId) return duplicateId;
+
+    const now = Date.now();
+    const deadline = args.deadline ? normalizeDeadlineToEndOfDay(args.deadline) : undefined;
+    const top = await ctx.db.query("briefs").withIndex("by_priority").order("desc").first();
+
+    const briefId = await ctx.db.insert("briefs", {
+      title,
+      description: args.description ?? "",
+      status: "active",
+      briefType: "single_task",
+      createdBy: userId,
+      globalPriority: (top?.globalPriority ?? 0) + 1,
+      brandId: args.brandId,
+      assignedManagerId: args.managerId,
+      ...(deadline !== undefined ? { deadline } : {}),
+    });
+
+    // The creator's team, so it shows under that team and its lead reviews it.
+    const myTeam = (
+      await ctx.db
+        .query("userTeams")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect()
+    )[0];
+    if (myTeam) {
+      await ctx.db.insert("briefTeams", { briefId, teamId: myTeam.teamId, order: 0 });
+    }
+
+    const taskId = await ctx.db.insert("tasks", {
+      briefId,
+      title,
+      description: args.description,
+      assigneeId: userId,
+      assignedBy: args.managerId,
+      status: "pending",
+      sortOrder: 1000,
+      ...(deadline !== undefined ? { deadline } : {}),
+      assignedAt: now,
+    });
+
+    const me = await ctx.db.get(userId);
+    if (args.managerId !== userId) {
+      await ctx.db.insert("notifications", {
+        recipientId: args.managerId,
+        type: "task_assigned",
+        title: "New self-created task",
+        message: `${me?.name ?? "Someone"} created "${title}" for ${brand.name} and attached you as brand manager`,
+        briefId,
+        taskId,
+        triggeredBy: userId,
+        read: false,
+        createdAt: now,
+      });
+    }
+    await ctx.db.insert("activityLog", {
+      briefId,
+      taskId,
+      userId,
+      action: "created_brief",
+      details: JSON.stringify({ title, selfCreated: true }),
+      timestamp: now,
+    });
+    return briefId;
+  },
+});
+
 export const createIndividualTaskBrief = mutation({
   args: {
     title: v.string(),

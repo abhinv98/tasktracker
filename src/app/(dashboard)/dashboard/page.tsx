@@ -2,15 +2,16 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
+import { NewSelfTaskModal } from "@/components/NewSelfTaskModal";
 import { isTaskOverdue } from "@/lib/status";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, EmptyState, PageHeader, SectionHeader, SegmentedTabs, StatTile, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
+import { Button, Card, EmptyState, PageHeader, SectionHeader, SegmentedTabs, StatTile, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
 import { TodayList } from "@/components/dashboard/TodayList";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, type LucideIcon } from "lucide-react";
+import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -1450,6 +1451,7 @@ function EmployeeDashboard() {
   const updateTaskStatus = useUpdateTaskStatus();
   const [justContactedTasks, setJustContactedTasks] = useState<Set<string>>(new Set());
   const startingTaskId: string | null = null;
+  const [showNewTask, setShowNewTask] = useState(false);
 
   const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
     "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
@@ -1468,7 +1470,8 @@ function EmployeeDashboard() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 relative">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6 flex items-start justify-between gap-4">
+      <div>
         <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </p>
@@ -1483,6 +1486,12 @@ function EmployeeDashboard() {
               : "Nothing due this week."}
         </p>
       </div>
+        <Button onClick={() => setShowNewTask(true)} className="shrink-0">
+          <Plus className="h-4 w-4" />
+          New task
+        </Button>
+      </div>
+      <NewSelfTaskModal open={showNewTask} onClose={() => setShowNewTask(false)} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <StatTile label="Open tasks" value={myOpen.length} href="/my-tasks" icon={ListChecks}
