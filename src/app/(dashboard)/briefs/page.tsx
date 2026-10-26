@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { TaskNavigator } from "@/components/TaskNavigator";
 import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -65,6 +66,46 @@ function daysUntil(deadline: number): number {
   return Math.ceil((deadline - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
+type ReviewTask = { _id: string; title: string; assigneeName: string | null };
+
+/** Under a brief in the Review tab: each task waiting for review, opening
+ *  straight to that task (a content calendar's brief page doesn't show it). */
+function ReviewTaskRows({
+  tasks,
+  colSpan,
+  onOpen,
+}: {
+  tasks: ReviewTask[] | undefined;
+  colSpan: number;
+  onOpen: (taskId: string) => void;
+}) {
+  if (!tasks || tasks.length === 0) return null;
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-3 pb-2 pt-0">
+        <div className="flex flex-col gap-0.5 pl-8">
+          {tasks.map((t) => (
+            <button
+              key={t._id}
+              onClick={() => onOpen(t._id)}
+              className="group flex items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Eye className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+              <span className="text-[var(--text-primary)] truncate">{t.title}</span>
+              {t.assigneeName && (
+                <span className="text-[var(--text-muted)] shrink-0">· {t.assigneeName}</span>
+              )}
+              <span className="ml-auto shrink-0 font-medium text-[var(--accent-admin-text)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">
+                Open task
+              </span>
+            </button>
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function BriefsPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
@@ -112,6 +153,8 @@ export default function BriefsPage() {
   const [itCalGoLiveDate, setItCalGoLiveDate] = useState("");
 
   const [deletingBriefId, setDeletingBriefId] = useState<Id<"briefs"> | null>(null);
+  // A task picked from the Review tab; TaskNavigator opens it where it lives.
+  const [navTaskId, setNavTaskId] = useState<string | null>(null);
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
 
@@ -918,8 +961,8 @@ export default function BriefsPage() {
                           const daysLeft = dl ? daysUntil(dl) : null;
 
                           return (
+                            <React.Fragment key={brief._id}>
                             <TableRow
-                              key={brief._id}
                               onClick={() => router.push(`/brief/${brief._id}`)}
                             >
                               <TableCell>
@@ -1028,6 +1071,14 @@ export default function BriefsPage() {
                                 </TableCell>
                               )}
                             </TableRow>
+                            {briefsTab === "review" && (
+                              <ReviewTaskRows
+                                tasks={(brief as { reviewTasks?: ReviewTask[] }).reviewTasks}
+                                colSpan={isAdmin ? 9 : 8}
+                                onOpen={setNavTaskId}
+                              />
+                            )}
+                            </React.Fragment>
                           );
                         })}
                       </TableBody>
@@ -1235,6 +1286,13 @@ export default function BriefsPage() {
                               </td>
                             </tr>
                           )}
+                          {briefsTab === "review" && (
+                            <ReviewTaskRows
+                              tasks={(brief as { reviewTasks?: ReviewTask[] }).reviewTasks}
+                              colSpan={isAdmin ? 10 : 9}
+                              onOpen={setNavTaskId}
+                            />
+                          )}
                           </React.Fragment>
                         );
                       })}
@@ -1254,6 +1312,8 @@ export default function BriefsPage() {
           )}
         </div>
       )}
+
+      <TaskNavigator taskId={navTaskId} onClose={() => setNavTaskId(null)} />
 
       {/* Create Brief Modal */}
       {/* Native <dialog> via Modal: focus trap, inert page behind, Escape. */}

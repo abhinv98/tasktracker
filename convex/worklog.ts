@@ -128,6 +128,8 @@ export const getEmployeeWorkLog = query({
   },
 });
 
+// Briefs on hold are left out of manifests and load: their tasks can't be
+// worked on, so paused work leaves team members' views until it resumes.
 export const getTaskManifest = query({
   args: {},
   handler: async (ctx) => {
@@ -142,7 +144,7 @@ export const getTaskManifest = query({
     const allBrands = await ctx.db.query("brands").collect();
 
     const activeBriefs = allBriefs.filter(
-      (b) => !["archived", "completed"].includes(b.status)
+      (b) => !["archived", "completed", "on_hold"].includes(b.status)
     );
 
     // Include ALL users, not just employees
@@ -211,7 +213,7 @@ export const getTeamMemberTasks = query({
     const allBrands = await ctx.db.query("brands").collect();
 
     const activeBriefs = allBriefs.filter(
-      (b) => !["archived", "completed"].includes(b.status)
+      (b) => !["archived", "completed", "on_hold"].includes(b.status)
     );
     const activeBriefIds = new Set(activeBriefs.map((b) => b._id));
 
@@ -325,7 +327,7 @@ export const getTeamLoadView = query({
     const allBriefs = await ctx.db.query("briefs").collect();
 
     const activeBriefs = allBriefs.filter(
-      (b) => !["archived", "completed"].includes(b.status)
+      (b) => !["archived", "completed", "on_hold"].includes(b.status)
     );
     // A Set, not activeBriefs.some() per task: that was tasks × briefs work.
     const activeBriefIds = new Set<string>(activeBriefs.map((b) => b._id));

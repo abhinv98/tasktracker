@@ -140,11 +140,22 @@ export const listBriefs = query({
         // (deadlineIsManual) must win. No read-time re-derivation — that's what
         // made manual deadlines appear not to stick.
 
+        // What exactly is waiting for review. A content calendar sits in
+        // "review" while one [Design]/[Copy] entry is, which the brief page
+        // alone doesn't show; the Review tab lists these and opens each one.
+        const reviewTasks = tasksInBrief
+          .filter((t) => t.status === "review")
+          .map((t) => {
+            const who = managers.get(t.assigneeId);
+            return { _id: t._id, title: t.title, assigneeName: who?.name ?? who?.email ?? null };
+          });
+
         return {
           ...b,
           managerName: manager?.name ?? manager?.email,
           teamIds,
           teamNames,
+          reviewTasks,
           taskCount: countableTasks.length,
           doneCount,
           progress:
@@ -1248,6 +1259,48 @@ export const removeTeamFromBrief = mutation({
     if (link) {
       await ctx.db.delete(link._id);
     }
+  },
+});
+
+/**
+ * Super admins only: close a brief outright. Every open task is marked done
+ * the same way an admin's "Done" does it (timers stopped, deliverables
+ * auto-approved), then the brief is completed. Unlike setting the status to
+ * Completed, nothing is left pending inside it.
+ */
+export const closeBrief = mutation({
+  args: { briefId: v.id("briefs") },
+  handler: async (ctx, { briefId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const user = await ctx.db.get(userId);
+    if (!user?.isSuperAdmin) throw new Error("Only super admins can close a brief");
+    const brief = await ctx.db.get(briefId);
+    if (!brief) throw new Error("Brief not found");
+    if (brief.status === "archived") throw new Error("Restore the brief before closing it");
+
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    const now = Date.now();
+    let closed = 0;
+    for (const t of tasks) {
+      if (t.status === "done") continue;
+      await ctx.db.patch(t._id, { status: "done", completedAt: now });
+      await stopTaskTimers(ctx, t._id);
+      await autoApproveDeliverablesForTaskTree(ctx, t._id, userId);
+      closed++;
+    }
+    await ctx.db.patch(briefId, { status: "completed" });
+    await ctx.db.insert("activityLog", {
+      briefId,
+      userId,
+      action: "closed_brief",
+      details: JSON.stringify({ closedTasks: closed }),
+      timestamp: now,
+    });
+    return closed;
   },
 });
 

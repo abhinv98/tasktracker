@@ -54,6 +54,16 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
   { value: "done", label: "Done", color: "#10b981" },
 ];
 
+/** Non-admins send work for review by submitting a deliverable (that is what
+ *  notifies the team lead and brand manager), so the dropdown doesn't offer
+ *  Review or Done to them, except to show a status the task already has. */
+function statusOptionsFor(user: { role?: string } | null | undefined, current: string) {
+  if (user?.role === "admin") return STATUS_OPTIONS;
+  return STATUS_OPTIONS.filter(
+    (s) => (s.value !== "review" && s.value !== "done") || s.value === current
+  );
+}
+
 function statusInfo(status: string) {
   return (
     STATUS_OPTIONS.find((s) => s.value === status) ?? {
@@ -2294,7 +2304,7 @@ export function ContentCalendarEntrySidebar({
                   }
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 >
-                  {STATUS_OPTIONS.map((s) => (
+                  {statusOptionsFor(user, task.status).map((s) => (
                     <option key={s.value} value={s.value}>
                       {s.label}
                     </option>
@@ -2633,7 +2643,7 @@ export function ContentCalendarEntrySidebar({
                 }
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
-                {STATUS_OPTIONS.map((s) => (
+                {statusOptionsFor(user, task.status).map((s) => (
                   <option key={s.value} value={s.value}>
                     {s.label}
                   </option>

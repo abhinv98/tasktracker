@@ -119,7 +119,8 @@ export default function ContentCalendarPage() {
   const [newDeadline, setNewDeadline] = useState("");
   const [newDescription, setNewDescription] = useState("");
 
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // ?task=<id> opens that entry (links from Review, My Tasks, Work Log…).
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(searchParams.get("task"));
   const [popoverDate, setPopoverDate] = useState<string | null>(null);
   const [showBreakDayPicker, setShowBreakDayPicker] = useState(false);
 

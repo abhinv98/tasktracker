@@ -9,8 +9,9 @@ import { AlertTriangle } from "lucide-react";
 
 /**
  * Given a taskId, resolves where the task lives and navigates there:
- *  - a normal brief → the brief page
- *  - a content-calendar task → the Content Calendar at the right brand + month
+ *  - a normal brief → the brief page, with the task open
+ *  - a content-calendar task → the Content Calendar at the right brand + month,
+ *    with the entry open
  *  - a deleted/archived brief → a popup explaining exactly why the task
  *    can't be opened (and why it still shows in Worklog / My Tasks /
  *    Oversight but not under Briefs).
@@ -37,10 +38,10 @@ export function TaskNavigator({
       const params = new URLSearchParams();
       if (loc.brandId) params.set("brand", loc.brandId);
       if (loc.month) params.set("month", loc.month);
-      const qs = params.toString();
-      router.push(`/content-calendar${qs ? `?${qs}` : ""}`);
+      params.set("task", taskId);
+      router.push(`/content-calendar?${params.toString()}`);
     } else {
-      router.push(`/brief/${loc.briefId}`);
+      router.push(`/brief/${loc.briefId}?task=${taskId}`);
     }
     onClose();
   }, [taskId, loc, router, onClose]);

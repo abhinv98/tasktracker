@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Badge, Button, Card, Input, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, Card, Input, SegmentedTabs, Textarea, useToast } from "@/components/ui";
 import { Plus, X, Tag, Briefcase } from "lucide-react";
 
 const BRAND_COLORS = [
@@ -37,9 +37,15 @@ export default function BrandsTab() {
   const { toast } = useToast();
 
   const myBrandIdSet = new Set(myBrandIds ?? []);
-  const filteredBrands = filterMine && brands
+  // Brands on hold leave the main grid and live in their own tab.
+  const [holdTab, setHoldTab] = useState<"active" | "on_hold">("active");
+  const scoped = filterMine && brands
     ? brands.filter((b) => myBrandIdSet.has(b._id))
     : brands;
+  const onHoldCount = (scoped ?? []).filter((b) => b.onHold === true).length;
+  const filteredBrands = (scoped ?? []).filter((b) =>
+    holdTab === "on_hold" ? b.onHold === true : b.onHold !== true
+  );
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -67,6 +73,15 @@ export default function BrandsTab() {
   return (
     <div>
       <div className="flex justify-end items-center gap-3 mb-6">
+        <SegmentedTabs
+          className="mr-auto"
+          value={holdTab}
+          onChange={setHoldTab}
+          options={[
+            { value: "active", label: "Active", count: (scoped ?? []).length - onHoldCount },
+            { value: "on_hold", label: "On hold", count: onHoldCount },
+          ]}
+        />
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => setFilterMine((p) => !p)}
@@ -147,7 +162,9 @@ export default function BrandsTab() {
         ))}
         {(filteredBrands ?? []).length === 0 && (
           <p className="text-[13px] text-[var(--text-muted)] col-span-3">
-            No brands yet.{isAdmin ? " Create one to get started." : ""}
+            {holdTab === "on_hold"
+              ? "No brands are on hold."
+              : <>No brands yet.{isAdmin ? " Create one to get started." : ""}</>}
           </p>
         )}
       </div>

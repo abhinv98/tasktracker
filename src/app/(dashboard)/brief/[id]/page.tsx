@@ -529,6 +529,8 @@ export default function BriefPage() {
   const updateTask = useMutation(api.tasks.updateTask);
   const updateBrief = useMutation(api.briefs.updateBrief);
   const archiveBrief = useMutation(api.briefs.archiveBrief);
+  const closeBrief = useMutation(api.briefs.closeBrief);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const deleteBrief = useMutation(api.briefs.deleteBrief);
   const assignTeamsToBrief = useMutation(api.briefs.assignTeamsToBrief);
   const removeTeamFromBrief = useMutation(api.briefs.removeTeamFromBrief);
@@ -547,7 +549,8 @@ export default function BriefPage() {
   const [taskClientFacing, setTaskClientFacing] = useState(false);
   const [taskHandoffTeam, setTaskHandoffTeam] = useState<string>("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // ?task=<id> opens that task (links from Review, My Tasks, Work Log…).
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(searchParams.get("task"));
   const [autoEditTask, setAutoEditTask] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditMenu, setShowEditMenu] = useState(false);
@@ -825,6 +828,11 @@ export default function BriefPage() {
                 <option value="on_hold">On Hold</option>
                 <option value="sent_to_client">Sent to Client</option>
               </select>
+              {user?.isSuperAdmin && brief.status !== "completed" && (
+                <Button variant="secondary" onClick={() => setShowCloseConfirm(true)}>
+                  Close brief
+                </Button>
+              )}
               <Button variant="secondary" onClick={handleArchive}>
                 Archive
               </Button>
@@ -1661,6 +1669,25 @@ export default function BriefPage() {
         </div>
       </div>
       )}
+
+      {/* Close Brief (super admins): finishes every open task, then the brief. */}
+      <ConfirmModal
+        open={showCloseConfirm}
+        title="Close brief"
+        message={`Mark every open task in "${brief?.title ?? "this brief"}" as done and complete the brief? Open deliverables are approved and running timers stop.`}
+        confirmLabel="Close brief"
+        confirmingLabel="Closing..."
+        onConfirm={async () => {
+          try {
+            const n = await closeBrief({ briefId });
+            toast("success", n > 0 ? `Brief closed. ${n} open task${n === 1 ? "" : "s"} marked done.` : "Brief closed");
+          } catch (err) {
+            toast("error", err instanceof Error ? err.message : "Couldn't close the brief");
+          }
+          setShowCloseConfirm(false);
+        }}
+        onCancel={() => setShowCloseConfirm(false)}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

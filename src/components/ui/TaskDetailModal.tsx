@@ -35,6 +35,7 @@ import {
   RotateCcw,
   Lock,
   Pause,
+  CheckCircle2,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { ConfirmModal } from "./ConfirmModal";
@@ -750,6 +751,16 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 >
                   <ChevronRight className="h-3 w-3" />
                   Move to {STATUS_CONFIG[nextStatus]?.label}
+                </button>
+              )}
+              {/* Super admins can close a task outright, from any status. */}
+              {user?.isSuperAdmin && status !== "done" && nextStatus !== "done" && (
+                <button
+                  onClick={() => setStatus("done")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-primary)] bg-white border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  Close task
                 </button>
               )}
               {isAssignee && !isAdmin && status === "in-progress" && (

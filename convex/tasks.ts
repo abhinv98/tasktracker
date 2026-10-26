@@ -102,10 +102,13 @@ export const listTasksForUser = query({
     const brands = await Promise.all(brandIds.map((id) => ctx.db.get(id)));
     const brandMap = new Map(brands.filter((b) => b !== null).map((b) => [b!._id, b!]));
 
+    // Paused (on-hold) briefs drop out too: their tasks can't be worked on,
+    // and leaving them "pending" here made paused work look outstanding.
+    // They come back unchanged when the brief resumes.
     const visible = tasks
       .filter((t) => {
         const brief = briefMap.get(t.briefId);
-        return brief && brief.status !== "archived";
+        return brief && brief.status !== "archived" && brief.status !== "on_hold";
       })
       .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -678,6 +681,13 @@ export const updateTaskStatus = mutation({
 
     if (newStatus === "done" && user?.role !== "admin") {
       throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
+    }
+    // Review only through a deliverable: that is what notifies the team lead
+    // and brand manager and puts the work in their queue. Setting the status
+    // straight from the calendar dropdown left entries "in review" that no
+    // reviewer had been told about.
+    if (newStatus === "review" && user?.role !== "admin" && task.status !== "review") {
+      throw new Error("Send it for review with a deliverable, so your team lead and brand manager are notified.");
     }
 
     // A brief on hold freezes its tasks for employees. Admins can still move
