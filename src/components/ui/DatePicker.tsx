@@ -53,7 +53,9 @@ export function DatePicker({
   id,
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
-  const [dropUp, setDropUp] = useState(false);
+  // Fixed to the viewport, not absolute: inside a modal's scrolling body an
+  // absolute calendar was clipped and had to be scrolled to.
+  const [pos, setPos] = useState<React.CSSProperties>({});
   const [viewDate, setViewDate] = useState(() => {
     const base = value ? new Date(value) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
@@ -72,10 +74,27 @@ export function DatePicker({
   }, [open]);
 
   useEffect(() => {
-    if (!open || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    setDropUp(spaceBelow < 380);
+    if (!open) return;
+    function place() {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const width = 280;
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+      const dropUp = window.innerHeight - rect.bottom < 380 && rect.top > 380;
+      setPos(
+        dropUp
+          ? { position: "fixed", left, bottom: window.innerHeight - rect.top + 4 }
+          : { position: "fixed", left, top: rect.bottom + 4 }
+      );
+    }
+    place();
+    // Follow the field if the page or a modal body scrolls under it.
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
   }, [open]);
 
   const displayLabel = value
@@ -119,8 +138,8 @@ export function DatePicker({
         <span className="truncate">{displayLabel}</span>
       </button>
 
-      {open && (
-        <div className={`absolute right-0 z-50 w-[280px] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
+      {open && pos.position && (
+        <div style={pos} className="z-50 w-[280px] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)]">
             <span className="font-semibold text-[15px] text-[var(--text-primary)]">
