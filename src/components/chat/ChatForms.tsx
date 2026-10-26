@@ -228,7 +228,7 @@ export function DeleteBriefForm() {
   const [result, setResult] = useState<{ briefTitle: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const brands = useQuery(api.brands.listBrands) ?? [];
+  const brands = useQuery(api.brands.listBrands, {}) ?? [];
   const brandDetail = useQuery(
     api.brands.getBrand,
     selectedBrandId ? { brandId: selectedBrandId as Id<"brands"> } : "skip"

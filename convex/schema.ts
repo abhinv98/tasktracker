@@ -143,6 +143,7 @@ export default defineSchema({
     creativesRequired: v.optional(v.number()),
   })
     .index("by_status", ["status"])
+    .index("by_type_brand", ["briefType", "brandId"])
     .index("by_manager", ["assignedManagerId"])
     .index("by_priority", ["globalPriority"]),
 
@@ -289,7 +290,12 @@ export default defineSchema({
     sentToClientBy: v.optional(v.id("users")),
   })
     .index("by_task", ["taskId"])
-    .index("by_submittedBy", ["submittedBy"]),
+    .index("by_submittedBy", ["submittedBy"])
+    // Review queues and their sidebar badges read only the open rows.
+    .index("by_status", ["status"])
+    .index("by_teamLeadStatus_status", ["teamLeadStatus", "status"])
+    .index("by_mainAssigneeStatus_teamLeadStatus", ["mainAssigneeStatus", "teamLeadStatus"])
+    .index("by_clientStatus", ["clientStatus"]),
 
   // ─── COMMENTS ──────────────────────────────────
   comments: defineTable({

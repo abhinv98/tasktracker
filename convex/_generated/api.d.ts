@@ -40,6 +40,7 @@ import type * as lib_cascadeTaskStatus from "../lib/cascadeTaskStatus.js";
 import type * as lib_clientReview from "../lib/clientReview.js";
 import type * as lib_guards from "../lib/guards.js";
 import type * as lib_internalAuth from "../lib/internalAuth.js";
+import type * as lib_openBriefs from "../lib/openBriefs.js";
 import type * as lib_recomputeBriefDeadline from "../lib/recomputeBriefDeadline.js";
 import type * as lib_stopTaskTimers from "../lib/stopTaskTimers.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
@@ -135,6 +136,7 @@ declare const fullApi: ApiFromModules<{
   "lib/clientReview": typeof lib_clientReview;
   "lib/guards": typeof lib_guards;
   "lib/internalAuth": typeof lib_internalAuth;
+  "lib/openBriefs": typeof lib_openBriefs;
   "lib/recomputeBriefDeadline": typeof lib_recomputeBriefDeadline;
   "lib/stopTaskTimers": typeof lib_stopTaskTimers;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;

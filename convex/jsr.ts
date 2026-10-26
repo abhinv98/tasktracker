@@ -1424,17 +1424,31 @@ export const getClientApprovalCounts = query({
       .collect();
     if (myBrandAssignments.length === 0) return { approved: 0, pendingClient: 0, changesRequested: 0, denied: 0 };
 
-    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
-    const briefs = await ctx.db.query("briefs").collect();
-    const brandBriefs = briefs.filter((b) => b.brandId && myBrandIds.has(b.brandId));
-    const briefIds = new Set(brandBriefs.map((b) => b._id));
-
-    const allTasks = await ctx.db.query("tasks").collect();
-    const brandTasks = allTasks.filter((t) => briefIds.has(t.briefId) && t.clientFacing);
-    const taskIds = new Set(brandTasks.map((t) => t._id));
-
-    const allDeliverables = await ctx.db.query("deliverables").collect();
-    const clientDeliverables = allDeliverables.filter((d) => taskIds.has(d.taskId) && d.clientStatus);
+    const myBrandIds = new Set<string>(myBrandAssignments.map((bm) => bm.brandId));
+    // Only deliverables that ever went to a client, then their task and brief
+    // (was three whole-table reads on every admin dashboard).
+    const withClientStatus = (
+      await Promise.all(
+        (["client_approved", "pending_client", "client_changes_requested", "client_denied"] as const).map((cs) =>
+          ctx.db
+            .query("deliverables")
+            .withIndex("by_clientStatus", (q) => q.eq("clientStatus", cs))
+            .collect()
+        )
+      )
+    ).flat();
+    const docCache = new Map<string, any>();
+    const get = async (id: any) => {
+      if (!docCache.has(id)) docCache.set(id, await ctx.db.get(id));
+      return docCache.get(id);
+    };
+    const clientDeliverables: typeof withClientStatus = [];
+    for (const d of withClientStatus) {
+      const task = await get(d.taskId);
+      if (!task?.clientFacing) continue;
+      const brief = await get(task.briefId);
+      if (brief?.brandId && myBrandIds.has(brief.brandId)) clientDeliverables.push(d);
+    }
 
     return {
       approved: clientDeliverables.filter((d) => d.clientStatus === "client_approved").length,

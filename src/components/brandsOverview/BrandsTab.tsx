@@ -17,7 +17,7 @@ const RETURN_TO = "/brands-overview";
 export default function BrandsTab() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const brands = useQuery(api.brands.listBrands);
+  const brands = useQuery(api.brands.listBrands, { withCounts: true });
   const myBrandIds = useQuery(api.brands.getMyManagedBrandIds);
   const createBrand = useMutation(api.brands.createBrand);
   const user = useQuery(api.users.getCurrentUser);

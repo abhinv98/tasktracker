@@ -147,7 +147,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
             <Bell className="h-4 w-4" />
             {(unreadCount ?? 0) > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-[11px] font-semibold text-white">
-                {unreadCount}
+                {(unreadCount ?? 0) > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>

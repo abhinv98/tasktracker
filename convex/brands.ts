@@ -30,8 +30,10 @@ export const getMyManagedBrandIds = query({
 
 // List all brands (admin sees all, employees see none)
 export const listBrands = query({
-  args: {},
-  handler: async (ctx) => {
+  /** withCounts: brief counts per brand. Only Brands Overview shows them, and
+   *  computing them reads every brief, so the other pages skip it. */
+  args: { withCounts: v.optional(v.boolean()) },
+  handler: async (ctx, { withCounts }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
@@ -44,7 +46,7 @@ export const listBrands = query({
     }
 
     const brandManagers = await ctx.db.query("brandManagers").collect();
-    const briefs = await ctx.db.query("briefs").collect();
+    const briefs = withCounts ? await ctx.db.query("briefs").collect() : [];
     const users = await ctx.db.query("users").collect();
 
     return Promise.all(brands.map(async (brand) => {

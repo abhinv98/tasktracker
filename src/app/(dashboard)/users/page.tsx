@@ -383,7 +383,7 @@ function ResetPasswordModal({
 
 /* ─── Create Client Login Modal ─── */
 function CreateClientModal({ onClose }: { onClose: () => void }) {
-  const brands = useQuery(api.brands.listBrands);
+  const brands = useQuery(api.brands.listBrands, {});
   const createClient = useAction(api.clientUsers.adminCreateClientUser);
   const { toast } = useToast();
 

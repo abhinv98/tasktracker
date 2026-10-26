@@ -1,3 +1,4 @@
+import { openBriefsAndTasks } from "./lib/openBriefs";
 import { getAuthUserId } from "./lib/internalAuth";
 import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { canViewBrief } from "./lib/guards";
@@ -155,8 +156,20 @@ export const listMyWork = query({
     const me = await ctx.db.get(userId);
     if (!me || me.role !== "admin") return null;
 
-    const briefs = await ctx.db.query("briefs").collect();
-    const briefMap = new Map(briefs.map((b) => [b._id, b]));
+    const mine = await ctx.db
+      .query("tasks")
+      .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
+      .collect();
+    const delegated = await ctx.db
+      .query("tasks")
+      .withIndex("by_assigned_by", (q) => q.eq("assignedBy", userId))
+      .collect();
+
+    // Only the briefs these tasks sit in, not the whole table.
+    const briefs = await Promise.all(
+      [...new Set([...mine, ...delegated].map((t) => t.briefId))].map((id) => ctx.db.get(id))
+    );
+    const briefMap = new Map(briefs.filter((b) => b !== null).map((b) => [b!._id, b!]));
     const brands = await ctx.db.query("brands").collect();
     const brandMap = new Map(brands.map((b) => [b._id, b]));
     const users = await ctx.db.query("users").collect();
@@ -194,19 +207,11 @@ export const listMyWork = query({
       };
     };
 
-    const mine = await ctx.db
-      .query("tasks")
-      .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
-      .collect();
     const assignedToMe = mine
       .filter((t) => liveBrief(t.briefId))
       .sort((a, b) => b._creationTime - a._creationTime)
       .map(decorate);
 
-    const delegated = await ctx.db
-      .query("tasks")
-      .withIndex("by_assigned_by", (q) => q.eq("assignedBy", userId))
-      .collect();
     const supervising = delegated
       .filter(
         (t) => t.assigneeId !== userId && liveBrief(t.briefId)
@@ -1559,8 +1564,6 @@ export const listOverdueTasksForManager = query({
     if (!user || user.role !== "admin") return [];
 
     const now = Date.now();
-    const allTasks = await ctx.db.query("tasks").collect();
-    const briefs = await ctx.db.query("briefs").collect();
     const users = await ctx.db.query("users").collect();
 
     // Find brands this manager is assigned to
@@ -1568,7 +1571,13 @@ export const listOverdueTasksForManager = query({
       .query("brandManagers")
       .withIndex("by_manager", (q) => q.eq("managerId", userId))
       .collect();
-    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+    const myBrandIds = new Set<string>(myBrandAssignments.map((bm) => bm.brandId));
+    // Completed and archived briefs are skipped below anyway, so read only
+    // the open ones this manager owns, and their tasks.
+    const { briefs, tasks: allTasks } = await openBriefsAndTasks(
+      ctx,
+      (b) => b.assignedManagerId === userId || (!!b.brandId && myBrandIds.has(b.brandId))
+    );
 
     // Filter to briefs where this user is the assignedManager or is a brand manager for the brief's brand
     const myBriefIds = new Set(
@@ -1654,8 +1663,6 @@ export const listActionNeededTasks = query({
     const user = await ctx.db.get(userId);
     if (!user || user.role !== "admin") return [];
 
-    const allTasks = await ctx.db.query("tasks").collect();
-    const briefs = await ctx.db.query("briefs").collect();
     const brands = await ctx.db.query("brands").collect();
     const users = await ctx.db.query("users").collect();
 
@@ -1663,7 +1670,28 @@ export const listActionNeededTasks = query({
       .query("brandManagers")
       .withIndex("by_manager", (q) => q.eq("managerId", userId))
       .collect();
-    const myBrandIds = new Set(myBrandAssignments.map((bm) => bm.brandId));
+    const myBrandIds = new Set<string>(myBrandAssignments.map((bm) => bm.brandId));
+    // Only open briefs this manager owns, and their tasks.
+    const mine = (b: { assignedManagerId?: string; brandId?: string }) =>
+      b.assignedManagerId === userId || (!!b.brandId && myBrandIds.has(b.brandId));
+    const { briefs, tasks: allTasks } = await openBriefsAndTasks(ctx, mine);
+    // Content calendars run month after month, so one marked completed can
+    // still hold entries that need an owner or a date; keep those in view.
+    const completedCalendars = (
+      await ctx.db
+        .query("briefs")
+        .withIndex("by_type_brand", (q) => q.eq("briefType", "content_calendar"))
+        .collect()
+    ).filter((b) => b.status === "completed" && mine(b));
+    for (const b of completedCalendars) {
+      briefs.push(b);
+      allTasks.push(
+        ...(await ctx.db
+          .query("tasks")
+          .withIndex("by_brief", (q) => q.eq("briefId", b._id))
+          .collect())
+      );
+    }
 
     const myBriefIds = new Set(
       briefs

@@ -142,7 +142,7 @@ function NotesTab() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [scope, setScope] = useState<"day" | "all">("day");
 
-  const brands = useQuery(api.brands.listBrands) ?? [];
+  const brands = useQuery(api.brands.listBrands, {}) ?? [];
   const notes = useQuery(api.personalNotes.listMine, {
     ...(scope === "day" ? { date } : {}),
     ...(brandFilter ? { brandId: brandFilter as Id<"brands"> } : {}),

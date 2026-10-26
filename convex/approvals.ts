@@ -470,17 +470,24 @@ export const listDeliverables = query({
     }
 
     const users = await ctx.db.query("users").collect();
-    const tasks = await ctx.db.query("tasks").collect();
-    const briefs = await ctx.db.query("briefs").collect();
     const allTeams = await ctx.db.query("teams").collect();
+    // Fetch only the tasks and briefs these deliverables point at. Reading
+    // both whole tables made every task window wait a second or more, and
+    // re-run on any task change anywhere.
+    const docCache = new Map<string, any>();
+    const get = async (id: any): Promise<any> => {
+      if (!id) return null;
+      if (!docCache.has(id)) docCache.set(id, await ctx.db.get(id));
+      return docCache.get(id);
+    };
 
     const results = await Promise.all(
       deliverables.map(async (d) => {
         const submitter = users.find((u) => u._id === d.submittedBy);
         const reviewer = d.reviewedBy ? users.find((u) => u._id === d.reviewedBy) : null;
         const teamLeadReviewer = d.teamLeadReviewedBy ? users.find((u) => u._id === d.teamLeadReviewedBy) : null;
-        const task = tasks.find((t) => t._id === d.taskId);
-        const brief = task ? briefs.find((b) => b._id === task.briefId) : null;
+        const task = await get(d.taskId);
+        const brief = task ? await get(task.briefId) : null;
 
         const files = await deliverableFiles(ctx, d);
 
@@ -509,7 +516,7 @@ export const listDeliverables = query({
           ? users.find((u) => u._id === d.mainAssigneeReviewedBy)
           : null;
         if (isSubTask && task?.parentTaskId) {
-          const parentTask = tasks.find((t) => t._id === task.parentTaskId);
+          const parentTask = await get(task.parentTaskId);
           parentTaskTitle = parentTask?.title ?? null;
           const ma = parentTask ? users.find((u) => u._id === parentTask.assigneeId) : null;
           mainAssigneeName = ma?.name ?? ma?.email ?? null;
@@ -903,18 +910,18 @@ export const getTeamLeadPendingCount = query({
       allUserTeams.filter((ut) => teamIds.includes(ut.teamId)).map((ut) => ut.userId)
     );
 
-    const allDeliverables = await ctx.db.query("deliverables").collect();
-    const tasks = await ctx.db.query("tasks").collect();
-    const doneTaskIds = new Set(
-      tasks.filter((t) => t.status === "done").map((t) => t._id as string)
-    );
-    return allDeliverables.filter(
-      (d) =>
-        d.teamLeadStatus === "pending" &&
-        teamMemberIds.has(d.submittedBy) &&
-        d.submittedBy !== userId &&
-        !doneTaskIds.has(d.taskId as string)
-    ).length;
+    // Only deliverables waiting on a team lead, and only their tasks.
+    const waiting = await ctx.db
+      .query("deliverables")
+      .withIndex("by_teamLeadStatus_status", (q) => q.eq("teamLeadStatus", "pending"))
+      .collect();
+    let count = 0;
+    for (const d of waiting) {
+      if (!teamMemberIds.has(d.submittedBy) || d.submittedBy === userId) continue;
+      const task = await ctx.db.get(d.taskId);
+      if (task?.status !== "done") count++;
+    }
+    return count;
   },
 });
 
@@ -2031,17 +2038,26 @@ export const getMainAssigneePendingCount = query({
       .collect();
     const myTaskIds = new Set(myTasks.map((t) => t._id));
 
-    const allDeliverables = await ctx.db.query("deliverables").collect();
-    const tasks = await ctx.db.query("tasks").collect();
-
-    return allDeliverables.filter((d) => {
-      const awaitingMain = d.mainAssigneeStatus === "pending";
-      const stuckAfterMain = d.mainAssigneeStatus === "approved" && !d.teamLeadStatus;
-      if (!awaitingMain && !stuckAfterMain) return false;
-      if (d.submittedBy === userId) return false;
-      const subTask = tasks.find((t) => t._id === d.taskId);
-      return subTask?.isHelper && subTask.parentTaskId && myTaskIds.has(subTask.parentTaskId);
-    }).length;
+    // Awaiting the main assignee, or approved by them but never routed on.
+    const candidates = [
+      ...(await ctx.db
+        .query("deliverables")
+        .withIndex("by_mainAssigneeStatus_teamLeadStatus", (q) => q.eq("mainAssigneeStatus", "pending"))
+        .collect()),
+      ...(await ctx.db
+        .query("deliverables")
+        .withIndex("by_mainAssigneeStatus_teamLeadStatus", (q) =>
+          q.eq("mainAssigneeStatus", "approved").eq("teamLeadStatus", undefined)
+        )
+        .collect()),
+    ];
+    let count = 0;
+    for (const d of candidates) {
+      if (d.submittedBy === userId) continue;
+      const subTask = await ctx.db.get(d.taskId);
+      if (subTask?.isHelper && subTask.parentTaskId && myTaskIds.has(subTask.parentTaskId)) count++;
+    }
+    return count;
   },
 });
 
@@ -3100,7 +3116,22 @@ export const getPendingDeliverableCount = query({
 
     if (!isAdmin && !isTeamLead) return 0;
 
-    const allDeliverables = await ctx.db.query("deliverables").collect();
+    // Only the open queues: waiting on a team lead, or passed by one and not
+    // yet decided by the manager (status pending or never set).
+    const tlPending = await ctx.db
+      .query("deliverables")
+      .withIndex("by_teamLeadStatus_status", (q) => q.eq("teamLeadStatus", "pending"))
+      .collect();
+    const tlApprovedOpen = [
+      ...(await ctx.db
+        .query("deliverables")
+        .withIndex("by_teamLeadStatus_status", (q) => q.eq("teamLeadStatus", "approved").eq("status", "pending"))
+        .collect()),
+      ...(await ctx.db
+        .query("deliverables")
+        .withIndex("by_teamLeadStatus_status", (q) => q.eq("teamLeadStatus", "approved").eq("status", undefined))
+        .collect()),
+    ];
     // This badge sits in every admin's sidebar. Reading only the tasks and
     // briefs behind pending deliverables (not whole tables) keeps it cheap and
     // stops every unrelated task write from re-running it for every admin —
@@ -3124,7 +3155,7 @@ export const getPendingDeliverableCount = query({
       const teamMemberIds = new Set(
         allUserTeams.filter((ut) => ledTeamIds.has(ut.teamId)).map((ut) => ut.userId)
       );
-      for (const d of allDeliverables) {
+      for (const d of tlPending) {
         if (d.teamLeadStatus !== "pending") continue;
         if (!teamMemberIds.has(d.submittedBy) || d.submittedBy === userId) continue;
         const task = await getTask(d.taskId);
@@ -3144,7 +3175,7 @@ export const getPendingDeliverableCount = query({
       const managedBrandIds = new Set<string>(bms.map((bm) => bm.brandId));
 
       if (managedBrandIds.size > 0) {
-        for (const d of allDeliverables) {
+        for (const d of tlApprovedOpen) {
           if (d.submittedBy === userId) continue;
           if (d.teamLeadStatus !== "approved") continue;
           if (d.status === "approved" || d.status === "rejected") continue;

@@ -68,14 +68,12 @@ function daysUntil(deadline: number): number {
 export default function BriefsPage() {
   const router = useRouter();
   const user = useQuery(api.users.getCurrentUser);
-  const brands = useQuery(api.brands.listBrands);
+  const brands = useQuery(api.brands.listBrands, {});
   const managers = useQuery(api.users.listManagers);
 
   const [filterManagerId, setFilterManagerId] = useState<string>("");
-  const briefs = useQuery(
-    api.briefs.listBriefs,
-    filterManagerId ? { managerId: filterManagerId as Id<"users"> } : {}
-  );
+  const managerArg = filterManagerId ? { managerId: filterManagerId as Id<"users"> } : {};
+  const openBriefs = useQuery(api.briefs.listBriefs, managerArg);
 
   const createBrief = useMutation(api.briefs.createBrief);
   const createIndividualTaskBrief = useMutation(api.briefs.createIndividualTaskBrief);
@@ -121,6 +119,21 @@ export default function BriefsPage() {
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
   const [expandedBriefs, setExpandedBriefs] = useState<Set<string>>(() => new Set());
   const [briefsTab, setBriefsTab] = useState<"active" | "completed" | "review">("active");
+  // Completed briefs are most of the table, so they load only once the tab
+  // has been opened (and stay loaded after that).
+  const [completedWanted, setCompletedWanted] = useState(false);
+  useEffect(() => {
+    if (briefsTab === "completed") setCompletedWanted(true);
+  }, [briefsTab]);
+  const completedList = useQuery(
+    api.briefs.listBriefs,
+    completedWanted ? { ...managerArg, scope: "completed" as const } : "skip"
+  );
+  const briefs = useMemo(
+    () => (openBriefs ? [...openBriefs, ...(completedList ?? [])] : undefined),
+    [openBriefs, completedList]
+  );
+  const completedLoading = briefsTab === "completed" && completedList === undefined;
   const [filterBriefType, setFilterBriefType] = useState<string>("");
   const [filterDateStart, setFilterDateStart] = useState<string>("");
   const [filterDateEnd, setFilterDateEnd] = useState<string>("");
@@ -665,7 +678,7 @@ export default function BriefsPage() {
         options={[
           { value: "active", label: "Active", icon: Briefcase, count: activeBriefs.length },
           { value: "review", label: "Review", icon: Eye, count: reviewBriefs.length },
-          { value: "completed", label: "Completed", icon: CheckCircle2, count: completedBriefs.length },
+          { value: "completed", label: "Completed", icon: CheckCircle2, count: completedList ? completedBriefs.length : undefined },
         ]}
       />
 
@@ -803,7 +816,9 @@ export default function BriefsPage() {
           </button>
         </div>
         <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
-          {displayedBriefs.length} brief{displayedBriefs.length !== 1 ? "s" : ""}
+          {completedLoading
+            ? "Loading completed briefs…"
+            : `${displayedBriefs.length} brief${displayedBriefs.length !== 1 ? "s" : ""}`}
         </span>
       </div>
 
@@ -1023,7 +1038,7 @@ export default function BriefsPage() {
             );
           })}
 
-          {brandFolders.length === 0 && briefs !== undefined && (
+          {brandFolders.length === 0 && briefs !== undefined && !completedLoading && (
             <EmptyState
               icon={Briefcase}
               title={filterManagerId ? "No briefs for this manager" : "No briefs yet"}
@@ -1230,7 +1245,7 @@ export default function BriefsPage() {
             );
           })}
 
-          {brandFolders.length === 0 && briefs !== undefined && (
+          {brandFolders.length === 0 && briefs !== undefined && !completedLoading && (
             <EmptyState
               icon={Briefcase}
               title={filterManagerId ? "No briefs for this manager" : "No briefs yet"}

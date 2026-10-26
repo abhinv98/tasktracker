@@ -199,33 +199,43 @@ export const getTeamLeadBriefOverview = query({
 
     const allUserTeams = await ctx.db.query("userTeams").collect();
     const allUsers = await ctx.db.query("users").collect();
-    const allBriefTeams = await ctx.db.query("briefTeams").collect();
-    const allBriefs = await ctx.db.query("briefs").collect();
-    const allTasks = await ctx.db.query("tasks").collect();
+    // Indexed reads only: each team's brief links, each member's own tasks,
+    // and just the briefs those point at (was four whole-table scans).
+    const briefCache = new Map<string, any>();
+    const getBrief = async (id: any) => {
+      if (!briefCache.has(id)) briefCache.set(id, await ctx.db.get(id));
+      return briefCache.get(id);
+    };
 
-    return ledTeams.map((team) => {
+    return await Promise.all(ledTeams.map(async (team) => {
+      const teamBriefIds = new Set<string>(
+        (
+          await ctx.db
+            .query("briefTeams")
+            .withIndex("by_team", (q) => q.eq("teamId", team._id))
+            .collect()
+        ).map((bt) => bt.briefId)
+      );
       const memberLinks = allUserTeams.filter((ut) => ut.teamId === team._id);
-      const members = memberLinks
-        .map((ut) => {
+      const members = (await Promise.all(memberLinks
+        .map(async (ut) => {
           const user = allUsers.find((u) => u._id === ut.userId);
           if (!user) return null;
 
-          const teamBriefLinks = allBriefTeams.filter(
-            (bt) => bt.teamId === team._id
-          );
-          const teamBriefIds = new Set(teamBriefLinks.map((bt) => bt.briefId));
-
-          const memberTasks = allTasks.filter(
-            (t) => t.assigneeId === user._id && teamBriefIds.has(t.briefId)
-          );
+          const memberTasks = (
+            await ctx.db
+              .query("tasks")
+              .withIndex("by_assignee", (q) => q.eq("assigneeId", user._id))
+              .collect()
+          ).filter((t) => teamBriefIds.has(t.briefId));
 
           const briefIdsFromTasks = [
             ...new Set(memberTasks.map((t) => t.briefId)),
           ];
 
-          const briefs = briefIdsFromTasks
-            .map((briefId) => {
-              const brief = allBriefs.find((b) => b._id === briefId);
+          const briefs = (await Promise.all(briefIdsFromTasks
+            .map(async (briefId) => {
+              const brief = await getBrief(briefId);
               if (!brief || brief.status === "archived") return null;
               const taskCount = memberTasks.filter(
                 (t) => t.briefId === briefId
@@ -240,7 +250,7 @@ export const getTeamLeadBriefOverview = query({
                 taskCount,
                 doneCount,
               };
-            })
+            })))
             .filter(Boolean);
 
           if (briefs.length === 0) return null;
@@ -256,7 +266,7 @@ export const getTeamLeadBriefOverview = query({
             },
             briefs,
           };
-        })
+        })))
         .filter(Boolean);
 
       return {
@@ -267,6 +277,6 @@ export const getTeamLeadBriefOverview = query({
         },
         members,
       };
-    });
+    }));
   },
 });

@@ -3,6 +3,7 @@ import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { canViewBrief } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { Id } from "./_generated/dataModel";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
@@ -30,10 +31,25 @@ function normalizeDeadlineToEndOfDay(deadline: number): number {
 }
 
 
+// Everything except completed and archived. 577 of 656 live briefs are
+// completed, so the board loads these and pages the rest on demand.
+const OPEN_BRIEF_STATUSES = [
+  "draft",
+  "active",
+  "in-progress",
+  "review",
+  "rejected",
+  "on_hold",
+  "sent_to_client",
+] as const;
+
 export const listBriefs = query({
   args: {
     status: v.optional(v.string()),
     managerId: v.optional(v.id("users")),
+    /** "open" (default): not completed or archived. "completed": the
+     *  Completed tab, loaded only when opened. "all": both. */
+    scope: v.optional(v.union(v.literal("open"), v.literal("completed"), v.literal("all"))),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -41,7 +57,26 @@ export const listBriefs = query({
     const user = await ctx.db.get(userId);
     if (!user) return [];
 
-    let briefs = await ctx.db.query("briefs").collect();
+    // Read through the status index: whole-table reads of briefs and tasks
+    // made this the second-slowest query in the app (4s, every task write).
+    const scope = args.scope ?? "open";
+    const statuses: string[] = args.status
+      ? [args.status]
+      : [
+          ...(scope !== "completed" ? OPEN_BRIEF_STATUSES : []),
+          ...(scope !== "open" ? ["completed"] : []),
+        ];
+    let briefs = (
+      await Promise.all(
+        statuses.map((s) =>
+          ctx.db
+            .query("briefs")
+            .withIndex("by_status", (q) => q.eq("status", s as any))
+            .collect()
+        )
+      )
+    ).flat();
+
     if (user.role === "employee") {
       const tasks = await ctx.db
         .query("tasks")
@@ -55,22 +90,22 @@ export const listBriefs = query({
     // briefs, HR gets HR's briefs and nothing else, super admins get both.
     // This lives here rather than in the page so the rows never go over the
     // wire — a client-side filter is a disclosure with extra steps.
-    const briefTeams = await ctx.db.query("briefTeams").collect();
     const teams = await ctx.db.query("teams").collect();
     const hrTeamId = teams.find((t) => t.name === "HR")?._id;
     if (hrTeamId && user.isSuperAdmin !== true) {
-      const hrBriefIds = new Set(
-        briefTeams.filter((x) => x.teamId === hrTeamId).map((x) => x.briefId)
+      const hrBriefIds = new Set<string>(
+        (
+          await ctx.db
+            .query("briefTeams")
+            .withIndex("by_team", (q) => q.eq("teamId", hrTeamId))
+            .collect()
+        ).map((x) => x.briefId)
       );
       briefs = briefs.filter((b) =>
         user.isHR === true ? hrBriefIds.has(b._id) : !hrBriefIds.has(b._id)
       );
     }
 
-    // Archived briefs live on the Archive page (listArchivedBriefs) only.
-    briefs = briefs.filter((b) =>
-      args.status ? b.status === args.status : b.status !== "archived"
-    );
     if (args.managerId) {
       briefs = briefs.filter((b) => b.assignedManagerId === args.managerId);
     }
@@ -79,52 +114,44 @@ export const listBriefs = query({
       (await ctx.db.query("users").collect()).map((u) => [u._id, u])
     );
     const teamName = new Map<string, string>(teams.map((t) => [t._id, t.name]));
-    // Group once: filtering every table per brief was briefs × tasks work on
-    // a query that re-runs for every viewer on every task write.
-    const group = <T,>(rows: T[], key: (r: T) => string) => {
-      const m = new Map<string, T[]>();
-      for (const r of rows) {
-        const k = key(r);
-        const arr = m.get(k);
-        if (arr) arr.push(r);
-        else m.set(k, [r]);
-      }
-      return m;
-    };
-    const teamsByBrief = group(briefTeams, (x) => x.briefId);
-    const tasksByBrief = group(await ctx.db.query("tasks").collect(), (t) => t.briefId);
 
-    return briefs.map((b) => {
-      const manager = b.assignedManagerId ? managers.get(b.assignedManagerId) : undefined;
-      const bt = teamsByBrief.get(b._id) ?? [];
-      const teamIds = bt.map((x) => x.teamId);
-      const teamNames = bt
-        .map((x) => teamName.get(x.teamId))
-        .filter(Boolean); 
-      const tasksInBrief = tasksByBrief.get(b._id) ?? [];
-      // Content-calendar entries are stored as a parent task plus
-      // `[Copy]`/`[Design]` children, and helper sub-tasks hang off their
-      // parent on every brief type. Count parents only (matching
-      // recomputeBriefDeadline) — otherwise 6 entries register as 12 or 18.
-      const countableTasks = tasksInBrief.filter((t) => t.parentTaskId === undefined);
-      const doneCount = countableTasks.filter((t) => t.status === "done").length;
+    return await Promise.all(
+      briefs.map(async (b) => {
+        const manager = b.assignedManagerId ? managers.get(b.assignedManagerId) : undefined;
+        const bt = await ctx.db
+          .query("briefTeams")
+          .withIndex("by_brief", (q) => q.eq("briefId", b._id))
+          .collect();
+        const teamIds = bt.map((x) => x.teamId);
+        const teamNames = bt.map((x) => teamName.get(x.teamId)).filter(Boolean);
+        const tasksInBrief = await ctx.db
+          .query("tasks")
+          .withIndex("by_brief", (q) => q.eq("briefId", b._id))
+          .collect();
+        // Content-calendar entries are stored as a parent task plus
+        // `[Copy]`/`[Design]` children, and helper sub-tasks hang off their
+        // parent on every brief type. Count parents only (matching
+        // recomputeBriefDeadline) — otherwise 6 entries register as 12 or 18.
+        const countableTasks = tasksInBrief.filter((t) => t.parentTaskId === undefined);
+        const doneCount = countableTasks.filter((t) => t.status === "done").length;
 
-      // b.deadline is authoritative: recomputeBriefDeadline keeps it rolled up
-      // from tasks on every task write, and a hand-set deadline
-      // (deadlineIsManual) must win. No read-time re-derivation — that's what
-      // made manual deadlines appear not to stick.
+        // b.deadline is authoritative: recomputeBriefDeadline keeps it rolled up
+        // from tasks on every task write, and a hand-set deadline
+        // (deadlineIsManual) must win. No read-time re-derivation — that's what
+        // made manual deadlines appear not to stick.
 
-      return {
-        ...b,
-        managerName: manager?.name ?? manager?.email,
-        teamIds,
-        teamNames,
-        taskCount: countableTasks.length,
-        doneCount,
-        progress:
-          countableTasks.length > 0 ? (doneCount / countableTasks.length) * 100 : 0,
-      };
-    });
+        return {
+          ...b,
+          managerName: manager?.name ?? manager?.email,
+          teamIds,
+          teamNames,
+          taskCount: countableTasks.length,
+          doneCount,
+          progress:
+            countableTasks.length > 0 ? (doneCount / countableTasks.length) * 100 : 0,
+        };
+      })
+    );
   },
 });
 
@@ -1540,34 +1567,42 @@ export const removeTaskConnection = mutation({
   },
 });
 
+/** The Archive page, newest first, a page at a time ("Load more"). */
 export const getArchivedBriefs = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { paginationOpts }) => {
+    const empty = { page: [], isDone: true, continueCursor: "" };
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    if (!userId) return empty;
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
-      return [];
-    }
-    const briefs = await ctx.db
+    if (!user || user.role !== "admin") return empty;
+
+    const result = await ctx.db
       .query("briefs")
       .withIndex("by_status", (q) => q.eq("status", "archived"))
-      .collect();
+      .order("desc")
+      .paginate(paginationOpts);
     const managers = await ctx.db.query("users").collect();
-    const allTasks = await ctx.db.query("tasks").collect();
-    return briefs.map((b) => {
-      const manager = managers.find((m) => m._id === b.archivedBy);
-      // Parents only, matching listBriefs/getBrief.
-      const tasks = allTasks.filter(
-        (t) => t.briefId === b._id && t.parentTaskId === undefined
-      );
-      const doneCount = tasks.filter((t) => t.status === "done").length;
-      return {
-        ...b,
-        archivedByName: manager?.name ?? manager?.email,
-        taskCount: tasks.length,
-        doneCount,
-      };
-    });
+    const page = await Promise.all(
+      result.page.map(async (b) => {
+        const manager = managers.find((m) => m._id === b.archivedBy);
+        // Parents only, matching listBriefs/getBrief. Only this brief's
+        // tasks, not the whole table.
+        const tasks = (
+          await ctx.db
+            .query("tasks")
+            .withIndex("by_brief", (q) => q.eq("briefId", b._id))
+            .collect()
+        ).filter((t) => t.parentTaskId === undefined);
+        const doneCount = tasks.filter((t) => t.status === "done").length;
+        return {
+          ...b,
+          archivedByName: manager?.name ?? manager?.email,
+          taskCount: tasks.length,
+          doneCount,
+        };
+      })
+    );
+    return { ...result, page };
   },
 });

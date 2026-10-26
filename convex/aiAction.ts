@@ -781,6 +781,7 @@ async function executeTool(
     case "list_briefs": {
       const briefs = await ctx.runQuery(api.briefs.listBriefs, {
         status: fnArgs.status,
+        scope: "all",
       });
       return JSON.stringify(
         briefs.map((b: Record<string, unknown>) => ({
@@ -882,7 +883,7 @@ async function executeTool(
     }
 
     case "list_brands": {
-      const brands = await ctx.runQuery(api.brands.listBrands, {});
+      const brands = await ctx.runQuery(api.brands.listBrands, { withCounts: true });
       return JSON.stringify(
         brands.map((b: Record<string, unknown>) => ({
           id: b._id,
@@ -981,7 +982,7 @@ async function executeTool(
     }
 
     case "get_dashboard_stats": {
-      const briefs = await ctx.runQuery(api.briefs.listBriefs, {});
+      const briefs = await ctx.runQuery(api.briefs.listBriefs, { scope: "all" });
       const brands = await ctx.runQuery(api.brands.listBrands, {});
       const teams = await ctx.runQuery(api.teams.listTeams, {});
 

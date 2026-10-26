@@ -91,6 +91,18 @@ function classifyCalendarEntry(
 
 // Build a userId → role map using each user's userTeams membership. Caches
 // nothing — invoked once per query handler.
+/** A brand's live content-calendar brief, through the briefType+brand index
+ *  (these lookups used to scan the whole briefs table on every calendar view). */
+export async function findCalendarBrief(ctx: any, brandId: any) {
+  const rows = await ctx.db
+    .query("briefs")
+    .withIndex("by_type_brand", (q: any) =>
+      q.eq("briefType", "content_calendar").eq("brandId", brandId)
+    )
+    .collect();
+  return rows.find((b: any) => b.status !== "archived") ?? null;
+}
+
 async function buildRoleByUserMap(ctx: any): Promise<Map<any, "copy" | "design" | null>> {
   const userTeams = await ctx.db.query("userTeams").collect();
   const teams = await ctx.db.query("teams").collect();
@@ -125,13 +137,7 @@ export async function getOrCreateCalendarBrief(
     throw new Error("This brand is on hold. Resume it from the brand page first.");
   }
 
-  const allBriefs = await ctx.db.query("briefs").collect();
-  const existing = allBriefs.find(
-    (b: any) =>
-      b.brandId === brandId &&
-      b.briefType === "content_calendar" &&
-      b.status !== "archived"
-  );
+  const existing = await findCalendarBrief(ctx, brandId);
   if (existing) {
     const brandMgrs = await ctx.db
       .query("brandManagers")
@@ -149,9 +155,8 @@ export async function getOrCreateCalendarBrief(
     .collect();
   const managerId = brandMgrs.length > 0 ? brandMgrs[0].managerId : userId;
 
-  const maxPriority = allBriefs.length > 0
-    ? Math.max(...allBriefs.map((b: any) => b.globalPriority))
-    : 0;
+  const top = await ctx.db.query("briefs").withIndex("by_priority").order("desc").first();
+  const maxPriority = top?.globalPriority ?? 0;
 
   return await ctx.db.insert("briefs", {
     title: `${brand.name} - Content Calendar`,
@@ -213,13 +218,7 @@ export const getCalendarBriefForBrand = query({
     if (!userId) return null;
     if (!(await canViewBrandCalendar(ctx, userId, brandId))) return null;
 
-    const allBriefs = await ctx.db.query("briefs").collect();
-    const existing = allBriefs.find(
-      (b: any) =>
-        b.brandId === brandId &&
-        b.briefType === "content_calendar" &&
-        b.status !== "archived"
-    );
+    const existing = await findCalendarBrief(ctx, brandId);
     return existing?._id ?? null;
   },
 });
@@ -240,13 +239,7 @@ async function canViewBrandCalendar(
 
   // Find the brand's CC brief (if any) and check the employee has at least
   // one task on it.
-  const allBriefs = await ctx.db.query("briefs").collect();
-  const ccBrief = allBriefs.find(
-    (b: any) =>
-      b.brandId === brandId &&
-      b.briefType === "content_calendar" &&
-      b.status !== "archived"
-  );
+  const ccBrief = await findCalendarBrief(ctx, brandId);
   if (!ccBrief) return false;
 
   const myTask = await ctx.db
@@ -282,11 +275,12 @@ export const getMyAccessibleCalendarBrandIds = query({
     const user = await ctx.db.get(userId);
     if (!user) return [];
 
-    const briefs = await ctx.db.query("briefs").collect();
-    const ccBriefs = briefs.filter(
-      (b: any) =>
-        b.briefType === "content_calendar" && b.status !== "archived"
-    );
+    const ccBriefs = (
+      await ctx.db
+        .query("briefs")
+        .withIndex("by_type_brand", (q) => q.eq("briefType", "content_calendar"))
+        .collect()
+    ).filter((b) => b.status !== "archived");
     if (ccBriefs.length === 0) return [];
 
     if (user.role === "admin") {
@@ -338,11 +332,12 @@ export const listMyCalendarBrands = query({
     const user = await ctx.db.get(userId);
     if (!user) return [];
 
-    const briefs = await ctx.db.query("briefs").collect();
-    const ccBriefs = briefs.filter(
-      (b: any) =>
-        b.briefType === "content_calendar" && b.status !== "archived"
-    );
+    const ccBriefs = (
+      await ctx.db
+        .query("briefs")
+        .withIndex("by_type_brand", (q) => q.eq("briefType", "content_calendar"))
+        .collect()
+    ).filter((b) => b.status !== "archived");
     if (ccBriefs.length === 0) return [];
 
     const brandIds = new Set<string>();
@@ -396,13 +391,7 @@ export const listTasksByBrandMonth = query({
     if (!userId) return [];
     if (!(await canViewBrandCalendar(ctx, userId, brandId))) return [];
 
-    const allBriefs = await ctx.db.query("briefs").collect();
-    const ccBrief = allBriefs.find(
-      (b: any) =>
-        b.brandId === brandId &&
-        b.briefType === "content_calendar" &&
-        b.status !== "archived"
-    );
+    const ccBrief = await findCalendarBrief(ctx, brandId);
     if (!ccBrief) return [];
 
     const tasks = await ctx.db
@@ -493,8 +482,11 @@ export const listEntriesByIds = query({
     );
     if (present.length === 0) return [];
 
-    const briefs = await ctx.db.query("briefs").collect();
-    const briefMap = new Map(briefs.map((b) => [b._id, b]));
+    // Only these entries' briefs, not the whole table.
+    const briefs = await Promise.all(
+      [...new Set(present.map((t) => t.briefId))].map((id) => ctx.db.get(id))
+    );
+    const briefMap = new Map(briefs.filter((b) => b !== null).map((b) => [b!._id, b!]));
     const brands = await ctx.db.query("brands").collect();
     const brandMap = new Map(brands.map((b) => [b._id, b]));
     const users = await ctx.db.query("users").collect();
@@ -602,13 +594,7 @@ export const listStagedEntries = query({
     if (!userId) return [];
     if (!(await canViewBrandCalendar(ctx, userId, brandId))) return [];
 
-    const allBriefs = await ctx.db.query("briefs").collect();
-    const ccBrief = allBriefs.find(
-      (b: any) =>
-        b.brandId === brandId &&
-        b.briefType === "content_calendar" &&
-        b.status !== "archived"
-    );
+    const ccBrief = await findCalendarBrief(ctx, brandId);
     if (!ccBrief) return [];
 
     const tasks = await ctx.db

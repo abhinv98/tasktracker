@@ -160,7 +160,7 @@ export default function ContentCalendarPage() {
   const { toast } = useToast();
 
   const user = useQuery(api.users.getCurrentUser);
-  const allBrands = useQuery(api.brands.listBrands);
+  const allBrands = useQuery(api.brands.listBrands, {});
   // Brands whose calendar this user may open — sticky for employees, based on
   // any past task in that brand's calendar brief. `brands.listBrands` returns
   // nothing to employees, so their picker is fed by this scoped list instead.

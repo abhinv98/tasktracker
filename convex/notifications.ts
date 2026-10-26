@@ -17,7 +17,9 @@ export const getNotifications = query({
       .withIndex("by_recipient_read", (q) =>
         q.eq("recipientId", userId).eq("read", false)
       )
-      .collect();
+      // The badge shows "99+" past 99; counting further only reads rows (one
+      // person had 1,178 unread, re-read on every refresh).
+      .take(100);
     return { notifications, unreadCount: unread.length };
   },
 });
@@ -32,7 +34,9 @@ export const getUnreadCount = query({
       .withIndex("by_recipient_read", (q) =>
         q.eq("recipientId", userId).eq("read", false)
       )
-      .collect();
+      // The badge shows "99+" past 99; counting further only reads rows (one
+      // person had 1,178 unread, re-read on every refresh).
+      .take(100);
     return unread.length;
   },
 });

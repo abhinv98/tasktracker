@@ -18,7 +18,8 @@ import {
 
 export default function DiscussionsPage() {
   const user = useQuery(api.users.getCurrentUser);
-  const briefs = useQuery(api.briefs.listBriefs, {});
+  // Discussions stay open on finished work too.
+  const briefs = useQuery(api.briefs.listBriefs, { scope: "all" });
   const unreadCounts = useQuery(api.comments.getUnreadCounts);
   const markRead = useMutation(api.comments.markBriefRead);
   const [selectedBriefId, setSelectedBriefId] = useState<Id<"briefs"> | null>(

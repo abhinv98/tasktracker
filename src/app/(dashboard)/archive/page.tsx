@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -9,7 +9,12 @@ import { Archive } from "lucide-react";
 
 export default function ArchivePage() {
   const router = useRouter();
-  const archived = useQuery(api.briefs.getArchivedBriefs);
+  // 208 archived briefs and counting: load 25 at a time, newest first.
+  const { results: archived, status, loadMore } = usePaginatedQuery(
+    api.briefs.getArchivedBriefs,
+    {},
+    { initialNumItems: 25 }
+  );
   const restoreBrief = useMutation(api.briefs.restoreBrief);
 
   const { toast } = useToast();
@@ -28,7 +33,7 @@ export default function ArchivePage() {
     <div className="p-4 sm:p-8">
       <PageHeader title="Archive" subtitle="Restore archived briefs" />
 
-      {archived === undefined ? (
+      {status === "LoadingFirstPage" ? (
         <SkeletonList />
       ) : archived.length === 0 ? (
         <EmptyState
@@ -38,7 +43,7 @@ export default function ArchivePage() {
         />
       ) : (
       <div className="flex flex-col gap-4">
-        {(archived ?? []).map((brief) => (
+        {archived.map((brief) => (
           <Card key={brief._id} className="flex flex-row justify-between items-center">
             <div>
               <h3 className="font-semibold text-[var(--text-primary)]">
@@ -55,6 +60,17 @@ export default function ArchivePage() {
             </Button>
           </Card>
         ))}
+        {status !== "Exhausted" && (
+          <div className="flex justify-center pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => loadMore(25)}
+              disabled={status === "LoadingMore"}
+            >
+              {status === "LoadingMore" ? "Loading…" : "Load more"}
+            </Button>
+          </div>
+        )}
       </div>
       )}
     </div>
