@@ -10,6 +10,7 @@ import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { recomputeBriefDeadline } from "./lib/recomputeBriefDeadline";
 import { tagForOversight } from "./lib/tagForOversight";
+import { reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
 
 function normalizeDeadlineToEndOfDay(deadline: number): number {
@@ -1087,6 +1088,8 @@ export const createIndividualTaskBrief = mutation({
         });
       }
     }
+
+    await reopenBriefForNewTask(ctx, ccBriefId);
 
     await ctx.db.insert("activityLog", {
       briefId: ccBriefId,

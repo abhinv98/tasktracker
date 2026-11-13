@@ -10,10 +10,11 @@ export const checkDeadlines = internalMutation({
     const tasks = await ctx.db.query("tasks").collect();
     for (const task of tasks) {
       // Overdue applies to pending / in-progress / on-hold only, and not to
-      // tasks inside completed or archived briefs (see STATUSES.txt).
+      // tasks inside completed or archived briefs (see STATUSES.txt). A brief
+      // on hold is paused: no "due soon" or "overdue" nudges until it resumes.
       if (!task.deadline || task.status === "done" || task.status === "review") continue;
       const brief = await ctx.db.get(task.briefId);
-      if (!brief || brief.status === "completed" || brief.status === "archived") continue;
+      if (!brief || ["completed", "archived", "on_hold"].includes(brief.status)) continue;
 
       // 24h reminder
       if (task.deadline > now && task.deadline <= in24h) {

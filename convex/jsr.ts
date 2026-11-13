@@ -12,6 +12,7 @@ import {
 } from "./contentCalendar";
 import type { Id } from "./_generated/dataModel";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
+import { reopenBriefForNewTask } from "./lib/syncBriefStatus";
 
 function generateToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -802,6 +803,8 @@ export const acceptClientRequest = mutation({
       });
     }
 
+    await reopenBriefForNewTask(ctx, briefId);
+
     await ctx.db.patch(requestId, {
       status: "accepted",
       acceptedDestination:
@@ -970,6 +973,7 @@ export const updateClientTaskStatus = mutation({
       });
 
       await ctx.db.patch(taskId, { linkedTaskId: realTaskId, linkedBriefId: briefId });
+      await reopenBriefForNewTask(ctx, briefId);
     }
 
     // The linked task may have been deleted from its brief since.

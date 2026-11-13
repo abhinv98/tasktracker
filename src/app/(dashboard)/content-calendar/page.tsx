@@ -7,7 +7,8 @@ import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Card, useToast } from "@/components/ui";
-import { ContentCalendarEntrySidebar } from "@/components/ContentCalendarView";
+import { ContentCalendarEntrySidebar, DeadlineInput } from "@/components/ContentCalendarView";
+import { deadlineInputToMs } from "@/lib/deadlineInput";
 import {
   Plus,
   X,
@@ -401,7 +402,7 @@ export default function ContentCalendarPage() {
         platform: newPlatform,
         contentType: newContentType,
         postDate: addingDate,
-        ...(newDeadline ? { deadline: new Date(newDeadline + "T23:59:59").getTime() } : {}),
+        ...(newDeadline ? { deadline: deadlineInputToMs(newDeadline) } : {}),
       });
       setNewTitle("");
       setNewDescription("");
@@ -630,7 +631,9 @@ export default function ContentCalendarPage() {
               className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
             >
               <option value="">Select brand</option>
-              {(brands ?? []).map((b: any) => (
+              {/* On-hold brands take no new entries, so they are not offered;
+                  one that is already open stays listed. */}
+              {(brands ?? []).filter((b: { _id: string; onHold?: boolean }) => !b.onHold || b._id === selectedBrandId).map((b: any) => (
                 <option key={b._id} value={b._id}>{b.name}</option>
               ))}
               {isAdmin && <option value="__create__">+ Create new brand</option>}
@@ -1267,10 +1270,9 @@ export default function ContentCalendarPage() {
               </div>
               <div>
                 <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline (optional)</label>
-                <input
-                  type="date"
+                <DeadlineInput
                   value={newDeadline}
-                  onChange={(e) => setNewDeadline(e.target.value)}
+                  onChange={setNewDeadline}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 />
               </div>

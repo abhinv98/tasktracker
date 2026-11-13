@@ -22,7 +22,11 @@ export const listMine = query({
       .withIndex("by_user_created", (q) => q.eq("userId", userId))
       .collect();
 
-    return rows.sort((a, b) => b.createdAt - a.createdAt);
+    return Promise.all(
+      rows
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (s) => ({ ...s, fileUrl: s.fileId ? await ctx.storage.getUrl(s.fileId) : null }))
+    );
   },
 });
 
@@ -38,7 +42,7 @@ export const listAll = query({
     const rows = await ctx.db.query("suggestions").collect();
     const users = await ctx.db.query("users").collect();
 
-    return rows
+    const withAuthors = rows
       .map((s) => {
         const author = users.find((u) => u._id === s.userId);
         const reviewer = s.reviewedBy
@@ -55,18 +59,41 @@ export const listAll = query({
         };
       })
       .sort((a, b) => b.createdAt - a.createdAt);
+    return Promise.all(
+      withAuthors.map(async (s) => ({ ...s, fileUrl: s.fileId ? await ctx.storage.getUrl(s.fileId) : null }))
+    );
   },
 });
+
+const SUGGESTION_FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+const SUGGESTION_FILE_MAX_BYTES = 10 * 1024 * 1024;
 
 /** Any authenticated user can create a suggestion. */
 export const create = mutation({
   args: {
     title: v.optional(v.string()),
     content: v.string(),
+    // Uploaded first through attachments.generateUploadUrl.
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
   },
-  handler: async (ctx, { title, content }) => {
+  handler: async (ctx, { title, content, fileId, fileName }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    if (fileId) {
+      // Super admins open this file from a link, so only formats a browser
+      // shows without running anything (no HTML, no SVG).
+      const meta = await ctx.db.system.get(fileId);
+      // Only a file uploaded just now: an older storage id (someone's
+      // deliverable, say) can't be attached and read back through this row.
+      if (!meta || Date.now() - meta._creationTime > 10 * 60 * 1000)
+        throw new Error("The attached file was not uploaded. Please try again.");
+      if (!SUGGESTION_FILE_TYPES.includes(meta.contentType ?? ""))
+        throw new Error("Attach an image (PNG, JPG, WebP, GIF) or a PDF");
+      if (meta.size > SUGGESTION_FILE_MAX_BYTES)
+        throw new Error("The attached file is too large (max 10 MB)");
+    }
 
     const trimmedContent = content.trim();
     if (!trimmedContent) throw new Error("Suggestion cannot be empty");
@@ -82,6 +109,7 @@ export const create = mutation({
       userId,
       title: trimmedTitle || undefined,
       content: trimmedContent,
+      ...(fileId ? { fileId, fileName: fileName?.trim().slice(0, 200) || "attachment" } : {}),
       status: "new",
       createdAt: now,
       updatedAt: now,
@@ -140,6 +168,9 @@ export const remove = mutation({
     if (!isAuthor && !isSuperAdmin)
       throw new Error("You can only delete your own suggestions");
 
+    // ponytail: the attached file stays in storage. fileId came from the
+    // client, so deleting it here would let anyone delete any stored file
+    // whose id they can see. Sweep orphans if storage space ever matters.
     await ctx.db.delete(suggestionId);
   },
 });

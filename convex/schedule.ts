@@ -171,7 +171,8 @@ export const getUnscheduledTasks = query({
     const activeTasks = tasks.filter((t) => {
       if (t.status === "done") return false;
       const brief = briefs.find((b) => b._id === t.briefId);
-      return brief && brief.status !== "archived";
+      // Paused (on-hold) briefs can't be worked on, so nothing to schedule.
+      return brief && brief.status !== "archived" && brief.status !== "on_hold";
     });
 
     // Check each active task: does it have ANY block on ANY date?

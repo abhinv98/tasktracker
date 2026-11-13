@@ -1,5 +1,6 @@
 "use client";
 
+import { deadlineInputToMs, deadlineToInput, formatDeadline } from "@/lib/deadlineInput";
 import { useMutation, useQuery } from "convex/react";
 import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useState, useRef, useMemo, useEffect } from "react";
@@ -82,10 +83,41 @@ function formatPostDate(dateStr: string) {
   return { display: `${month} ${day}`, weekday };
 }
 
-/** Local YYYY-MM-DD for a date input. Saves use local T23:59:59, so reading
- *  the UTC date (toISOString) would shift the day before 05:30 IST. */
-function localYmd(ts?: number | null) {
-  return ts ? new Date(ts).toLocaleDateString("en-CA") : "";
+/** Deadline date with an optional time beside it. No time means end of day.
+ *  `value` is the string form from src/lib/deadlineInput.ts. */
+export function DeadlineInput({
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  className: string;
+}) {
+  const [date, time = ""] = value.split("T");
+  const join = (d: string, t: string) => (d && t ? `${d}T${t}` : d);
+  return (
+    <div className="flex gap-1.5">
+      <input
+        type="date"
+        value={date}
+        onChange={(e) => onChange(join(e.target.value, time))}
+        disabled={disabled}
+        className={className}
+      />
+      <input
+        type="time"
+        value={time}
+        onChange={(e) => onChange(join(date, e.target.value))}
+        disabled={disabled || !date}
+        aria-label="Deadline time (optional)"
+        title="Time (optional). Left empty, the deadline is the end of the day."
+        className={`${className.replace("w-full", "")} w-[112px] shrink-0`}
+      />
+    </div>
+  );
 }
 
 /** Explicit deadline, or end-of-day go-live (postDate) when no deadline is set. */
@@ -314,7 +346,7 @@ export function ContentCalendarView({
         contentType: newContentType,
         postDate: newPostDate,
         ...(newDeadline
-          ? { deadline: new Date(newDeadline + "T23:59:59").getTime() }
+          ? { deadline: deadlineInputToMs(newDeadline) }
           : {}),
       });
       setNewTitle("");
@@ -736,10 +768,7 @@ export function ContentCalendarView({
                                 : "text-[var(--text-secondary)]"
                             }`}
                           >
-                            {new Date(dl).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
+                            {formatDeadline(dl)}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-amber-700 bg-amber-100">
@@ -1054,10 +1083,9 @@ export function ContentCalendarView({
                 <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
                   Deadline (optional)
                 </label>
-                <input
-                  type="date"
+                <DeadlineInput
                   value={newDeadline}
-                  onChange={(e) => setNewDeadline(e.target.value)}
+                  onChange={setNewDeadline}
                   className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                 />
               </div>
@@ -1158,7 +1186,7 @@ export function ContentCalendarEntrySidebar({
       ? String((task as any).designCreativesRequired)
       : ""
   );
-  const [editDeadline, setEditDeadline] = useState(localYmd(task.deadline));
+  const [editDeadline, setEditDeadline] = useState(deadlineToInput(task.deadline));
   const [editAssignee, setEditAssignee] = useState(task.assigneeId ?? "");
   const [editAssignor, setEditAssignor] = useState(task.assignedBy ?? "");
   const [editDescription, setEditDescription] = useState(
@@ -1272,7 +1300,7 @@ export function ContentCalendarEntrySidebar({
     if (openTask) {
       setOTeam(""); // user can pick a different team; we don't infer the bound team
       setOAssignee(openTask.assigneeId ?? "");
-      setODeadline(localYmd(openTask.deadline));
+      setODeadline(deadlineToInput(openTask.deadline));
       setOCreativeCopy(openTask.creativeCopy ?? "");
       setOCaption(openTask.caption ?? "");
     }
@@ -1344,11 +1372,11 @@ export function ContentCalendarEntrySidebar({
         updates.assigneeId = editAssignee;
       // Assignor edits removed from UI — assignor is always the brand manager
       // (auto-set on task creation). Leave existing task.assignedBy alone.
-      // Compare day strings, not timestamps: an untouched date must not rewrite
-      // a deadline whose stored time isn't exactly 23:59:59 local.
+      // Compare field strings, not timestamps: an untouched field must not
+      // rewrite a deadline whose stored seconds differ from what it shows.
       if (editDeadline) {
-        if (editDeadline !== localYmd(task.deadline))
-          updates.deadline = new Date(editDeadline + "T23:59:59").getTime();
+        if (editDeadline !== deadlineToInput(task.deadline))
+          updates.deadline = deadlineInputToMs(editDeadline);
       } else if (task.deadline) {
         updates.clearDeadline = true;
       }
@@ -1421,9 +1449,7 @@ export function ContentCalendarEntrySidebar({
     }
     setOSaving(true);
     try {
-      const deadlineMs = oDeadline
-        ? new Date(oDeadline + "T23:59:59").getTime()
-        : undefined;
+      const deadlineMs = oDeadline ? deadlineInputToMs(oDeadline) : undefined;
 
       if (creatingNew) {
         const label = teamLabelForNew ?? "Team";
@@ -1444,7 +1470,7 @@ export function ContentCalendarEntrySidebar({
       const updates: Record<string, any> = {};
       if (oAssignee !== openTask.assigneeId) updates.assigneeId = oAssignee;
       if (deadlineMs !== undefined) {
-        if (oDeadline !== localYmd(openTask.deadline)) updates.deadline = deadlineMs;
+        if (oDeadline !== deadlineToInput(openTask.deadline)) updates.deadline = deadlineMs;
       } else if (openTask.deadline) {
         updates.clearDeadline = true;
       }
@@ -1959,10 +1985,9 @@ export function ContentCalendarEntrySidebar({
               <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
                 Deadline
               </label>
-              <input
-                type="date"
+              <DeadlineInput
                 value={oDeadline}
-                onChange={(e) => setODeadline(e.target.value)}
+                onChange={setODeadline}
                 disabled={!isEditable}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
               />
@@ -2596,23 +2621,16 @@ export function ContentCalendarEntrySidebar({
               Deadline
             </label>
             {isEditable ? (
-              <input
-                type="date"
+              <DeadlineInput
                 value={editDeadline}
-                onChange={(e) => setEditDeadline(e.target.value)}
+                onChange={setEditDeadline}
                 className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               />
             ) : (
               <p className="text-[13px] text-[var(--text-primary)]">
                 {(() => {
                   const dl = effectiveDeadlineMs(task);
-                  return dl != null
-                    ? new Date(dl).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : "No deadline";
+                  return dl != null ? formatDeadline(dl, true) : "No deadline";
                 })()}
               </p>
             )}
@@ -2959,10 +2977,9 @@ function RequestChangesControl({
           New deadline
           {deadlinePast ? " (required, old deadline has passed)" : " (optional)"}
         </label>
-        <input
-          type="date"
+        <DeadlineInput
           value={newDeadline}
-          onChange={(e) => setNewDeadline(e.target.value)}
+          onChange={setNewDeadline}
           className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
         />
         {deadlinePast && !newDeadline && (
@@ -2993,9 +3010,7 @@ function RequestChangesControl({
                 note: note.trim(),
                 ...(newDeadline
                   ? {
-                      newDeadline: new Date(
-                        newDeadline + "T23:59:59"
-                      ).getTime(),
+                      newDeadline: deadlineInputToMs(newDeadline),
                     }
                   : {}),
               });

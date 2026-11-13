@@ -114,7 +114,7 @@ export const getDashboardAnalytics = query({
       totalTasks: tasks.length,
       totalUsers: users.length,
       totalTeams: teams.length,
-      totalBrands: brands.length,
+      totalBrands: brands.filter((b) => !b.onHold).length,
       briefsByStatus,
       tasksByStatus,
       overdueTasks: overdueTasks.length,

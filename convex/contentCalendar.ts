@@ -2,7 +2,7 @@ import { getAuthUserId } from "./lib/internalAuth";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
-import { syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
+import { syncBriefStatusFromTasks, reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { tagForOversight } from "./lib/tagForOversight";
 
 // Calendar entries were authored under two schemes:
@@ -788,6 +788,7 @@ export const duplicateEntry = mutation({
       assignedBy,
       source: "content_calendar",
     });
+    await reopenBriefForNewTask(ctx, task.briefId);
 
     if (!isPlaceholder) {
       await ctx.db.insert("notifications", {
@@ -884,6 +885,7 @@ export const createEntryForBrand = mutation({
       assignedBy: assignor,
       source: "content_calendar",
     });
+    await reopenBriefForNewTask(ctx, briefId);
 
     if (args.assigneeId) {
       await ctx.db.insert("notifications", {
@@ -1041,6 +1043,8 @@ export const createCalendarEntryWithCopyTask = mutation({
         timestamp: Date.now(),
       });
     }
+
+    await reopenBriefForNewTask(ctx, briefId);
 
     await ctx.db.insert("activityLog", {
       briefId,
@@ -1375,6 +1379,7 @@ export const createCalendarEntry = mutation({
       assignedBy: assignor,
       source: "content_calendar",
     });
+    await reopenBriefForNewTask(ctx, args.briefId);
 
     if (args.assigneeId) {
       await ctx.db.insert("notifications", {
@@ -1579,6 +1584,7 @@ export const createLinkedCalendarTask = mutation({
       assignedBy: assignor,
       source: "content_calendar",
     });
+    await reopenBriefForNewTask(ctx, args.briefId);
 
     await ctx.db.insert("notifications", {
       recipientId: args.assigneeId,

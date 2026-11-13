@@ -463,7 +463,8 @@ export const getEmployeeHistory = query({
       const brand = brief.brandId ? brandMap.get(brief.brandId) : null;
       // A held brand's unfinished work is paused, not owed: keep it out of
       // the tracker. Its done tasks stay as real history.
-      if (brand?.onHold && task.status !== "done") continue;
+      // Same for a brief that is itself on hold.
+      if ((brand?.onHold || brief.status === "on_hold") && task.status !== "done") continue;
 
       if (!brandGroups.has(brandId)) {
         brandGroups.set(brandId, {

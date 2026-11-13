@@ -1,5 +1,5 @@
-import { MutationCtx } from "../_generated/server";
-import { Id } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
 
 /**
  * For single-task briefs, keeps the brief status in sync with its tasks.
@@ -29,15 +29,28 @@ export async function syncSingleTaskBriefStatus(
   const done = tasks.filter((t) => t.status === "done").length;
   // Paused tasks don't move the brief (matches the old status mapping).
   if (done < tasks.length && tasks.every((t) => t.status === "done" || t.status === "on-hold")) return;
-  let next: string;
+  let next: Doc<"briefs">["status"];
   if (done === tasks.length) next = "completed";
   else if (tasks.some((t) => t.status === "review")) next = "review";
   else if (done > 0 || tasks.some((t) => t.status === "in-progress")) next = "in-progress";
   else next = "active";
 
   if (brief.status !== next) {
-    await ctx.db.patch(briefId, { status: next as any });
+    await ctx.db.patch(briefId, { status: next });
   }
+}
+
+/**
+ * Call after inserting a task into a brief that already existed. A new open
+ * task reopens a completed brief (only then: a draft brief must not be
+ * auto-activated just because tasks were added). Without this a finished
+ * content calendar stays under Completed while new entries pile up in it.
+ */
+export async function reopenBriefForNewTask(ctx: MutationCtx, briefId: Id<"briefs">) {
+  const brief = await ctx.db.get(briefId);
+  if (brief?.status !== "completed") return;
+  await syncSingleTaskBriefStatus(ctx, briefId);
+  await syncBriefStatusFromTasks(ctx, briefId);
 }
 
 /**
@@ -65,7 +78,7 @@ export async function syncMultiTaskBriefStatus(
 
   const allDone = allTasks.every((t) => t.status === "done");
   if (allDone) {
-    await ctx.db.patch(briefId, { status: "completed" as any });
+    await ctx.db.patch(briefId, { status: "completed" });
   }
 }
 
@@ -115,7 +128,7 @@ export async function syncBriefStatusFromTasks(
   // overridden just because a couple of entries are still in progress.
   if (brief.status === "on_hold" && done < total) return;
 
-  let next: string;
+  let next: Doc<"briefs">["status"];
   if (done === total) {
     next = "completed";
   } else if (review > 0) {
@@ -127,7 +140,7 @@ export async function syncBriefStatusFromTasks(
   }
 
   if (brief.status !== next) {
-    await ctx.db.patch(briefId, { status: next as any });
+    await ctx.db.patch(briefId, { status: next });
   }
 }
 

@@ -90,11 +90,13 @@ export default function MyTasksPage() {
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Asking for Done by status wins over the "Hide done" tick.
+  const hidingDone = hideDone && statusFilter !== "done";
   const s = search.trim().toLowerCase();
   const matches = (t: any) => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (brandFilter && t.brandId !== brandFilter) return false;
-    if (hideDone && t.status === "done") return false;
+    if (hidingDone && t.status === "done") return false;
     if (s) {
       const hay = [
         t.title,
@@ -122,6 +124,13 @@ export default function MyTasksPage() {
     setSearch("");
     setScope("all");
     setHideDone(true);
+  };
+
+  // "of N" is for rows the filters removed. Finished tasks tucked away by
+  // "Hide done" don't count: "12 of 211" read as 199 open tasks gone missing.
+  const countLabel = (shown: number, all: { status: string }[]) => {
+    const total = hidingDone ? all.filter((t) => t.status !== "done").length : all.length;
+    return shown !== total ? `${shown} of ${total}` : `${shown}`;
   };
 
   const showMine = scope !== "supervising";
@@ -224,8 +233,7 @@ export default function MyTasksPage() {
       <section className="mb-8">
         <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <ClipboardCheck className="h-4 w-4 text-[var(--text-muted)]" />
-          Assigned to me ({filteredMine.length}
-          {filteredMine.length !== assignedToMe.length ? ` of ${assignedToMe.length}` : ""})
+          Assigned to me ({countLabel(filteredMine.length, assignedToMe)})
         </h2>
         {filteredMine.length === 0 ? (
           <div className="text-center py-10 rounded-xl border border-[var(--border)] bg-white">
@@ -291,8 +299,7 @@ export default function MyTasksPage() {
       <section>
         <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <CalendarClock className="h-4 w-4 text-[var(--text-muted)]" />
-          Supervising: tasks I delegated ({filteredSup.length}
-          {filteredSup.length !== supervising.length ? ` of ${supervising.length}` : ""})
+          Supervising: tasks I delegated ({countLabel(filteredSup.length, supervising)})
         </h2>
         <p className="text-[12px] text-[var(--text-muted)] mb-3">
           Tracking progress, reviewing and marking these done is your

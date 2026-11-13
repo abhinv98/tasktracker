@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
@@ -246,6 +247,8 @@ export const convertEntryToTask = mutation({
         ? { deadline, originalDeadline: deadline }
         : {}),
     });
+
+    await reopenBriefForNewTask(ctx, briefId);
 
     // Same silent super-admin oversight tag as every other task-creation path.
     await tagForOversight(ctx, {

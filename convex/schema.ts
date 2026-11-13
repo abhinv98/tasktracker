@@ -763,6 +763,9 @@ export default defineSchema({
       v.literal("declined")
     ),
     adminNote: v.optional(v.string()),
+    // One screenshot or PDF, in Convex storage.
+    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.string()),
     reviewedBy: v.optional(v.id("users")),
     reviewedAt: v.optional(v.number()),
     createdAt: v.number(),

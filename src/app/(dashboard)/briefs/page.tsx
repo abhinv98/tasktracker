@@ -1282,6 +1282,7 @@ export default function BriefsPage() {
                                 <BriefSubRowsPanel
                                   briefId={brief._id}
                                   briefType={bType}
+                                  onOpen={setNavTaskId}
                                 />
                               </td>
                             </tr>
@@ -1538,11 +1539,13 @@ export default function BriefsPage() {
 function BriefSubRowsPanel({
   briefId,
   briefType,
+  onOpen,
 }: {
   briefId: Id<"briefs">;
   briefType: string | undefined;
+  /** Opens the clicked task where it lives (TaskNavigator), not the whole brief. */
+  onOpen: (taskId: string) => void;
 }) {
-  const router = useRouter();
   const data = useQuery(api.tasks.listTasksForBrief, { briefId });
 
   if (!data) {
@@ -1643,7 +1646,7 @@ function BriefSubRowsPanel({
               return (
                 <div
                   key={t._id}
-                  onClick={() => router.push(`/brief/${briefId}`)}
+                  onClick={() => onOpen(t._id)}
                   className="flex items-center gap-3 px-6 py-2 hover:bg-[var(--bg-hover)] cursor-pointer text-[12px]"
                 >
                   <span

@@ -206,7 +206,8 @@ export const getBrandOverview = query({
     const user = await ctx.db.get(userId);
     if (!user || user.role !== "admin") return [];
 
-    const brands = await ctx.db.query("brands").collect();
+    // On-hold brands live under the Brands tab's "On hold" list only.
+    const brands = (await ctx.db.query("brands").collect()).filter((b) => !b.onHold);
     const brandManagers = await ctx.db.query("brandManagers").collect();
     const users = await ctx.db.query("users").collect();
     const briefs = await ctx.db.query("briefs").collect();

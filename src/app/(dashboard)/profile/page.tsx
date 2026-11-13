@@ -18,6 +18,7 @@ import {
   Camera,
   Loader2,
   Lightbulb,
+  Paperclip,
   Pencil,
   Plus,
   Shield,
@@ -492,13 +493,18 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 // ─── USER VIEW: submit + list your own ───────────────────
 
+const SUGGESTION_FILE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,application/pdf";
+
 function MySuggestionsView() {
   const mySuggestions = useQuery(api.suggestions.listMine);
   const createSuggestion = useMutation(api.suggestions.create);
+  const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -507,14 +513,37 @@ function MySuggestionsView() {
       toast("error", "Please write your suggestion first");
       return;
     }
+    // Checked again on the server; this just avoids uploading a file that
+    // would be refused.
+    if (file && !SUGGESTION_FILE_ACCEPT.split(",").includes(file.type)) {
+      toast("error", "Attach an image (PNG, JPG, WebP, GIF) or a PDF");
+      return;
+    }
+    if (file && file.size > 10 * 1024 * 1024) {
+      toast("error", "The attached file is too large (max 10 MB)");
+      return;
+    }
     setSubmitting(true);
     try {
+      let fileId: Id<"_storage"> | undefined;
+      if (file) {
+        const res = await fetch(await generateUploadUrl(), {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!res.ok) throw new Error("Could not upload the file. Please try again.");
+        fileId = (await res.json()).storageId;
+      }
       await createSuggestion({
         title: title.trim() || undefined,
         content: content.trim(),
+        ...(fileId ? { fileId, fileName: file!.name } : {}),
       });
       setTitle("");
       setContent("");
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       toast("success", "Suggestion submitted. Thank you!");
     } catch (err) {
       toast(
@@ -553,6 +582,16 @@ function MySuggestionsView() {
             placeholder="Describe your idea. What would it change? Why would it help?"
             maxLength={5000}
           />
+          <label className="flex flex-col gap-1 text-[12px] font-medium text-[var(--text-secondary)]">
+            Screenshot or PDF (optional, max 10 MB)
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={SUGGESTION_FILE_ACCEPT}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="text-[13px] font-normal text-[var(--text-primary)]"
+            />
+          </label>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-[var(--text-muted)]">
               {content.length}/5000
@@ -594,6 +633,21 @@ function MySuggestionsView() {
   );
 }
 
+function SuggestionFile({ suggestion }: { suggestion: { fileUrl: string | null; fileName?: string } }) {
+  if (!suggestion.fileUrl) return null;
+  return (
+    <a
+      href={suggestion.fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 mt-2 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
+    >
+      <Paperclip className="h-3.5 w-3.5" />
+      {suggestion.fileName ?? "Attachment"}
+    </a>
+  );
+}
+
 function MySuggestionItem({
   suggestion,
 }: {
@@ -601,6 +655,8 @@ function MySuggestionItem({
     _id: Id<"suggestions">;
     title?: string;
     content: string;
+    fileUrl: string | null;
+    fileName?: string;
     status: SuggestionStatus;
     adminNote?: string;
     createdAt: number;
@@ -734,6 +790,7 @@ function MySuggestionItem({
           {suggestion.content}
         </p>
       )}
+      <SuggestionFile suggestion={suggestion} />
 
       {suggestion.adminNote && !editing && (
         <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
@@ -876,6 +933,8 @@ function AdminSuggestionItem({
     _id: Id<"suggestions">;
     title?: string;
     content: string;
+    fileUrl: string | null;
+    fileName?: string;
     status: SuggestionStatus;
     adminNote?: string;
     authorName: string;
@@ -1001,6 +1060,7 @@ function AdminSuggestionItem({
           <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed mt-2">
             {suggestion.content}
           </p>
+          <SuggestionFile suggestion={suggestion} />
 
           {/* Quick status pills */}
           <div className="flex items-center gap-2 mt-4 flex-wrap">

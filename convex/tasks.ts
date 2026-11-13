@@ -5,7 +5,7 @@ import { canViewBrief } from "./lib/guards";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks, reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
 import { cascadeDeleteTask } from "./lib/cascadeDeleteTask";
@@ -422,10 +422,7 @@ export const createTask = mutation({
 
     // A new open task reopens a completed brief (only then: a draft brief
     // must not be auto-activated just because tasks were added).
-    if (brief.status === "completed") {
-      await syncSingleTaskBriefStatus(ctx, args.briefId);
-      await syncBriefStatusFromTasks(ctx, args.briefId);
-    }
+    await reopenBriefForNewTask(ctx, args.briefId);
 
     return taskId;
   },
@@ -1209,6 +1206,7 @@ export const createSubTask = mutation({
       assignedBy: userId,
       source: "sub_task",
     });
+    await reopenBriefForNewTask(ctx, parentTask.briefId);
 
     await ctx.db.insert("activityLog", {
       briefId: parentTask.briefId,
@@ -1359,10 +1357,7 @@ export const createEmployeeTask = mutation({
       source: "employee_task",
     });
 
-    if (brief.status === "completed") {
-      await syncSingleTaskBriefStatus(ctx, args.briefId);
-      await syncBriefStatusFromTasks(ctx, args.briefId);
-    }
+    await reopenBriefForNewTask(ctx, args.briefId);
 
     await ctx.db.insert("notifications", {
       recipientId: args.assignorId,

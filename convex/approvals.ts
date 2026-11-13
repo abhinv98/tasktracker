@@ -2,7 +2,7 @@ import { getAuthUserId } from "./lib/internalAuth";
 import { stopTaskTimers } from "./lib/stopTaskTimers";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks } from "./lib/syncBriefStatus";
+import { syncSingleTaskBriefStatus, syncMultiTaskBriefStatus, syncBriefStatusFromTasks, reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { mergeUpstreamResourcesIntoTask } from "./lib/taskFlowResources";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree, creativeSlotTarget } from "./lib/autoApproveDeliverables";
@@ -345,6 +345,7 @@ async function autoHandoffIfNeeded(
             ...(task.deadline ? { deadline: task.deadline } : {}),
             ...(referenceLinks.length > 0 ? { referenceLinks } : {}),
           });
+          await reopenBriefForNewTask(ctx, task.briefId);
           notifyUserId = targetAssigneeId;
         }
 
@@ -2969,6 +2970,7 @@ export const handoffDeliverable = mutation({
         sourceDeliverableId: deliverableId,
         handoffSourceTaskId: sourceTask._id,
       });
+      await reopenBriefForNewTask(ctx, targetBriefId);
     }
 
     const shouldNotifyAssignee = !reusedHandoffTask;
