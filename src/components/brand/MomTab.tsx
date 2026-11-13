@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, ConfirmModal, useToast } from "@/components/ui";
+import { Badge, Button, ConfirmModal, EmptyState, useToast } from "@/components/ui";
 import {
   Plus,
   FileText,
@@ -19,6 +19,12 @@ import {
   X,
   Clock,
 } from "lucide-react";
+import { fieldClass } from "@/components/ui/classes";
+
+const FIELD = `w-full ${fieldClass}`;
+const TEXTAREA =
+  "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2.5 py-2 text-[13px] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-y";
+const LABEL = "text-[12px] font-medium text-[var(--text-muted)] block mb-1.5";
 
 interface MomTabProps {
   brandId: Id<"brands">;
@@ -160,20 +166,20 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
   }
 
   if (moms === undefined) {
-    return <p className="text-[15px] text-[var(--text-secondary)] py-8">Loading...</p>;
+    return <p className="text-[13px] text-[var(--text-secondary)] py-8">Loading...</p>;
   }
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">Meeting Minutes</h2>
           <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{moms.length} minute{moms.length !== 1 ? "s" : ""} recorded</p>
         </div>
         {canEdit && !showAdd && (
           <Button onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
+            <Plus className="h-4 w-4" />
             Add MOM
           </Button>
         )}
@@ -181,72 +187,72 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
 
       {/* Add Form */}
       {showAdd && (
-        <form onSubmit={handleCreate} className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6">
+        <form onSubmit={handleCreate} className="rounded-lg border border-[var(--border)] bg-white p-4 mb-4">
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">New Meeting Minutes</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Title</label>
+              <label className={LABEL}>Title</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Meeting title"
                 required
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Meeting Date</label>
+              <label className={LABEL}>Meeting Date</label>
               <input
                 type="date"
                 value={meetingDate}
                 onChange={(e) => setMeetingDate(e.target.value)}
                 required
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Start Time</label>
+              <label className={LABEL}>Start Time</label>
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">End Time</label>
+              <label className={LABEL}>End Time</label>
               <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             </div>
           </div>
           <div className="mb-4">
-            <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Attendees (comma-separated)</label>
+            <label className={LABEL}>Attendees (comma-separated)</label>
             <input
               value={attendeesStr}
               onChange={(e) => setAttendeesStr(e.target.value)}
               placeholder="John, Jane, Alex"
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              className={FIELD}
             />
           </div>
           <div className="mb-4">
-            <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Minutes Content</label>
+            <label className={LABEL}>Minutes Content</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Meeting notes, decisions, action items..."
               required
               rows={6}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-y"
+              className={TEXTAREA}
             />
           </div>
           <div className="mb-4">
-            <label className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5">Meeting Transcript (optional)</label>
+            <label className={LABEL}>Meeting Transcript (optional)</label>
             <div className="flex items-center gap-3">
               <input
                 ref={fileInputRef}
@@ -254,24 +260,25 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                 onChange={(e) => setTranscriptFile(e.target.files?.[0] ?? null)}
                 className="hidden"
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Upload className="h-3.5 w-3.5" />
                 {transcriptFile ? "Change file" : "Upload transcript"}
-              </button>
+              </Button>
               {transcriptFile && (
                 <div className="flex items-center gap-2 text-[12px] text-[var(--text-primary)]">
-                  <FileText className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
+                  <FileText className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                   <span className="truncate max-w-[200px]">{transcriptFile.name}</span>
                   <button
                     type="button"
                     onClick={() => { setTranscriptFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                    className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                    aria-label="Remove file"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}
@@ -281,7 +288,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
             <Button type="submit" disabled={submitting}>
               {submitting ? "Saving..." : "Save MOM"}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => { setShowAdd(false); setTitle(""); setContent(""); setStartTime(""); setEndTime(""); setAttendeesStr(""); setTranscriptFile(null); }}>
+            <Button type="button" variant="ghost" onClick={() => { setShowAdd(false); setTitle(""); setContent(""); setStartTime(""); setEndTime(""); setAttendeesStr(""); setTranscriptFile(null); }}>
               Cancel
             </Button>
           </div>
@@ -290,10 +297,10 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
 
       {/* MOM List */}
       {moms.length === 0 && !showAdd && (
-        <div className="text-center py-12 rounded-xl border border-[var(--border)] bg-white">
-          <FileText className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-          <p className="text-[13px] text-[var(--text-muted)]">No meeting minutes yet. Click "Add MOM" to create one.</p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title={'No meeting minutes yet. Click "Add MOM" to create one.'}
+        />
       )}
 
       <div className="space-y-3">
@@ -302,10 +309,11 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
           const isEditing = editingId === mom._id;
 
           return (
-            <div key={mom._id} className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+            <div key={mom._id} className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
               <button
                 onClick={() => setExpandedId(isExpanded ? null : mom._id)}
-                className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-[var(--bg-hover)] transition-colors"
+                aria-expanded={isExpanded}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--bg-primary)] transition-colors"
               >
                 {isExpanded ? (
                   <ChevronDown className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
@@ -313,69 +321,69 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                   <ChevronRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">{mom.title}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                      <Calendar className="h-3 w-3" />
+                  <p className="font-medium text-[14px] text-[var(--text-primary)] truncate">{mom.title}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
+                    <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+                      <Calendar className="h-3.5 w-3.5" />
                       {formatDate(mom.meetingDate)}
                     </span>
                     {(mom.startTime || mom.endTime) && (
-                      <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                        <Clock className="h-3 w-3" />
+                      <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+                        <Clock className="h-3.5 w-3.5" />
                         {mom.startTime ?? "?"} – {mom.endTime ?? "?"}
                       </span>
                     )}
                     {mom.attendees && mom.attendees.length > 0 && (
-                      <span className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                        <Users className="h-3 w-3" />
+                      <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+                        <Users className="h-3.5 w-3.5" />
                         {mom.attendees.length} attendee{mom.attendees.length !== 1 ? "s" : ""}
                       </span>
                     )}
                     {mom.transcriptUrl && (
-                      <span className="flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)]">
-                        <FileText className="h-3 w-3" />
+                      <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
+                        <FileText className="h-3.5 w-3.5" />
                         Transcript
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="text-[11px] text-[var(--text-muted)] shrink-0">
+                <span className="text-[12px] text-[var(--text-muted)] shrink-0">
                   by {mom.creatorName}
                 </span>
               </button>
 
               {isExpanded && (
-                <div className="border-t border-[var(--border)] px-5 py-4">
+                <div className="border-t border-[var(--border-subtle)] px-4 py-4">
                   {isEditing ? (
                     <div className="space-y-3">
                       <input
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className={FIELD}
                       />
                       <input
                         type="date"
                         value={editDate}
                         onChange={(e) => setEditDate(e.target.value)}
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className={FIELD}
                       />
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">Start Time</label>
+                          <label className={LABEL}>Start Time</label>
                           <input
                             type="time"
                             value={editStartTime}
                             onChange={(e) => setEditStartTime(e.target.value)}
-                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            className={FIELD}
                           />
                         </div>
                         <div>
-                          <label className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">End Time</label>
+                          <label className={LABEL}>End Time</label>
                           <input
                             type="time"
                             value={editEndTime}
                             onChange={(e) => setEditEndTime(e.target.value)}
-                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            className={FIELD}
                           />
                         </div>
                       </div>
@@ -383,38 +391,36 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                         value={editAttendees}
                         onChange={(e) => setEditAttendees(e.target.value)}
                         placeholder="Attendees (comma-separated)"
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className={FIELD}
                       />
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
                         rows={6}
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-y"
+                        className={TEXTAREA}
                       />
                       <div className="flex gap-2">
                         <Button onClick={handleSaveEdit} disabled={saving}>
                           {saving ? "Saving..." : "Save"}
                         </Button>
-                        <Button variant="secondary" onClick={() => setEditingId(null)}>Cancel</Button>
+                        <Button variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
                       </div>
                     </div>
                   ) : (
                     <>
                       {mom.attendees && mom.attendees.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Attendees</p>
+                          <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">Attendees</p>
                           <div className="flex flex-wrap gap-1.5">
                             {mom.attendees.map((a: string, i: number) => (
-                              <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-primary)]">
-                                {a}
-                              </span>
+                              <Badge key={i}>{a}</Badge>
                             ))}
                           </div>
                         </div>
                       )}
                       <div className="mb-3">
-                        <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Minutes</p>
-                        <div className="text-[12px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
+                        <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">Minutes</p>
+                        <div className="text-[13px] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-primary)] rounded-md p-3">
                           {mom.content}
                         </div>
                       </div>
@@ -424,7 +430,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                             href={mom.transcriptUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] text-[12px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/5 transition-colors"
+                            className="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <Download className="h-3.5 w-3.5" />
                             {mom.transcriptFileName ?? "Download Transcript"}
@@ -432,19 +438,13 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                         </div>
                       )}
                       {canEdit && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
-                          <button
-                            onClick={() => startEdit(mom)}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                          >
-                            <Edit3 className="h-3 w-3" /> Edit
-                          </button>
-                          <button
-                            onClick={() => setDeletingId(mom._id)}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/5 transition-colors"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
+                        <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-subtle)]">
+                          <Button variant="secondary" onClick={() => startEdit(mom)}>
+                            <Edit3 className="h-3.5 w-3.5" /> Edit
+                          </Button>
+                          <Button variant="ghost" onClick={() => setDeletingId(mom._id)}>
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </Button>
                         </div>
                       )}
                     </>

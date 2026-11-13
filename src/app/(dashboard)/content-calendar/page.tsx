@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Card, Modal, useToast } from "@/components/ui";
+import { TASK_STATUS_META, taskStatusMeta } from "@/lib/status";
 import { readCalendarCsv, type CalendarCsvRow } from "@/lib/calendarCsv";
 import { ContentCalendarEntrySidebar, DeadlineInput } from "@/components/ContentCalendarView";
 import { deadlineInputToMs } from "@/lib/deadlineInput";
@@ -16,8 +17,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Link2,
-  ExternalLink,
   AlertTriangle,
   Loader2,
   Inbox,
@@ -39,6 +38,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { fieldBaseClass, fieldClass, iconButtonClass } from "@/components/ui/classes";
 
 const PLATFORMS = [
   "Instagram",
@@ -61,13 +61,13 @@ const CONTENT_TYPES = [
   "Other",
 ];
 
-const STATUS_COLORS: Record<string, { bg: string; dot: string; label: string }> = {
-  pending: { bg: "#f3f4f6", dot: "#6b7280", label: "Pending" },
-  "in-progress": { bg: "#fef3c7", dot: "#f59e0b", label: "In Progress" },
-  review: { bg: "#ede9fe", dot: "#8b5cf6", label: "Review" },
-  done: { bg: "#d1fae5", dot: "#10b981", label: "Done" },
-  "on-hold": { bg: "#fee2e2", dot: "#ef4444", label: "On Hold" },
-};
+// One look for every field, label and icon button on this page.
+const FIELD = `w-full ${fieldClass}`;
+const LABEL = "block mb-1 text-[12px] font-medium text-[var(--text-muted)]";
+const ICON_BTN = iconButtonClass;
+// Same button, sized for the inside of a day cell, the shelf and popovers.
+const ICON_BTN_SM =
+  "inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors";
 
 // New entries default the assignee to the assignor as a placeholder, so an
 // entry whose assignee is its assignor still needs someone assigned.
@@ -601,15 +601,12 @@ export default function ContentCalendarPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)] bg-white shrink-0">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-5 w-5 text-[var(--accent-admin-text)]" />
-            <h1 className="font-semibold text-[18px] sm:text-[20px] text-[var(--text-primary)] whitespace-nowrap">
-              Content Calendar
-            </h1>
-          </div>
+          <h1 className="font-semibold text-[18px] sm:text-[20px] text-[var(--text-primary)] tracking-[-0.01em] whitespace-nowrap">
+            Content Calendar
+          </h1>
 
           {/* Brand Selector */}
-          <div className="flex items-center gap-2 sm:ml-4">
+          <div className="flex items-center gap-2">
             {selectedBrand && (
               <div
                 className="w-6 h-6 rounded-md flex items-center justify-center overflow-hidden shrink-0"
@@ -634,7 +631,8 @@ export default function ContentCalendarPage() {
                   setSelectedTaskId(null);
                 }
               }}
-              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
+              aria-label="Brand"
+              className="h-8 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
             >
               <option value="">Select brand</option>
               {/* On-hold brands take no new entries, so they are not offered;
@@ -645,18 +643,18 @@ export default function ContentCalendarPage() {
               {isAdmin && <option value="__create__">+ Create new brand</option>}
             </select>
           </div>
+          {/* Actions on the open month, kept apart from the brand picker. */}
+          <div className="flex flex-wrap items-center gap-2 empty:hidden">
           {isEditable && calendarBriefId && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              aria-pressed={showBreakDayPicker}
               onClick={() => setShowBreakDayPicker((v) => !v)}
-              className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
-                showBreakDayPicker
-                  ? "border-red-300 bg-red-50 text-red-800"
-                  : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-              }`}
+              className={showBreakDayPicker ? "!bg-[var(--bg-hover)] !border-[var(--border-strong)]" : ""}
             >
               {showBreakDayPicker ? "Done" : "Break days"}
-            </button>
+            </Button>
           )}
           {isEditable && selectedBrandId && (
             <>
@@ -675,68 +673,63 @@ export default function ContentCalendarPage() {
                   setCsvRows(rows);
                 }}
               />
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => csvInputRef.current?.click()}
                 title={`Fill ${MONTHS[month]} from a CSV file`}
-                className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 Upload CSV
-              </button>
+              </Button>
             </>
           )}
           {isEditable && selectedBrandId && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              aria-pressed={selectMode}
               onClick={() => {
                 setSelectMode((v) => !v);
                 setSelectedIds(new Set());
                 setBulkAction(null);
               }}
-              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
-                selectMode
-                  ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                  : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-              }`}
+              className={selectMode ? "!bg-[var(--bg-hover)] !border-[var(--border-strong)]" : ""}
             >
-              <CheckSquare className="h-3.5 w-3.5" />
+              <CheckSquare className="h-3.5 w-3.5 text-[var(--text-muted)]" />
               {selectMode ? "Done selecting" : "Select"}
-            </button>
+            </Button>
           )}
+          </div>
         </div>
 
         {/* Month Nav */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <button
+          <Button
+            variant="secondary"
             onClick={() => {
               const n = new Date();
               setYear(n.getFullYear());
               setMonth(n.getMonth());
             }}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             Today
-          </button>
-          <button
-            onClick={prevMonth}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="font-semibold text-[15px] text-[var(--text-primary)] min-w-[140px] text-center">
-            {MONTHS[month]} {year}
-          </span>
-          <button
-            onClick={nextMonth}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
+          <div className="flex items-center gap-1">
+            <button onClick={prevMonth} aria-label="Previous month" className={ICON_BTN}>
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="font-semibold text-[15px] text-[var(--text-primary)] min-w-[140px] text-center">
+              {MONTHS[month]} {year}
+            </span>
+            <button onClick={nextMonth} aria-label="Next month" className={ICON_BTN}>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
 
           {/* Status legend */}
           <div className="hidden lg:flex flex-wrap items-center gap-x-3 gap-y-1 pl-3 border-l border-[var(--border)]">
-            {Object.entries(STATUS_COLORS).map(([key, sc]) => (
-              <span key={key} className="inline-flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+            {Object.entries(TASK_STATUS_META).map(([key, sc]) => (
+              <span key={key} className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sc.dot }} />
                 {sc.label}
               </span>
@@ -749,11 +742,11 @@ export default function ContentCalendarPage() {
       {hasNoAccess ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-6">
-            <Calendar className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
-            <p className="text-[15px] text-[var(--text-secondary)] font-medium">
+            <Calendar className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-3" aria-hidden />
+            <p className="text-[14px] font-medium text-[var(--text-primary)]">
               No content calendars to show yet
             </p>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1">
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
               You'll see a brand's content calendar here as soon as you're
               assigned a task in it. Access stays open after that.
             </p>
@@ -762,9 +755,9 @@ export default function ContentCalendarPage() {
       ) : !selectedBrandId ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <Calendar className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
-            <p className="text-[15px] text-[var(--text-secondary)] font-medium">Select a brand to view its content calendar</p>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1">Choose a brand from the dropdown above</p>
+            <Calendar className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-3" aria-hidden />
+            <p className="text-[14px] font-medium text-[var(--text-primary)]">Select a brand to view its content calendar</p>
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">Choose a brand from the dropdown above</p>
           </div>
         </div>
       ) : (
@@ -782,37 +775,34 @@ export default function ContentCalendarPage() {
               const noDeadline = incomplete.filter((t: any) => !t.deadline).length;
               if (incomplete.length === 0) return null;
               return (
-                <div className="mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                  <span className="text-[12px] font-semibold text-amber-800">
+                <div className="mb-3 px-3 py-2 rounded-md bg-[var(--warning-dim)] flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <AlertTriangle className="h-3.5 w-3.5 text-[var(--warning)] shrink-0" />
+                  <span className="text-[12px] font-medium text-[var(--warning)]">
                     {incomplete.length} task{incomplete.length !== 1 ? "s" : ""} need attention
                   </span>
-                  <span className="text-[11px] text-amber-700">
+                  <span className="text-[12px] text-[var(--text-secondary)]">
                     {noAssignee > 0 && `${noAssignee} unassigned`}
                     {noAssignee > 0 && noDeadline > 0 && " · "}
                     {noDeadline > 0 && `${noDeadline} no deadline`}
                   </span>
-                  <span className="text-[11px] text-amber-600 ml-auto">Click a task to assign</span>
+                  <span className="text-[12px] text-[var(--text-muted)] ml-auto">Click a task to assign</span>
                 </div>
               );
             })()}
             {!calendarBriefId && (
-              <p className="mb-3 text-[11px] text-[var(--text-muted)] px-1">
+              <p className="mb-3 rounded-md bg-[var(--bg-hover)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
                 Add at least one calendar entry for this brand to load break days (same data as the brief Content Calendar).
               </p>
             )}
             {showBreakDayPicker && calendarBriefId && (
-              <div className="mb-3 px-3 py-3 rounded-lg border border-amber-200 bg-amber-50 flex flex-col gap-2">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-[12px] font-semibold text-amber-900">
-                      Break days - {MONTHS[month]} {year}
-                    </p>
-                    <p className="text-[11px] text-amber-800 mt-0.5">
-                      Tap dates below to mark or clear breaks (same as the brand&apos;s Content Calendar brief). Red cells in the grid are full-day breaks.
-                    </p>
-                  </div>
+              <div className="mb-3 p-3 rounded-lg border border-[var(--border)] bg-white flex flex-col gap-2.5">
+                <div>
+                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+                    Break days - {MONTHS[month]} {year}
+                  </p>
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+                    Tap dates below to mark or clear breaks (same as the brand&apos;s Content Calendar brief). Cells marked Break in the grid are full-day breaks.
+                  </p>
                 </div>
                 {(() => {
                   const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -823,7 +813,7 @@ export default function ContentCalendarPage() {
                   return (
                     <div className="grid grid-cols-7 gap-1 max-w-[420px]">
                       {weekdays.map((wd) => (
-                        <div key={wd} className="text-center text-[11px] font-semibold text-amber-900/70 py-0.5">
+                        <div key={wd} className="text-center text-[12px] font-medium text-[var(--text-muted)] py-0.5">
                           {wd}
                         </div>
                       ))}
@@ -835,6 +825,7 @@ export default function ContentCalendarPage() {
                           <button
                             key={dateStr}
                             type="button"
+                            aria-pressed={isBreak}
                             onClick={() =>
                               toggleBreakDayMut({
                                 briefId: calendarBriefId,
@@ -850,8 +841,8 @@ export default function ContentCalendarPage() {
                             }
                             className={`rounded-md text-[12px] font-medium py-1.5 transition-colors ${
                               isBreak
-                                ? "bg-red-500 text-white hover:bg-red-600"
-                                : "bg-white text-[var(--text-primary)] hover:bg-amber-100 border border-amber-200"
+                                ? "bg-[var(--text-primary)] text-white border border-[var(--text-primary)] hover:opacity-90"
+                                : "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
                             }`}
                           >
                             {day}
@@ -876,18 +867,20 @@ export default function ContentCalendarPage() {
             )}
 
             {/* Weekday Headers — sticky relative to the scrolling parent.
-                Opaque bg + bottom border + shadow so cells scrolling under
-                the row are clipped cleanly instead of bleeding through. */}
-            <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-20 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] shadow-[0_2px_4px_-2px_rgba(0,0,0,0.06)]">
+                Opaque bg + bottom border so cells scrolling under the row
+                are clipped cleanly instead of bleeding through. */}
+            <div className="grid grid-cols-7 gap-px mb-px sticky top-0 z-20 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center py-2 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide bg-[var(--bg-primary)]">
+                <div key={d} className="text-center py-2 text-[12px] font-medium text-[var(--text-muted)] bg-[var(--bg-primary)]">
                   {d}
                 </div>
               ))}
             </div>
 
-            {/* Day Cells */}
-            <div className="grid grid-cols-7 gap-px bg-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]">
+            {/* Day Cells. The grid always ends on a full week, so the four
+                corner cells are fixed positions and can carry the radius
+                (no overflow-hidden: the day popover hangs outside its cell). */}
+            <div className="grid grid-cols-7 gap-px bg-[var(--border-subtle)] rounded-lg border border-[var(--border)] [&>*:first-child]:rounded-tl-[6px] [&>*:nth-child(7)]:rounded-tr-[6px] [&>*:nth-last-child(7)]:rounded-bl-[6px] [&>*:last-child]:rounded-br-[6px]">
               {/* Empty cells for days before the 1st */}
               {Array.from({ length: firstDay }).map((_, i) => (
                 <div key={`empty-${i}`} className="bg-[var(--bg-primary)] min-h-[120px] p-2 opacity-40" />
@@ -951,11 +944,11 @@ export default function ContentCalendarPage() {
                             e.stopPropagation();
                             setPopoverDate(popoverDate === dateStr ? null : dateStr);
                           }}
-                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="flex items-center gap-1.5 h-6 px-1.5 rounded-md text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <div className="flex items-center gap-0.5">
                             {dayTasks.slice(2).map((t: any) => {
-                              const sc = STATUS_COLORS[t.status] ?? STATUS_COLORS.pending;
+                              const sc = taskStatusMeta(t.status);
                               return <div key={t._id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: sc.dot }} />;
                             })}
                           </div>
@@ -1033,8 +1026,8 @@ export default function ContentCalendarPage() {
 
       {/* Bulk action bar (select mode) */}
       {selectMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--text-primary)] text-white shadow-2xl">
-          <span className="text-[12px] font-semibold tabular-nums">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--text-primary)] text-white shadow-lg">
+          <span className="px-1 text-[13px] font-medium tabular-nums">
             {selectedIds.size} selected
           </span>
           <div className="w-px h-5 bg-white/20" />
@@ -1047,6 +1040,7 @@ export default function ContentCalendarPage() {
           </button>
           <button
             type="button"
+            aria-pressed={bulkAction === "shift"}
             onClick={() => setBulkAction(bulkAction === "shift" ? null : "shift")}
             className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               bulkAction === "shift" ? "bg-white/20" : "hover:bg-white/15"
@@ -1056,6 +1050,7 @@ export default function ContentCalendarPage() {
           </button>
           <button
             type="button"
+            aria-pressed={bulkAction === "month"}
             onClick={() => setBulkAction(bulkAction === "month" ? null : "month")}
             className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               bulkAction === "month" ? "bg-white/20" : "hover:bg-white/15"
@@ -1067,15 +1062,15 @@ export default function ContentCalendarPage() {
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="text-[12px] text-white/70 hover:text-white px-1.5 transition-colors"
+            className="inline-flex items-center h-8 px-3 rounded-md text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/15 transition-colors"
           >
             Clear
           </button>
 
           {/* Shift-dates popover */}
           {bulkAction === "shift" && (
-            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[280px] rounded-xl bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-xl p-3">
-              <p className="text-[12px] font-semibold mb-2">Shift selected entries</p>
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[280px] rounded-lg bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-lg p-3">
+              <p className="text-[13px] font-semibold mb-2">Shift selected entries</p>
               <div className="flex items-center gap-2 mb-2">
                 <input
                   type="number"
@@ -1084,39 +1079,38 @@ export default function ContentCalendarPage() {
                     setShiftDays(e.target.value);
                     setShiftStartDate("");
                   }}
-                  className="w-20 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  aria-label="Days to shift"
+                  className={`${fieldClass} w-20 tabular-nums`}
                 />
                 <span className="text-[12px] text-[var(--text-secondary)]">
                   days (negative = earlier)
                 </span>
               </div>
-              <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+              <p className="text-[12px] text-[var(--text-muted)] mb-1.5">
                 …or move the earliest entry to a date (gaps preserved):
               </p>
               <input
                 type="date"
                 value={shiftStartDate}
                 onChange={(e) => setShiftStartDate(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] mb-2.5"
+                aria-label="New start date"
+                className={`${FIELD} mb-2.5`}
               />
-              <button
-                type="button"
-                onClick={handleBulkShift}
-                className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold"
-              >
+              <Button type="button" variant="primary" onClick={handleBulkShift} className="w-full">
                 Apply
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Move-to-month popover */}
           {bulkAction === "month" && (
-            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[240px] rounded-xl bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-xl p-3">
-              <p className="text-[12px] font-semibold mb-2">Move to month</p>
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[240px] rounded-lg bg-white text-[var(--text-primary)] border border-[var(--border)] shadow-lg p-3">
+              <p className="text-[13px] font-semibold mb-2">Move to month</p>
               <select
                 value={targetMonth}
                 onChange={(e) => setTargetMonth(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer mb-2.5"
+                aria-label="Target month"
+                className={`${FIELD} cursor-pointer mb-2.5`}
               >
                 <option value="">Choose month…</option>
                 {monthOptions.map((m) => (
@@ -1128,17 +1122,18 @@ export default function ContentCalendarPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-[var(--text-muted)] mb-2">
+              <p className="text-[12px] text-[var(--text-muted)] mb-2">
                 Day-of-month is kept (clamped to the month&apos;s end).
               </p>
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={handleBulkMonth}
                 disabled={!targetMonth}
-                className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-50"
+                className="w-full"
               >
                 Move
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1154,7 +1149,8 @@ export default function ContentCalendarPage() {
               </h3>
               <button
                 onClick={() => setDuplicateTaskId(null)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+                className={ICON_BTN}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1166,16 +1162,18 @@ export default function ContentCalendarPage() {
               type="date"
               value={duplicateDate}
               onChange={(e) => setDuplicateDate(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] mb-3"
+              aria-label="Date for the copy"
+              className={`${FIELD} mb-3`}
             />
-            <button
+            <Button
               type="button"
+              variant="primary"
               onClick={handleDuplicate}
               disabled={!duplicateDate}
-              className="w-full py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-50"
+              className="w-full"
             >
               Duplicate
-            </button>
+            </Button>
           </Card>
         </div>
       )}
@@ -1183,7 +1181,7 @@ export default function ContentCalendarPage() {
       {/* Right-click context menu for calendar cards. */}
       {trayContextMenu && (
         <div
-          className="fixed z-50 rounded-lg shadow-lg border border-[var(--border)] bg-white py-1 text-[12px]"
+          className="fixed z-50 rounded-lg shadow-lg border border-[var(--border)] bg-white py-1 text-[13px]"
           style={{
             left: Math.min(trayContextMenu.x, window.innerWidth - 200),
             top: Math.min(trayContextMenu.y, window.innerHeight - 90),
@@ -1195,7 +1193,7 @@ export default function ContentCalendarPage() {
             onClick={() => handleAddToShelf(trayContextMenu.taskId)}
             className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
           >
-            <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
+            <Inbox className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             Move to staging shelf
           </button>
           <button
@@ -1207,7 +1205,7 @@ export default function ContentCalendarPage() {
             }}
             className="flex items-center gap-2 px-3 py-1.5 w-full hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
           >
-            <Copy className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
+            <Copy className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             Duplicate to date…
           </button>
         </div>
@@ -1215,68 +1213,69 @@ export default function ContentCalendarPage() {
 
       {/* Add Entry Modal */}
       {addingDate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                Add Entry - Go Live: {new Date(addingDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                Add entry - Go live: {new Date(addingDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </h3>
               <button
                 onClick={() => setAddingDate(null)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+                className={ICON_BTN}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleAddEntry} className="flex flex-col gap-3">
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Title</label>
+                <label className={LABEL}>Title</label>
                 <input
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   required
                   placeholder="e.g. Instagram Post - Product Launch"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Description</label>
+                <label className={LABEL}>Description</label>
                 <textarea
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   rows={2}
                   placeholder="Optional description or caption..."
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                  className={`w-full ${fieldBaseClass} py-1.5 resize-none`}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Platform</label>
+                  <label className={LABEL}>Platform</label>
                   <select
                     value={newPlatform}
                     onChange={(e) => setNewPlatform(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD}
                   >
                     {PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Content Type</label>
+                  <label className={LABEL}>Content type</label>
                   <select
                     value={newContentType}
                     onChange={(e) => setNewContentType(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD}
                   >
                     {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignor</label>
+                <label className={LABEL}>Assignor</label>
                 <select
                   value={newAssignor || defaultAssignor}
                   onChange={(e) => setNewAssignor(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 >
                   <option value="">Select assignor</option>
                   {admins.map((u: any) => (
@@ -1287,11 +1286,11 @@ export default function ContentCalendarPage() {
                 </select>
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignee (optional)</label>
+                <label className={LABEL}>Assignee (optional)</label>
                 <select
                   value={newAssignee}
                   onChange={(e) => setNewAssignee(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 >
                   <option value="">Unassigned</option>
                   {employees.map((emp: any) => (
@@ -1302,23 +1301,23 @@ export default function ContentCalendarPage() {
                 </select>
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline (optional)</label>
+                <label className={LABEL}>Deadline (optional)</label>
                 <DeadlineInput
                   value={newDeadline}
                   onChange={setNewDeadline}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div className="flex gap-2 mt-1">
-                <Button type="submit" variant="primary" loading={addingEntry} disabled={addingEntry}>Add Entry</Button>
-                <Button type="button" variant="secondary" onClick={() => setAddingDate(null)}>Cancel</Button>
+                <Button type="submit" variant="primary" loading={addingEntry} disabled={addingEntry}>Add entry</Button>
+                <Button type="button" variant="ghost" onClick={() => setAddingDate(null)}>Cancel</Button>
               </div>
             </form>
           </Card>
         </div>
       )}
 
-      {/* Create Brand Modal */}
+      {/* CSV preview: what the file will add */}
       {csvRows && (() => {
         const good = csvRows.filter((r) => !r.error && r.date);
         const posts = good.filter((r) => !r.isBreak).length;
@@ -1332,7 +1331,7 @@ export default function ContentCalendarPage() {
             size="lg"
             footer={
               <>
-                <Button variant="secondary" onClick={() => setCsvRows(null)}>
+                <Button variant="ghost" onClick={() => setCsvRows(null)}>
                   Cancel
                 </Button>
                 <Button
@@ -1419,35 +1418,38 @@ export default function ContentCalendarPage() {
         );
       })()}
 
+      {/* Create Brand Modal */}
       {showCreateBrand && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Create Brand</h3>
-              <button onClick={() => setShowCreateBrand(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Create brand</h3>
+              <button onClick={() => setShowCreateBrand(false)} aria-label="Close" className={ICON_BTN}>
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleCreateBrand} className="flex flex-col gap-3">
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Brand Name</label>
+                <label className={LABEL}>Brand name</label>
                 <input
                   value={newBrandName}
                   onChange={(e) => setNewBrandName(e.target.value)}
                   required
                   placeholder="e.g. Acme Corp"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Brand Color</label>
+                <label className={LABEL}>Brand color</label>
                 <div className="flex gap-2 flex-wrap">
                   {BRAND_COLORS.map((c) => (
                     <button
                       key={c}
                       type="button"
                       onClick={() => setNewBrandColor(c)}
-                      className={`w-7 h-7 rounded-lg transition-all ${newBrandColor === c ? "ring-2 ring-offset-2 ring-[var(--accent-admin)]" : "hover:scale-110"}`}
+                      aria-label={`Brand color ${c}`}
+                      aria-pressed={newBrandColor === c}
+                      className={`w-7 h-7 rounded-md transition-all ${newBrandColor === c ? "ring-2 ring-offset-2 ring-[var(--text-primary)]" : "hover:scale-110"}`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
@@ -1455,7 +1457,7 @@ export default function ContentCalendarPage() {
               </div>
               <div className="flex gap-2 mt-1">
                 <Button type="submit" variant="primary">Create</Button>
-                <Button type="button" variant="secondary" onClick={() => setShowCreateBrand(false)}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => setShowCreateBrand(false)}>Cancel</Button>
               </div>
             </form>
           </Card>
@@ -1492,39 +1494,38 @@ function DroppableDayCell({
     <div
       ref={setNodeRef}
       className={`min-h-[120px] p-2 flex flex-col transition-colors group relative ${
+        // A break is a quiet tint with a label; red stays for overdue.
         isBreakDay
-          ? "!bg-red-500 text-white"
-          : `bg-white ${isWeekend ? "bg-[#fafafa]" : ""}`
-      } ${
-        isToday && !isBreakDay
-          ? "ring-2 ring-inset ring-[var(--accent-admin)]"
-          : ""
-      } ${
-        isToday && isBreakDay
-          ? "ring-2 ring-inset ring-white/90"
-          : ""
+          ? "bg-[var(--bg-hover)]"
+          : isWeekend
+            ? "bg-[var(--bg-primary)]"
+            : "bg-white"
       } ${isOver ? "!bg-[var(--accent-admin-dim)] ring-2 ring-inset ring-[var(--accent-admin)]" : ""}`}
     >
-      <div className="flex items-center justify-between mb-1">
-        <span
-          className={`text-[12px] font-medium ${
-            isBreakDay
-              ? "bg-white/20 text-white w-6 h-6 rounded-full flex items-center justify-center"
-              : isToday
-                ? "bg-[var(--accent-admin-strong)] text-white w-6 h-6 rounded-full flex items-center justify-center"
-                : "text-[var(--text-secondary)]"
-          }`}
-        >
-          {day}
+      <div className="flex items-center justify-between h-6 mb-1">
+        <span className="flex items-center gap-1.5 min-w-0">
+          {/* Today is marked once: the date in an ink disc. */}
+          <span
+            className={`text-[12px] font-medium tabular-nums ${
+              isToday
+                ? "bg-[var(--text-primary)] text-white w-6 h-6 rounded-full flex items-center justify-center"
+                : isBreakDay
+                  ? "text-[var(--text-muted)]"
+                  : "text-[var(--text-secondary)]"
+            }`}
+            aria-current={isToday ? "date" : undefined}
+          >
+            {day}
+          </span>
+          {isBreakDay && (
+            <span className="text-[11px] font-medium text-[var(--text-muted)]">Break</span>
+          )}
         </span>
         {isEditable && (
           <button
             onClick={onAddClick}
-            className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all ${
-              isBreakDay
-                ? "text-white/70 hover:text-white hover:bg-white/15"
-                : "text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
-            }`}
+            aria-label={`Add entry on ${dateStr}`}
+            className={`${ICON_BTN_SM} opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -1558,7 +1559,7 @@ function DraggableTaskCard({
     disabled: !isDragEnabled,
   });
 
-  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+  const sc = taskStatusMeta(task.status);
 
   return (
     <button
@@ -1577,8 +1578,8 @@ function DraggableTaskCard({
             }
           : undefined
       }
-      className={`w-full text-left px-1.5 py-1 rounded-md text-[11px] leading-tight transition-all hover:shadow-sm ${
-        isSelected && !selectMode ? "outline outline-2 outline-[var(--accent-admin)] shadow-sm" : ""
+      className={`w-full text-left px-1.5 py-1 rounded-md text-[11px] leading-tight transition-all hover:brightness-[0.97] ${
+        isSelected && !selectMode ? "outline outline-2 outline-[var(--accent-admin)]" : ""
       } ${selectMode && isChecked ? "outline outline-2 outline-[var(--accent-admin)]" : ""} ${
         isDragging ? "opacity-30" : ""
       } ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -1589,7 +1590,7 @@ function DraggableTaskCard({
           <span
             className={`w-3 h-3 rounded-[3px] border shrink-0 flex items-center justify-center ${
               isChecked
-                ? "bg-[var(--accent-admin)] border-[var(--accent-admin)]"
+                ? "bg-[var(--text-primary)] border-[var(--text-primary)]"
                 : "border-[var(--border-strong)] bg-white"
             }`}
           >
@@ -1610,7 +1611,7 @@ function DraggableTaskCard({
           {task.platform}
         </span>
         {(isUnassigned(task) || !task.deadline) && (
-          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title={isUnassigned(task) && !task.deadline ? "Unassigned & No Deadline" : isUnassigned(task) ? "Unassigned" : "No Deadline"} />
+          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[var(--warning)] shrink-0" title={isUnassigned(task) && !task.deadline ? "Unassigned & No Deadline" : isUnassigned(task) ? "Unassigned" : "No Deadline"} />
         )}
       </div>
     </button>
@@ -1618,7 +1619,7 @@ function DraggableTaskCard({
 }
 
 function TaskCardOverlay({ task }: { task: any }) {
-  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+  const sc = taskStatusMeta(task.status);
 
   return (
     <div
@@ -1673,39 +1674,33 @@ function DayPopover({
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
-        className="absolute left-0 right-0 top-full mt-1 z-40 bg-white rounded-xl shadow-xl border border-[var(--border)] p-3 min-w-[240px] max-w-[300px] animate-scaleIn"
+        className="absolute left-0 right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-lg border border-[var(--border)] p-3 min-w-[240px] max-w-[300px] animate-scaleIn"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+          <span className="text-[13px] font-semibold text-[var(--text-primary)]">
             {dateLabel}
           </span>
           <div className="flex items-center gap-1">
             {isEditable && (
-              <button
-                onClick={onAddEntry}
-                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
-              >
+              <button onClick={onAddEntry} aria-label="Add entry" className={ICON_BTN_SM}>
                 <Plus className="h-3.5 w-3.5" />
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            >
+            <button onClick={onClose} aria-label="Close" className={ICON_BTN_SM}>
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
         <div className="flex flex-col gap-1 max-h-[280px] overflow-y-auto">
           {tasks.map((task: any) => {
-            const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+            const sc = taskStatusMeta(task.status);
             const isSelected = selectedTaskId === task._id;
             return (
               <button
                 key={task._id}
                 onClick={() => onSelectTask(task._id)}
-                className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] transition-all hover:shadow-sm ${
+                className={`w-full text-left px-2 py-1.5 rounded-md text-[12px] transition-all hover:brightness-[0.97] ${
                   isSelected ? "outline outline-2 outline-[var(--accent-admin)]" : ""
                 }`}
                 style={{ backgroundColor: sc.bg }}
@@ -1722,7 +1717,7 @@ function DayPopover({
             );
           })}
         </div>
-        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] text-center">
+        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)] text-center tabular-nums">
           {tasks.length} {tasks.length === 1 ? "entry" : "entries"}
         </div>
       </div>
@@ -1752,27 +1747,26 @@ function StagingShelf({
   return (
     <div
       ref={setNodeRef}
-      className={`mb-3 rounded-xl border transition-colors ${
+      className={`mb-3 rounded-lg border transition-colors ${
         isOver
           ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
           : "border-dashed border-[var(--border-strong)] bg-white"
       }`}
     >
       <div className="flex items-center gap-2 px-3 py-2">
-        <Inbox className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Staging shelf
         </span>
-        <span className="text-[11px] tabular-nums text-[var(--text-muted)] bg-[var(--bg-hover)] rounded-full px-1.5 py-0.5">
+        <span className="text-[13px] tabular-nums text-[var(--text-muted)]">
           {tasks.length}
         </span>
-        <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
+        <span className="text-[12px] text-[var(--text-muted)] hidden sm:inline">
           Set entries aside here, then drag them back onto a day. Shared with the whole team.
         </span>
         <button
           type="button"
           onClick={onToggle}
-          className="ml-auto p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          className={`ml-auto ${ICON_BTN_SM}`}
           aria-label={collapsed ? "Expand shelf" : "Collapse shelf"}
         >
           {collapsed ? (
@@ -1785,7 +1779,7 @@ function StagingShelf({
       {!collapsed && (
         <div className="px-3 pb-2.5 flex flex-wrap gap-1.5 min-h-[34px]">
           {tasks.length === 0 ? (
-            <p className="text-[11px] text-[var(--text-muted)] py-1">
+            <p className="text-[12px] text-[var(--text-muted)] py-1">
               Empty. Drag an entry here (or right-click one → “Move to staging shelf”).
             </p>
           ) : (
@@ -1822,7 +1816,7 @@ function ShelfChip({
     disabled: !isDragEnabled,
   });
 
-  const sc = STATUS_COLORS[task.status] ?? STATUS_COLORS.pending;
+  const sc = taskStatusMeta(task.status);
   const origDate = task.postDate
     ? new Date(task.postDate + "T00:00:00").toLocaleDateString("en-US", {
         month: "short",
@@ -1834,7 +1828,7 @@ function ShelfChip({
     <div
       ref={setNodeRef}
       {...(isDragEnabled ? { ...listeners, ...attributes } : {})}
-      className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-lg border border-[var(--border-subtle)] max-w-[240px] ${
+      className={`inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-md border border-[var(--border-subtle)] max-w-[240px] ${
         isDragging ? "opacity-30" : ""
       } ${isDragEnabled ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{ backgroundColor: sc.bg }}
@@ -1867,6 +1861,7 @@ function ShelfChip({
           }}
           className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/60 shrink-0"
           title="Put back on its original day"
+          aria-label="Put back on its original day"
         >
           <X className="h-3 w-3" />
         </button>

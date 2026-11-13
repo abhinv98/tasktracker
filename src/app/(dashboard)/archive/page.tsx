@@ -4,7 +4,7 @@ import { useMutation, usePaginatedQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card, EmptyState, PageHeader, SkeletonList, useToast } from "@/components/ui";
+import { Button, EmptyState, PageHeader, SkeletonList, useToast } from "@/components/ui";
 import { Archive } from "lucide-react";
 
 export default function ArchivePage() {
@@ -43,23 +43,26 @@ export default function ArchivePage() {
         />
       ) : (
       <div className="flex flex-col gap-4">
+        {/* One frame, hairline dividers: a list to scan, not a stack of cards. */}
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden divide-y divide-[var(--border-subtle)]">
         {archived.map((brief) => (
-          <Card key={brief._id} className="flex flex-row justify-between items-center">
-            <div>
-              <h3 className="font-semibold text-[var(--text-primary)]">
+          <div key={brief._id} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--bg-primary)] transition-colors">
+            <div className="min-w-0">
+              <h3 className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                 {brief.title}
               </h3>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">
+              <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                 Archived {(brief as { archivedByName?: string }).archivedByName} ·{" "}
                 {(brief as { taskCount?: number }).taskCount ?? 0} tasks ·{" "}
                 {(brief as { doneCount?: number }).doneCount ?? 0} completed
               </p>
             </div>
-            <Button variant="secondary" onClick={() => handleRestore(brief._id)}>
+            <Button variant="secondary" className="shrink-0" onClick={() => handleRestore(brief._id)}>
               Restore
             </Button>
-          </Card>
+          </div>
         ))}
+        </div>
         {status !== "Exhausted" && (
           <div className="flex justify-center pt-2">
             <Button

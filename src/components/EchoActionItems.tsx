@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card } from "@/components/ui";
+import { Button, Panel } from "@/components/ui";
 import { NewSelfTaskModal } from "@/components/NewSelfTaskModal";
 
 type Item = {
@@ -28,28 +28,27 @@ export function EchoActionItems() {
   if (!items?.length) return null;
 
   return (
-    <Card className="mb-6">
-      <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">From your meetings</h2>
-      <p className="text-[13px] text-[var(--text-secondary)] mt-0.5 mb-2">
+    <Panel title="From your meetings" count={items.length} className="mb-4">
+      <p className="px-4 py-2.5 text-[12px] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
         Action items that were given to you. Add the ones that are real, dismiss the rest.
       </p>
-      <ul className="flex flex-col divide-y divide-[var(--border)]">
+      <ul className="flex flex-col divide-y divide-[var(--border-subtle)]">
         {items.map((item) => (
-          <li key={item._id} className="py-2 last:pb-0 flex items-start justify-between gap-4">
+          <li key={item._id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <div className="min-w-0">
-              <p className="text-[13px] text-[var(--text-primary)]">{item.task}</p>
+              <p className="text-[14px] font-medium text-[var(--text-primary)]">{item.task}</p>
               <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                 {item.meetingTitle}
                 {item.dueDate && ` · due ${item.dueDate}`}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Button size="sm" onClick={() => setTaking(item)}>
+              <Button size="sm" variant="secondary" onClick={() => setTaking(item)}>
                 Add to my tasks
               </Button>
               <Button
                 size="sm"
-                variant="secondary"
+                variant="ghost"
                 onClick={() => resolve({ itemId: item._id, status: "dismissed" })}
               >
                 Dismiss
@@ -73,6 +72,6 @@ export function EchoActionItems() {
           onCreated={() => void resolve({ itemId: taking._id, status: "accepted" }).catch(() => {})}
         />
       )}
-    </Card>
+    </Panel>
   );
 }

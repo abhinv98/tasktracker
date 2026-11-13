@@ -3,19 +3,18 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { Badge, Card, PageHeader, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { Badge, Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonList, StatStrip, StatTile, StatusBadge } from "@/components/ui";
+import { taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 import {
   ChevronDown,
   ChevronRight,
   Briefcase,
-  FileCheck,
-  Tag,
-  CheckCircle2,
-  Clock,
   FileText,
   Download,
 } from "lucide-react";
 
+// Labels for the text export only; on screen, statuses come from the lib.
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "#6b7280" },
   "in-progress": { label: "In Progress", color: "#f59e0b" },
@@ -23,10 +22,10 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   done: { label: "Done", color: "#10b981" },
 };
 
-const DELIVERABLE_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "Pending", color: "#8b5cf6", bg: "rgba(139,92,246,0.1)" },
-  approved: { label: "Approved", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-  rejected: { label: "Rejected", color: "var(--danger)", bg: "var(--danger-dim)" },
+const DELIVERABLE_STATUS: Record<string, { label: string; variant: "neutral" | "employee" | "danger" }> = {
+  pending: { label: "Pending", variant: "neutral" },
+  approved: { label: "Approved", variant: "employee" },
+  rejected: { label: "Rejected", variant: "danger" },
 };
 
 export default function HistoryPage() {
@@ -141,28 +140,30 @@ export default function HistoryPage() {
         subtitle="Your portfolio of brands, briefs, tasks, and deliverables"
         actions={
           <div className="relative">
-          <button
+          <Button
+            variant="primary"
             onClick={() => setShowExportMenu(!showExportMenu)}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity print:hidden"
+            aria-expanded={showExportMenu}
+            className="print:hidden"
           >
             <Download className="w-3.5 h-3.5" />
             Export
-            <ChevronDown className="w-3 h-3" />
-          </button>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </Button>
           {showExportMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
               <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-[var(--border)] z-50 overflow-hidden">
                 <button
                   onClick={handleExportText}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
                 >
                   <FileText className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   Export as Text
                 </button>
                 <button
                   onClick={handleExportPDF}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors text-left"
                 >
                   <Download className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                   Export as PDF
@@ -175,76 +176,48 @@ export default function HistoryPage() {
       />
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <Tag className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-            <p className="text-[11px] font-medium text-[var(--text-secondary)]">Brands</p>
-          </div>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalBrands}</p>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <Briefcase className="h-3.5 w-3.5 text-[var(--accent-manager-text)]" />
-            <p className="text-[11px] font-medium text-[var(--text-secondary)]">Briefs</p>
-          </div>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalBriefs}</p>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
-            <p className="text-[11px] font-medium text-[var(--text-secondary)]">Tasks Done</p>
-          </div>
-          <p className="font-bold text-[24px] tabular-nums" style={{ color: "#10b981" }}>
-            {completedTasks}<span className="text-[15px] text-[var(--text-muted)]">/{totalTasks}</span>
-          </p>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <FileCheck className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-            <p className="text-[11px] font-medium text-[var(--text-secondary)]">Deliverables</p>
-          </div>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">{totalDeliverables}</p>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-            <p className="text-[11px] font-medium text-[var(--text-secondary)]">Completion</p>
-          </div>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] tabular-nums">
-            {totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%
-          </p>
-        </Card>
-      </div>
+      <StatStrip className="mb-4">
+        <StatTile label="Brands" value={totalBrands} />
+        <StatTile label="Briefs" value={totalBriefs} />
+        <StatTile label="Tasks done" value={`${completedTasks}/${totalTasks}`} />
+        <StatTile label="Deliverables" value={totalDeliverables} />
+        <StatTile
+          label="Completion"
+          value={`${totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}%`}
+        />
+      </StatStrip>
 
       {/* Brand Accordion */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
+        {history && history.length > 0 && (
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden divide-y divide-[var(--border-subtle)]">
         {(history ?? []).map((brandGroup) => {
           const isBrandOpen = expandedBrands.has(brandGroup.brand._id);
           const brandTasks = brandGroup.briefs.reduce((s, b) => s + b.tasks.length, 0);
           const brandDone = brandGroup.briefs.reduce((s, b) => s + b.tasks.filter((t) => t.status === "done").length, 0);
 
           return (
-            <Card key={brandGroup.brand._id} className="p-0 overflow-hidden">
+            <div key={brandGroup.brand._id}>
               {/* Brand Header */}
               <button
                 onClick={() => toggleBrand(brandGroup.brand._id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors text-left"
-                style={{ borderLeft: `4px solid ${brandGroup.brand.color}` }}
+                aria-expanded={isBrandOpen}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
               >
                 {isBrandOpen ? (
                   <ChevronDown className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                 ) : (
                   <ChevronRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                 )}
-                <div
-                  className="w-3 h-3 rounded-sm shrink-0"
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: brandGroup.brand.color }}
+                  aria-hidden
                 />
-                <span className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
+                <span className="font-medium text-[14px] text-[var(--text-primary)] flex-1 truncate">
                   {brandGroup.brand.name}
                 </span>
-                <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">
+                <span className="text-[12px] text-[var(--text-muted)] tabular-nums shrink-0">
                   {brandGroup.briefs.length} brief{brandGroup.briefs.length !== 1 ? "s" : ""} &middot; {brandDone}/{brandTasks} tasks done
                 </span>
               </button>
@@ -261,6 +234,7 @@ export default function HistoryPage() {
                         {/* Brief Header */}
                         <button
                           onClick={() => toggleBrief(brief._id)}
+                          aria-expanded={isBriefOpen}
                           className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
                         >
                           {isBriefOpen ? (
@@ -272,11 +246,13 @@ export default function HistoryPage() {
                           <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1 truncate">
                             {brief.title}
                           </span>
-                          <Badge variant={brief.status === "completed" ? "employee" : brief.status === "active" ? "manager" : "neutral"}>
-                            {brief.status}
-                          </Badge>
+                          <StatusBadge
+                            className="shrink-0"
+                            color={BRIEF_STATUS_COLORS[brief.status] ?? BRIEF_STATUS_COLORS.draft}
+                            label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                          />
                           {brief.briefType && (
-                            <span className="text-[11px] text-[var(--text-muted)]">
+                            <span className="text-[12px] text-[var(--text-muted)] shrink-0">
                               {brief.briefType === "content_calendar" ? "Content Calendar"
                                 : brief.briefType === "video_editing" ? "Video Editing"
                                 : brief.briefType === "production" ? "Production"
@@ -285,7 +261,7 @@ export default function HistoryPage() {
                                 : brief.briefType}
                             </span>
                           )}
-                          <span className="text-[11px] text-[var(--text-muted)] tabular-nums shrink-0">
+                          <span className="text-[12px] text-[var(--text-muted)] tabular-nums shrink-0">
                             {briefDone}/{brief.tasks.length}
                           </span>
                         </button>
@@ -295,7 +271,7 @@ export default function HistoryPage() {
                           <div className="bg-[var(--bg-primary)]">
                             {brief.tasks.map((task) => {
                               const isTaskOpen = expandedTasks.has(task._id);
-                              const statusInfo = STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending;
+                              const statusInfo = taskStatusMeta(task.status);
                               const hasDeliverables = task.deliverables.length > 0;
 
                               return (
@@ -309,34 +285,26 @@ export default function HistoryPage() {
                                   >
                                     {hasDeliverables ? (
                                       isTaskOpen ? (
-                                        <ChevronDown className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
+                                        <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                                       ) : (
-                                        <ChevronRight className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
+                                        <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                                       )
                                     ) : (
-                                      <div className="w-3 shrink-0" />
+                                      <div className="w-3.5 shrink-0" />
                                     )}
-                                    <span
-                                      className="w-2 h-2 rounded-full shrink-0"
-                                      style={{ backgroundColor: statusInfo.color }}
-                                    />
-                                    <span className="text-[12px] text-[var(--text-primary)] flex-1 truncate">
+                                    <span className="text-[13px] text-[var(--text-primary)] flex-1 truncate">
                                       {task.title}
                                     </span>
-                                    <span
-                                      className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                                      style={{
-                                        color: statusInfo.color,
-                                        backgroundColor: `color-mix(in srgb, ${statusInfo.color} 12%, transparent)`,
-                                      }}
-                                    >
-                                      {statusInfo.label}
-                                    </span>
-                                    <span className="text-[11px] text-[var(--text-muted)] shrink-0 tabular-nums">
+                                    <StatusBadge
+                                      className="shrink-0"
+                                      color={statusInfo.dot}
+                                      label={statusInfo.label}
+                                    />
+                                    <span className="text-[12px] text-[var(--text-muted)] shrink-0 tabular-nums">
                                       {task.duration}
                                     </span>
                                     {hasDeliverables && (
-                                      <span className="text-[11px] text-[var(--text-muted)] shrink-0">
+                                      <span className="text-[12px] text-[var(--text-muted)] shrink-0">
                                         {task.deliverables.length} deliverable{task.deliverables.length !== 1 ? "s" : ""}
                                       </span>
                                     )}
@@ -350,7 +318,7 @@ export default function HistoryPage() {
                                         return (
                                           <div
                                             key={del._id}
-                                            className="flex items-start gap-2 px-3 py-2 rounded-lg bg-white border border-[var(--border-subtle)]"
+                                            className="flex items-start gap-2 px-3 py-2 rounded-lg bg-white border border-[var(--border)]"
                                           >
                                             <FileText className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
                                             <div className="flex-1 min-w-0">
@@ -358,7 +326,7 @@ export default function HistoryPage() {
                                                 {del.message}
                                               </p>
                                               <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[11px] text-[var(--text-muted)]">
+                                                <span className="text-[12px] text-[var(--text-muted)]">
                                                   {new Date(del.submittedAt).toLocaleDateString("en-US", {
                                                     month: "short",
                                                     day: "numeric",
@@ -366,18 +334,15 @@ export default function HistoryPage() {
                                                   })}
                                                 </span>
                                                 {del.fileNames && del.fileNames.length > 0 && (
-                                                  <span className="text-[11px] text-[var(--text-muted)]">
+                                                  <span className="text-[12px] text-[var(--text-muted)]">
                                                     {del.fileNames.length} file{del.fileNames.length !== 1 ? "s" : ""}
                                                   </span>
                                                 )}
                                               </div>
                                             </div>
-                                            <span
-                                              className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                                              style={{ color: ds.color, backgroundColor: ds.bg }}
-                                            >
+                                            <Badge variant={ds.variant} className="shrink-0">
                                               {ds.label}
-                                            </span>
+                                            </Badge>
                                           </div>
                                         );
                                       })}
@@ -393,25 +358,21 @@ export default function HistoryPage() {
                   })}
                 </div>
               )}
-            </Card>
+            </div>
           );
         })}
+        </div>
+        )}
 
         {history && history.length === 0 && (
-          <Card>
-            <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
-              No work history yet. Tasks assigned to you will appear here.
-            </p>
-          </Card>
+          <EmptyState
+            icon={Briefcase}
+            title="No work history yet"
+            description="Tasks assigned to you will appear here."
+          />
         )}
 
-        {history === undefined && (
-          <Card>
-            <p className="text-[13px] text-[var(--text-muted)] text-center py-8">
-              Loading history...
-            </p>
-          </Card>
-        )}
+        {history === undefined && <SkeletonList rows={6} what="your history" />}
       </div>
     </div>
   );

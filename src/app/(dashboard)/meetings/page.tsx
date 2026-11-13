@@ -4,7 +4,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card, EmptyState, PageHeader, Select, useToast } from "@/components/ui";
+import { Button, Card, EmptyState, PageHeader, Panel, PanelEmpty, Select, useToast } from "@/components/ui";
 import { ArrowLeft, AudioLines } from "lucide-react";
 
 const when = (ms: number) =>
@@ -70,12 +70,12 @@ export default function MeetingsPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** One block of the notes: the shared panel frame with padded content. */
+function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <Card className="mt-4">
-      <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">{title}</h2>
-      {children}
-    </Card>
+    <Panel title={title} count={count}>
+      <div className="px-4 py-3.5">{children}</div>
+    </Panel>
   );
 }
 
@@ -114,146 +114,162 @@ function MeetingDetail({
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-3xl">
+    <div className="p-4 sm:p-6 lg:p-8">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[var(--text-secondary)] mb-4"
+        className="inline-flex items-center gap-1.5 text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors mb-4"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden /> All meetings
       </button>
       {m === undefined ? (
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
       ) : m === null ? (
-        <p className="text-[15px] text-[var(--text-secondary)]">This meeting is not available.</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">This meeting is not available.</p>
       ) : (
         <>
-          <PageHeader
-            title={m.title}
-            subtitle={`${when(m.startedAt)} · ${length(m.durationMs)}${
-              people.length ? ` · ${[...new Set(people)].join(", ")}` : ""
-            }`}
-          />
-          <Card>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="sm:w-72">
-                <Select
-                  label="Brand folder"
-                  value={m.brandId ?? ""}
-                  onChange={(e) =>
-                    setBrand({
-                      meetingId,
-                      brandId: (e.target.value || null) as Id<"brands"> | null,
-                    }).catch((err) =>
-                      toast("error", err instanceof Error ? err.message : "Could not file it")
-                    )
-                  }
-                  options={[
-                    { value: "", label: "Not filed under a brand" },
-                    ...(brands ?? []).map((b) => ({ value: b._id, label: b.name })),
-                  ]}
-                />
-              </div>
-              {m.hasRecording && !recording && (
-                <Button variant="secondary" onClick={() => play()}>
-                  Listen to the recording
-                </Button>
+          <PageHeader title={m.title} subtitle={`${when(m.startedAt)} · ${length(m.durationMs)}`} />
+          {/* The notes on the left; who, where it is filed, and the recording
+              with its transcript beside them, so a line can be played while
+              reading the summary. Below xl the rail stacks under the notes. */}
+          <div className="grid gap-4 xl:grid-cols-5 items-start">
+            <div className="min-w-0 flex flex-col gap-4 xl:col-span-3">
+              <Section title="Summary">
+                <ul className="list-disc pl-5 text-[13px] leading-relaxed text-[var(--text-primary)] flex flex-col gap-1.5">
+                  {m.summary.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </Section>
+              <Panel title="Action items" count={m.actionItems.length}>
+                {m.actionItems.length === 0 ? (
+                  <PanelEmpty>None found.</PanelEmpty>
+                ) : (
+                  <ul className="divide-y divide-[var(--border-subtle)]">
+                    {m.actionItems.map((a, i) => (
+                      <li key={i} className="px-4 py-3">
+                        <p className="text-[13px] font-medium text-[var(--text-primary)]">{a.task}</p>
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                          {a.ownerName ?? "No owner yet"}
+                          {(a.dueDate || a.dueText) && ` · due ${a.dueDate ?? a.dueText}`}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Panel>
+              {m.decisions.length > 0 && (
+                <Section title="Decisions" count={m.decisions.length}>
+                  <ul className="list-disc pl-5 text-[13px] leading-relaxed text-[var(--text-primary)] flex flex-col gap-1.5">
+                    {m.decisions.map((d, i) => (
+                      <li key={i}>
+                        {d.text}
+                        {d.by && <span className="text-[var(--text-muted)]"> · {d.by}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {m.openQuestions.length > 0 && (
+                <Section title="Open questions" count={m.openQuestions.length}>
+                  <ul className="list-disc pl-5 text-[13px] leading-relaxed text-[var(--text-primary)] flex flex-col gap-1.5">
+                    {m.openQuestions.map((q, i) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {m.nextMeeting && (
+                <Section title="Next meeting">
+                  <p className="text-[13px] text-[var(--text-primary)]">{m.nextMeeting}</p>
+                </Section>
               )}
             </div>
-            <p className="text-[12px] text-[var(--text-muted)] mt-2">
-              {m.brandId
-                ? `${
-                    m.brandSource === "auto" ? "Filed by Echo from who was in the meeting. " : ""
-                  }The notes are also in this brand's Meeting Minutes, and Echo files the next meeting with these people here by itself.`
-                : "Pick the brand once. Echo remembers the people in this meeting and files their next one by itself."}
-            </p>
-            <audio
-              ref={audio}
-              controls
-              className={recording ? "mt-3 w-full" : "hidden"}
-              // The link expires after a few hours: drop it, so Listen comes back and fetches a new one.
-              onError={() => {
-                if (!recording) return;
-                setRecording(null);
-                toast("error", "The recording stopped loading. Press Listen again.");
-              }}
-            />
-          </Card>
-          <Section title="Summary">
-            <ul className="list-disc pl-5 text-[13px] text-[var(--text-primary)] flex flex-col gap-1">
-              {m.summary.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          </Section>
-          <Section title={`Action items (${m.actionItems.length})`}>
-            {m.actionItems.length === 0 ? (
-              <p className="text-[13px] text-[var(--text-muted)]">None found.</p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-[var(--border)]">
-                {m.actionItems.map((a, i) => (
-                  <li key={i} className="py-2 first:pt-0 last:pb-0">
-                    <p className="text-[13px] text-[var(--text-primary)]">{a.task}</p>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
-                      {a.ownerName ?? "No owner yet"}
-                      {(a.dueDate || a.dueText) && ` · due ${a.dueDate ?? a.dueText}`}
+
+            <aside className="min-w-0 flex flex-col gap-4 xl:col-span-2">
+              <Panel title="Details">
+                <dl className="px-4 py-3.5 grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 text-[13px]">
+                  <dt className="text-[var(--text-muted)]">When</dt>
+                  <dd className="text-[var(--text-primary)]">{when(m.startedAt)}</dd>
+                  <dt className="text-[var(--text-muted)]">Length</dt>
+                  <dd className="text-[var(--text-primary)] tabular-nums">{length(m.durationMs)}</dd>
+                  <dt className="text-[var(--text-muted)]">People</dt>
+                  <dd className="text-[var(--text-primary)]">
+                    {people.length ? [...new Set(people)].join(", ") : "Not known"}
+                  </dd>
+                </dl>
+                <div className="px-4 py-3.5 border-t border-[var(--border-subtle)]">
+                  <Select
+                    label="Brand folder"
+                    value={m.brandId ?? ""}
+                    onChange={(e) =>
+                      setBrand({
+                        meetingId,
+                        brandId: (e.target.value || null) as Id<"brands"> | null,
+                      }).catch((err) =>
+                        toast("error", err instanceof Error ? err.message : "Could not file it")
+                      )
+                    }
+                    options={[
+                      { value: "", label: "Not filed under a brand" },
+                      ...(brands ?? []).map((b) => ({ value: b._id, label: b.name })),
+                    ]}
+                  />
+                  <p className="text-[12px] text-[var(--text-muted)] mt-2">
+                    {m.brandId
+                      ? `${
+                          m.brandSource === "auto" ? "Filed by Echo from who was in the meeting. " : ""
+                        }The notes are also in this brand's Meeting Minutes, and Echo files the next meeting with these people here by itself.`
+                      : "Pick the brand once. Echo remembers the people in this meeting and files their next one by itself."}
+                  </p>
+                </div>
+              </Panel>
+
+              <Panel title="Transcript">
+                {m.hasRecording && (
+                  <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+                    {!recording && (
+                      <Button variant="secondary" onClick={() => play()}>
+                        Listen to the recording
+                      </Button>
+                    )}
+                    <audio
+                      ref={audio}
+                      controls
+                      className={recording ? "w-full" : "hidden"}
+                      // The link expires after a few hours: drop it, so Listen comes back and fetches a new one.
+                      onError={() => {
+                        if (!recording) return;
+                        setRecording(null);
+                        toast("error", "The recording stopped loading. Press Listen again.");
+                      }}
+                    />
+                    <p className="text-[12px] text-[var(--text-muted)] mt-2">
+                      Click a line below to hear the meeting from that moment.
                     </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-          {m.decisions.length > 0 && (
-            <Section title="Decisions">
-              <ul className="list-disc pl-5 text-[13px] text-[var(--text-primary)] flex flex-col gap-1">
-                {m.decisions.map((d, i) => (
-                  <li key={i}>
-                    {d.text}
-                    {d.by && <span className="text-[var(--text-muted)]"> · {d.by}</span>}
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          )}
-          {m.openQuestions.length > 0 && (
-            <Section title="Open questions">
-              <ul className="list-disc pl-5 text-[13px] text-[var(--text-primary)] flex flex-col gap-1">
-                {m.openQuestions.map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
-          {m.nextMeeting && (
-            <Section title="Next meeting">
-              <p className="text-[13px] text-[var(--text-primary)]">{m.nextMeeting}</p>
-            </Section>
-          )}
-          <Section title="Transcript">
-            <details>
-              <summary className="text-[13px] text-[var(--text-secondary)] cursor-pointer">
-                Show the full transcript
-              </summary>
-              <div className="mt-3 flex flex-col text-[12px] leading-5 text-[var(--text-primary)]">
-                {m.transcript.split("\n").map((line, i) => {
-                  const at = line.match(/^\[(\d+):(\d\d)\]/);
-                  // With a recording, a line plays the meeting from that moment.
-                  return at && m.hasRecording ? (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => play(Number(at[1]) * 60 + Number(at[2]))}
-                      className="text-left rounded px-1 -mx-1 hover:bg-[var(--bg-hover)]"
-                    >
-                      {line}
-                    </button>
-                  ) : (
-                    <p key={i}>{line}</p>
-                  );
-                })}
-              </div>
-            </details>
-          </Section>
+                  </div>
+                )}
+                <div className="px-4 py-3 max-h-[60vh] overflow-y-auto flex flex-col text-[12px] leading-5 text-[var(--text-primary)]">
+                  {m.transcript.split("\n").map((line, i) => {
+                    const at = line.match(/^\[(\d+):(\d\d)\]/);
+                    // With a recording, a line plays the meeting from that moment.
+                    return at && m.hasRecording ? (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => play(Number(at[1]) * 60 + Number(at[2]))}
+                        className="text-left rounded px-1 -mx-1 hover:bg-[var(--bg-hover)] transition-colors"
+                      >
+                        {line}
+                      </button>
+                    ) : (
+                      <p key={i}>{line}</p>
+                    );
+                  })}
+                </div>
+              </Panel>
+            </aside>
+          </div>
         </>
       )}
     </div>

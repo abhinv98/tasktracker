@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, Button, ConfirmModal, Input, Modal, Select, Textarea, StatusBadge, useToast, SkeletonCards } from "@/components/ui";
+import { PageHeader, Badge, Button, ConfirmModal, EmptyState, Input, Modal, Select, SegmentedTabs, SectionHeader, Textarea, StatusBadge, useToast, SkeletonCards } from "@/components/ui";
 import {
   HR_CATEGORIES,
   categoryLabel,
@@ -68,7 +68,7 @@ function NewRequestModal({ onClose }: { onClose: () => void }) {
       icon={Send}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button
@@ -120,34 +120,32 @@ function RequestCard({
   const meta = statusMeta(req.status);
 
   return (
-    <div className="flex flex-col rounded-xl border border-[var(--border)] bg-white shadow-sm p-4 h-full">
+    <div className="flex flex-col rounded-lg border border-[var(--border)] bg-white p-4 h-full">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
-          {categoryLabel(req.category)}
-        </span>
+        <Badge>{categoryLabel(req.category)}</Badge>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <StatusBadge color={meta.color} label={meta.label} />
-          <span className="text-[11px] text-[var(--text-muted)]">
+          <span className="text-[12px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
         </div>
       </div>
 
-      <h3 className="mt-2 font-medium text-[15px] text-[var(--text-primary)] leading-snug">
+      <h3 className="mt-2 font-medium text-[14px] text-[var(--text-primary)] leading-snug">
         {req.subject}
       </h3>
       {req.details && (
-        <p className="mt-1 text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+        <p className="mt-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
           {req.details}
         </p>
       )}
 
       {req.statusNote && (
-        <div className="mt-3 rounded-lg bg-[var(--bg-hover)] px-2.5 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+        <div className="mt-3 rounded-md bg-[var(--bg-primary)] px-3 py-2">
+          <p className="text-[12px] font-medium text-[var(--text-muted)]">
             Update from HR
           </p>
-          <p className="mt-0.5 text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">
+          <p className="mt-0.5 text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
             {req.statusNote}
           </p>
         </div>
@@ -161,14 +159,14 @@ function RequestCard({
               href={d.url ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] hover:border-[var(--border)] group"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] transition-colors group"
             >
-              <Paperclip size={12} className="text-[var(--text-muted)] shrink-0" />
-              <span className="flex-1 truncate text-[11px] text-[var(--text-primary)]">
+              <Paperclip size={14} className="text-[var(--text-muted)] shrink-0" />
+              <span className="flex-1 truncate text-[12px] text-[var(--text-primary)]">
                 {d.fileName}
               </span>
               <Download
-                size={12}
+                size={14}
                 className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100"
               />
             </a>
@@ -177,13 +175,10 @@ function RequestCard({
       )}
 
       <div className="mt-auto pt-3 flex justify-end border-t border-[var(--border-subtle)]">
-        <button
-          onClick={onDelete}
-          className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
-        >
-          <Trash2 size={12} />
+        <Button variant="ghost" onClick={onDelete}>
+          <Trash2 size={14} />
           Delete
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -222,7 +217,7 @@ export default function MyRequestsPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="My Requests"
         subtitle="Requests you've raised with HR and where they stand"
@@ -238,63 +233,31 @@ export default function MyRequestsPage() {
       {requests === undefined ? (
         <SkeletonCards count={3} what="your requests" />
       ) : all.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            No requests yet
-          </p>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1">
-            Raise one with HR using the button above.
-          </p>
-        </div>
+        <EmptyState
+          icon={Inbox}
+          title="No requests yet"
+          description="Raise one with HR using the button above."
+        />
       ) : (
         <>
           {/* Category tabs — same arrangement as HR's board */}
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6 flex-wrap">
-            {tabs.map(({ key, label, count }) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                  tab === key
-                    ? "bg-white shadow-sm text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                {label}
-                <span
-                  className={`px-1.5 rounded text-[11px] ${
-                    tab === key
-                      ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                      : "bg-white/60 text-[var(--text-muted)]"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs
+            value={tab}
+            onChange={setTab}
+            options={tabs.map(({ key, label, count }) => ({ value: key, label, count }))}
+            className="mb-4 max-w-full flex-wrap"
+          />
 
           {visible.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-              <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-                No requests here
-              </p>
-            </div>
+            <EmptyState icon={Inbox} title="No requests here" />
           ) : tab === "all" ? (
-            <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-6">
               {HR_CATEGORIES.map(({ value, label }) => {
                 const group = visible.filter((r) => r.category === value);
                 if (group.length === 0) return null;
                 return (
                   <section key={value}>
-                    <h2 className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                      {label}
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)] normal-case tracking-normal">
-                        {group.length}
-                      </span>
-                    </h2>
+                    <SectionHeader title={label} count={group.length} />
                     <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                       {group.map((r) => (
                         <RequestCard

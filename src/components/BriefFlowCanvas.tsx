@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useRef, useEffect, useState } from "react";
-import { isTaskOverdue } from "@/lib/status";
+import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -28,6 +28,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Plus, Pencil, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { StatusBadge } from "@/components/ui/Badge";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -91,19 +93,10 @@ interface BriefFlowCanvasProps {
   onRequestAddTeam?: () => void;
 }
 
-/* ─── Status colors ──────────────────────────────── */
-
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  pending: { color: "#94a3b8", label: "Pending" },
-  "in-progress": { color: "#f59e0b", label: "In Progress" },
-  review: { color: "#8b5cf6", label: "Review" },
-  done: { color: "#10b981", label: "Done" },
-};
-
 /* ─── Custom Task Node ───────────────────────────── */
 
 function TaskNode({ data }: { data: TaskData }) {
-  const status = STATUS_CONFIG[data.status] ?? STATUS_CONFIG.pending;
+  const status = taskStatusMeta(data.status);
 
   return (
     <div className="group relative">
@@ -123,12 +116,12 @@ function TaskNode({ data }: { data: TaskData }) {
 
       {/* Card */}
       <div
-        className="bg-white rounded-xl shadow-md border-2 border-[var(--border)] hover:shadow-lg hover:border-[var(--accent-admin)] transition-all cursor-pointer min-w-[180px] max-w-[220px]"
+        className="bg-white rounded-lg border-2 border-[var(--border)] hover:border-[var(--border-strong)] transition-colors cursor-pointer min-w-[180px] max-w-[220px]"
         onClick={() => data.onOpenDetail(data._id)}
       >
         {/* Color top bar + team name (inside the block) */}
         <div
-          className="h-1.5 rounded-t-[10px]"
+          className="h-1.5 rounded-t-[5px]"
           style={{ backgroundColor: data.teamColor }}
         />
         <div className="px-3 pt-2 pb-0 flex items-center gap-1.5">
@@ -136,7 +129,7 @@ function TaskNode({ data }: { data: TaskData }) {
             className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{ backgroundColor: data.teamColor }}
           />
-          <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide truncate">
+          <span className="text-[11px] font-medium text-[var(--text-muted)] truncate">
             {data.teamName}
           </span>
         </div>
@@ -153,6 +146,7 @@ function TaskNode({ data }: { data: TaskData }) {
                   e.stopPropagation();
                   data.onEdit(data._id);
                 }}
+                aria-label="Edit task"
                 className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
               >
                 <Pencil className="h-3 w-3" />
@@ -160,15 +154,9 @@ function TaskNode({ data }: { data: TaskData }) {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: status.color }}
-            />
-            <span className="text-[11px] text-[var(--text-secondary)] truncate">
-              {data.assigneeName}
-            </span>
-          </div>
+          <p className="text-[11px] text-[var(--text-secondary)] truncate mt-1.5">
+            {data.assigneeName}
+          </p>
 
           {data.deadline && (
             <p className={`text-[11px] mt-1 ${isTaskOverdue(data) ? "text-[var(--danger)] font-semibold" : "text-[var(--text-muted)]"}`}>
@@ -183,15 +171,7 @@ function TaskNode({ data }: { data: TaskData }) {
 
         {/* Status badge */}
         <div className="px-3 pb-2">
-          <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium"
-            style={{
-              color: status.color,
-              backgroundColor: `color-mix(in srgb, ${status.color} 12%, transparent)`,
-            }}
-          >
-            {status.label}
-          </span>
+          <StatusBadge color={status.dot} label={status.label} />
         </div>
       </div>
 
@@ -235,20 +215,20 @@ function EmptyDraftNode({
             data.onClick();
           }
         }}
-        className="bg-white rounded-xl shadow-md border-2 border-[var(--border)] hover:border-[var(--accent-admin)] hover:shadow-lg transition-all cursor-pointer min-w-[180px] max-w-[220px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
+        className="bg-white rounded-lg border-2 border-[var(--border)] hover:border-[var(--border-strong)] transition-colors cursor-pointer min-w-[180px] max-w-[220px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
         onClick={(e) => {
           e.stopPropagation();
           data.onClick();
         }}
       >
-        <div className="h-1.5 rounded-t-[10px] bg-[var(--bg-hover)]" />
+        <div className="h-1.5 rounded-t-[5px] bg-[var(--bg-hover)]" />
         <div className="px-3 pt-2 pb-1">
-          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">New task</p>
+          <p className="text-[11px] font-medium text-[var(--text-muted)]">New task</p>
         </div>
         <div className="px-3 pb-3">
-          <div className="rounded-lg bg-amber-50 border border-amber-200/90 px-2 py-1.5 flex items-start gap-1.5 text-left">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
-            <p className="text-[11px] text-amber-950 leading-snug">
+          <div className="rounded-md bg-[var(--warning-dim)] px-2 py-1.5 flex items-start gap-1.5 text-left">
+            <AlertCircle className="h-3.5 w-3.5 text-[var(--warning)] shrink-0 mt-0.5" aria-hidden />
+            <p className="text-[11px] text-[var(--text-primary)] leading-snug">
               Finish in the panel on the right. Select team, assignee, title, and deadline.
             </p>
           </div>
@@ -359,10 +339,10 @@ function BriefFlowCanvasInner({
         targetHandle: th,
         type: "smoothstep",
         animated: true,
-        style: { stroke: "#6366f1", strokeWidth: 2 },
+        style: { stroke: "var(--text-muted)", strokeWidth: 2 },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: "#6366f1",
+          color: "var(--text-muted)",
           width: 16,
           height: 16,
         },
@@ -558,38 +538,38 @@ function BriefFlowCanvasInner({
   const accentStroke = "var(--accent-admin, #c4684d)";
 
   return (
-    <div className="w-full h-full relative rounded-xl overflow-hidden border border-[var(--border)] bg-[linear-gradient(160deg,color-mix(in_srgb,var(--bg-primary)_92%,var(--accent-admin-dim))_0%,var(--bg-primary)_45%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+    <div className="w-full h-full relative rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-primary)]">
       {isAdmin && onRequestAddTeam && (
-        <button
-          type="button"
-          onClick={onRequestAddTeam}
-          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-white/95 border border-[var(--border)] text-[var(--text-primary)] shadow-sm hover:bg-[var(--accent-admin-dim)] hover:border-[var(--accent-admin)] transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-          Add team to brief
-        </button>
+        // Button is `relative` itself, so the wrapper carries the position.
+        <div className="absolute top-3 right-3 z-10">
+          <Button type="button" variant="secondary" onClick={onRequestAddTeam}>
+            <Plus className="h-3.5 w-3.5" />
+            Add team to brief
+          </Button>
+        </div>
       )}
       {isAdmin &&
         onCreateTask &&
         teams.length > 0 &&
         totalCanvasTasks === 0 && (
           <div className="absolute inset-0 z-[5] flex items-center justify-center pointer-events-none p-4 pt-14">
-            <div className="pointer-events-auto rounded-xl border border-[var(--border)] bg-white/95 shadow-lg px-5 py-4 max-w-sm w-full text-center">
-              <p className="text-[13px] font-medium text-[var(--text-primary)]">No tasks on the flow yet</p>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1 mb-3">
+            <div className="pointer-events-auto rounded-lg border border-[var(--border)] bg-white px-5 py-4 max-w-sm w-full text-center">
+              <p className="text-[14px] font-medium text-[var(--text-primary)]">No tasks on the flow yet</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1 mb-3">
                 Add a task for a team. Nodes appear here; drag from a handle to connect or branch.
               </p>
               <div className="flex flex-col gap-1.5">
                 {teams.map((team) => (
-                  <button
+                  <Button
                     key={team.teamId}
                     type="button"
+                    variant="secondary"
                     onClick={() => onCreateTask(team.teamId)}
-                    className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] border border-[var(--border)] hover:bg-[var(--accent-admin-strong)] hover:text-white hover:border-[var(--accent-admin)] transition-colors"
+                    className="w-full"
                   >
                     <Plus className="h-3.5 w-3.5 shrink-0" />
                     Add task - {team.teamName}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -628,19 +608,20 @@ function BriefFlowCanvasInner({
         // connection it has in the DB while the node itself comes back.
         onBeforeDelete={async ({ nodes }) => nodes.length === 0}
       >
-        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="color-mix(in srgb, var(--accent-admin) 12%, transparent)" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--border-strong)" />
         <Controls
           showInteractive={false}
-          className="!bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
+          className="!bg-white !border !border-[var(--border)] !shadow-none !rounded-lg overflow-hidden"
         />
         <MiniMap
           nodeColor={(node) => {
-            if (node.type === "emptyDraftNode") return "#cbd5e1";
+            // --border-strong, as a literal: the minimap paints SVG fills.
+            if (node.type === "emptyDraftNode") return "#cfcfcb";
             const taskData = node.data as unknown as TaskData;
-            return (STATUS_CONFIG[taskData?.status]?.color) ?? "#94a3b8";
+            return taskStatusMeta(taskData?.status).dot;
           }}
-          maskColor="rgba(241, 245, 249, 0.7)"
-          className="!hidden md:!block !bg-white/95 !border-[var(--border)] !shadow-md !rounded-xl"
+          maskColor="rgba(246, 246, 245, 0.7)"
+          className="!hidden md:!block !bg-white !border !border-[var(--border)] !shadow-none !rounded-lg overflow-hidden"
           pannable
           zoomable
         />

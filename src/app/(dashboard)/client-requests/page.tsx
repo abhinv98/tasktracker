@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { ConfirmModal, PageHeader, useToast, SkeletonList } from "@/components/ui";
+import { Badge, Button, ConfirmModal, EmptyState, PageHeader, SegmentedTabs, useToast, SkeletonList } from "@/components/ui";
 import {
   Inbox,
   X,
@@ -19,7 +19,6 @@ import {
   Ban,
   Trash2,
   Clock,
-  Loader2,
 } from "lucide-react";
 
 type RefItem = {
@@ -105,13 +104,15 @@ function refUrl(r: RefItem): string | undefined {
   return undefined;
 }
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending_review: { label: "Awaiting Review", color: "#b45309", bg: "#fffbeb" },
-  on_hold: { label: "On Hold", color: "#57534e", bg: "#f5f5f4" },
-  accepted: { label: "Accepted", color: "#047857", bg: "#ecfdf5" },
-  in_progress: { label: "In Progress", color: "#1d4ed8", bg: "#eff6ff" },
-  completed: { label: "Completed", color: "#047857", bg: "#ecfdf5" },
+const STATUS_META: Record<string, { label: string; variant: "neutral" | "success" }> = {
+  pending_review: { label: "Awaiting Review", variant: "neutral" },
+  on_hold: { label: "On Hold", variant: "neutral" },
+  accepted: { label: "Accepted", variant: "success" },
+  in_progress: { label: "In Progress", variant: "neutral" },
+  completed: { label: "Completed", variant: "success" },
 };
+
+const SECTION_LABEL = "font-medium text-[12px] text-[var(--text-muted)]";
 
 const DEST_LABEL: Record<string, string> = {
   campaign_brief: "Campaign brief",
@@ -397,61 +398,28 @@ export default function ClientRequestsPage() {
       {requests === undefined ? (
         <SkeletonList rows={5} what="client requests" />
       ) : requests.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="w-14 h-14 rounded-2xl bg-[var(--bg-hover)] flex items-center justify-center mx-auto mb-3">
-            <Inbox className="h-7 w-7 text-[var(--text-muted)]" />
-          </div>
-          <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-1">No client requests</h3>
-          <p className="text-[13px] text-[var(--text-muted)] max-w-sm mx-auto">
-            When a client submits a task through a brand intake link, it will appear here for review.
-          </p>
-        </div>
+        <EmptyState
+          icon={Inbox}
+          title="No client requests"
+          description="When a client submits a task through a brand intake link, it will appear here for review."
+        />
       ) : (
         <div className="space-y-8 pb-10">
           {/* PENDING / ON HOLD QUEUE */}
           <section>
-            <div className="flex items-center gap-1.5 mb-4">
-              <button
-                onClick={() => setTab("pending")}
-                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                  tab === "pending"
-                    ? "bg-[var(--text-primary)] text-white"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                }`}
-              >
-                Awaiting Review
-                <span
-                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                    tab === "pending" ? "bg-white/25 text-white" : "bg-amber-500 text-white"
-                  }`}
-                >
-                  {pending.length}
-                </span>
-              </button>
-              <button
-                onClick={() => setTab("held")}
-                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                  tab === "held"
-                    ? "bg-[var(--text-primary)] text-white"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-                }`}
-              >
-                On Hold
-                <span
-                  className={`min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                    tab === "held"
-                      ? "bg-white/25 text-white"
-                      : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                  }`}
-                >
-                  {held.length}
-                </span>
-              </button>
-            </div>
+            <SegmentedTabs
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: "pending", label: "Awaiting Review", count: pending.length },
+                { value: "held", label: "On Hold", count: held.length },
+              ]}
+              className="mb-4"
+            />
             {pendingByBrand.length === 0 ? (
               <p className="text-[13px] text-[var(--text-muted)]">
                 {tab === "pending"
-                  ? "Nothing awaiting review. 🎉"
+                  ? "Nothing awaiting review."
                   : "Nothing on hold. Requests you park with “Hold for later” appear here."}
               </p>
             ) : (
@@ -460,12 +428,12 @@ export default function ClientRequestsPage() {
                   <div key={group.brandName}>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.brandColor }} />
-                      <h3 className="font-semibold text-[12px] uppercase tracking-wide text-[var(--text-secondary)]">
+                      <h3 className="font-medium text-[13px] text-[var(--text-primary)]">
                         {group.brandName}
                       </h3>
-                      <span className="text-[11px] text-[var(--text-muted)]">{group.items.length}</span>
+                      <span className="text-[12px] tabular-nums text-[var(--text-muted)]">{group.items.length}</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {group.items.map((r) => (
                         <RequestCard key={r._id} r={r} onClick={() => setSelectedId(r._id)} />
                       ))}
@@ -480,7 +448,7 @@ export default function ClientRequestsPage() {
           {accepted.length > 0 && (
             <section>
               <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Accepted &amp; In Progress</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {accepted.map((r) => (
                   <RequestCard key={r._id} r={r} onClick={() => setSelectedId(r._id)} />
                 ))}
@@ -498,22 +466,20 @@ export default function ClientRequestsPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: selected.brandColor }} />
-                <span className="text-[12px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] truncate">
+                <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">
                   {selected.brandName}
                 </span>
-                <span
-                  className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{
-                    color: (STATUS_META[selected.status] ?? STATUS_META.pending_review).color,
-                    backgroundColor: (STATUS_META[selected.status] ?? STATUS_META.pending_review).bg,
-                  }}
+                <Badge
+                  variant={(STATUS_META[selected.status] ?? STATUS_META.pending_review).variant}
+                  className="shrink-0"
                 >
                   {(STATUS_META[selected.status] ?? STATUS_META.pending_review).label}
-                </span>
+                </Badge>
               </div>
               <button
                 onClick={() => setSelectedId(null)}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                aria-label="Close"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -523,7 +489,7 @@ export default function ClientRequestsPage() {
               {/* Submitted details */}
               <div>
                 <h3 className="font-semibold text-[15px] text-[var(--text-primary)] leading-snug">{selected.title}</h3>
-                <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
+                <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[12px] text-[var(--text-muted)]">
                   {selected.clientName && (
                     <span>
                       From {selected.clientName}
@@ -531,11 +497,11 @@ export default function ClientRequestsPage() {
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1">
-                    <Clock className="h-3 w-3" /> {timeAgo(selected.createdAt)}
+                    <Clock className="h-3.5 w-3.5" /> {timeAgo(selected.createdAt)}
                   </span>
                   {selected.proposedDeadline && (
                     <span className="inline-flex items-center gap-1">
-                      <Calendar className="h-3 w-3" /> Requested {formatDate(selected.proposedDeadline)}
+                      <Calendar className="h-3.5 w-3.5" /> Requested {formatDate(selected.proposedDeadline)}
                     </span>
                   )}
                 </div>
@@ -551,25 +517,26 @@ export default function ClientRequestsPage() {
                   to the client until reflected from here. */}
               {selected.linkedTaskId && selected.liveTaskStatus && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                  <h4 className={`${SECTION_LABEL} mb-2`}>
                     Portal Status
                   </h4>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-[12px] text-[var(--text-muted)]">
                       Client sees:{" "}
-                      <span className="font-semibold text-[var(--text-primary)]">
+                      <span className="font-medium text-[var(--text-primary)]">
                         {selected.publishedTaskStatus ?? selected.liveTaskStatus}
                       </span>
                     </span>
                     <span className="text-[12px] text-[var(--text-muted)]">
                       Internal:{" "}
-                      <span className="font-semibold text-[var(--text-primary)]">
+                      <span className="font-medium text-[var(--text-primary)]">
                         {selected.liveTaskStatus}
                       </span>
                     </span>
                     {(selected.publishedTaskStatus ?? selected.liveTaskStatus) !==
                       selected.liveTaskStatus && (
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={async () => {
                           try {
                             await publishStatus({
@@ -583,13 +550,12 @@ export default function ClientRequestsPage() {
                             );
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                       >
                         Reflect to portal
-                      </button>
+                      </Button>
                     )}
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1.5">
                     Status changes on this task are NOT shown to the client until you
                     reflect them.
                   </p>
@@ -599,7 +565,7 @@ export default function ClientRequestsPage() {
               {/* References */}
               {selected.references && selected.references.length > 0 && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-3">
+                  <h4 className={`${SECTION_LABEL} mb-3`}>
                     References ({selected.references.length})
                   </h4>
                   {selected.references.some((r) => r.kind === "image") && (
@@ -614,7 +580,7 @@ export default function ClientRequestsPage() {
                               href={url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="block h-16 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--bg-hover)]"
+                              className="block h-16 rounded-md overflow-hidden border border-[var(--border)] bg-[var(--bg-hover)]"
                             >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={url} alt={r.name ?? "reference"} className="w-full h-full object-cover" />
@@ -634,7 +600,7 @@ export default function ClientRequestsPage() {
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-secondary)] hover:border-[var(--border)] transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--bg-primary)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <RefIcon kind={r.kind} />
                             <span className="truncate flex-1">{r.name || r.url}</span>
@@ -647,7 +613,7 @@ export default function ClientRequestsPage() {
 
               {/* Counter date */}
               <div className="border-t border-[var(--border-subtle)] pt-4">
-                <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                <h4 className={`${SECTION_LABEL} mb-2`}>
                   Counter completion date
                 </h4>
                 <p className="text-[12px] text-[var(--text-muted)] mb-2.5">
@@ -658,17 +624,18 @@ export default function ClientRequestsPage() {
                     type="date"
                     value={toDateInput(counterDate)}
                     onChange={(e) => setCounterDate(fromDateInput(e.target.value))}
-                    className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
                   {(selected.status === "pending_review" || selected.status === "on_hold") && (
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={handleSaveCounterDate}
                       disabled={busy || counterDate === undefined}
-                      className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
+                      loading={busyAction === "date"}
+                      className="shrink-0"
                     >
-                      {busyAction === "date" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Save
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -676,7 +643,7 @@ export default function ClientRequestsPage() {
               {/* Category tag (applied to the created task on accept) */}
               {(selected.status === "pending_review" || selected.status === "on_hold") && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                  <h4 className={`${SECTION_LABEL} mb-2`}>
                     Category Tag
                   </h4>
                   <input
@@ -684,14 +651,14 @@ export default function ClientRequestsPage() {
                     onChange={(e) => setTaskTag(e.target.value)}
                     list="client-request-tags"
                     placeholder="e.g. Social, Blog, Design (optional)"
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
                   <datalist id="client-request-tags">
                     {(brandTagSuggestions ?? []).map((t) => (
                       <option key={t} value={t} />
                     ))}
                   </datalist>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1.5">
                     The tag is applied to the task when you accept, and lets the client filter their portal view by category.
                   </p>
                 </div>
@@ -701,7 +668,7 @@ export default function ClientRequestsPage() {
               {acceptMode &&
                 (selected.status === "pending_review" || selected.status === "on_hold") && (
                   <div className="border-t border-[var(--border-subtle)] pt-4">
-                    <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                    <h4 className={`${SECTION_LABEL} mb-2`}>
                       Where should this task go?
                     </h4>
                     <div className="space-y-2">
@@ -727,16 +694,17 @@ export default function ClientRequestsPage() {
                         <button
                           key={opt.kind}
                           onClick={() => setDestKind(opt.kind)}
-                          className={`w-full text-left px-3.5 py-2.5 rounded-lg border transition-colors ${
+                          aria-pressed={destKind === opt.kind}
+                          className={`w-full text-left px-3 py-2.5 rounded-md border transition-colors ${
                             destKind === opt.kind
                               ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]"
                               : "border-[var(--border)] hover:border-[var(--border-strong)]"
                           }`}
                         >
-                          <span className="block text-[13px] font-semibold text-[var(--text-primary)]">
+                          <span className="block text-[13px] font-medium text-[var(--text-primary)]">
                             {opt.title}
                           </span>
-                          <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">
+                          <span className="block text-[12px] text-[var(--text-muted)] mt-0.5">
                             {opt.hint}
                           </span>
                         </button>
@@ -745,49 +713,35 @@ export default function ClientRequestsPage() {
 
                     {destKind === "campaign" && (
                       <div className="mt-3 space-y-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setCampaignChoice("new")}
-                            className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
-                              campaignChoice === "new"
-                                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
-                                : "border-[var(--border)] text-[var(--text-secondary)]"
-                            }`}
-                          >
-                            Create new brief
-                          </button>
-                          <button
-                            onClick={() => setCampaignChoice("existing")}
-                            className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
-                              campaignChoice === "existing"
-                                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
-                                : "border-[var(--border)] text-[var(--text-secondary)]"
-                            }`}
-                          >
-                            Add to existing
-                          </button>
-                        </div>
+                        <SegmentedTabs
+                          value={campaignChoice}
+                          onChange={setCampaignChoice}
+                          options={[
+                            { value: "new", label: "Create new brief" },
+                            { value: "existing", label: "Add to existing" },
+                          ]}
+                        />
                         {campaignChoice === "new" ? (
                           <>
                             <input
                               value={newBriefTitle}
                               onChange={(e) => setNewBriefTitle(e.target.value)}
                               placeholder="Campaign brief title"
-                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                             />
                             <textarea
                               value={newBriefDesc}
                               onChange={(e) => setNewBriefDesc(e.target.value)}
                               placeholder="Brief description (optional)"
                               rows={2}
-                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
                             />
                           </>
                         ) : (
                           <select
                             value={existingBriefId}
                             onChange={(e) => setExistingBriefId(e.target.value)}
-                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             <option value="">
                               {campaignBriefs === undefined
@@ -812,13 +766,13 @@ export default function ClientRequestsPage() {
                           type="date"
                           value={calDate}
                           onChange={(e) => setCalDate(e.target.value)}
-                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <select
                             value={calPlatform}
                             onChange={(e) => setCalPlatform(e.target.value)}
-                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             {PLATFORMS.map((p) => (
                               <option key={p} value={p}>{p}</option>
@@ -827,7 +781,7 @@ export default function ClientRequestsPage() {
                           <select
                             value={calContentType}
                             onChange={(e) => setCalContentType(e.target.value)}
-                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             {CONTENT_TYPES.map((t) => (
                               <option key={t} value={t}>{t}</option>
@@ -835,7 +789,7 @@ export default function ClientRequestsPage() {
                           </select>
                         </div>
                         {!calDate && (
-                          <p className="text-[11px] text-[var(--text-muted)]">
+                          <p className="text-[12px] text-[var(--text-muted)]">
                             Pick the post date. The entry lands on that day of the calendar.
                           </p>
                         )}
@@ -844,13 +798,13 @@ export default function ClientRequestsPage() {
 
                     {destKind && (
                       <div className="mt-3">
-                        <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                        <h4 className={`${SECTION_LABEL} mb-2`}>
                           Assign to (optional)
                         </h4>
                         <select
                           value={acceptAssigneeId}
                           onChange={(e) => setAcceptAssigneeId(e.target.value)}
-                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                         >
                           <option value="">Decide later</option>
                           {assignableUsers.map((u: any) => (
@@ -867,13 +821,13 @@ export default function ClientRequestsPage() {
               {/* Assignment (after acceptance) */}
               {selected.status !== "pending_review" && selected.status !== "on_hold" && (
                 <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+                  <h4 className={`${SECTION_LABEL} mb-2`}>
                     Assignment
                   </h4>
                   {selected.assigned ? (
                     <div className="flex items-center gap-2 mb-2 text-[13px] text-[var(--text-primary)]">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      Assigned to <span className="font-semibold">{selected.assigneeName}</span>
+                      <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee-text)]" />
+                      Assigned to <span className="font-medium">{selected.assigneeName}</span>
                     </div>
                   ) : (
                     <p className="text-[12px] text-[var(--text-muted)] mb-2">Not yet assigned to anyone.</p>
@@ -882,7 +836,7 @@ export default function ClientRequestsPage() {
                     <select
                       value={assigneeId}
                       onChange={(e) => setAssigneeId(e.target.value)}
-                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                     >
                       <option value="">{selected.assigned ? "Reassign to…" : "Choose assignee…"}</option>
                       {assignableUsers.map((u: any) => (
@@ -891,18 +845,15 @@ export default function ClientRequestsPage() {
                         </option>
                       ))}
                     </select>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={handleAssign}
                       disabled={busy || !assigneeId}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40 transition-colors"
+                      loading={busyAction === "assign"}
                     >
-                      {busyAction === "assign" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <UserPlus className="h-3.5 w-3.5" />
-                      )}
-                      {busyAction === "assign" ? "Assigning…" : "Assign"}
-                    </button>
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Assign
+                    </Button>
                   </div>
                 </div>
               )}
@@ -913,99 +864,81 @@ export default function ClientRequestsPage() {
               {selected.status === "pending_review" || selected.status === "on_hold" ? (
                 acceptMode ? (
                   <>
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => {
                         setAcceptMode(false);
                         setDestKind(null);
                       }}
                       disabled={busy}
-                      className="flex items-center justify-center h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
                     >
                       Back
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="primary"
                       onClick={handleConfirmAccept}
                       disabled={busy || !destKind || !acceptReady}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
-                      style={{ backgroundColor: "var(--accent-admin)" }}
+                      loading={busyAction === "action"}
+                      className="flex-1"
                     >
-                      {busyAction === "action" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4" />
-                      )}
-                      {busyAction === "action"
-                        ? "Accepting…"
-                        : !destKind
-                          ? "Choose a destination"
-                          : "Confirm Accept"}
-                    </button>
+                      <CheckCircle2 className="h-4 w-4" />
+                      {!destKind ? "Choose a destination" : "Confirm Accept"}
+                    </Button>
                   </>
                 ) : (
                   <>
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={() => setAcceptMode(true)}
                       disabled={busy}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-white text-[13px] font-semibold disabled:opacity-50 transition-colors"
-                      style={{ backgroundColor: "var(--accent-admin)" }}
+                      className="flex-1"
                     >
                       <CheckCircle2 className="h-4 w-4" />
                       Accept…
-                    </button>
+                    </Button>
                     {selected.status === "pending_review" ? (
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={handleHold}
                         disabled={busy}
-                        className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                        loading={busyAction === "hold"}
                       >
-                        {busyAction === "hold" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Clock className="h-4 w-4" />
-                        )}
+                        <Clock className="h-4 w-4" />
                         Hold
-                      </button>
+                      </Button>
                     ) : (
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={handleResume}
                         disabled={busy}
-                        className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                        loading={busyAction === "resume"}
                       >
-                        {busyAction === "resume" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Inbox className="h-4 w-4" />
-                        )}
+                        <Inbox className="h-4 w-4" />
                         To Pending
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
+                      variant="ghost"
                       onClick={handleDecline}
                       disabled={busy}
-                      className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      loading={busyAction === "decline"}
                     >
-                      {busyAction === "decline" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Ban className="h-4 w-4" />
-                      )}
+                      <Ban className="h-4 w-4" />
                       Decline
-                    </button>
+                    </Button>
                   </>
                 )
               ) : (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => setConfirmDelete(true)}
                   disabled={busy}
-                  className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
+                  loading={busyAction === "delete"}
+                  className="ml-auto"
                 >
-                  {busyAction === "delete" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  {busyAction === "delete" ? "Deleting…" : "Delete (removes brief task)"}
-                </button>
+                  <Trash2 className="h-4 w-4" />
+                  Delete (removes brief task)
+                </Button>
               )}
             </div>
           </div>
@@ -1021,19 +954,14 @@ function RequestCard({ r, onClick }: { r: ClientRequest; onClick: () => void }) 
   return (
     <button
       onClick={onClick}
-      className="text-left w-full rounded-xl border border-[var(--border)] bg-white p-4 hover:border-[var(--border-strong)] hover:shadow-sm transition-all"
+      className="text-left w-full rounded-lg border border-[var(--border)] bg-white p-4 hover:border-[var(--border-strong)] transition-colors"
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="font-medium text-[13px] text-[var(--text-primary)] line-clamp-2 flex-1">{r.title}</p>
-        <span
-          className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full"
-          style={{ color: meta.color, backgroundColor: meta.bg }}
-        >
-          {meta.label}
-        </span>
+        <p className="font-medium text-[14px] text-[var(--text-primary)] line-clamp-2 flex-1">{r.title}</p>
+        <Badge variant={meta.variant} className="shrink-0">{meta.label}</Badge>
       </div>
-      {r.description && <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mb-2">{r.description}</p>}
-      <div className="flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-muted)]">
+      {r.description && <p className="text-[12px] text-[var(--text-muted)] line-clamp-2 mb-2">{r.description}</p>}
+      <div className="flex flex-wrap items-center gap-3 text-[12px] text-[var(--text-muted)]">
         {r.clientName && (
           <span>
             {r.clientName}
@@ -1042,15 +970,15 @@ function RequestCard({ r, onClick }: { r: ClientRequest; onClick: () => void }) 
         )}
         {r.proposedDeadline && (
           <span className="inline-flex items-center gap-1">
-            <Calendar className="h-3 w-3" /> {formatDate(r.proposedDeadline)}
+            <Calendar className="h-3.5 w-3.5" /> {formatDate(r.proposedDeadline)}
           </span>
         )}
         {refCount > 0 && (
           <span className="inline-flex items-center gap-1">
-            <Paperclip className="h-3 w-3" /> {refCount}
+            <Paperclip className="h-3.5 w-3.5" /> {refCount}
           </span>
         )}
-        {r.assigned && <span className="text-emerald-600 font-medium">→ {r.assigneeName}</span>}
+        {r.assigned && <span className="text-[var(--accent-employee-text)] font-medium">→ {r.assigneeName}</span>}
         {r.acceptedDestination && (
           <span className="font-medium">{DEST_LABEL[r.acceptedDestination]}</span>
         )}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, StatusBadge } from "@/components/ui";
+import { Badge, Button, StatStrip, StatTile, StatusBadge } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import {
   Search,
@@ -17,13 +17,15 @@ import {
   CalendarDays,
   X,
 } from "lucide-react";
-import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
+import { taskStatusMeta } from "@/lib/status";
 import { PaginationFooter } from "@/components/ui/PaginationFooter";
+import { fieldClass, iconButtonClass } from "@/components/ui/classes";
 
-const STATUS = TASK_STATUS_CONFIG as Record<
-  string,
-  { color: string; label: string }
->;
+const ICON_BTN = iconButtonClass;
+const FIELD = fieldClass;
+// Badge variant="warning" as a class, for the one chip here that needs a title attribute.
+const WARN_BADGE =
+  "inline-flex items-center px-1.5 py-px font-medium text-[11px] leading-[16px] whitespace-nowrap rounded bg-[var(--warning-dim)] text-[var(--warning)]";
 
 function fmt(ts: number | null): string {
   if (!ts) return "-";
@@ -67,23 +69,23 @@ function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
           className="rounded-lg border border-[var(--border)] bg-white p-3"
         >
           <div className="flex items-center gap-2 mb-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="text-[11px] font-medium text-[var(--text-primary)]">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)]" />
+            <span className="text-[12px] font-medium text-[var(--text-primary)]">
               {d.approvalSource === "client"
                 ? "Client approved"
                 : "Internal approval"}
             </span>
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-[12px] text-[var(--text-muted)]">
               · by {d.submitterName} · {fmt(d.approvedAt)}
             </span>
           </div>
           {d.message && (
-            <p className="text-[12px] text-[var(--text-secondary)] italic mb-1.5">
+            <p className="text-[12px] text-[var(--text-secondary)] mb-1.5">
               {d.message}
             </p>
           )}
           {d.clientNote && (
-            <p className="text-[12px] text-emerald-700 bg-emerald-50 rounded px-2 py-1 mb-1.5">
+            <p className="text-[12px] text-[var(--accent-employee-text)] bg-[var(--accent-employee-dim)] rounded-md px-2 py-1 mb-1.5">
               “{d.clientNote}”
             </p>
           )}
@@ -99,9 +101,9 @@ function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium text-[var(--accent-admin-text)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                <ExternalLink className="h-3 w-3" />
+                <ExternalLink className="h-3.5 w-3.5" />
                 Link
               </a>
             )}
@@ -112,7 +114,7 @@ function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {isImg(f.name) ? (
                   <img
@@ -121,7 +123,7 @@ function ApprovedWorkDetail({ taskId }: { taskId: Id<"tasks"> }) {
                     className="h-4 w-4 object-cover rounded"
                   />
                 ) : (
-                  <FileText className="h-3 w-3" />
+                  <FileText className="h-3.5 w-3.5" />
                 )}
                 <span className="max-w-[160px] truncate">{f.name}</span>
               </a>
@@ -181,13 +183,13 @@ export default function OversightBoard() {
 
   if (board === undefined)
     return (
-      <p className="text-[15px] text-[var(--text-secondary)] py-8">
+      <p className="text-[13px] text-[var(--text-secondary)] py-8">
         Loading...
       </p>
     );
   if (board === null)
     return (
-      <p className="text-[15px] text-[var(--text-secondary)] py-8">
+      <p className="text-[13px] text-[var(--text-secondary)] py-8">
         Access denied. Oversight is open to oversight admins, brand managers,
         and team leads.
       </p>
@@ -223,7 +225,7 @@ export default function OversightBoard() {
   return (
     <div>
       <p className="text-[12px] text-[var(--text-muted)] mb-4">{scopeLabel}</p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <StatStrip className="mb-4">
         {[
           // Total counts creative deliverables, not rows: a task holding 15
           // creatives counts 15. The per-row CREATIVES tag shows the split.
@@ -234,25 +236,19 @@ export default function OversightBoard() {
           { label: "Done", value: s.done },
           { label: "On Hold", value: s.onHold },
         ].map((c) => (
-          <Card key={c.label} className="p-4">
-            <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-              {c.label}
-            </p>
-            <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-              {c.value}
-            </p>
-          </Card>
+          <StatTile key={c.label} label={c.label} value={c.value} />
         ))}
-      </div>
+      </StatStrip>
 
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
           <Filter className="h-3.5 w-3.5" /> Filters
         </div>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          aria-label="Status"
+          className={FIELD}
         >
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
@@ -264,7 +260,8 @@ export default function OversightBoard() {
         <select
           value={brandId}
           onChange={(e) => setBrandId(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          aria-label="Brand"
+          className={FIELD}
         >
           <option value="">All brands</option>
           {board.filterOptions.brands.map((b) => (
@@ -276,7 +273,8 @@ export default function OversightBoard() {
         <select
           value={managerId}
           onChange={(e) => setManagerId(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          aria-label="Brand manager"
+          className={FIELD}
         >
           <option value="">All brand managers</option>
           {board.filterOptions.managers.map((m) => (
@@ -288,7 +286,8 @@ export default function OversightBoard() {
         <select
           value={assigneeId}
           onChange={(e) => setAssigneeId(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          aria-label="Employee"
+          className={FIELD}
         >
           <option value="">All employees</option>
           {board.filterOptions.assignees.map((a) => (
@@ -300,7 +299,8 @@ export default function OversightBoard() {
         <select
           value={teamId}
           onChange={(e) => setTeamId(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          aria-label="Team"
+          className={FIELD}
           title="Filter by team. Shows tasks owned by anyone on that team"
         >
           <option value="">All teams</option>
@@ -316,7 +316,8 @@ export default function OversightBoard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px]"
+            aria-label="Search"
+            className={`${FIELD} pl-8`}
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -326,7 +327,8 @@ export default function OversightBoard() {
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             max={endDate || undefined}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+            aria-label="From date"
+            className={FIELD}
             title="From: start of range (inclusive)"
           />
           <span className="text-[12px] text-[var(--text-muted)]">to</span>
@@ -335,20 +337,22 @@ export default function OversightBoard() {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate || undefined}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+            aria-label="To date"
+            className={FIELD}
             title="To: end of range (inclusive)"
           />
-          <button
+          <Button
+            variant="secondary"
             onClick={() => {
               const t = todayStr();
               setStartDate(t);
               setEndDate(t);
             }}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             Today
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => {
               const end = new Date();
               const start = new Date();
@@ -358,10 +362,9 @@ export default function OversightBoard() {
               setStartDate(fmtIso(start));
               setEndDate(fmtIso(end));
             }}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             Last 7 days
-          </button>
+          </Button>
           {(startDate || endDate) && (
             <button
               onClick={() => {
@@ -369,41 +372,42 @@ export default function OversightBoard() {
                 setEndDate("");
               }}
               title="Clear range"
-              className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+              aria-label="Clear range"
+              className={ICON_BTN}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           )}
           {rangeInvalid && (
-            <span className="text-[11px] text-rose-600">
+            <span className="text-[12px] font-medium text-[var(--danger)]">
               From must be on or before To
             </span>
           )}
         </div>
-        <span className="text-[12px] text-[var(--text-muted)] ml-auto">
+        <span className="text-[12px] tabular-nums text-[var(--text-muted)] ml-auto">
           {board.total} task{board.total !== 1 ? "s" : ""}
           {s.multiCreativeTasks > 0 && ` · ${s.creativeTotal} creatives`}
         </span>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+      <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
-            <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
-              <th className="px-3 py-3 w-6"></th>
-              <th className="px-4 py-3 font-medium">Task</th>
-              <th className="px-4 py-3 font-medium">Employee</th>
-              <th className="px-4 py-3 font-medium">Brand</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Assigned by</th>
-              <th className="px-4 py-3 font-medium">Brief</th>
-              <th className="px-4 py-3 font-medium">Assigned</th>
-              <th className="px-4 py-3 font-medium">Deadline</th>
-              <th className="px-4 py-3 font-medium">Submitted</th>
-              <th className="px-4 py-3 font-medium">Completed</th>
-              <th className="px-4 py-3 font-medium text-center">Changes</th>
-              <th className="px-4 py-3 font-medium">Remarks</th>
+            <tr className="border-b border-[var(--border-subtle)] text-left text-[var(--text-muted)] whitespace-nowrap">
+              <th className="px-3 py-2.5 w-6"></th>
+              <th className="px-4 py-2.5 font-medium">Task</th>
+              <th className="px-4 py-2.5 font-medium">Employee</th>
+              <th className="px-4 py-2.5 font-medium">Brand</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 font-medium">Assigned by</th>
+              <th className="px-4 py-2.5 font-medium">Brief</th>
+              <th className="px-4 py-2.5 font-medium">Assigned</th>
+              <th className="px-4 py-2.5 font-medium">Deadline</th>
+              <th className="px-4 py-2.5 font-medium">Submitted</th>
+              <th className="px-4 py-2.5 font-medium">Completed</th>
+              <th className="px-4 py-2.5 font-medium text-right">Changes</th>
+              <th className="px-4 py-2.5 font-medium">Remarks</th>
             </tr>
           </thead>
           <tbody>
@@ -418,10 +422,8 @@ export default function OversightBoard() {
               </tr>
             ) : (
               pageRows.map((r) => {
-                const cfg = STATUS[r.status] ?? {
-                  color: "#6b7280",
-                  label: r.status,
-                };
+                const meta = taskStatusMeta(r.status);
+                const cfg = { color: meta.dot, label: meta.label };
                 const isDone = r.status === "done";
                 const isOpen = expanded === r._id;
                 return (
@@ -478,7 +480,7 @@ function FragmentRow({
     <>
       <tr
         onClick={onOpenTask}
-        className="border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)]"
+        className="border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-primary)] transition-colors"
         title="Open task"
       >
         <td className="px-3 py-3 text-[var(--text-muted)]">
@@ -490,24 +492,28 @@ function FragmentRow({
                 onToggle();
               }}
               title={isOpen ? "Hide approved work" : "Show approved work"}
-              className="hover:text-[var(--text-primary)]"
+              aria-label={isOpen ? "Hide approved work" : "Show approved work"}
+              aria-expanded={isOpen}
+              className={`${ICON_BTN} -my-2 -mx-1.5`}
             >
               {isOpen ? (
-                <ChevronDown className="h-3.5 w-3.5" />
+                <ChevronDown className="h-4 w-4" />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="h-4 w-4" />
               )}
             </button>
           ) : null}
         </td>
-        <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[240px]">
+        <td className="px-4 py-3 text-[13px] text-[var(--text-primary)] font-medium max-w-[240px]">
           <span className="line-clamp-2">{r.title}</span>
           {r.creativeSlots > 1 && (
             <span
-              className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap"
+              className="inline-flex mt-1"
               title={`This task holds ${r.creativeSlots} creative deliverables — ${r.creativesSubmitted} submitted`}
             >
-              {r.creativesSubmitted}/{r.creativeSlots} CREATIVES
+              <Badge>
+                {r.creativesSubmitted}/{r.creativeSlots} creatives
+              </Badge>
             </span>
           )}
         </td>
@@ -515,10 +521,11 @@ function FragmentRow({
           {r.assigneeName}
         </td>
         <td className="px-4 py-3">
-          <span
-            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-            style={{ background: r.brandColor }}
-          >
+          <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] whitespace-nowrap">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: r.brandColor }}
+            />
             {r.brandName}
           </span>
         </td>
@@ -532,17 +539,17 @@ function FragmentRow({
           {r.briefTitle}
         </td>
         <td
-          className="px-4 py-3 text-[var(--text-secondary)]"
+          className="px-4 py-3 text-[var(--text-secondary)] tabular-nums whitespace-nowrap"
           title="When this task was assigned to the employee"
         >
           {fmt(r.assignedAt)}
         </td>
-        <td className="px-4 py-3 text-[var(--text-secondary)]">
+        <td className="px-4 py-3 text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
           <div className="flex items-center gap-1.5">
             <span>{fmt(r.deadline)}</span>
             {r.carryOverDays > 0 && (
               <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
+                className={WARN_BADGE}
                 title="Worklog task rolled forward, not completed by its original deadline"
               >
                 Carried over · {r.carryOverDays}d
@@ -551,7 +558,7 @@ function FragmentRow({
           </div>
         </td>
         <td
-          className="px-4 py-3 text-[var(--text-secondary)]"
+          className="px-4 py-3 text-[var(--text-secondary)] tabular-nums whitespace-nowrap"
           title={
             r.lastSubmittedAt
               ? "Most recent deliverable submitted by the employee"
@@ -560,32 +567,28 @@ function FragmentRow({
         >
           {fmt(r.lastSubmittedAt)}
         </td>
-        <td className="px-4 py-3 text-[var(--text-secondary)]">
+        <td className="px-4 py-3 text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
           {fmt(r.completedAt)}
         </td>
-        <td className="px-4 py-3 text-center" title="Number of change-request rounds on this task">
+        <td className="px-4 py-3 text-right tabular-nums" title="Number of change-request rounds on this task">
           {r.changesCount > 0 ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700">
+            <span className="font-medium text-[var(--text-primary)]">
               {r.changesCount}
             </span>
           ) : (
-            <span className="text-[11px] text-[var(--text-muted)]">0</span>
+            <span className="text-[var(--text-muted)]">0</span>
           )}
         </td>
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
             {r.deadlineExtended && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
-                EXTENDED
-              </span>
+              <Badge>Extended</Badge>
             )}
             {r.isOverdue && (
-              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
-                OVERDUE
-              </span>
+              <Badge variant="danger">Overdue</Badge>
             )}
             {!r.deadlineExtended && !r.isOverdue && (
-              <span className="text-[11px] text-[var(--text-muted)]">-</span>
+              <span className="text-[var(--text-muted)]">-</span>
             )}
           </div>
         </td>
@@ -593,7 +596,7 @@ function FragmentRow({
       {isDone && isOpen && (
         <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
           <td colSpan={12} className="px-6 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mt-2 mb-1">
+            <p className="text-[12px] font-medium text-[var(--text-muted)] mt-2 mb-1">
               Approved work
             </p>
             <ApprovedWorkDetail taskId={r._id as Id<"tasks">} />

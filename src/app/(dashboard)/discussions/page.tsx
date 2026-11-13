@@ -5,6 +5,8 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { CommentThread } from "@/components/comments/CommentThread";
+import { StatusBadge } from "@/components/ui";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 import {
   MessageCircle,
   Search,
@@ -81,13 +83,10 @@ export default function DiscussionsPage() {
       {/* Phones show one pane at a time: the list, or the open thread. */}
       <div className={`${selectedBriefId ? "hidden md:flex" : "flex"} w-full md:w-80 shrink-0 flex-col border-r border-[var(--border)] bg-white`}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2 mb-3">
-            <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
-            <h1 className="font-semibold text-[15px] text-[var(--text-primary)]">
-              Discussions
-            </h1>
-          </div>
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <h1 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
+            Discussions
+          </h1>
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -96,7 +95,7 @@ export default function DiscussionsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search briefs..."
-              className="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              className="w-full pl-8 pr-3 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-input)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
           </div>
         </div>
@@ -105,7 +104,7 @@ export default function DiscussionsPage() {
         <div className="flex-1 overflow-y-auto">
           {filteredBriefs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 px-4">
-              <Briefcase className="h-8 w-8 text-[var(--text-disabled)] mb-2" />
+              <Briefcase className="h-8 w-8 text-[var(--text-muted)] mb-2" />
               <p className="text-[12px] text-[var(--text-muted)] text-center">
                 {searchQuery
                   ? "No briefs match your search"
@@ -115,52 +114,39 @@ export default function DiscussionsPage() {
           )}
           {filteredBriefs.map((brief) => {
             const isSelected = selectedBriefId === brief._id;
-            const statusColor =
-              brief.status === "active" || brief.status === "in-progress"
-                ? "var(--accent-employee)"
-                : brief.status === "review"
-                  ? "var(--accent-admin)"
-                  : brief.status === "completed"
-                    ? "var(--accent-employee)"
-                    : "var(--text-muted)";
             return (
               <button
                 key={brief._id}
                 onClick={() => setSelectedBriefId(brief._id)}
                 className={`w-full text-left px-4 py-3 border-b border-[var(--border-subtle)] transition-colors ${
                   isSelected
-                    ? "bg-[var(--accent-admin-dim)] border-l-[3px] border-l-[var(--accent-admin)]"
-                    : "hover:bg-[var(--bg-hover)] border-l-[3px] border-l-transparent"
+                    ? "bg-[var(--bg-hover)]"
+                    : "hover:bg-[var(--bg-primary)]"
                 }`}
               >
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <Hash className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
-                      <span className="font-medium text-[13px] text-[var(--text-primary)] truncate">
+                      <Hash className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                      <span className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                         {brief.title}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium capitalize"
-                        style={{
-                          color: statusColor,
-                          backgroundColor: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
-                        }}
-                      >
-                        {brief.status}
-                      </span>
+                      <StatusBadge
+                        color={BRIEF_STATUS_COLORS[brief.status] ?? "var(--text-muted)"}
+                        label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                      />
                       {brief.managerName && (
-                        <span className="text-[11px] text-[var(--text-muted)] truncate">
+                        <span className="text-[12px] text-[var(--text-muted)] truncate">
                           {brief.managerName}
                         </span>
                       )}
                     </div>
                     {brief.teamNames && brief.teamNames.length > 0 && (
                       <div className="flex items-center gap-1 mt-1">
-                        <Users className="h-2.5 w-2.5 text-[var(--text-disabled)]" />
-                        <span className="text-[11px] text-[var(--text-disabled)] truncate">
+                        <Users className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
+                        <span className="text-[12px] text-[var(--text-muted)] truncate">
                           {brief.teamNames.join(", ")}
                         </span>
                       </div>
@@ -168,12 +154,12 @@ export default function DiscussionsPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {unreadCounts?.[brief._id] ? (
-                      <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold px-1">
+                      <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-semibold tabular-nums px-1">
                         {unreadCounts[brief._id]}
                       </span>
                     ) : null}
                     {isSelected && (
-                      <ChevronRight className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
+                      <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                     )}
                   </div>
                 </div>
@@ -183,8 +169,8 @@ export default function DiscussionsPage() {
         </div>
 
         {/* Brief count */}
-        <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-primary)]">
-          <p className="text-[11px] text-[var(--text-muted)]">
+        <div className="px-4 py-2 border-t border-[var(--border-subtle)]">
+          <p className="text-[12px] tabular-nums text-[var(--text-muted)]">
             {filteredBriefs.length} brief
             {filteredBriefs.length !== 1 ? "s" : ""} available
           </p>
@@ -200,20 +186,17 @@ export default function DiscussionsPage() {
               <button
                 type="button"
                 onClick={() => setSelectedBriefId(null)}
-                className="md:hidden -ml-1 p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                className="md:hidden -ml-1 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 aria-label="Back to list"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                <Hash className="h-4 w-4 text-[var(--accent-admin-text)]" />
-              </div>
               <div className="flex-1 min-w-0">
                 <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                   {selectedBrief.title}
                 </h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[var(--text-secondary)]">
+                  <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
                     {selectedBrief.taskCount} task
                     {selectedBrief.taskCount !== 1 ? "s" : ""}
                   </span>
@@ -222,7 +205,7 @@ export default function DiscussionsPage() {
                       <span className="text-[var(--text-disabled)]">
                         &middot;
                       </span>
-                      <span className="text-[11px] text-[var(--text-secondary)]">
+                      <span className="text-[12px] text-[var(--text-muted)]">
                         {selectedBrief.managerName}
                       </span>
                     </>
@@ -234,7 +217,7 @@ export default function DiscussionsPage() {
                       </span>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-[var(--text-muted)]" />
-                        <span className="text-[11px] text-[var(--text-secondary)]">
+                        <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
                           {new Date(selectedBrief.deadline).toLocaleDateString(
                             "en-US",
                             { month: "short", day: "numeric", year: "numeric" }
@@ -256,7 +239,7 @@ export default function DiscussionsPage() {
                       }}
                     />
                   </div>
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
+                  <span className="text-[12px] font-medium text-[var(--text-muted)] tabular-nums">
                     {Math.round(selectedBrief.progress)}%
                   </span>
                 </div>
@@ -283,17 +266,15 @@ export default function DiscussionsPage() {
           /* Empty state */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-xs">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--accent-admin-dim)] flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="h-8 w-8 text-[var(--accent-admin-text)]" />
-              </div>
-              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
+              <MessageCircle className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-3" aria-hidden />
+              <h2 className="font-medium text-[14px] text-[var(--text-primary)] mb-1">
                 Brief Discussions
               </h2>
-              <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed mb-1">
+              <p className="text-[12px] text-[var(--text-muted)] mb-1">
                 Select a brief from the left to view and participate in its
                 discussion thread.
               </p>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-[12px] text-[var(--text-muted)]">
                 All team members can collaborate here with @mentions and
                 task-specific messages.
               </p>

@@ -16,7 +16,8 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/Table";
-import { TASK_STATUS_CONFIG, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { taskStatusMeta } from "@/lib/status";
 
 function formatDate(ts?: number) {
   if (!ts) return "-";
@@ -52,7 +53,7 @@ export default function FreelancersPage() {
   if (data === null) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">
+        <p className="text-[13px] text-[var(--text-secondary)]">
           Access denied. Only brand managers can view this page.
         </p>
       </div>
@@ -75,16 +76,16 @@ export default function FreelancersPage() {
 
       {data.freelancers.length === 0 ? (
         <Card>
-          <p className="text-[15px] text-[var(--text-secondary)]">
+          <p className="text-[13px] text-[var(--text-muted)]">
             {data.isSuperAdmin
               ? "No freelancers yet. Invite one from Users & Teams with the Freelancer role."
               : "No freelancers are working on your brands yet."}
           </p>
         </Card>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           {data.freelancers.map((f) => (
-            <Card key={f._id} accent="employee">
+            <Card key={f._id}>
               {/* Freelancer header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                 <div className="flex items-center gap-3">
@@ -107,12 +108,12 @@ export default function FreelancersPage() {
                       </span>
                       <Badge variant="manager">Freelancer</Badge>
                       {f.designation && (
-                        <span className="text-[12px] text-[var(--text-secondary)]">
+                        <span className="text-[12px] text-[var(--text-muted)]">
                           {f.designation}
                         </span>
                       )}
                     </div>
-                    <p className="text-[12px] text-[var(--text-secondary)]">
+                    <p className="text-[12px] text-[var(--text-muted)]">
                       {f.email ?? ""}
                     </p>
                   </div>
@@ -120,22 +121,22 @@ export default function FreelancersPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="neutral">{f.taskCounts.total} tasks</Badge>
                   {f.taskCounts.inProgress > 0 && (
-                    <Badge variant="status">
+                    <Badge variant="neutral">
                       {f.taskCounts.inProgress} in progress
                     </Badge>
                   )}
                   {f.taskCounts.review > 0 && (
-                    <Badge variant="status">{f.taskCounts.review} in review</Badge>
+                    <Badge variant="neutral">{f.taskCounts.review} in review</Badge>
                   )}
                   {f.taskCounts.done > 0 && (
-                    <Badge variant="success">{f.taskCounts.done} done</Badge>
+                    <Badge variant="neutral">{f.taskCounts.done} done</Badge>
                   )}
                 </div>
               </div>
 
               {/* Briefs assigned to this freelancer */}
               {f.briefs.length === 0 ? (
-                <p className="text-[13px] text-[var(--text-secondary)]">
+                <p className="text-[13px] text-[var(--text-muted)]">
                   No briefs assigned yet.
                 </p>
               ) : (
@@ -143,15 +144,15 @@ export default function FreelancersPage() {
                   {f.briefs.map((b) => (
                     <div
                       key={b.briefId}
-                      className="border border-[var(--border-subtle)] rounded-lg overflow-hidden"
+                      className="border border-[var(--border)] rounded-lg overflow-hidden"
                     >
-                      <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-[var(--bg-hover)]">
+                      <div className="flex flex-wrap items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border-subtle)]">
                         <span className="font-medium text-[13px] text-[var(--text-primary)]">
                           {b.title}
                         </span>
                         {b.brand && (
                           <span
-                            className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-md"
+                            className="inline-flex items-center px-2 py-0.5 font-medium text-[11px] rounded-full"
                             style={{
                               backgroundColor: `${b.brand.color}1a`,
                               color: b.brand.color,
@@ -160,11 +161,12 @@ export default function FreelancersPage() {
                             {b.brand.name}
                           </span>
                         )}
-                        <Badge variant="status">
-                          {BRIEF_STATUS_LABELS[b.status] ?? b.status}
-                        </Badge>
+                        <StatusBadge
+                          color={BRIEF_STATUS_COLORS[b.status] ?? "var(--text-muted)"}
+                          label={BRIEF_STATUS_LABELS[b.status] ?? b.status}
+                        />
                         {b.deadline && (
-                          <span className="ml-auto text-[12px] text-[var(--text-secondary)]">
+                          <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
                             Due {formatDate(b.deadline)}
                           </span>
                         )}
@@ -178,10 +180,7 @@ export default function FreelancersPage() {
                         </TableHeader>
                         <TableBody>
                           {b.tasks.map((t) => {
-                            const cfg = TASK_STATUS_CONFIG[t.status] ?? {
-                              label: t.status,
-                              color: "#6b7280",
-                            };
+                            const meta = taskStatusMeta(t.status);
                             const overdue =
                               t.deadline !== undefined &&
                               t.deadline < now &&
@@ -190,7 +189,7 @@ export default function FreelancersPage() {
                               <TableRow key={t._id}>
                                 <TableCell>{t.title}</TableCell>
                                 <TableCell>
-                                  <StatusBadge color={cfg.color} label={cfg.label} />
+                                  <StatusBadge color={meta.dot} label={meta.label} />
                                 </TableCell>
                                 <TableCell>{formatDate(t.assignedAt)}</TableCell>
                                 <TableCell

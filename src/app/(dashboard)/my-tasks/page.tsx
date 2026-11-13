@@ -1,27 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { isTaskOverdue } from "@/lib/status";
+import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { PageHeader, SegmentedTabs, StatStrip, StatTile, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { Badge, Button, PageHeader, Panel, PanelEmpty, SegmentedTabs, StatStrip, StatTile, StatusBadge, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
-import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
   ListTodo,
   Eye,
-  ClipboardCheck,
-  CalendarClock,
   Filter,
   Search,
   X,
 } from "lucide-react";
+import { fieldClass } from "@/components/ui/classes";
 
-const STATUS = TASK_STATUS_CONFIG as Record<
-  string,
-  { label: string; color: string; bg: string }
->;
+const FILTER_FIELD = fieldClass;
+const TH = "px-4 py-2.5 text-left font-medium text-[12px] text-[var(--text-muted)]";
 
 function fmt(ts: number | null): string {
   if (!ts) return "-";
@@ -32,17 +28,16 @@ function fmt(ts: number | null): string {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const cfg = STATUS[status] ?? {
-    label: status,
-    color: "#6b7280",
-    bg: "rgba(107,114,128,0.1)",
-  };
+  const meta = taskStatusMeta(status);
+  return <StatusBadge color={meta.dot} label={meta.label} />;
+}
+
+/** Brand identity as a dot + name, the way the dashboard rows show it. */
+function BrandTag({ name, color }: { name?: string; color?: string }) {
   return (
-    <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium"
-      style={{ background: cfg.bg, color: cfg.color }}
-    >
-      {cfg.label}
+    <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)] whitespace-nowrap">
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} aria-hidden />
+      {name}
     </span>
   );
 }
@@ -152,7 +147,7 @@ export default function MyTasksPage() {
       </StatStrip>
 
       {/* Filter bar */}
-      <div className="rounded-lg border border-[var(--border)] bg-white p-3 mb-6 flex flex-wrap items-center gap-3">
+      <div className="rounded-lg border border-[var(--border)] bg-white p-3 mb-4 flex flex-wrap items-center gap-2">
         <SegmentedTabs
           value={scope}
           onChange={setScope}
@@ -162,13 +157,13 @@ export default function MyTasksPage() {
             { value: "supervising", label: "Supervising" },
           ]}
         />
-        <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)]">
-          <Filter className="h-3.5 w-3.5" />
+        <div className="flex items-center gap-1.5 pl-1 text-[12px] text-[var(--text-muted)]">
+          <Filter className="h-3.5 w-3.5" aria-hidden />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          className={`${FILTER_FIELD} px-2.5`}
         >
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
@@ -180,7 +175,7 @@ export default function MyTasksPage() {
         <select
           value={brandFilter}
           onChange={(e) => setBrandFilter(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          className={`${FILTER_FIELD} px-2.5`}
         >
           <option value="">All brands</option>
           {brandOptions.map((b) => (
@@ -195,52 +190,45 @@ export default function MyTasksPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px] w-[180px]"
+            className={`${FILTER_FIELD} pl-8 pr-2.5 w-[180px] placeholder:text-[var(--text-disabled)]`}
           />
         </div>
-        <label className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)] cursor-pointer">
+        <label className="flex items-center gap-1.5 pl-1 text-[13px] text-[var(--text-secondary)] cursor-pointer select-none">
           <input
             type="checkbox"
             checked={hideDone}
             onChange={(e) => setHideDone(e.target.checked)}
+            className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent-admin)]"
           />
           Hide done
         </label>
         {filtersActive && (
-          <button
-            onClick={clearFilters}
-            className="ml-auto inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-          >
-            <X className="h-3 w-3" />
+          <Button variant="ghost" onClick={clearFilters} className="ml-auto">
+            <X className="h-3.5 w-3.5" />
             Clear
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Assigned to me */}
       {showMine && (
-      <section className="mb-8">
-        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
-          <ClipboardCheck className="h-4 w-4 text-[var(--text-muted)]" />
-          Assigned to me ({countLabel(filteredMine.length, assignedToMe)})
-        </h2>
+      <Panel
+        className="mb-4"
+        title={`Assigned to me (${countLabel(filteredMine.length, assignedToMe)})`}
+      >
         {filteredMine.length === 0 ? (
-          <div className="text-center py-10 rounded-xl border border-[var(--border)] bg-white">
-            <p className="text-[13px] text-[var(--text-muted)]">
-              Nothing is assigned to you right now.
-            </p>
-          </div>
+          <PanelEmpty>Nothing is assigned to you right now.</PanelEmpty>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-white overflow-x-auto">
-            <table className="w-full text-[12px]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
-                  <th className="px-4 py-3 font-medium">Task</th>
-                  <th className="px-4 py-3 font-medium">Brand</th>
-                  <th className="px-4 py-3 font-medium">Brief</th>
-                  <th className="px-4 py-3 font-medium">Assigned by</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Deadline</th>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className={TH}>Task</th>
+                  <th className={TH}>Brand</th>
+                  <th className={TH}>Brief</th>
+                  <th className={TH}>Assigned by</th>
+                  <th className={TH}>Status</th>
+                  <th className={TH}>Deadline</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,31 +236,26 @@ export default function MyTasksPage() {
                   <tr
                     key={t._id}
                     onClick={() => setOpenTaskId(t._id)}
-                    className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer"
+                    className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-primary)] cursor-pointer"
                   >
-                    <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[260px]">
+                    <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium max-w-[260px]">
                       <span className="line-clamp-2">{t.title}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                        style={{ background: t.brandColor }}
-                      >
-                        {t.brandName}
-                      </span>
+                    <td className="px-4 py-2.5">
+                      <BrandTag name={t.brandName} color={t.brandColor} />
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-muted)] max-w-[180px] truncate">
+                    <td className="px-4 py-2.5 text-[var(--text-muted)] max-w-[180px] truncate">
                       {t.briefTitle}
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                       {t.assignedByName}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       <StatusPill status={t.status} />
                     </td>
-                    <td className={`px-4 py-3 ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                       {fmt(t.deadline)}
-                      {isTaskOverdue(t) && <span className="ml-1.5 text-[11px] font-semibold text-[var(--danger)]">Overdue</span>}
+                      {isTaskOverdue(t) && <Badge variant="danger" className="ml-1.5">Overdue</Badge>}
                     </td>
                   </tr>
                 ))}
@@ -280,37 +263,31 @@ export default function MyTasksPage() {
             </table>
           </div>
         )}
-      </section>
+      </Panel>
       )}
 
       {/* Supervising */}
       {showSup && (
-      <section>
-        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-[var(--text-muted)]" />
-          Supervising: tasks I delegated ({countLabel(filteredSup.length, supervising)})
-        </h2>
-        <p className="text-[12px] text-[var(--text-muted)] mb-3">
+      <Panel
+        title={`Supervising: tasks I delegated (${countLabel(filteredSup.length, supervising)})`}
+      >
+        <p className="px-4 py-2.5 border-b border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
           Tracking progress, reviewing and marking these done is your
           responsibility. They clear once the work is approved/done.
         </p>
         {filteredSup.length === 0 ? (
-          <div className="text-center py-10 rounded-xl border border-[var(--border)] bg-white">
-            <p className="text-[13px] text-[var(--text-muted)]">
-              You haven't delegated any active tasks.
-            </p>
-          </div>
+          <PanelEmpty>You haven&apos;t delegated any active tasks.</PanelEmpty>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-white overflow-x-auto">
-            <table className="w-full text-[12px]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
-                  <th className="px-4 py-3 font-medium">Task</th>
-                  <th className="px-4 py-3 font-medium">Assigned to</th>
-                  <th className="px-4 py-3 font-medium">Brand</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Deadline</th>
-                  <th className="px-4 py-3 font-medium"></th>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className={TH}>Task</th>
+                  <th className={TH}>Assigned to</th>
+                  <th className={TH}>Brand</th>
+                  <th className={TH}>Status</th>
+                  <th className={TH}>Deadline</th>
+                  <th className={TH}></th>
                 </tr>
               </thead>
               <tbody>
@@ -318,50 +295,41 @@ export default function MyTasksPage() {
                   <tr
                     key={t._id}
                     onClick={() => setNavTaskId(t._id)}
-                    className={`border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer ${
-                      t.needsReview ? "bg-purple-50/60" : ""
-                    }`}
+                    className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-primary)] cursor-pointer"
                   >
-                    <td className="px-4 py-3 text-[var(--text-primary)] font-medium max-w-[240px]">
+                    <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium max-w-[240px]">
                       <span className="line-clamp-2">{t.title}</span>
                     </td>
-                    <td className="px-4 py-3 text-[var(--text-secondary)]">
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                       {t.assigneeName}
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                        style={{ background: t.brandColor }}
-                      >
-                        {t.brandName}
-                      </span>
+                    <td className="px-4 py-2.5">
+                      <BrandTag name={t.brandName} color={t.brandColor} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <StatusPill status={t.status} />
-                        {t.needsReview && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
-                            Review now
-                          </span>
-                        )}
+                        {/* The one row state the viewer has to act on. */}
+                        {t.needsReview && <Badge variant="warning">Review now</Badge>}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
+                    <td className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${isTaskOverdue(t) ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
                       {fmt(t.deadline)}
-                      {isTaskOverdue(t) && <span className="ml-1.5 text-[11px] font-semibold text-[var(--danger)]">Overdue</span>}
+                      {isTaskOverdue(t) && <Badge variant="danger" className="ml-1.5">Overdue</Badge>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2.5">
                       {t.needsReview && (
-                        <button
+                        <Button
+                          variant="secondary"
+                          className="-my-1"
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push("/deliverables");
                           }}
-                          className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           Review
-                        </button>
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -370,7 +338,7 @@ export default function MyTasksPage() {
             </table>
           </div>
         )}
-      </section>
+      </Panel>
       )}
 
       <TaskNavigator

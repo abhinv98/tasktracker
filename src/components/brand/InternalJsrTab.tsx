@@ -6,19 +6,16 @@ import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Filter, Inbox, Tag as TagIcon } from "lucide-react";
+import { Button, EmptyState, StatStrip, StatusBadge } from "@/components/ui";
 import { PaginationFooter } from "@/components/ui/PaginationFooter";
+import { taskStatusMeta } from "@/lib/status";
+import { fieldClass } from "@/components/ui/classes";
+
+const FIELD = fieldClass;
 
 interface InternalJsrTabProps {
   brandId: Id<"brands">;
 }
-
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  pending: { label: "Pending", color: "text-gray-600", bg: "bg-gray-100" },
-  "in-progress": { label: "In Progress", color: "text-amber-600", bg: "bg-amber-50" },
-  review: { label: "Review", color: "text-purple-600", bg: "bg-purple-50" },
-  done: { label: "Done", color: "text-green-600", bg: "bg-green-50" },
-  "on-hold": { label: "On hold", color: "text-slate-600", bg: "bg-slate-100" },
-};
 
 function fmtDate(ts: number | undefined): string {
   if (ts === undefined) return "-";
@@ -106,7 +103,7 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   );
 
   if (overview === undefined) {
-    return <p className="text-[15px] text-[var(--text-secondary)] py-8">Loading...</p>;
+    return <p className="text-[13px] text-[var(--text-secondary)] py-8">Loading...</p>;
   }
 
   const statusCounts = {
@@ -119,9 +116,9 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   return (
     <div>
       {/* Status summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <StatStrip className="mb-4">
         {(["pending", "in-progress", "review", "done"] as const).map((status) => {
-          const cfg = STATUS_CONFIG[status];
+          const cfg = taskStatusMeta(status);
           return (
             <button
               key={status}
@@ -130,25 +127,29 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                 setFilterStatus(filterStatus === status ? "" : status);
                 setPage(0);
               }}
-              className={`p-4 rounded-xl border transition-all text-left ${
+              aria-pressed={filterStatus === status}
+              className={`flex flex-col gap-1.5 px-4 py-3.5 text-left transition-colors focus-visible:outline-offset-[-2px] ${
                 filterStatus === status
-                  ? "border-[var(--accent-admin)] ring-2 ring-[var(--accent-admin)]/20"
-                  : "border-[var(--border)] hover:border-[var(--accent-admin)]/40"
-              } bg-white`}
+                  ? "bg-[var(--bg-hover)] shadow-[inset_0_-2px_0_var(--text-primary)]"
+                  : "bg-white hover:bg-[var(--bg-primary)]"
+              }`}
             >
-              <p className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</p>
-              <p className="text-[24px] font-bold text-[var(--text-primary)] tabular-nums mt-1">
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
+                {cfg.label}
+              </span>
+              <span className="text-[24px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">
                 {statusCounts[status]}
-              </p>
+              </span>
             </button>
           );
         })}
-      </div>
+      </StatStrip>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex items-center gap-2 text-[var(--text-muted)]">
-          <Filter className="h-4 w-4" />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+          <Filter className="h-3.5 w-3.5" />
           <span className="text-[12px] font-medium">Filter:</span>
         </div>
         <select
@@ -157,7 +158,8 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
             setFilterMember(e.target.value);
             setPage(0);
           }}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          aria-label="Assignee"
+          className={FIELD}
         >
           <option value="">All assignees</option>
           {members.map((m) => (
@@ -173,7 +175,8 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
               setFilterTag(e.target.value);
               setPage(0);
             }}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            aria-label="Tag"
+            className={FIELD}
           >
             <option value="">All tags</option>
             {(brandTags ?? []).map((t) => (
@@ -184,79 +187,76 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
           </select>
         )}
         {(filterStatus || filterMember || filterTag) && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               setFilterStatus("");
               setFilterMember("");
               setFilterTag("");
               setPage(0);
             }}
-            className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
           >
             Clear filters
-          </button>
+          </Button>
         )}
-        <span className="text-[11px] text-[var(--text-muted)] ml-auto">
+        <span className="text-[12px] tabular-nums text-[var(--text-muted)] ml-auto">
           {sortedRows.length} task{sortedRows.length !== 1 ? "s" : ""}
         </span>
       </div>
 
       {sortedRows.length === 0 ? (
-        <div className="text-center py-12 rounded-xl border border-[var(--border)] bg-white">
-          <Inbox className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-          <p className="text-[13px] text-[var(--text-muted)]">
-            {overview.length === 0 ? "No tasks for this brand yet." : "No tasks match the current filters."}
-          </p>
-        </div>
+        <EmptyState
+          icon={Inbox}
+          title={overview.length === 0 ? "No tasks for this brand yet." : "No tasks match the current filters."}
+        />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Task
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Tag
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Assignee
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Status
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Deadline
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Assigned
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Submitted
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Approved
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Overseer
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] whitespace-nowrap">
+                  <th className="px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap">
                     Team lead
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((task) => {
-                  const cfg =
-                    STATUS_CONFIG[task.taskStatus] ?? STATUS_CONFIG.pending;
+                  const cfg = taskStatusMeta(task.taskStatus);
                   return (
                     <tr
                       key={task._id}
                       role="link"
                       tabIndex={0}
-                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                      className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-primary)] transition-colors cursor-pointer"
                       onClick={() => goToBrief(task.briefId)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
@@ -267,13 +267,13 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                       aria-label={`Open brief: ${task.taskTitle}`}
                     >
                       <td className="px-3 py-2.5 align-top max-w-[240px]">
-                        <p className="text-[12px] font-medium text-[var(--text-primary)] leading-snug">
+                        <p className="text-[13px] font-medium text-[var(--text-primary)] leading-snug">
                           {task.taskTitle}
                         </p>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate" title={task.briefTitle}>
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5 truncate" title={task.briefTitle}>
                           {task.briefTitle}
                         </p>
-                        <p className="text-[11px] text-[var(--text-disabled)] mt-0.5">{task.teamName}</p>
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{task.teamName}</p>
                       </td>
                       <td
                         className="px-3 py-2.5 align-top whitespace-nowrap"
@@ -291,7 +291,8 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                             onBlur={() => void saveTag(task._id)}
                             list={`brand-tags-${brandId}`}
                             placeholder="Tag name"
-                            className="w-24 px-2 py-1 rounded-md border border-[var(--border)] text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                            aria-label="Tag name"
+                            className={`${FIELD} w-28 -my-1.5`}
                             autoFocus
                           />
                         ) : (
@@ -301,44 +302,40 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
                               setEditingTagFor(task._id);
                               setTagDraft(task.tag ?? "");
                             }}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-medium transition-colors ${
                               task.tag
-                                ? "text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:opacity-80"
-                                : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                                ? "text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                : "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                             }`}
                             title="Edit tag"
                           >
-                            <TagIcon className="h-3 w-3" />
+                            <TagIcon className="h-3.5 w-3.5" />
                             {task.tag ?? "Add tag"}
                           </button>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-primary)]">
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-secondary)]">
                         {task.assigneeName}
                       </td>
                       <td className="px-3 py-2.5 align-top whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${cfg.color} ${cfg.bg}`}
-                        >
-                          {cfg.label}
-                        </span>
+                        <StatusBadge color={cfg.dot} label={cfg.label} />
                       </td>
-                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-secondary)] tabular-nums">
                         {task.deadline ? fmtDateShort(task.deadline) : "-"}
                       </td>
-                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-secondary)] tabular-nums">
                         {fmtDate(task.assignedAt)}
                       </td>
-                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-secondary)] tabular-nums">
                         {fmtDate(task.latestSubmittedAt)}
                       </td>
-                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[11px] text-[var(--text-secondary)] tabular-nums">
+                      <td className="px-3 py-2.5 align-top whitespace-nowrap text-[12px] text-[var(--text-secondary)] tabular-nums">
                         {fmtDate(task.latestApprovedAt)}
                       </td>
-                      <td className="px-3 py-2.5 align-top text-[11px] text-[var(--text-primary)] max-w-[120px]">
+                      <td className="px-3 py-2.5 align-top text-[12px] text-[var(--text-secondary)] max-w-[120px]">
                         <span className="line-clamp-2">{task.managerName}</span>
                       </td>
-                      <td className="px-3 py-2.5 align-top text-[11px] text-[var(--text-primary)] max-w-[120px]">
+                      <td className="px-3 py-2.5 align-top text-[12px] text-[var(--text-secondary)] max-w-[120px]">
                         <span className="line-clamp-2">{task.teamLeadName}</span>
                       </td>
                     </tr>

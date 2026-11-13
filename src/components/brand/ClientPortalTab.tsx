@@ -4,10 +4,9 @@ import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, ConfirmModal, useToast } from "@/components/ui";
+import { Badge, Button, ConfirmModal, useToast } from "@/components/ui";
 import ClientJsrTab from "@/components/brand/ClientJsrTab";
 import {
-  Activity,
   Ban,
   CheckCircle2,
   ChevronDown,
@@ -17,17 +16,19 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  Link2,
   Loader2,
   Pencil,
   Plus,
-  Presentation,
-  RotateCcw,
   Trash2,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
+import { fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
+
+const ICON_BTN = iconButtonClass;
+const ICON_BTN_DANGER = iconButtonDangerClass;
+const FIELD = fieldClass;
+const COUNT = "font-normal tabular-nums text-[var(--text-muted)]";
 
 interface ClientPortalTabProps {
   brandId: Id<"brands">;
@@ -208,39 +209,39 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
       {/* ── LEFT COLUMN ── */}
       <div className="space-y-4 min-w-0">
         {/* Portal Link */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-            <Link2 className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Portal Link</span>
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
+            <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">Portal Link</span>
           </div>
           <div className="p-4">
             {!canManageLinks ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Only admins can manage the portal link.</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Only admins can manage the portal link.</p>
             ) : portal === undefined ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
             ) : portal === null ? (
-              <div className="text-center py-2">
-                <p className="text-[12px] text-[var(--text-secondary)] mb-3">
+              <div>
+                <p className="text-[13px] text-[var(--text-secondary)] mb-3">
                   One login link per brand, named after the brand (for example /portal/
                   {brand?.name ? brand.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "brand"}).
                   Clients sign in with the accounts created in Users &amp; Teams.
                 </p>
                 <Button onClick={() => void handleGenerate()} disabled={generating}>
-                  {generating ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Activate Portal Link
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <code className="flex-1 text-[11px] text-[var(--text-secondary)] truncate">
+                <div className="flex items-center gap-2 pl-3 pr-1 py-1 rounded-md bg-[var(--bg-primary)]">
+                  <span className="w-2 h-2 rounded-full bg-[var(--accent-employee)] shrink-0" />
+                  <code className="flex-1 text-[12px] text-[var(--text-secondary)] truncate">
                     /portal/{portal.token}
                   </code>
                   <button
                     onClick={() => copyPortalLink(portal.token)}
-                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    className={ICON_BTN}
                     title="Copy link"
+                    aria-label="Copy link"
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
@@ -248,19 +249,20 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                     href={`/portal/${portal.token}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                    className={ICON_BTN}
                     title="Open portal"
+                    aria-label="Open portal"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="secondary" onClick={() => setConfirmDeactivate(true)}>
-                    <Ban className="h-3.5 w-3.5 mr-1.5" />
+                    <Ban className="h-3.5 w-3.5" />
                     Deactivate
                   </Button>
                 </div>
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-[12px] text-[var(--text-muted)]">
                   Active since {new Date(portal.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
                   Deactivating blocks the portal until you activate it again; the URL stays the same.
                 </p>
@@ -270,11 +272,10 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
         </div>
 
         {/* Client Users */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-            <Users className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">
-              Client Logins {clientUsers ? `(${clientUsers.length})` : ""}
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
+            <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">
+              Client Logins{clientUsers && clientUsers.length > 0 && <span className={COUNT}> {clientUsers.length}</span>}
             </span>
             {canManageLinks && (
               <a
@@ -286,25 +287,25 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
               </a>
             )}
           </div>
-          <div className="p-4 space-y-3">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {clientUsers === undefined && canManageLinks ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+              <p className="px-4 py-3.5 text-[13px] text-[var(--text-muted)]">Loading…</p>
             ) : !clientUsers || clientUsers.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+              <p className="px-4 py-3.5 text-[13px] text-[var(--text-muted)]">
                 No client logins yet. Create one from Users & Teams → Clients so the client can sign in.
               </p>
             ) : (
               clientUsers.map((u) => (
-                <div key={u._id} className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }}>
+                <div key={u._id} className="flex items-center gap-2.5 px-4 py-2.5">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-medium text-white shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }}>
                     {(u.name ?? u.email ?? "C")[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{u.name ?? "-"}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">{u.email}</p>
+                    <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{u.name ?? "-"}</p>
+                    <p className="text-[12px] text-[var(--text-muted)] truncate">{u.email}</p>
                   </div>
                   {resetUserId === u._id ? (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
                       <input
                         value={resetPassword}
                         onChange={(e) => setResetPassword(e.target.value)}
@@ -319,37 +320,42 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                         }}
                         placeholder="New password (min 8 chars)"
                         title="At least 8 characters"
-                        className="w-40 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                        aria-label="New password"
+                        className={`${FIELD} w-44`}
                         autoFocus
                       />
                       <button
                         onClick={() => void handleResetPassword()}
                         disabled={resetPassword.length < 8 || resettingPassword}
-                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-emerald-600 disabled:opacity-40"
+                        className={`${ICON_BTN} disabled:opacity-40`}
                         title="Save new password"
+                        aria-label="Save new password"
                       >
                         {resettingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                       </button>
                       <button
                         onClick={() => { setResetUserId(null); setResetPassword(""); }}
-                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                        className={ICON_BTN}
+                        aria-label="Cancel"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center">
                       <button
                         onClick={() => { setResetUserId(u._id); setResetPassword(""); }}
-                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                        className={ICON_BTN}
                         title="Reset password"
+                        aria-label="Reset password"
                       >
                         <KeyRound className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => setDeleteUserId(u._id)}
-                        className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
+                        className={ICON_BTN_DANGER}
                         title="Delete login"
+                        aria-label="Delete login"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -362,54 +368,56 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
         </div>
 
         {/* Tab Visibility */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-            <Eye className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Portal Tabs</span>
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
+            <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">Portal Tabs</span>
           </div>
           <div className="p-4">
             {!portal ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Generate a portal link first to configure tabs.</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Generate a portal link first to configure tabs.</p>
             ) : (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-[12px] text-[var(--text-secondary)]">JSR Track</span>
-                  <span className="text-[11px] text-[var(--text-muted)]">Always visible</span>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between h-8">
+                  <span className="text-[13px] text-[var(--text-primary)]">JSR Track</span>
+                  <span className="text-[12px] text-[var(--text-muted)]">Always visible</span>
                 </div>
                 {PORTAL_TAB_OPTIONS.map((tab) => {
                   const hidden = hiddenTabs.includes(tab.key);
                   return (
-                    <div key={tab.key} className="flex items-center justify-between py-1.5">
-                      <span className="text-[12px] text-[var(--text-secondary)]">{tab.label}</span>
+                    <div key={tab.key} className="flex items-center justify-between h-8">
+                      <span className={`text-[13px] ${hidden ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{tab.label}</span>
                       <button
                         onClick={() => void toggleTab(tab.key)}
-                        className={`p-1.5 rounded transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--accent-admin-text)]"} hover:bg-[var(--bg-hover)]`}
+                        className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"} hover:bg-[var(--bg-hover)]`}
                         title={hidden ? "Show tab" : "Hide tab"}
+                        aria-label={hidden ? `Show ${tab.label}` : `Hide ${tab.label}`}
+                        aria-pressed={!hidden}
                       >
                         {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                   );
                 })}
-                <div className="pt-2 mt-1 border-t border-[var(--border-subtle)]">
-                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
+                <div className="pt-3 mt-2 border-t border-[var(--border-subtle)]">
+                  <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                     Pin Content Calendar to a month (optional)
                   </label>
                   <input
                     type="month"
                     value={calendarMonth}
                     onChange={(e) => void updatePortalConfig({ brandId, calendarMonth: e.target.value }).catch(() => {})}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
+                    aria-label="Pin Content Calendar to a month"
+                    className={`${FIELD} w-full`}
                   />
                 </div>
 
                 {/* Calendar month visibility */}
-                <div className="pt-2 mt-1 border-t border-[var(--border-subtle)]">
-                  <label className="block text-[11px] font-medium text-[var(--text-muted)] mb-1">
+                <div className="pt-3 mt-3 border-t border-[var(--border-subtle)]">
+                  <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                     Calendar months visible to the client
                   </label>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-[12px] text-[var(--text-secondary)]">Show all months</span>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-[13px] text-[var(--text-primary)]">Show all months</span>
                     <button
                       onClick={() =>
                         void updatePortalConfig({
@@ -418,22 +426,19 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                             visibleMonths === undefined ? (calendarMonths ?? []) : null,
                         }).catch(() => {})
                       }
-                      className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                        visibleMonths === undefined
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                      }`}
+                      aria-pressed={visibleMonths === undefined}
+                      className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       {visibleMonths === undefined ? "All visible" : "Restricted"}
                     </button>
                   </div>
                   {visibleMonths !== undefined && (
                     <>
-                      <p className="text-[11px] text-[var(--text-muted)] mb-1.5">
+                      <p className="text-[12px] text-[var(--text-muted)] mt-1 mb-2">
                         Only ticked months appear on the client&apos;s calendar.
                       </p>
                       {(calendarMonths ?? []).length === 0 ? (
-                        <p className="text-[11px] text-[var(--text-muted)] italic">
+                        <p className="text-[12px] text-[var(--text-muted)]">
                           No calendar months exist for this brand yet.
                         </p>
                       ) : (
@@ -455,10 +460,11 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                       : [...visibleMonths, m],
                                   }).catch(() => {})
                                 }
+                                aria-pressed={on}
                                 className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                                   on
-                                    ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                                    : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"
+                                    ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
+                                    : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--border-strong)]"
                                 }`}
                               >
                                 {label}
@@ -479,48 +485,44 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
       {/* ── RIGHT COLUMN ── */}
       <div className="space-y-4 min-w-0">
         {/* Client Deck manager */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-            <Presentation className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">
-              Client Deck {deckItems ? `(${deckItems.length})` : ""}
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
+            <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">
+              Client Deck{deckItems && deckItems.length > 0 && <span className={COUNT}> {deckItems.length}</span>}
             </span>
             {canManageLinks && (
-              <button
-                onClick={() => setShowAddDeck(!showAddDeck)}
-                className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
-              >
+              <Button variant="secondary" onClick={() => setShowAddDeck(!showAddDeck)}>
                 {showAddDeck ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                 {showAddDeck ? "Cancel" : "Add"}
-              </button>
+              </Button>
             )}
           </div>
           <div className="p-4 space-y-3">
             {showAddDeck && (
-              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] space-y-2">
+              <div className="p-3 rounded-md bg-[var(--bg-primary)] border border-[var(--border)] space-y-2">
                 <input
                   value={newDeck.title}
                   onChange={(e) => setNewDeck((p) => ({ ...p, title: e.target.value }))}
                   placeholder="Title (e.g. Q3 Strategy Deck)"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={`${FIELD} w-full`}
                 />
                 <input
                   value={newDeck.url}
                   onChange={(e) => setNewDeck((p) => ({ ...p, url: e.target.value }))}
                   placeholder="Link (Slides, Sheets, Figma, gantt…)"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={`${FIELD} w-full`}
                 />
                 <input
                   value={newDeck.description}
                   onChange={(e) => setNewDeck((p) => ({ ...p, description: e.target.value }))}
                   placeholder="Description (optional)"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={`${FIELD} w-full`}
                 />
                 <div className="flex items-center gap-3">
                   <select
                     value={newDeck.category}
                     onChange={(e) => setNewDeck((p) => ({ ...p, category: e.target.value }))}
-                    className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
+                    className={`${FIELD} flex-1 min-w-0`}
                   >
                     <option value="deck">Deck</option>
                     <option value="gantt">Gantt</option>
@@ -540,48 +542,48 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                   disabled={savingDeck || !newDeck.title.trim() || !newDeck.url.trim()}
                   className="w-full"
                 >
-                  {savingDeck ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+                  {savingDeck ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add to Deck
                 </Button>
               </div>
             )}
 
             {deckItems === undefined ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
             ) : deckItems.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+              <p className="text-[13px] text-[var(--text-muted)]">
                 Share decks, gantt charts and documents with the client, optionally requiring their approval.
               </p>
             ) : (
               deckItems.map((item: any) => (
-                <div key={item._id} className="p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                <div key={item._id} className="p-3 rounded-md border border-[var(--border-subtle)]">
                   {editDeckId === item._id ? (
                     <div className="space-y-2">
                       <input
                         value={editDeck.title}
                         onChange={(e) => setEditDeck((p) => ({ ...p, title: e.target.value }))}
                         placeholder="Title"
-                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className={`${FIELD} w-full`}
                       />
                       {!item.fileKey && (
                         <input
                           value={editDeck.url}
                           onChange={(e) => setEditDeck((p) => ({ ...p, url: e.target.value }))}
                           placeholder="Link"
-                          className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          className={`${FIELD} w-full`}
                         />
                       )}
                       <input
                         value={editDeck.description}
                         onChange={(e) => setEditDeck((p) => ({ ...p, description: e.target.value }))}
                         placeholder="Description (optional)"
-                        className="w-full px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className={`${FIELD} w-full`}
                       />
                       <div className="flex items-center gap-2">
                         <select
                           value={editDeck.category}
                           onChange={(e) => setEditDeck((p) => ({ ...p, category: e.target.value }))}
-                          className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] text-[13px] bg-white focus:outline-none"
+                          className={`${FIELD} flex-1 min-w-0`}
                         >
                           <option value="deck">Deck</option>
                           <option value="gantt">Gantt</option>
@@ -615,7 +617,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                         >
                           {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                         </Button>
-                        <Button variant="secondary" onClick={() => setEditDeckId(null)}>
+                        <Button variant="ghost" onClick={() => setEditDeckId(null)}>
                           Cancel
                         </Button>
                       </div>
@@ -627,50 +629,42 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                           href={item.resolvedUrl ?? item.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 min-w-0 text-[12px] font-medium text-[var(--text-primary)] truncate hover:underline"
+                          className="flex-1 min-w-0 text-[14px] font-medium text-[var(--text-primary)] truncate hover:underline underline-offset-2"
                         >
                           {item.title}
                         </a>
                         {item.addedByClientName && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] shrink-0">
-                            From {item.addedByClientName}
-                          </span>
+                          <Badge className="shrink-0">From {item.addedByClientName}</Badge>
                         )}
                         {item.category && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-muted)] capitalize shrink-0">
-                            {item.category}
-                          </span>
+                          <Badge className="capitalize shrink-0">{item.category}</Badge>
                         )}
-                        {item.requiresApproval && (
-                          <span
-                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                              item.approvalStatus === "client_approved"
-                                ? "text-emerald-600 bg-emerald-50"
-                                : item.approvalStatus === "client_changes_requested"
-                                  ? "text-amber-600 bg-amber-50"
-                                  : "text-[var(--text-muted)] bg-[var(--bg-hover)]"
-                            }`}
-                          >
-                            {item.approvalStatus === "client_approved"
-                              ? `Approved${item.reviewedByName ? ` · ${item.reviewedByName}` : ""}`
-                              : item.approvalStatus === "client_changes_requested"
-                                ? "Changes requested"
-                                : "Awaiting approval"}
-                          </span>
-                        )}
+                        {item.requiresApproval &&
+                          (item.approvalStatus === "client_approved" ? (
+                            <Badge variant="employee" className="shrink-0">
+                              {`Approved${item.reviewedByName ? ` · ${item.reviewedByName}` : ""}`}
+                            </Badge>
+                          ) : item.approvalStatus === "client_changes_requested" ? (
+                            <Badge variant="warning" className="shrink-0">Changes requested</Badge>
+                          ) : (
+                            <Badge className="shrink-0">Awaiting approval</Badge>
+                          ))}
                         {canManageLinks && (
                           <div className="flex items-center shrink-0">
                             <button
                               onClick={() => void updateDeckItem({ deckItemId: item._id, isVisible: !item.isVisible }).catch(() => {})}
-                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                              className={ICON_BTN}
                               title={item.isVisible ? "Hide from client" : "Show to client"}
+                              aria-label={item.isVisible ? "Hide from client" : "Show to client"}
                             >
                               {item.isVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                             </button>
                             <button
                               onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
-                              className={`p-1.5 rounded hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--accent-admin-text)]" : "text-[var(--text-muted)]"}`}
+                              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
                               title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
+                              aria-label={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
+                              aria-pressed={!!item.requiresApproval}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
                             </button>
@@ -684,15 +678,17 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                   category: item.category ?? "deck",
                                 });
                               }}
-                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                              className={ICON_BTN}
                               title="Edit"
+                              aria-label="Edit"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => setDeleteDeckId(item._id)}
-                              className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-red-500"
+                              className={ICON_BTN_DANGER}
                               title="Delete"
+                              aria-label="Delete"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -700,7 +696,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                         )}
                       </div>
                       {item.approvalNote && (
-                        <p className="text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1.5">
+                        <p className="rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)] mt-2">
                           Client note: {item.approvalNote}
                         </p>
                       )}
@@ -708,12 +704,12 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                       {(item.remarks ?? []).length > 0 && (
                         <div className="mt-2 space-y-1 border-t border-[var(--border-subtle)] pt-2">
                           {item.remarks.map((r: any) => (
-                            <p key={r._id} className="text-[11px] text-[var(--text-secondary)]">
-                              <span className="font-semibold text-[var(--text-primary)]">
+                            <p key={r._id} className="text-[12px] text-[var(--text-secondary)]">
+                              <span className="font-medium text-[var(--text-primary)]">
                                 {r.senderName ?? (r.senderType === "client" ? "Client" : "Team")}:
                               </span>{" "}
                               {r.content}
-                              <span className="text-[var(--text-disabled)]"> · {timeAgo(r.createdAt)}</span>
+                              <span className="text-[var(--text-muted)]"> · {timeAgo(r.createdAt)}</span>
                             </p>
                           ))}
                         </div>
@@ -735,23 +731,22 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                               }
                             }}
                             placeholder="Reply to the client"
-                            className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                            aria-label="Reply to the client"
+                            className={`${FIELD} flex-1 min-w-0`}
                             autoFocus
                           />
                           <button
                             onClick={() => { setDeckReplyFor(null); setDeckReply(""); }}
-                            className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                            className={ICON_BTN}
+                            aria-label="Cancel reply"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setDeckReplyFor(item._id)}
-                          className="mt-1.5 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
-                        >
+                        <Button variant="secondary" className="mt-2" onClick={() => setDeckReplyFor(item._id)}>
                           Comment
-                        </button>
+                        </Button>
                       )}
                     </>
                   )}
@@ -762,29 +757,28 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
         </div>
 
         {/* Client Activity */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-            <Activity className="h-4 w-4 text-[var(--text-muted)]" />
-            <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">Client Activity</span>
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
+            <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">Client Activity</span>
           </div>
           <div className="p-4">
             {activity === undefined ? (
-              <p className="text-[12px] text-[var(--text-muted)]">Loading…</p>
+              <p className="text-[13px] text-[var(--text-muted)]">Loading…</p>
             ) : activity.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-2">
+              <p className="text-[13px] text-[var(--text-muted)]">
                 No portal activity yet. Logins, approvals and comments will show up here.
               </p>
             ) : (
               <div className="space-y-0.5 max-h-[420px] overflow-y-auto">
                 {activity.map((a: any) => (
                   <div key={a._id} className="flex items-start gap-2.5 py-2 border-b border-[var(--border-subtle)] last:border-0">
-                    <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }} />
+                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: brand?.color ?? "#171717" }} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] text-[var(--text-primary)]">
-                        <span className="font-semibold">{a.clientName}</span> {activityLine(a)}
+                      <p className="text-[13px] text-[var(--text-primary)]">
+                        <span className="font-medium">{a.clientName}</span> {activityLine(a)}
                       </p>
                     </div>
-                    <span className="text-[11px] text-[var(--text-muted)] shrink-0">{timeAgo(a.createdAt)}</span>
+                    <span className="text-[12px] tabular-nums text-[var(--text-muted)] shrink-0">{timeAgo(a.createdAt)}</span>
                   </div>
                 ))}
               </div>
@@ -797,6 +791,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
       <div className="lg:col-span-2">
         <button
           onClick={() => setShowLegacy(!showLegacy)}
+          aria-expanded={showLegacy}
           className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors mb-3"
         >
           {showLegacy ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}

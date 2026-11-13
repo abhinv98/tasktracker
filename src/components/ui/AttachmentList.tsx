@@ -3,7 +3,9 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Paperclip, Download, Trash2, Loader2 } from "lucide-react";
+import { Paperclip, Download, Trash2 } from "lucide-react";
+import { Button } from "./Button";
+import { SectionHeader } from "./StatTile";
 
 interface AttachmentListProps {
   parentType: "brief" | "task";
@@ -48,43 +50,42 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-          Files ({attachments?.length ?? 0})
-        </h4>
+      <div className="flex items-center justify-between gap-3">
+        <SectionHeader title="Files" count={attachments?.length} className="" />
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-        <button
+        <Button
+          variant="secondary"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline disabled:opacity-50"
+          loading={isUploading}
         >
-          {isUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
-          {isUploading ? "Uploading..." : "Attach file"}
-        </button>
+          <Paperclip className="h-3.5 w-3.5" />
+          Attach file
+        </Button>
       </div>
 
       <div className="flex flex-col gap-1.5">
         {attachments?.map((att) => (
           <div
             key={att._id}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] group"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] group"
           >
             <Paperclip className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">
+              <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
                 {att.fileName}
               </p>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-[12px] text-[var(--text-muted)]">
                 {att.uploaderName}
               </p>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
               {att.url && (
                 <a
                   href={att.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
+                  aria-label={`Download ${att.fileName}`}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
                 </a>
@@ -92,7 +93,8 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
               {(att.uploadedBy === user?._id || user?.role === "admin") && (
                 <button
                   onClick={() => deleteAttachment({ attachmentId: att._id })}
-                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)]"
+                  aria-label={`Delete ${att.fileName}`}
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -101,7 +103,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
           </div>
         ))}
         {attachments?.length === 0 && (
-          <p className="text-[11px] text-[var(--text-muted)]">No files attached.</p>
+          <p className="text-[12px] text-[var(--text-muted)]">No files attached.</p>
         )}
       </div>
     </div>

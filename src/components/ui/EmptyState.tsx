@@ -16,7 +16,7 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center text-center gap-2 py-12 px-6 rounded-xl border border-dashed border-[var(--border)] bg-white ${className}`}
+      className={`flex flex-col items-center justify-center text-center gap-2 py-12 px-6 rounded-lg border border-dashed border-[var(--border)] bg-white ${className}`}
     >
       {Icon && <Icon className="h-8 w-8 text-[var(--text-muted)]" aria-hidden />}
       <p className="text-[14px] font-medium text-[var(--text-primary)]">{title}</p>

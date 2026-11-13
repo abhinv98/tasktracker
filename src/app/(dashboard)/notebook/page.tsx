@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, ConfirmModal, PageHeader, useToast, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { Badge, Button, ConfirmModal, EmptyState, PageHeader, SegmentedTabs, useToast, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import {
   Plus,
   NotebookPen,
@@ -58,9 +58,9 @@ function formatDate(dateStr: string): string {
 }
 
 const inputCls =
-  "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]";
+  "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]";
 const labelCls =
-  "text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider block mb-1.5";
+  "text-[12px] font-medium text-[var(--text-muted)] block mb-1.5";
 
 type Note = {
   _id: Id<"personalNotes">;
@@ -93,7 +93,7 @@ export default function NotebookPage() {
   if (!user || user.role !== "admin") {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">
+        <p className="text-[13px] text-[var(--text-secondary)]">
           Access denied. The notebook is available to managers only.
         </p>
       </div>
@@ -107,24 +107,15 @@ export default function NotebookPage() {
         subtitle="Private notes & your brand-wise daily worklog. Only you can see this."
       />
 
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
-        {[
-          { key: "notes" as const, label: "Notes", icon: NotebookPen },
-          { key: "worklog" as const, label: "Daily Worklog", icon: ClipboardList },
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              tab === key
-                ? "bg-white shadow-sm text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <SegmentedTabs
+          value={tab}
+          options={[
+            { value: "notes", label: "Notes", icon: NotebookPen },
+            { value: "worklog", label: "Daily Worklog", icon: ClipboardList },
+          ]}
+          onChange={setTab}
+        />
       </div>
 
       {tab === "notes" ? <NotesTab /> : <WorklogTab />}
@@ -206,10 +197,10 @@ function NotesTab() {
     <div>
       {/* Due reminders */}
       {dueReminders.length > 0 && (
-        <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <BellRing className="h-4 w-4 text-amber-600" />
-            <p className="text-[13px] font-semibold text-amber-800">
+        <div className="mb-4 rounded-md bg-[var(--warning-dim)] px-3 py-2">
+          <div className="flex items-center gap-2 mb-1">
+            <BellRing className="h-4 w-4 text-[var(--warning)]" />
+            <p className="text-[13px] font-medium text-[var(--warning)]">
               {dueReminders.length} note{dueReminders.length !== 1 ? "s" : ""} to revisit
             </p>
           </div>
@@ -217,7 +208,7 @@ function NotesTab() {
             {dueReminders.map((n: any) => (
               <div
                 key={n._id}
-                className="flex items-center justify-between text-[12px] text-amber-900"
+                className="flex items-center justify-between text-[12px] text-[var(--text-primary)]"
               >
                 <span className="truncate">{n.title}</span>
                 <button
@@ -225,7 +216,7 @@ function NotesTab() {
                     await updateNote({ noteId: n._id, clearReminder: true });
                     toast("success", "Reminder cleared");
                   }}
-                  className="text-amber-700 hover:text-amber-900 text-[11px] font-medium shrink-0 ml-3"
+                  className="text-[var(--warning)] hover:underline text-[12px] font-medium shrink-0 ml-3"
                 >
                   Dismiss
                 </button>
@@ -236,56 +227,48 @@ function NotesTab() {
       )}
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex items-center gap-1.5 p-0.5 rounded-lg bg-[var(--bg-hover)]">
-          {(["day", "all"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setScope(s)}
-              className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                scope === s
-                  ? "bg-white shadow-sm text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {s === "day" ? "By Day" : "All Notes"}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <SegmentedTabs
+          value={scope}
+          options={[
+            { value: "day", label: "By Day" },
+            { value: "all", label: "All Notes" },
+          ]}
+          onChange={setScope}
+        />
 
         {scope === "day" && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setDate(shiftDate(date, -1))}
-              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+              aria-label="Previous day"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
-              <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
             />
             <button
               onClick={() => setDate(shiftDate(date, 1))}
-              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+              aria-label="Next day"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
-              <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronRight className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => setDate(getTodayStr())}
-              className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            >
+            <Button variant="secondary" onClick={() => setDate(getTodayStr())}>
               Today
-            </button>
+            </Button>
           </div>
         )}
 
         <select
           value={brandFilter}
           onChange={(e) => setBrandFilter(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
         >
           <option value="">All brands</option>
           {brands.map((b: any) => (
@@ -301,7 +284,7 @@ function NotesTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search notes..."
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px]"
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] pl-8 pr-3 py-1.5 text-[13px]"
           />
         </div>
 
@@ -332,7 +315,7 @@ function NotesTab() {
       {showAdd && (
         <form
           onSubmit={handleCreate}
-          className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6"
+          className="rounded-lg border border-[var(--border)] bg-white p-4 mb-4"
         >
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
             New Note
@@ -393,10 +376,12 @@ function NotesTab() {
                     key={c.name}
                     type="button"
                     title={c.name}
+                    aria-label={c.name}
+                    aria-pressed={color === c.value}
                     onClick={() => setColor(c.value)}
                     className={`h-7 w-7 rounded-full border-2 ${
                       color === c.value
-                        ? "border-[var(--accent-admin)]"
+                        ? "border-[var(--text-primary)]"
                         : "border-[var(--border)]"
                     }`}
                     style={{ background: c.value || "#ffffff" }}
@@ -411,7 +396,7 @@ function NotesTab() {
             </Button>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               onClick={() => setShowAdd(false)}
             >
               Cancel
@@ -424,31 +409,27 @@ function NotesTab() {
       {notes === undefined ? (
         <p className="text-[13px] text-[var(--text-muted)] py-8">Loading...</p>
       ) : notes.length === 0 ? (
-        <div className="text-center py-12 rounded-xl border border-[var(--border)] bg-white">
-          <NotebookPen className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-          <p className="text-[13px] text-[var(--text-muted)]">
-            No notes here yet. Click "New Note" to start.
-          </p>
-        </div>
+        <EmptyState icon={NotebookPen} title={'No notes here yet. Click "New Note" to start.'} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {notes.map((n: any) => (
             <div
               key={n._id}
-              className="rounded-xl border border-[var(--border)] p-4 flex flex-col"
+              className="rounded-lg border border-[var(--border)] p-4 flex flex-col"
               style={{ background: n.color || "#ffffff" }}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
-                <p className="font-semibold text-[15px] text-[var(--text-primary)] break-words">
+                <p className="font-medium text-[14px] text-[var(--text-primary)] break-words">
                   {n.title}
                 </p>
                 <button
                   onClick={() => togglePin({ noteId: n._id })}
                   title={n.pinned ? "Unpin" : "Pin"}
-                  className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] shrink-0"
+                  aria-label={n.pinned ? "Unpin note" : "Pin note"}
+                  className="inline-flex items-center justify-center h-7 w-7 -mt-1 -mr-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5 transition-colors shrink-0"
                 >
                   {n.pinned ? (
-                    <Pin className="h-4 w-4 fill-[var(--accent-admin)] text-[var(--accent-admin-text)]" />
+                    <Pin className="h-4 w-4 fill-[var(--text-primary)] text-[var(--text-primary)]" />
                   ) : (
                     <PinOff className="h-4 w-4" />
                   )}
@@ -456,7 +437,7 @@ function NotesTab() {
               </div>
 
               {n.content && (
-                <p className="text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap break-words mb-2">
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap break-words mb-2">
                   {n.content}
                 </p>
               )}
@@ -469,10 +450,10 @@ function NotesTab() {
                       onClick={() =>
                         toggleChecklistItem({ noteId: n._id, index: i })
                       }
-                      className="flex items-center gap-2 text-[12px] text-left w-full"
+                      className="flex items-center gap-2 text-[13px] text-left w-full"
                     >
                       {item.done ? (
-                        <CheckSquare className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                        <CheckSquare className="h-3.5 w-3.5 text-[var(--accent-employee-text)] shrink-0" />
                       ) : (
                         <Square className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                       )}
@@ -501,19 +482,19 @@ function NotesTab() {
                     key={i}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/70 text-[var(--text-secondary)] border border-[var(--border)]"
                   >
-                    <TagIcon className="h-2.5 w-2.5" />
+                    <TagIcon className="h-3 w-3" />
                     {t}
                   </span>
                 ))}
                 {n.remindAt && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700">
-                    <Bell className="h-2.5 w-2.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)]">
+                    <Bell className="h-3 w-3" />
                     {new Date(n.remindAt).toLocaleDateString()}
                   </span>
                 )}
                 {n.convertedTo && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 text-green-700">
-                    <ArrowRightCircle className="h-2.5 w-2.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]">
+                    <ArrowRightCircle className="h-3 w-3" />
                     {n.convertedTo.kind}
                   </span>
                 )}
@@ -615,10 +596,11 @@ function IconBtn({
     <button
       onClick={onClick}
       title={label}
-      className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+      aria-label={label}
+      className={`flex items-center gap-1.5 h-8 px-2 rounded-md text-[12px] font-medium text-[var(--text-muted)] transition-colors ${
         danger
-          ? "text-[var(--danger)] hover:bg-[var(--danger)]/10"
-          : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          ? "hover:text-[var(--danger)] hover:bg-[var(--danger-dim)]"
+          : "hover:text-[var(--text-primary)] hover:bg-black/5"
       }`}
     >
       {children}
@@ -733,9 +715,11 @@ function EditNoteModal({
                 key={c.name}
                 type="button"
                 onClick={() => setColor(c.value)}
+                aria-label={c.name}
+                aria-pressed={color === c.value}
                 className={`h-7 w-7 rounded-full border-2 ${
                   color === c.value
-                    ? "border-[var(--accent-admin)]"
+                    ? "border-[var(--text-primary)]"
                     : "border-[var(--border)]"
                 }`}
                 style={{ background: c.value || "#ffffff" }}
@@ -750,6 +734,7 @@ function EditNoteModal({
               <div key={i} className="flex items-center gap-2">
                 <button
                   type="button"
+                  aria-label={item.done ? "Mark as not done" : "Mark as done"}
                   onClick={() =>
                     setChecklist((cl) =>
                       cl.map((it, idx) =>
@@ -759,7 +744,7 @@ function EditNoteModal({
                   }
                 >
                   {item.done ? (
-                    <CheckSquare className="h-4 w-4 text-green-600" />
+                    <CheckSquare className="h-4 w-4 text-[var(--accent-employee-text)]" />
                   ) : (
                     <Square className="h-4 w-4 text-[var(--text-muted)]" />
                   )}
@@ -778,7 +763,8 @@ function EditNoteModal({
                   onClick={() =>
                     setChecklist((cl) => cl.filter((_, idx) => idx !== i))
                   }
-                  className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                  aria-label="Remove item"
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -817,7 +803,7 @@ function EditNoteModal({
           <Button onClick={save} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
         </div>
@@ -929,7 +915,7 @@ function ConvertModal({
       <div className="space-y-4">
         <div>
           <label className={labelCls}>Convert into</label>
-          <div className="flex gap-1.5 p-0.5 rounded-lg bg-[var(--bg-hover)]">
+          <div className="flex gap-0.5 p-0.5 rounded-lg border border-[var(--border)] bg-[var(--bg-hover)]">
             {[
               { k: "task" as const, l: "Individual Task" },
               { k: "calendar" as const, l: "Content Calendar" },
@@ -938,10 +924,11 @@ function ConvertModal({
               <button
                 key={k}
                 onClick={() => setKind(k)}
-                className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+                aria-pressed={kind === k}
+                className={`flex-1 px-3 py-1 rounded-md text-[12px] font-medium transition-colors ${
                   kind === k
-                    ? "bg-white shadow-sm text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    ? "bg-white text-[var(--text-primary)] border border-[var(--border)]"
+                    : "text-[var(--text-muted)] border border-transparent hover:text-[var(--text-primary)]"
                 }`}
               >
                 {l}
@@ -1065,7 +1052,7 @@ function ConvertModal({
           </div>
         )}
 
-        <div className="rounded-lg bg-[var(--bg-hover)] p-3 text-[12px] text-[var(--text-secondary)]">
+        <div className="rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
           <span className="font-medium text-[var(--text-primary)]">
             {note.title || "Untitled note"}
           </span>
@@ -1076,7 +1063,7 @@ function ConvertModal({
           <Button onClick={submit} disabled={busy}>
             {busy ? "Converting..." : "Convert"}
           </Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
         </div>
@@ -1188,7 +1175,7 @@ function AddMomModal({
           <Button onClick={submit} disabled={busy}>
             {busy ? "Adding..." : "Add MoM"}
           </Button>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
         </div>
@@ -1267,31 +1254,30 @@ function WorklogTab() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-6">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <button
           onClick={() => setDate(shiftDate(date, -1))}
-          className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+          aria-label="Previous day"
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
-          <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
+          <ChevronLeft className="h-4 w-4" />
         </button>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
         />
         <button
           onClick={() => setDate(shiftDate(date, 1))}
-          className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+          aria-label="Next day"
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
-          <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+          <ChevronRight className="h-4 w-4" />
         </button>
-        <button
-          onClick={() => setDate(getTodayStr())}
-          className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-        >
+        <Button variant="secondary" onClick={() => setDate(getTodayStr())}>
           Today
-        </button>
+        </Button>
         <span className="text-[12px] text-[var(--text-muted)] ml-1">
           {formatDate(date)}
         </span>
@@ -1299,7 +1285,7 @@ function WorklogTab() {
 
       <form
         onSubmit={handleAdd}
-        className="rounded-xl border border-[var(--border)] bg-white p-5 mb-6"
+        className="rounded-lg border border-[var(--border)] bg-white p-4 mb-4"
       >
         <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
           Log work for {formatDate(date)}
@@ -1328,7 +1314,7 @@ function WorklogTab() {
             placeholder={"One task per line.\n\ne.g.\nDrafted Feb content calendar\nReviewed influencer outreach list\nApproved reel edits"}
             className={`${inputCls} resize-y`}
           />
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+          <p className="mt-1 text-[12px] text-[var(--text-muted)]">
             Each line is saved as a separate line item. Tick it off when done —
             unticked items carry forward to the next day. Use &quot;Convert to
             self task&quot; on a line item to turn it into a real task.
@@ -1347,12 +1333,7 @@ function WorklogTab() {
       {entries === undefined ? (
         <p className="text-[13px] text-[var(--text-muted)] py-8">Loading...</p>
       ) : entries.length === 0 ? (
-        <div className="text-center py-12 rounded-xl border border-[var(--border)] bg-white">
-          <ClipboardList className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-          <p className="text-[13px] text-[var(--text-muted)]">
-            No worklog entries for this day.
-          </p>
-        </div>
+        <EmptyState icon={ClipboardList} title="No worklog entries for this day." />
       ) : (
         <div className="space-y-3">
           {entries.map((e: any) => {
@@ -1363,7 +1344,7 @@ function WorklogTab() {
             return (
             <div
               key={e._id}
-              className="rounded-xl border border-[var(--border)] bg-white p-4"
+              className="rounded-lg border border-[var(--border)] bg-white p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1384,7 +1365,7 @@ function WorklogTab() {
                           );
                         }
                       }}
-                      className="h-4 w-4 rounded border-[var(--border)] accent-emerald-600 cursor-pointer shrink-0"
+                      className="h-4 w-4 rounded border-[var(--border)] accent-[var(--text-primary)] cursor-pointer shrink-0"
                     />
                   )}
                   <span
@@ -1394,13 +1375,11 @@ function WorklogTab() {
                     {e.brandName}
                   </span>
                   {e.isTask && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Task
-                    </span>
+                    <Badge>Task</Badge>
                   )}
                   {!isDone && e.carryOverDays > 0 && (
                     <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700"
+                      className="inline-flex items-center px-1.5 py-px rounded text-[11px] leading-[16px] font-medium whitespace-nowrap bg-[var(--warning-dim)] text-[var(--warning)]"
                       title={
                         e.isTask
                           ? "Not completed by its original deadline, rolled forward each day"
@@ -1413,17 +1392,17 @@ function WorklogTab() {
                 </div>
                 <div className="flex items-center gap-2">
                   {!e.isTask && !isDone && (
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => {
                         setConvertingEntry(e);
                         setConvTitle(e.content.slice(0, 80));
                         setConvDeadline("");
                         setConvDuration("");
                       }}
-                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                     >
                       Convert to self task
-                    </button>
+                    </Button>
                   )}
                   {/* Status — only for task-backed items */}
                   {e.isTask && (
@@ -1446,7 +1425,7 @@ function WorklogTab() {
                         );
                       }
                     }}
-                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   >
                     <option value="pending">Pending</option>
                     <option value="in-progress">In Progress</option>
@@ -1480,7 +1459,7 @@ function WorklogTab() {
                         );
                       }
                     }}
-                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2 py-1 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
                   )}
                   <button
@@ -1488,13 +1467,15 @@ function WorklogTab() {
                       setEditingId(e._id);
                       setEditContent(e.content);
                     }}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    aria-label="Edit entry"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setDeletingId(e._id)}
-                    className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                    aria-label="Delete entry"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1522,7 +1503,7 @@ function WorklogTab() {
                       Save
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       onClick={() => setEditingId(null)}
                     >
                       Cancel
@@ -1608,7 +1589,7 @@ function WorklogTab() {
             </div>
             <div className="flex gap-2 justify-end">
               <Button
-                variant="secondary"
+                variant="ghost"
                 onClick={() => setConvertingEntry(null)}
               >
                 Cancel
@@ -1670,7 +1651,7 @@ function Modal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-xl border border-[var(--border)] w-full max-w-xl my-8 p-6"
+        className="bg-white rounded-lg border border-[var(--border)] shadow-lg w-full max-w-xl my-8 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
@@ -1679,9 +1660,10 @@ function Modal({
           </h3>
           <button
             onClick={onClose}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            aria-label="Close"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
         {children}

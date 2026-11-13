@@ -4,9 +4,38 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Panel,
+  PanelEmpty,
+  SegmentedTabs,
+  StatStrip,
+  StatTile,
+  StatusBadge,
+} from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { ChevronLeft, ChevronRight, FileText, ClipboardList } from "lucide-react";
+import { taskStatusMeta } from "@/lib/status";
+import { fieldClass, iconButtonClass } from "@/components/ui/classes";
+
+const ICON_BTN = iconButtonClass;
+const FIELD = fieldClass;
+const TH = "px-4 py-2 text-left text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap";
+// Badge variant="warning" as a class, for the one chip here that needs a title attribute.
+const WARN_BADGE =
+  "inline-flex items-center px-1.5 py-px font-medium text-[11px] leading-[16px] whitespace-nowrap rounded bg-[var(--warning-dim)] text-[var(--warning)]";
+
+/** Brand identity: its colour as a dot beside the name. */
+function BrandName({ color, name, className = "" }: { color: string; name: string; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 min-w-0 ${className}`}>
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
 
 function getTodayStr(): string {
   const d = new Date();
@@ -55,11 +84,12 @@ export default function ManagerWorklogPanel() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
           value={managerId}
           onChange={(e) => setManagerId(e.target.value)}
-          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] min-w-[220px]"
+          aria-label="Brand manager"
+          className={`${FIELD} min-w-[220px]`}
         >
           <option value="">Select a brand manager…</option>
           {managers.map((m: any) => (
@@ -71,62 +101,53 @@ export default function ManagerWorklogPanel() {
         </select>
 
         {managerId && (
-          <div className="flex items-center gap-1.5 p-0.5 rounded-lg bg-[var(--bg-hover)]">
-            {(["day", "report"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                  mode === m
-                    ? "bg-white shadow-sm text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                {m === "day" ? "Day view" : "Report"}
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "day", label: "Day view" },
+              { value: "report", label: "Report" },
+            ]}
+          />
         )}
       </div>
 
       {!managerId && (
-        <div className="text-center py-12 rounded-xl border border-[var(--border)] bg-white">
-          <ClipboardList className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-          <p className="text-[13px] text-[var(--text-muted)]">
-            Pick a brand manager to view their brand-wise worklog.
-          </p>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="Pick a brand manager to view their brand-wise worklog."
+        />
       )}
 
       {/* DAY VIEW */}
       {managerId && mode === "day" && (
         <div>
-          <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <button
               onClick={() => setDate(shiftDate(date, -1))}
-              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+              className={ICON_BTN}
+              aria-label="Previous day"
             >
-              <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+              aria-label="Date"
+              className={FIELD}
             />
             <button
               onClick={() => setDate(shiftDate(date, 1))}
-              className="p-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-hover)]"
+              className={ICON_BTN}
+              aria-label="Next day"
             >
-              <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronRight className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => setDate(getTodayStr())}
-              className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            >
+            <Button variant="secondary" onClick={() => setDate(getTodayStr())}>
               Today
-            </button>
-            <span className="text-[12px] text-[var(--text-muted)] ml-1">
+            </Button>
+            <span className="text-[13px] font-medium text-[var(--text-secondary)] ml-1">
               {fmtDay(date)}
             </span>
           </div>
@@ -135,170 +156,109 @@ export default function ManagerWorklogPanel() {
             <p className="text-[13px] text-[var(--text-muted)] py-8">Loading...</p>
           ) : day === null ? (
             <p className="text-[13px] text-[var(--text-secondary)] py-8">
-              You don't have access to this manager's worklog.
+              You don&apos;t have access to this manager&apos;s worklog.
             </p>
           ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Supervising (open)
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {day.summary.supervisingOpen ?? 0}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Brands logged
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {day.summary.brandsLogged}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Hours
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {day.summary.totalHours}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Tasks handled
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {day.summary.tasksHandled}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    MoMs
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {day.summary.momCount}
-                  </p>
-                </Card>
-              </div>
+            <div className="flex flex-col gap-4">
+              <StatStrip>
+                <StatTile label="Supervising (open)" value={day.summary.supervisingOpen ?? 0} />
+                <StatTile label="Brands logged" value={day.summary.brandsLogged} />
+                <StatTile label="Hours" value={day.summary.totalHours} />
+                <StatTile label="Tasks handled" value={day.summary.tasksHandled} />
+                <StatTile label="MoMs" value={day.summary.momCount} />
+              </StatStrip>
 
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
-                Brand-wise worklog
-              </h3>
-              {day.entries.length === 0 ? (
-                <p className="text-[13px] text-[var(--text-muted)] mb-6">
-                  No worklog entries saved for this day.
-                </p>
-              ) : (
-                <div className="space-y-3 mb-6">
-                  {day.entries.map((e: any) => (
-                    <div
-                      key={e._id}
-                      className="rounded-xl border border-[var(--border)] bg-white p-4"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                            style={{ background: e.brandColor }}
-                          >
-                            {e.brandName}
-                          </span>
-                          {e.done && (
-                            <span className="text-[11px] font-medium text-[var(--accent-employee-text)] uppercase tracking-wider">
-                              Done
-                            </span>
-                          )}
-                          {!e.done && (e.carryOverDays ?? 0) > 0 && (
-                            <span
-                              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-700 whitespace-nowrap"
-                              title="Not completed by its original deadline, rolled forward each day"
-                            >
-                              Carried over · {e.carryOverDays}d
-                            </span>
-                          )}
+              <Panel title="Brand-wise worklog" count={day.entries.length}>
+                {day.entries.length === 0 ? (
+                  <PanelEmpty>No worklog entries saved for this day.</PanelEmpty>
+                ) : (
+                  <div className="divide-y divide-[var(--border-subtle)]">
+                    {day.entries.map((e: any) => (
+                      <div key={e._id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <BrandName
+                              color={e.brandColor}
+                              name={e.brandName}
+                              className="text-[14px] font-medium text-[var(--text-primary)]"
+                            />
+                            {e.done && <Badge variant="employee">Done</Badge>}
+                            {!e.done && (e.carryOverDays ?? 0) > 0 && (
+                              <span
+                                className={WARN_BADGE}
+                                title="Not completed by its original deadline, rolled forward each day"
+                              >
+                                Carried over · {e.carryOverDays}d
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 text-[12px] tabular-nums text-[var(--text-muted)]">
+                            {e.taskDeadline != null && (
+                              <span className="whitespace-nowrap">
+                                Due {new Date(e.taskDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                              </span>
+                            )}
+                            {e.hoursSpent != null && <span>{e.hoursSpent}h</span>}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {e.taskDeadline != null && (
-                            <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
-                              Due {new Date(e.taskDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </span>
-                          )}
-                          {e.hoursSpent != null && (
-                            <span className="text-[11px] text-[var(--text-muted)]">
-                              {e.hoursSpent}h
-                            </span>
-                          )}
-                        </div>
+                        <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
+                          {e.content}
+                        </p>
                       </div>
-                      <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
-                        {e.content}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </Panel>
 
-              <div className="mb-6">
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-1">
-                  Supervising: open delegated tasks
-                </h3>
-                <p className="text-[12px] text-[var(--text-muted)] mb-2">
+              <Panel
+                title="Supervising: open delegated tasks"
+                count={(day.supervising ?? []).length}
+              >
+                <p className="px-4 pt-3 text-[12px] text-[var(--text-muted)]">
                   Pending, in-progress and review tasks this manager
                   delegated and is responsible for tracking.
                 </p>
                 {(day.supervising ?? []).length === 0 ? (
-                  <p className="text-[13px] text-[var(--text-muted)]">None.</p>
+                  <PanelEmpty>None.</PanelEmpty>
                 ) : (
-                  <div className="rounded-xl border border-[var(--border)] bg-white overflow-x-auto">
-                    <table className="w-full text-[12px]">
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-[13px]">
                       <thead>
-                        <tr className="border-b border-[var(--border)] text-left text-[var(--text-muted)]">
-                          <th className="px-4 py-2.5 font-medium">Task</th>
-                          <th className="px-4 py-2.5 font-medium">Assigned to</th>
-                          <th className="px-4 py-2.5 font-medium">Brand</th>
-                          <th className="px-4 py-2.5 font-medium">Status</th>
-                          <th className="px-4 py-2.5 font-medium">Deadline</th>
+                        <tr className="border-y border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+                          <th className={TH}>Task</th>
+                          <th className={TH}>Assigned to</th>
+                          <th className={TH}>Brand</th>
+                          <th className={TH}>Status</th>
+                          <th className={TH}>Deadline</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
                         {day.supervising.map((t: any) => {
-                          const sc =
-                            t.status === "review"
-                              ? { c: "#8b5cf6", b: "rgba(139,92,246,0.12)" }
-                              : t.status === "in-progress"
-                                ? { c: "#f59e0b", b: "rgba(245,158,11,0.14)" }
-                                : { c: "#6b7280", b: "var(--bg-hover)" };
+                          const meta = taskStatusMeta(t.status);
                           return (
                             <tr
                               key={t._id}
                               onClick={() => setOpenTaskId(t._id)}
-                              className="border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)]"
+                              className="cursor-pointer hover:bg-[var(--bg-primary)] transition-colors"
                               title="Open task"
                             >
                               <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium max-w-[240px]">
                                 <span className="line-clamp-2">{t.title}</span>
                               </td>
-                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">
+                              <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">
                                 {t.assigneeName}
                               </td>
                               <td className="px-4 py-2.5">
-                                <span
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white"
-                                  style={{ background: t.brandColor }}
-                                >
-                                  {t.brandName}
-                                </span>
+                                <BrandName
+                                  color={t.brandColor}
+                                  name={t.brandName}
+                                  className="text-[12px] text-[var(--text-secondary)]"
+                                />
                               </td>
                               <td className="px-4 py-2.5">
-                                <span
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize"
-                                  style={{ background: sc.b, color: sc.c }}
-                                >
-                                  {t.status}
-                                </span>
+                                <StatusBadge color={meta.dot} label={meta.label} />
                               </td>
-                              <td className="px-4 py-2.5 text-[var(--text-secondary)]">
+                              <td className="px-4 py-2.5 text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                 {t.deadline
                                   ? new Date(t.deadline).toLocaleDateString(
                                       "en-US",
@@ -313,62 +273,66 @@ export default function ManagerWorklogPanel() {
                     </table>
                   </div>
                 )}
-              </div>
+              </Panel>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
-                    Tasks handled
-                  </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                <Panel title="Tasks handled" count={day.tasks.length}>
                   {day.tasks.length === 0 ? (
-                    <p className="text-[13px] text-[var(--text-muted)]">None.</p>
+                    <PanelEmpty>None.</PanelEmpty>
                   ) : (
-                    <div className="space-y-2">
-                      {day.tasks.map((t: any) => (
-                        <div
-                          key={t._id}
-                          onClick={() => setOpenTaskId(t._id)}
-                          title="Open task"
-                          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] cursor-pointer hover:bg-[var(--bg-hover)]"
-                        >
-                          <p className="font-medium text-[var(--text-primary)]">
-                            {t.title}
-                          </p>
-                          <p className="text-[var(--text-muted)]">
-                            {t.brandName} · {t.status}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="divide-y divide-[var(--border-subtle)]">
+                      {day.tasks.map((t: any) => {
+                        const meta = taskStatusMeta(t.status);
+                        return (
+                          <div
+                            key={t._id}
+                            onClick={() => setOpenTaskId(t._id)}
+                            title="Open task"
+                            className="flex items-center justify-between gap-3 px-4 py-2.5 cursor-pointer hover:bg-[var(--bg-primary)] transition-colors"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">
+                                {t.title}
+                              </p>
+                              <p className="text-[12px] text-[var(--text-muted)] truncate">
+                                {t.brandName}
+                              </p>
+                            </div>
+                            <StatusBadge
+                              className="w-[88px] shrink-0"
+                              color={meta.dot}
+                              label={meta.label}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
-                    MoMs that day
-                  </h3>
+                </Panel>
+                <Panel title="MoMs that day" count={day.moms.length}>
                   {day.moms.length === 0 ? (
-                    <p className="text-[13px] text-[var(--text-muted)]">None.</p>
+                    <PanelEmpty>None.</PanelEmpty>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="divide-y divide-[var(--border-subtle)]">
                       {day.moms.map((m: any) => (
                         <div
                           key={m._id}
-                          className="rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-[12px] flex items-center gap-2"
+                          className="flex items-center gap-2 px-4 py-2.5 text-[13px]"
                         >
-                          <FileText className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-                          <span className="font-medium text-[var(--text-primary)]">
+                          <FileText className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                          <span className="font-medium text-[var(--text-primary)] truncate">
                             {m.title}
                           </span>
-                          <span className="text-[var(--text-muted)]">
+                          <span className="text-[12px] text-[var(--text-muted)] shrink-0">
                             · {m.brandName}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </Panel>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -376,27 +340,29 @@ export default function ManagerWorklogPanel() {
       {/* REPORT VIEW */}
       {managerId && mode === "report" && (
         <div>
-          <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <div>
-              <label className="text-[11px] text-[var(--text-muted)] block mb-1">
+              <label className="text-[12px] font-medium text-[var(--text-muted)] block mb-1">
                 From
               </label>
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+                aria-label="From"
+                className={FIELD}
               />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--text-muted)] block mb-1">
+              <label className="text-[12px] font-medium text-[var(--text-muted)] block mb-1">
                 To
               </label>
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+                aria-label="To"
+                className={FIELD}
               />
             </div>
           </div>
@@ -405,44 +371,16 @@ export default function ManagerWorklogPanel() {
             <p className="text-[13px] text-[var(--text-muted)] py-8">Loading...</p>
           ) : report === null ? (
             <p className="text-[13px] text-[var(--text-secondary)] py-8">
-              You don't have access to this manager's worklog.
+              You don&apos;t have access to this manager&apos;s worklog.
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Brands
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {report.totals.brands}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Days logged
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {report.totals.daysLogged}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Total hours
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {report.totals.totalHours}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    MoMs
-                  </p>
-                  <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-                    {report.totals.momCount}
-                  </p>
-                </Card>
-              </div>
+              <StatStrip className="mb-4">
+                <StatTile label="Brands" value={report.totals.brands} />
+                <StatTile label="Days logged" value={report.totals.daysLogged} />
+                <StatTile label="Total hours" value={report.totals.totalHours} />
+                <StatTile label="MoMs" value={report.totals.momCount} />
+              </StatStrip>
 
               {report.brands.length === 0 ? (
                 <p className="text-[13px] text-[var(--text-muted)]">
@@ -453,16 +391,15 @@ export default function ManagerWorklogPanel() {
                   {report.brands.map((b: any) => (
                     <div
                       key={b.brandId}
-                      className="rounded-xl border border-[var(--border)] bg-white p-4"
+                      className="rounded-lg border border-[var(--border)] bg-white p-4"
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-semibold text-white"
-                          style={{ background: b.brandColor }}
-                        >
-                          {b.brandName}
-                        </span>
-                        <div className="flex items-center gap-4 text-[11px] text-[var(--text-muted)]">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <BrandName
+                          color={b.brandColor}
+                          name={b.brandName}
+                          className="text-[15px] font-semibold text-[var(--text-primary)]"
+                        />
+                        <div className="flex items-center gap-4 shrink-0 text-[12px] tabular-nums text-[var(--text-muted)]">
                           <span>{b.daysLogged} days</span>
                           <span>{b.totalHours}h</span>
                           <span>{b.momCount} MoMs</span>
@@ -472,20 +409,20 @@ export default function ManagerWorklogPanel() {
 
                       {b.entries.length > 0 && (
                         <div className="mb-3">
-                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                          <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">
                             Worklog by day
                           </p>
                           <div className="space-y-1.5">
                             {b.entries.map((e: any, i: number) => (
-                              <div key={i} className="text-[12px]">
-                                <span className="text-[var(--text-muted)] mr-2">
+                              <div key={i} className="text-[13px]">
+                                <span className="tabular-nums text-[var(--text-muted)] mr-2">
                                   {e.date}
                                 </span>
                                 <span className="text-[var(--text-primary)]">
                                   {e.content}
                                 </span>
                                 {e.hoursSpent != null && (
-                                  <span className="text-[var(--text-muted)]">
+                                  <span className="tabular-nums text-[var(--text-muted)]">
                                     {" "}
                                     ({e.hoursSpent}h)
                                   </span>
@@ -498,17 +435,17 @@ export default function ManagerWorklogPanel() {
 
                       {b.tasks.length > 0 && (
                         <div>
-                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                          <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">
                             Tasks
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {b.tasks.map((t: any) => (
                               <span
                                 key={t._id}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] bg-[var(--bg-hover)] text-[var(--text-secondary)]"
                               >
                                 {t.title}
-                                <span className="text-[var(--text-muted)]">
+                                <span className="tabular-nums text-[var(--text-muted)]">
                                   · {t.date ?? "-"}
                                 </span>
                               </span>

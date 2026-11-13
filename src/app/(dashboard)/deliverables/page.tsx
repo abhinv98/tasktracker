@@ -3,15 +3,27 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, Badge, Button, ConfirmModal, EmptyState, PageHeader, useToast, useCelebrate } from "@/components/ui";
+import { Card, Badge, Button, ConfirmModal, EmptyState, PageHeader, SegmentedTabs, useToast, useCelebrate } from "@/components/ui";
 import {
   Check, X, MessageSquare, ExternalLink, Paperclip, FileText,
   Image as ImageIcon, Eye, Trash2, ArrowRight, ShieldCheck, Users, UserCheck, Send, GitBranch, Loader2
 } from "lucide-react";
 import { FilePreviewModal } from "@/components/ui/FilePreviewModal";
 import type { Id } from "@/convex/_generated/dataModel";
+import { fieldBaseClass } from "@/components/ui/classes";
 
 type TabType = "my" | "helper_reviews" | "team_approvals" | "brand_deliverables";
+
+// One look for every native field on this page (32px, same as <Input>).
+const FIELD = fieldBaseClass; // also on textareas, so no fixed height
+const AREA =
+  "px-2.5 py-2 rounded-md border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:border-transparent";
+// Informs: neutral. Asks the reader to do something: warning.
+const NOTE = "rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)]";
+const NOTE_WARNING = "rounded-md bg-[var(--warning-dim)] px-3 py-2 text-[12px] text-[var(--warning)]";
+const FIELD_LABEL = "block text-[12px] font-medium text-[var(--text-secondary)] mb-1";
+
+type Mark = { variant: "neutral" | "success" | "danger"; label: string };
 
 export default function DeliverablesPage() {
   const user = useQuery(api.users.getCurrentUser);
@@ -407,23 +419,23 @@ export default function DeliverablesPage() {
     }
   }
 
-  const STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-    pending: { bg: "var(--accent-admin-dim)", text: "var(--accent-admin)", label: "Pending Review" },
-    approved: { bg: "var(--accent-employee-dim)", text: "var(--accent-employee)", label: "Approved" },
-    rejected: { bg: "var(--danger-dim)", text: "var(--danger)", label: "Changes Requested" },
+  const STATUS_STYLE: Record<string, Mark> = {
+    pending: { variant: "neutral", label: "Pending Review" },
+    approved: { variant: "success", label: "Approved" },
+    rejected: { variant: "danger", label: "Changes Requested" },
   };
 
-  const TL_STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-    pending: { bg: "#FEF3C7", text: "#D97706", label: "TL Review Pending" },
-    approved: { bg: "#D1FAE5", text: "#059669", label: "TL Approved" },
-    changes_requested: { bg: "var(--danger-dim)", text: "var(--danger)", label: "TL Requested Changes" },
-    rejected: { bg: "var(--danger-dim)", text: "var(--danger)", label: "TL Rejected" },
+  const TL_STATUS_STYLE: Record<string, Mark> = {
+    pending: { variant: "neutral", label: "TL Review Pending" },
+    approved: { variant: "success", label: "TL Approved" },
+    changes_requested: { variant: "danger", label: "TL Requested Changes" },
+    rejected: { variant: "danger", label: "TL Rejected" },
   };
 
-  const MA_STATUS_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-    pending: { bg: "#EDE9FE", text: "#7C3AED", label: "Assignee Review Pending" },
-    approved: { bg: "#D1FAE5", text: "#059669", label: "Assignee Approved" },
-    changes_requested: { bg: "var(--danger-dim)", text: "var(--danger)", label: "Assignee Requested Changes" },
+  const MA_STATUS_STYLE: Record<string, Mark> = {
+    pending: { variant: "neutral", label: "Assignee Review Pending" },
+    approved: { variant: "success", label: "Assignee Approved" },
+    changes_requested: { variant: "danger", label: "Assignee Requested Changes" },
   };
 
   function renderFiles(files: { name: string; url: string }[]) {
@@ -439,9 +451,9 @@ export default function DeliverablesPage() {
               onClick={() => setPreviewFile(file)}
               className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
             >
-              {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+              {isImage ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}
               <span className="max-w-[150px] truncate">{file.name}</span>
-              <Eye className="h-3 w-3 shrink-0" />
+              <Eye className="h-3.5 w-3.5 shrink-0" />
             </button>
           );
         })}
@@ -465,20 +477,21 @@ export default function DeliverablesPage() {
             }
           }}
           placeholder="Reason for changes..."
-          className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--danger)]"
+          className={`flex-1 min-w-0 ${FIELD}`}
           autoFocus
         />
-        <button
+        <Button
+          variant="secondary"
           onClick={() => onReject(id)}
           disabled={noteIsEmpty}
-          className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--danger)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           title={noteIsEmpty ? "Add a reason first" : "Send"}
         >
           Send
-        </button>
+        </Button>
         <button
           onClick={() => setShowRejectForm(null)}
-          className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          aria-label="Cancel request for changes"
+          className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -487,7 +500,7 @@ export default function DeliverablesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <div className="p-4 sm:p-6">
       <PageHeader
         title="Deliverables"
         actions={
@@ -499,34 +512,25 @@ export default function DeliverablesPage() {
         }
       />
 
+      <div className="flex flex-col gap-4">
       {/* Tabs */}
       {availableTabs.length > 1 && (
-        <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-hover)]">
-          {availableTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
-                activeTab === tab.id
-                  ? "bg-white text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          value={activeTab}
+          onChange={setActiveTab}
+          options={availableTabs.map((tab) => ({
+            value: tab.id,
+            label: tab.label,
+            count: tab.count !== undefined && tab.count > 0 ? tab.count : undefined,
+          }))}
+          className="self-start max-w-full overflow-x-auto"
+        />
       )}
 
       {/* Submit form for employees */}
       {showSubmit && (
         <Card className="p-4">
-          <h3 className="font-semibold text-[13px] text-[var(--text-primary)] mb-3">
+          <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
             {editingDeliverableId ? "Edit Deliverable" : "Submit a Deliverable"}
           </h3>
           <form onSubmit={(e) => handleSubmit(e, "tl")} className="flex flex-col gap-3">
@@ -534,7 +538,7 @@ export default function DeliverablesPage() {
               <select
                 value={submitTaskId}
                 onChange={(e) => setSubmitTaskId(e.target.value)}
-                className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               >
                 <option value="">Select task...</option>
                 {myTasks?.filter((t) => t.status !== "done").map((t) => (
@@ -546,31 +550,31 @@ export default function DeliverablesPage() {
               value={submitMessage}
               onChange={(e) => setSubmitMessage(e.target.value)}
               placeholder="Describe your deliverable..."
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] min-h-[60px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              className={`${AREA} min-h-[60px]`}
               required
             />
             <input
               value={submitLink}
               onChange={(e) => setSubmitLink(e.target.value)}
               placeholder="Link (optional)"
-              className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              className={FIELD}
             />
             {editingDeliverableId && editKeptFiles.length > 0 && (
-              <div className="px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+              <div className={NOTE_WARNING}>
                 <div className="font-medium mb-1">Existing files on this deliverable:</div>
                 <div className="flex flex-wrap gap-1.5">
                   {editKeptFiles.map((f, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white text-[11px] text-amber-900">
-                      <FileText className="h-3 w-3" />
+                    <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white text-[12px] text-[var(--text-secondary)]">
+                      <FileText className="h-3.5 w-3.5" />
                       <span className="max-w-[200px] truncate">{f.name}</span>
                     </span>
                   ))}
                 </div>
-                <div className="mt-1.5 italic">Uploading new files will replace this set. Re-upload anything you want to keep.</div>
+                <div className="mt-1.5">Uploading new files will replace this set. Re-upload anything you want to keep.</div>
               </div>
             )}
             <div>
-              <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+              <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                 <Paperclip className="h-3.5 w-3.5" />
                 {editingDeliverableId ? "Replace files (optional)" : "Attach files (images, PDFs, etc.)"}
                 <input
@@ -588,14 +592,15 @@ export default function DeliverablesPage() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {submitFiles.map((f, i) => (
                     <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[12px] text-[var(--text-secondary)]">
-                      {f.type.startsWith("image/") ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                      {f.type.startsWith("image/") ? <ImageIcon className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                       <span className="max-w-[150px] truncate">{f.name}</span>
                       <button
                         type="button"
                         onClick={() => setSubmitFiles((prev) => prev.filter((_, j) => j !== i))}
-                        className="text-[var(--text-muted)] hover:text-[var(--danger)]"
+                        aria-label={`Remove ${f.name}`}
+                        className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </span>
                   ))}
@@ -605,35 +610,35 @@ export default function DeliverablesPage() {
             {editingDeliverableId ? (
               <div className="flex gap-2">
                 <Button type="submit" variant="primary" disabled={isSubmitting}>Save Changes</Button>
-                <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={resetSubmitForm}>Cancel</Button>
               </div>
             ) : (() => {
               const selected = myTasks?.find((t) => t._id === submitTaskId);
               const showAssignorBtn = !!selected?.assignedBy && selected.assignedBy !== user?._id;
               return (
                 <div className="flex flex-col gap-2">
-                  <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide">Submit to</p>
+                  <p className="text-[12px] font-medium text-[var(--text-muted)]">Submit to</p>
                   <div className="flex flex-wrap gap-2">
                     <Button type="submit" variant="primary" disabled={isSubmitting}>Team Lead</Button>
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                       onClick={() => handleSubmit(null, "bm")}
-                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                     >
                       Brand Manager
-                    </button>
+                    </Button>
                     {showAssignorBtn && (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                         onClick={() => handleSubmit(null, "as")}
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
                         Assignor
-                      </button>
+                      </Button>
                     )}
-                    <Button type="button" variant="secondary" onClick={resetSubmitForm}>Cancel</Button>
+                    <Button type="button" variant="ghost" onClick={resetSubmitForm}>Cancel</Button>
                   </div>
                 </div>
               );
@@ -653,69 +658,54 @@ export default function DeliverablesPage() {
             const maStatus = (d as any).mainAssigneeStatus as string | undefined;
             const maStyle = maStatus ? (MA_STATUS_STYLE[maStatus] ?? null) : null;
             const isSubTask = !!(d as any).isSubTask;
+            // One mark per approval: the overall badge is dropped only when a
+            // stage badge beside it already says the same thing.
+            const stageRepeatsOverall =
+              (status === "pending" && (maStatus === "pending" || tlStatus === "pending")) ||
+              (status === "rejected" &&
+                (maStatus === "changes_requested" || tlStatus === "changes_requested" || tlStatus === "rejected"));
+            const showOverall = !((maStyle || tlStyle) && stageRepeatsOverall);
 
             return (
               <Card key={d._id} className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {isSubTask && (
-                        <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                          HELPER
-                        </span>
-                      )}
-                      <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                      {isSubTask && <Badge className="shrink-0">Helper</Badge>}
+                      <p className="font-medium text-[14px] text-[var(--text-primary)]">
                         {d.taskTitle}
                       </p>
                     </div>
-                    <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                    <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                       {isSubTask && (d as any).parentTaskTitle && (
-                        <>Parent: <span className="font-semibold">{(d as any).parentTaskTitle}</span> &middot; </>
+                        <>Parent: <span className="font-medium text-[var(--text-primary)]">{(d as any).parentTaskTitle}</span> &middot; </>
                       )}
                       {d.briefTitle} &middot; by {d.submitterName} &middot;{" "}
                       {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                    {maStyle && (
-                      <span
-                        className="px-2 py-0.5 rounded-md text-[11px] font-medium"
-                        style={{ backgroundColor: maStyle.bg, color: maStyle.text }}
-                      >
-                        {maStyle.label}
-                      </span>
-                    )}
-                    {tlStyle && (
-                      <span
-                        className="px-2 py-0.5 rounded-md text-[11px] font-medium"
-                        style={{ backgroundColor: tlStyle.bg, color: tlStyle.text }}
-                      >
-                        {tlStyle.label}
-                      </span>
-                    )}
-                    <span
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium"
-                      style={{ backgroundColor: style.bg, color: style.text }}
-                    >
-                      {style.label}
-                    </span>
+                    {maStyle && <Badge variant={maStyle.variant}>{maStyle.label}</Badge>}
+                    {tlStyle && <Badge variant={tlStyle.variant}>{tlStyle.label}</Badge>}
+                    {showOverall && <Badge variant={style.variant}>{style.label}</Badge>}
                     {isAdmin && (
                       <button
                         onClick={() => setDeletingDeliverableId(d._id)}
-                        className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center justify-center h-8 w-8 -my-1.5 -mr-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         title="Delete deliverable"
+                        aria-label="Delete deliverable"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <p className="text-[12px] text-[var(--text-secondary)] mb-2">{d.message}</p>
+                <p className="text-[13px] text-[var(--text-secondary)] mb-2">{d.message}</p>
 
                 {d.link && (
-                  <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-2">
-                    <ExternalLink className="h-3 w-3" />
+                  <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[var(--accent-admin-text)] hover:underline mb-2">
+                    <ExternalLink className="h-3.5 w-3.5" />
                     {d.link}
                   </a>
                 )}
@@ -723,37 +713,37 @@ export default function DeliverablesPage() {
                 {renderFiles((d as any).files ?? [])}
 
                 {d.reviewNote && (
-                  <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                    <MessageSquare className="h-3 w-3 text-[var(--text-muted)] mt-0.5 shrink-0" />
+                  <div className={`flex items-start gap-2 mt-2 ${NOTE}`}>
+                    <MessageSquare className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                      <p className="font-medium text-[var(--text-primary)]">
                         {d.reviewerName ?? "Reviewer"}:
                       </p>
-                      <p className="text-[11px] text-[var(--text-secondary)]">{d.reviewNote}</p>
+                      <p>{d.reviewNote}</p>
                     </div>
                   </div>
                 )}
 
                 {(d as any).mainAssigneeReviewNote && (d as any).mainAssigneeReviewerName && (
-                  <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-purple-50 border border-purple-200">
-                    <UserCheck className="h-3 w-3 text-purple-600 mt-0.5 shrink-0" />
+                  <div className={`flex items-start gap-2 mt-2 ${NOTE}`}>
+                    <UserCheck className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[11px] font-medium text-purple-700">
+                      <p className="font-medium text-[var(--text-primary)]">
                         {(d as any).mainAssigneeReviewerName} (Main Assignee):
                       </p>
-                      <p className="text-[11px] text-purple-700">{(d as any).mainAssigneeReviewNote}</p>
+                      <p>{(d as any).mainAssigneeReviewNote}</p>
                     </div>
                   </div>
                 )}
 
                 {(d as any).teamLeadReviewNote && (d as any).teamLeadReviewerName && (
-                  <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200">
-                    <ShieldCheck className="h-3 w-3 text-amber-600 mt-0.5 shrink-0" />
+                  <div className={`flex items-start gap-2 mt-2 ${NOTE}`}>
+                    <ShieldCheck className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
                     <div>
-                      <p className="text-[11px] font-medium text-amber-700">
+                      <p className="font-medium text-[var(--text-primary)]">
                         {(d as any).teamLeadReviewerName} (Team Lead):
                       </p>
-                      <p className="text-[11px] text-amber-700">{(d as any).teamLeadReviewNote}</p>
+                      <p>{(d as any).teamLeadReviewNote}</p>
                     </div>
                   </div>
                 )}
@@ -777,13 +767,10 @@ export default function DeliverablesPage() {
                   if (!canEdit) return null;
                   return (
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                      <button
-                        onClick={() => openEdit(d)}
-                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--accent-admin)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => openEdit(d)}>
                         Edit
-                      </button>
-                      <span className="text-[11px] text-[var(--text-muted)] italic">
+                      </Button>
+                      <span className="text-[12px] text-[var(--text-muted)]">
                         {isSubTask ? "Editable until main assignee reviews" : "Editable until team lead reviews"}
                       </span>
                     </div>
@@ -793,23 +780,17 @@ export default function DeliverablesPage() {
                 {/* Admin actions: final approve/reject for pending deliverables (never on your own submissions) */}
                 {isAdmin && status === "pending" && d.submittedBy !== user?._id && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                    <button
-                      onClick={() => handleApprove(d._id, d.taskTitle)}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
-                    >
+                    <Button variant="primary" onClick={() => handleApprove(d._id, d.taskTitle)}>
                       <Check className="h-3.5 w-3.5" />
                       Approve
-                    </button>
+                    </Button>
                     {showRejectForm === d._id ? (
                       renderRejectForm(d._id, handleReject)
                     ) : (
-                      <button
-                        onClick={() => setShowRejectForm(d._id)}
-                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => setShowRejectForm(d._id)}>
                         <X className="h-3.5 w-3.5" />
                         Request Changes
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -824,24 +805,21 @@ export default function DeliverablesPage() {
                   return (
                   <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
                     {hctx?.inMasterBrief && !hctx?.hasDownstreamConnection && (
-                      <div className="mb-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                      <div className={`mb-2 ${NOTE_WARNING}`}>
                         This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor. You can hand off manually below for now.
                       </div>
                     )}
-                    <button
+                    <Button
+                      variant="secondary"
+                      aria-expanded={handoffDeliverableId === d._id}
                       onClick={() => setHandoffDeliverableId(handoffDeliverableId === d._id ? null : d._id)}
-                      className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                        handoffDeliverableId === d._id
-                          ? "bg-indigo-600 text-white"
-                          : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                      }`}
                     >
                       <GitBranch className="h-3.5 w-3.5" />
                       Hand Off to Team
-                    </button>
+                    </Button>
                     {handoffDeliverableId === d._id && (
-                      <div className="space-y-2 mt-2 p-3 rounded-lg bg-indigo-50 border border-indigo-200">
-                        <p className="text-[11px] font-medium text-indigo-700 mb-1">Hand off to another team for the next stage</p>
+                      <div className="space-y-2 mt-2 p-3 rounded-md bg-[var(--bg-primary)]">
+                        <p className="text-[12px] font-medium text-[var(--text-primary)] mb-1">Hand off to another team for the next stage</p>
                         <select
                           value={handoffTeam[d._id] ?? ""}
                           onChange={(e) => {
@@ -857,7 +835,7 @@ export default function DeliverablesPage() {
                               return n;
                             });
                           }}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className={`w-full ${FIELD}`}
                         >
                           <option value="">Select target team...</option>
                           {(allTeams ?? []).map((t: any) => (
@@ -875,7 +853,7 @@ export default function DeliverablesPage() {
                                 return n;
                               });
                             }}
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            className={`w-full ${FIELD}`}
                           >
                             <option value="">Select assignee from team...</option>
                             {(allUsers ?? [])
@@ -899,13 +877,13 @@ export default function DeliverablesPage() {
                             <>
                               {needPick && (
                                 <div>
-                                  <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Attach deliverable to</label>
+                                  <label className={FIELD_LABEL}>Attach deliverable to</label>
                                   <select
                                     value={choice}
                                     onChange={(e) =>
                                       setHandoffTargetChoice((prev) => ({ ...prev, [d._id]: e.target.value }))
                                     }
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${FIELD}`}
                                   >
                                     <option value="">Choose one...</option>
                                     <option value="__new__">Create a new task</option>
@@ -918,7 +896,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[11px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
+                                <p className="text-[12px] text-[var(--text-secondary)]">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -929,7 +907,7 @@ export default function DeliverablesPage() {
                                       setHandoffNewTitle((prev) => ({ ...prev, [d._id]: e.target.value }))
                                     }
                                     placeholder={`New task title (optional, defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${FIELD}`}
                                   />
                                   <textarea
                                     value={handoffNewDesc[d._id] ?? ""}
@@ -937,17 +915,17 @@ export default function DeliverablesPage() {
                                       setHandoffNewDesc((prev) => ({ ...prev, [d._id]: e.target.value }))
                                     }
                                     placeholder="Description for the new task (optional)"
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${AREA} min-h-[56px]`}
                                   />
                                   <div>
-                                    <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <label className={FIELD_LABEL}>Deadline (optional)</label>
                                     <input
                                       type="date"
                                       value={handoffDeadline[d._id] ?? ""}
                                       onChange={(e) =>
                                         setHandoffDeadline((prev) => ({ ...prev, [d._id]: e.target.value }))
                                       }
-                                      className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      className={`w-full ${FIELD}`}
                                     />
                                   </div>
                                 </>
@@ -956,10 +934,11 @@ export default function DeliverablesPage() {
                                 value={handoffNote[d._id] ?? ""}
                                 onChange={(e) => setHandoffNote((prev) => ({ ...prev, [d._id]: e.target.value }))}
                                 placeholder="Extra instructions (optional), appended to the handoff"
-                                className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                className={`w-full ${AREA} min-h-[48px]`}
                               />
                               <div className="flex gap-2">
-                                <button
+                                <Button
+                                  variant="primary"
                                   disabled={!canSubmit}
                                   onClick={async () => {
                                     const teamId = handoffTeam[d._id];
@@ -1030,17 +1009,13 @@ export default function DeliverablesPage() {
                                       /* toast optional */
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-indigo-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                                 >
                                   <GitBranch className="h-3.5 w-3.5" />
                                   Hand Off
-                                </button>
-                                <button
-                                  onClick={() => setHandoffDeliverableId(null)}
-                                  className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                                >
+                                </Button>
+                                <Button variant="ghost" onClick={() => setHandoffDeliverableId(null)}>
                                   Cancel
-                                </button>
+                                </Button>
                               </div>
                             </>
                           );
@@ -1067,46 +1042,40 @@ export default function DeliverablesPage() {
       {activeTab === "helper_reviews" && (
         <div className="space-y-3">
           {(mainAssigneePending ?? []).length === 0 && (
-            <Card className="p-6 text-center">
-              <p className="text-[13px] text-[var(--text-muted)]">No pending helper deliverables to review.</p>
-            </Card>
+            <EmptyState title="No pending helper deliverables to review." />
           )}
           {(mainAssigneePending ?? []).map((d: any) => (
             <Card key={d._id} className="p-4">
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                      HELPER
-                    </span>
-                    <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                    <Badge className="shrink-0">Helper</Badge>
+                    <p className="font-medium text-[14px] text-[var(--text-primary)]">
                       {d.subTaskTitle}
                     </p>
                   </div>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                    Parent task: <span className="font-semibold">{d.parentTaskTitle}</span> &middot; {d.briefTitle} &middot; by{" "}
-                    <span className="font-semibold">{d.submitterName}</span> &middot;{" "}
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
+                    Parent task: <span className="font-medium text-[var(--text-primary)]">{d.parentTaskTitle}</span> &middot; {d.briefTitle} &middot; by{" "}
+                    <span className="font-medium text-[var(--text-primary)]">{d.submitterName}</span> &middot;{" "}
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 shrink-0">
-                  Awaiting Your Review
-                </span>
+                <Badge className="shrink-0">Awaiting Your Review</Badge>
               </div>
 
               {d.subTaskDescription && (
-                <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-blue-50/50 border border-blue-100">
-                  <p className="text-[11px] text-[var(--text-secondary)]">
-                    <span className="font-medium text-blue-700">Sub-task:</span>{" "}{d.subTaskDescription}
+                <div className={`mb-2 ${NOTE}`}>
+                  <p>
+                    <span className="font-medium text-[var(--text-primary)]">Sub-task:</span>{" "}{d.subTaskDescription}
                   </p>
                 </div>
               )}
 
-              <p className="text-[12px] text-[var(--text-secondary)] mb-2">{d.message}</p>
+              <p className="text-[13px] text-[var(--text-secondary)] mb-2">{d.message}</p>
 
               {d.link && (
-                <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-2">
-                  <ExternalLink className="h-3 w-3" />
+                <a href={d.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[var(--accent-admin-text)] hover:underline mb-2">
+                  <ExternalLink className="h-3.5 w-3.5" />
                   {d.link}
                 </a>
               )}
@@ -1116,45 +1085,36 @@ export default function DeliverablesPage() {
               <div className="flex items-center flex-wrap gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                 {d.mainAssigneeStatus === "pending" && (
                   <>
-                    <button
-                      onClick={() => handleMainAssigneeApprove(d._id)}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
-                    >
+                    <Button variant="primary" onClick={() => handleMainAssigneeApprove(d._id)}>
                       <Check className="h-3.5 w-3.5" />
                       Approve
-                    </button>
+                    </Button>
                     {showRejectForm === d._id ? (
                       renderRejectForm(d._id, handleMainAssigneeReject)
                     ) : (
-                      <button
-                        onClick={() => setShowRejectForm(d._id)}
-                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-                      >
+                      <Button variant="secondary" onClick={() => setShowRejectForm(d._id)}>
                         <X className="h-3.5 w-3.5" />
                         Request Changes
-                      </button>
+                      </Button>
                     )}
                   </>
                 )}
 
                 {d.mainAssigneeStatus === "approved" && !d.teamLeadStatus && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
-                      <UserCheck className="h-3 w-3" />
+                    <span className="text-[12px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
+                      <UserCheck className="h-3.5 w-3.5" />
                       Approved by you
                     </span>
-                    <button
-                      onClick={() => handlePassSubTaskToTeamLead(d._id)}
-                      className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
-                    >
+                    <Button variant="primary" onClick={() => handlePassSubTaskToTeamLead(d._id)}>
                       <ArrowRight className="h-3.5 w-3.5" />
                       Pass to Team Lead
-                    </button>
+                    </Button>
                   </div>
                 )}
 
                 {d.teamLeadStatus && (
-                  <span className="text-[11px] text-[var(--text-muted)] font-medium">
+                  <span className="text-[12px] text-[var(--text-muted)] font-medium">
                     Passed to team lead
                   </span>
                 )}
@@ -1168,9 +1128,7 @@ export default function DeliverablesPage() {
       {activeTab === "team_approvals" && (
         <div className="space-y-3">
           {tlGroupedByTask.length === 0 && (
-            <Card className="p-6 text-center">
-              <p className="text-[13px] text-[var(--text-muted)]">No pending approvals from your team.</p>
-            </Card>
+            <EmptyState title="No pending approvals from your team." />
           )}
           {tlGroupedByTask.map((group) => {
             const d = group.first; // shared task info from first deliverable
@@ -1181,40 +1139,34 @@ export default function DeliverablesPage() {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    {d.isSubTask && (
-                      <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                        HELPER
-                      </span>
-                    )}
-                    <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                    {d.isSubTask && <Badge className="shrink-0">Helper</Badge>}
+                    <p className="font-medium text-[14px] text-[var(--text-primary)]">
                       {d.taskTitle}
                     </p>
                     {isMultiCreative && (
-                      <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-600 shrink-0">
-                        {deliverables.length} CREATIVES
-                      </span>
+                      <Badge className="shrink-0">{deliverables.length} creatives</Badge>
                     )}
                   </div>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                     {d.isSubTask && d.parentTaskTitle && (
-                      <>Parent: <span className="font-semibold">{d.parentTaskTitle}</span> &middot; </>
+                      <>Parent: <span className="font-medium text-[var(--text-primary)]">{d.parentTaskTitle}</span> &middot; </>
                     )}
                     {d.briefTitle} &middot; {d.brandName} &middot; by{" "}
-                    <span className="font-semibold">{d.submitterName}</span> &middot;{" "}
+                    <span className="font-medium text-[var(--text-primary)]">{d.submitterName}</span> &middot;{" "}
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 shrink-0">
+                <Badge className="shrink-0">
                   {isMultiCreative
                     ? `${d.taskApprovedByTLCount ?? 0}/${deliverables.length} Approved`
                     : "Awaiting Review"}
-                </span>
+                </Badge>
               </div>
 
               {d.isSubTask && d.mainAssigneeApproved && d.mainAssigneeReviewerName && (
-                <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-green-50 border border-green-200 w-fit">
-                  <UserCheck className="h-3 w-3 text-green-600" />
-                  <span className="text-[11px] text-green-700 font-medium">
+                <div className={`flex items-center gap-2 mb-2 w-fit ${NOTE}`}>
+                  <UserCheck className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                  <span>
                     Approved by main assignee: {d.mainAssigneeReviewerName}
                     {d.mainAssigneeName && d.mainAssigneeName !== d.mainAssigneeReviewerName
                       ? ` (${d.mainAssigneeName})`
@@ -1225,14 +1177,14 @@ export default function DeliverablesPage() {
 
               {/* Render each deliverable/creative within this task */}
               {deliverables.map((del: any, idx: number) => (
-                <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-purple-200 mb-2" : "mb-2"}`}>
+                <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-[var(--border)] mb-2" : "mb-2"}`}>
                   {isMultiCreative && (
-                    <p className="text-[11px] font-semibold text-purple-600 mb-1">Creative {idx + 1}</p>
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">Creative {idx + 1}</p>
                   )}
-                  <p className="text-[12px] text-[var(--text-secondary)] mb-1">{del.message}</p>
+                  <p className="text-[13px] text-[var(--text-secondary)] mb-1">{del.message}</p>
                   {del.link && (
-                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-1">
-                      <ExternalLink className="h-3 w-3" />
+                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[var(--accent-admin-text)] hover:underline mb-1">
+                      <ExternalLink className="h-3.5 w-3.5" />
                       {del.link}
                     </a>
                   )}
@@ -1241,66 +1193,54 @@ export default function DeliverablesPage() {
                   <div className="flex items-center flex-wrap gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {del.teamLeadStatus === "pending" && (
                       <>
-                        <button
-                          onClick={() => handleTeamLeadApprove(del._id)}
-                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
-                        >
+                        <Button variant="primary" onClick={() => handleTeamLeadApprove(del._id)}>
                           <Check className="h-3.5 w-3.5" />
                           Approve{isMultiCreative ? ` #${idx + 1}` : " as Team Lead"}
-                        </button>
+                        </Button>
                         {del.isAlsoBrandManager && (
-                          <button
-                            onClick={() => handleTeamLeadAndManagerApprove(del._id)}
-                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
-                          >
+                          <Button variant="secondary" onClick={() => handleTeamLeadAndManagerApprove(del._id)}>
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Approve as TL & Manager
-                          </button>
+                          </Button>
                         )}
                         {showRejectForm === del._id ? (
                           renderRejectForm(del._id, handleTeamLeadReject)
                         ) : (
-                          <button
-                            onClick={() => setShowRejectForm(del._id)}
-                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-                          >
+                          <Button variant="secondary" onClick={() => setShowRejectForm(del._id)}>
                             <X className="h-3.5 w-3.5" />
                             Request Changes
-                          </button>
+                          </Button>
                         )}
                       </>
                     )}
 
                     {del.teamLeadStatus === "approved" && !del.passedToManagerAt && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[var(--accent-employee-text)] font-medium">TL Approved</span>
+                        <span className="text-[12px] text-[var(--accent-employee-text)] font-medium">TL Approved</span>
                         {del.isAlsoBrandManager ? (
-                          <button
-                            onClick={() => handleManagerApproveFromTeamLead(del._id)}
-                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
-                          >
+                          <Button variant="primary" onClick={() => handleManagerApproveFromTeamLead(del._id)}>
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Final Approve (Brand Manager)
-                          </button>
+                          </Button>
                         ) : (
                           (del.brandManagers ?? []).map((mgr: any) => (
-                            <button
+                            <Button
                               key={mgr._id}
+                              variant="primary"
                               onClick={async () => {
                                 try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                               }}
-                              className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                             >
                               <ArrowRight className="h-3.5 w-3.5" />
                               Pass to {mgr.name}
-                            </button>
+                            </Button>
                           ))
                         )}
                       </div>
                     )}
 
                     {del.passedToManagerAt && (
-                      <span className="text-[11px] text-[var(--text-muted)] font-medium">
+                      <span className="text-[12px] text-[var(--text-muted)] font-medium">
                         Passed to brand manager
                       </span>
                     )}
@@ -1317,9 +1257,7 @@ export default function DeliverablesPage() {
       {activeTab === "brand_deliverables" && (
         <div className="space-y-3">
           {managerGroupedByTask.length === 0 && (
-            <Card className="p-6 text-center">
-              <p className="text-[13px] text-[var(--text-muted)]">No deliverables pending your review.</p>
-            </Card>
+            <EmptyState title="No deliverables pending your review." />
           )}
           {managerGroupedByTask.map((group) => {
             const d = group.first;
@@ -1336,54 +1274,46 @@ export default function DeliverablesPage() {
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                    <p className="font-medium text-[14px] text-[var(--text-primary)]">
                       {d.taskTitle}
                     </p>
-                    {d.taskClientFacing && (
-                      <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-600">Client-facing</span>
-                    )}
+                    {d.taskClientFacing && <Badge>Client-facing</Badge>}
                   </div>
-                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                     {d.briefTitle} &middot; {d.brandName} &middot; by{" "}
-                    <span className="font-semibold">{d.submitterName}</span> &middot;{" "}
+                    <span className="font-medium text-[var(--text-primary)]">{d.submitterName}</span> &middot;{" "}
                     {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                 </div>
                 {isMultiCreative && (
-                  <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-600 shrink-0">
-                    {deliverables.length} CREATIVES
-                  </span>
+                  <Badge className="shrink-0">{deliverables.length} creatives</Badge>
                 )}
                 {allHandedOff ? (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
+                  <Badge variant={d.hasIncompleteChainTasks ? "neutral" : "success"} className="shrink-0">
                     Handed Off{d.handoffTargetTeamName ? ` → ${d.handoffTargetTeamName}` : ""}
                     {d.hasIncompleteChainTasks ? " (in progress)" : " ✓"}
-                  </span>
+                  </Badge>
                 ) : hasSendToClient ? (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 text-purple-700 shrink-0">
-                    Ready to Send to Client
-                  </span>
+                  <Badge className="shrink-0">Ready to Send to Client</Badge>
                 ) : allApproved ? (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-green-50 text-green-700 shrink-0">
+                  <Badge variant="success" className="shrink-0">
                     All Approved{d.taskHasHandoffTarget ? ", awaiting handoff" : ""}
-                  </span>
+                  </Badge>
                 ) : d.awaitingHandoff ? (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-800 shrink-0">
-                    TL approved, handoff pending
-                  </span>
+                  <Badge className="shrink-0">TL approved, handoff pending</Badge>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 shrink-0">
+                  <Badge className="shrink-0">
                     {isMultiCreative
                       ? `${deliverables.filter((x: any) => x.status === "approved").length}/${deliverables.length} Approved`
                       : "Awaiting Your Approval"}
-                  </span>
+                  </Badge>
                 )}
               </div>
 
               {d.teamLeadReviewerName && (
-                <div className="flex items-center gap-1.5 mb-2 px-2 py-1 rounded-md bg-green-50 border border-green-200 w-fit">
-                  <ShieldCheck className="h-3 w-3 text-green-600" />
-                  <span className="text-[11px] text-green-700 font-medium">
+                <div className={`flex items-center gap-2 mb-2 w-fit ${NOTE}`}>
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                  <span>
                     Approved by {d.teamLeadReviewerName}{d.teamName ? ` of ${d.teamName}` : ""}
                   </span>
                 </div>
@@ -1391,29 +1321,27 @@ export default function DeliverablesPage() {
 
               {/* Render each deliverable/creative within this task group */}
               {deliverables.map((del: any, idx: number) => (
-                <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-purple-200 mb-3" : "mb-2"}`}>
+                <div key={del._id} className={`${isMultiCreative ? "ml-3 pl-3 border-l-2 border-[var(--border)] mb-3" : "mb-2"}`}>
                   {isMultiCreative && (
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-[11px] font-semibold text-purple-600">Creative {idx + 1}</p>
-                      {del.isHandedOff && (
-                        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-600">Handed Off</span>
-                      )}
+                      <p className="text-[12px] font-medium text-[var(--text-muted)]">Creative {idx + 1}</p>
+                      {del.isHandedOff && <Badge>Handed Off</Badge>}
                       {del.status === "approved" && !del.isHandedOff && (
-                        <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-600">Approved</span>
+                        <Badge variant="success">Approved</Badge>
                       )}
                     </div>
                   )}
-                  <p className="text-[12px] text-[var(--text-secondary)] mb-1">{del.message}</p>
+                  <p className="text-[13px] text-[var(--text-secondary)] mb-1">{del.message}</p>
 
                   {del.clientNote && (del.clientStatus === "client_changes_requested" || del.clientStatus === "client_denied") && (
-                    <div className={`mb-1 p-2 rounded-md border text-[11px] ${del.clientStatus === "client_denied" ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                    <div className={`mb-1 rounded-md px-3 py-2 text-[12px] ${del.clientStatus === "client_denied" ? "bg-[var(--danger-dim)] text-[var(--danger)]" : "bg-[var(--warning-dim)] text-[var(--warning)]"}`}>
                       <span className="font-semibold">Client remarks:</span> {del.clientNote}
                     </div>
                   )}
 
                   {del.link && (
-                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-[var(--accent-admin-text)] hover:underline mb-1">
-                      <ExternalLink className="h-3 w-3" />
+                    <a href={del.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[var(--accent-admin-text)] hover:underline mb-1">
+                      <ExternalLink className="h-3.5 w-3.5" />
                       {del.link}
                     </a>
                   )}
@@ -1429,7 +1357,7 @@ export default function DeliverablesPage() {
                       <select
                         value={reassignTarget[group.taskId] ?? ""}
                         onChange={(e) => setReassignTarget((prev) => ({ ...prev, [group.taskId]: e.target.value }))}
-                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                        className={`flex-1 min-w-0 ${FIELD}`}
                       >
                         <option value="">Select team member to reassign...</option>
                         {(d.teamMembers ?? []).map((m: any) => (
@@ -1437,7 +1365,8 @@ export default function DeliverablesPage() {
                         ))}
                       </select>
                     </div>
-                    <button
+                    <Button
+                      variant="primary"
                       disabled={!reassignTarget[group.taskId]}
                       onClick={async () => {
                         const target = reassignTarget[group.taskId];
@@ -1450,45 +1379,45 @@ export default function DeliverablesPage() {
                           setReassignTarget((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
                         } catch {}
                       }}
-                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
+                      className="w-fit"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Send Back to Team Member
-                    </button>
+                    </Button>
                   </div>
                 ) : hasSendToClient ? (
                   <div className="flex items-center gap-2">
                     {deliverables.filter((x: any) => x._sendToClient).map((del: any) => (
-                      <button
+                      <Button
                         key={del._id}
+                        variant="primary"
                         onClick={async () => {
                           try { await sendToClientMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                         }}
-                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                       >
                         <Send className="h-3.5 w-3.5" />
                         Send to Client
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : d.awaitingHandoff ? (
                   <div className="flex flex-col gap-2">
-                    <p className="text-[11px] text-[var(--text-secondary)]">
+                    <p className="text-[12px] text-[var(--text-secondary)]">
                       Team lead approved. Confirm receipt to open final approval actions.
                     </p>
                     <div className="flex gap-2 flex-wrap">
                       {deliverables.filter((x: any) => x.awaitingHandoff).map((del: any) => (
-                        <button
+                        <Button
                           key={del._id}
                           type="button"
+                          variant="primary"
                           onClick={async () => {
                             try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                           }}
-                          className="flex items-center gap-1.5 w-fit h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                         >
                           <ArrowRight className="h-3.5 w-3.5" />
                           Receive{isMultiCreative ? ` #${deliverables.indexOf(del) + 1}` : ""} for review
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
@@ -1501,26 +1430,26 @@ export default function DeliverablesPage() {
                           {deliverables.some((x: any) => x.status !== "approved") && (
                             <div className="flex gap-2 flex-wrap">
                               {deliverables.filter((x: any) => x.status !== "approved" && !x.isHandedOff).map((del: any, idx: number) => (
-                                <button
+                                <Button
                                   key={del._id}
+                                  variant="primary"
                                   onClick={() => handleApprove(del._id, del.taskTitle ?? d?.taskTitle)}
-                                  className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
                                 >
                                   <Check className="h-3.5 w-3.5" />
                                   Approve{isMultiCreative ? ` #${deliverables.indexOf(del) + 1}` : ""}
-                                </button>
+                                </Button>
                               ))}
                             </div>
                           )}
                           {allApproved && !allHandedOff && (
-                            <span className="text-[11px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
-                              <Check className="h-3 w-3" /> All Approved
+                            <span className="text-[12px] text-[var(--accent-employee-text)] font-medium flex items-center gap-1">
+                              <Check className="h-3.5 w-3.5" /> All Approved
                             </span>
                           )}
                         </>
                       ) : (
-                        <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                        <span className="text-[12px] text-[var(--text-secondary)] font-medium flex items-center gap-1">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Chain tasks in progress, final approval pending
                         </span>
                       )}
@@ -1532,13 +1461,10 @@ export default function DeliverablesPage() {
                         return showRejectForm === rejectTargetId ? (
                           renderRejectForm(rejectTargetId, handleReject)
                         ) : (
-                          <button
-                            onClick={() => setShowRejectForm(rejectTargetId)}
-                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-                          >
+                          <Button variant="secondary" onClick={() => setShowRejectForm(rejectTargetId)}>
                             <X className="h-3.5 w-3.5" />
                             Request Changes
-                          </button>
+                          </Button>
                         );
                       })()}
 
@@ -1550,17 +1476,14 @@ export default function DeliverablesPage() {
                         if (hctx?.briefType === "content_calendar") return null;
                         if (hctx?.inMasterBrief && hctx?.hasDownstreamConnection) return null;
                         return (
-                          <button
+                          <Button
+                            variant="secondary"
+                            aria-expanded={handoffTaskId === group.taskId}
                             onClick={() => { setHandoffTaskId(handoffTaskId === group.taskId ? null : group.taskId); }}
-                            className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                              handoffTaskId === group.taskId
-                                ? "bg-indigo-600 text-white"
-                                : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
-                            }`}
                           >
                             <GitBranch className="h-3.5 w-3.5" />
                             Hand Off to Team{isMultiCreative ? ` (all ${deliverables.filter((x: any) => !x.isHandedOff).length} creatives)` : ""}
-                          </button>
+                          </Button>
                         );
                       })()}
                     </div>
@@ -1570,7 +1493,7 @@ export default function DeliverablesPage() {
                       const hctx = handoffContexts?.[group.taskId as string];
                       if (!hctx?.inMasterBrief || hctx?.hasDownstreamConnection || hctx?.briefType === "content_calendar") return null;
                       return (
-                        <div className="mt-2 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
+                        <div className={NOTE_WARNING}>
                           This task is part of master brief <span className="font-semibold">&ldquo;{hctx.briefTitle}&rdquo;</span>{hctx.brandName ? <> for <span className="font-semibold">{hctx.brandName}</span></> : null} but isn&apos;t connected to a downstream node. Add a connection in the master-brief editor. You can hand off manually below for now.
                         </div>
                       );
@@ -1578,8 +1501,8 @@ export default function DeliverablesPage() {
 
                     {/* Task-level Handoff form — hands off ALL un-handed-off deliverables */}
                     {handoffTaskId === group.taskId && (
-                      <div className="space-y-2 p-3 rounded-lg bg-indigo-50 border border-indigo-200">
-                        <p className="text-[11px] font-medium text-indigo-700 mb-1">
+                      <div className="space-y-2 p-3 rounded-md bg-[var(--bg-primary)]">
+                        <p className="text-[12px] font-medium text-[var(--text-primary)] mb-1">
                           Hand off {isMultiCreative ? `all ${deliverables.filter((x: any) => !x.isHandedOff).length} creatives` : "approved deliverable"} to another team
                         </p>
                         <select
@@ -1597,7 +1520,7 @@ export default function DeliverablesPage() {
                               return n;
                             });
                           }}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          className={`w-full ${FIELD}`}
                         >
                           <option value="">Select target team...</option>
                           {(allTeams ?? []).map((t: any) => (
@@ -1615,7 +1538,7 @@ export default function DeliverablesPage() {
                                 return n;
                               });
                             }}
-                            className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            className={`w-full ${FIELD}`}
                           >
                             <option value="">Select assignee from team...</option>
                             {(allUsers ?? [])
@@ -1637,13 +1560,13 @@ export default function DeliverablesPage() {
                             <>
                               {needPick && (
                                 <div>
-                                  <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Attach deliverables to</label>
+                                  <label className={FIELD_LABEL}>Attach deliverables to</label>
                                   <select
                                     value={choice}
                                     onChange={(e) =>
                                       setHandoffTargetChoice((prev) => ({ ...prev, [tk]: e.target.value }))
                                     }
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${FIELD}`}
                                   >
                                     <option value="">Choose one...</option>
                                     <option value="__new__">Create a new task</option>
@@ -1656,7 +1579,7 @@ export default function DeliverablesPage() {
                                 </div>
                               )}
                               {opts.length === 0 && (
-                                <p className="text-[11px] text-indigo-700">No open tasks for this person. A new task will be created on their team.</p>
+                                <p className="text-[12px] text-[var(--text-secondary)]">No open tasks for this person. A new task will be created on their team.</p>
                               )}
                               {showNewFields && (
                                 <>
@@ -1667,7 +1590,7 @@ export default function DeliverablesPage() {
                                       setHandoffNewTitle((prev) => ({ ...prev, [tk]: e.target.value }))
                                     }
                                     placeholder={`New task title (optional, defaults to Handoff: ${(d as any).taskTitle ?? "task"})`}
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${FIELD}`}
                                   />
                                   <textarea
                                     value={handoffNewDesc[tk] ?? ""}
@@ -1675,17 +1598,17 @@ export default function DeliverablesPage() {
                                       setHandoffNewDesc((prev) => ({ ...prev, [tk]: e.target.value }))
                                     }
                                     placeholder="Description for the new task (optional)"
-                                    className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[56px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className={`w-full ${AREA} min-h-[56px]`}
                                   />
                                   <div>
-                                    <label className="block text-[11px] font-semibold text-indigo-800 mb-0.5">Deadline (optional)</label>
+                                    <label className={FIELD_LABEL}>Deadline (optional)</label>
                                     <input
                                       type="date"
                                       value={handoffDeadline[tk] ?? ""}
                                       onChange={(e) =>
                                         setHandoffDeadline((prev) => ({ ...prev, [tk]: e.target.value }))
                                       }
-                                      className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      className={`w-full ${FIELD}`}
                                     />
                                   </div>
                                 </>
@@ -1694,10 +1617,11 @@ export default function DeliverablesPage() {
                                 value={handoffNote[tk] ?? ""}
                                 onChange={(e) => setHandoffNote((prev) => ({ ...prev, [tk]: e.target.value }))}
                                 placeholder="Extra instructions (optional), appended to the handoff"
-                                className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-300 bg-white text-[12px] min-h-[48px] focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                className={`w-full ${AREA} min-h-[48px]`}
                               />
                               <div className="flex gap-2">
-                                <button
+                                <Button
+                                  variant="primary"
                                   disabled={!canSubmit}
                                   onClick={async () => {
                                     const teamId = handoffTeam[tk];
@@ -1774,17 +1698,13 @@ export default function DeliverablesPage() {
                                       /* */
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-indigo-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                                 >
                                   <GitBranch className="h-3.5 w-3.5" />
                                   Hand Off{isMultiCreative ? " All" : ""}
-                                </button>
-                                <button
-                                  onClick={() => setHandoffTaskId(null)}
-                                  className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                                >
+                                </Button>
+                                <Button variant="ghost" onClick={() => setHandoffTaskId(null)}>
                                   Cancel
-                                </button>
+                                </Button>
                               </div>
                             </>
                           );
@@ -1799,6 +1719,8 @@ export default function DeliverablesPage() {
           })}
         </div>
       )}
+
+      </div>
 
       {previewFile && (
         <FilePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />

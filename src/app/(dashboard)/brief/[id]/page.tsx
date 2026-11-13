@@ -6,16 +6,18 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useMemo, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, SegmentedTabs, Textarea, useToast, useCelebrate } from "@/components/ui";
-import { isTaskOverdue } from "@/lib/status";
+import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, SectionHeader, SegmentedTabs, StatusBadge, Textarea, useToast, useCelebrate } from "@/components/ui";
+import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 import { AttachmentList } from "@/components/ui/AttachmentList";
 import { TaskDetailModal } from "@/components/ui/TaskDetailModal";
-import { Trash2, Calendar, Lock, FileDown, MessageCircle, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, FileText, Paperclip, UserPlus, Loader2, Pencil, Plus, X, Filter, Wand2, Palette } from "lucide-react";
+import { Trash2, Calendar, Lock, FileDown, ArrowLeft, AlertTriangle, User, Clock, ClipboardList, UserPlus, Pencil, Plus, X, Filter, Wand2, Palette } from "lucide-react";
 import { ContentCalendarView } from "@/components/ContentCalendarView";
 import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { BriefFlowCanvas } from "@/components/BriefFlowCanvas";
+import { fieldBaseClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -50,13 +52,18 @@ function computeSequentialFlowSlot(
   return { x: nextX, y: nextY };
 }
 
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "Pending", color: "#6b7280" },
-  todo: { label: "To Do", color: "#6b7280" },
-  "in-progress": { label: "In Progress", color: "#f59e0b" },
-  review: { label: "Review", color: "#8b5cf6" },
-  done: { label: "Done", color: "#10b981" },
-};
+// One look for every icon-only button, dropdown menu, add-chip and boxed
+// field on this page.
+const ICON_BTN = iconButtonClass;
+const ICON_BTN_DANGER = iconButtonDangerClass;
+const MENU = "bg-white rounded-lg border border-[var(--border)] shadow-lg py-1";
+const MENU_HEADING = "px-3 pt-1.5 pb-1 text-[12px] font-medium text-[var(--text-muted)]";
+const MENU_ITEM =
+  "w-full text-left px-3 py-1.5 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2";
+const ADD_CHIP =
+  "inline-flex items-center gap-1 h-6 px-2 text-[12px] font-medium rounded-full border border-dashed border-[var(--border-strong)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-40 disabled:pointer-events-none";
+const FIELD = fieldBaseClass; // also on textareas, so no fixed height
+const FIELD_LABEL = "font-medium text-[13px] text-[var(--text-secondary)] block mb-1.5";
 
 function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTask, onUpdateStatus }: {
   brief: any;
@@ -137,7 +144,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
     );
   }
 
-  const statusStyle = STATUS_LABELS[task.status] ?? { label: task.status, color: "var(--text-secondary)" };
+  const statusStyle = taskStatusMeta(task.status);
   const isDelivered = task.status === "done";
 
   return (
@@ -145,27 +152,26 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
       {/* Left: Task Details + Daily Summaries */}
       <div className="border-r border-[var(--border)] overflow-auto p-5 space-y-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-1 mb-1">
             <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">{task.title}</h2>
             {isAdmin && !isDelivered && (
               <button
                 onClick={() => onOpenTask(task._id)}
-                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+                className={ICON_BTN}
                 title="Edit task"
+                aria-label="Edit task"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-flex items-center px-2.5 py-0.5 font-medium text-[11px] rounded-full"
-              style={{ color: statusStyle.color, backgroundColor: `color-mix(in srgb, ${statusStyle.color} 12%, transparent)` }}
-            >{statusStyle.label}</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <StatusBadge color={statusStyle.dot} label={statusStyle.label} />
             {isDelivered && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
-                🔒 Task Done by Employee
-              </span>
+              <Badge className="gap-1">
+                <Lock className="h-3 w-3" />
+                Task done by employee
+              </Badge>
             )}
             {!isDelivered && task.status !== "done" && (() => {
               const nextMap: Record<string, { status: "in-progress" | "review" | "done"; label: string }> = {
@@ -179,12 +185,9 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               // submitting a deliverable.
               if (!isAdmin && (next.status !== "in-progress" || task.assigneeId !== user?._id)) return null;
               return (
-                <button
-                  onClick={() => onUpdateStatus(task._id, next.status)}
-                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors"
-                >
+                <Button onClick={() => onUpdateStatus(task._id, next.status)}>
                   Move to {next.label} &rarr;
-                </button>
+                </Button>
               );
             })()}
           </div>
@@ -192,38 +195,38 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
 
         {(task.description || brief.description) && (
           <div>
-            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-1">Description</p>
+            <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">Description</p>
             <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{task.description || brief.description}</p>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-            <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Assignee</p>
+          <div className="bg-[var(--bg-primary)] rounded-md p-3 border border-[var(--border-subtle)]">
+            <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">Assignee</p>
             <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+              <User className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               {assigneeName}
             </p>
           </div>
-          <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-            <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Assigned By</p>
+          <div className="bg-[var(--bg-primary)] rounded-md p-3 border border-[var(--border-subtle)]">
+            <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">Assigned by</p>
             <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+              <User className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               {assignerName}
             </p>
           </div>
-          <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-            <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Duration</p>
+          <div className="bg-[var(--bg-primary)] rounded-md p-3 border border-[var(--border-subtle)]">
+            <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">Duration</p>
             <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+              <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               {task.duration ?? "-"}
             </p>
           </div>
           {task.deadline && (
-            <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-              <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wide mb-0.5">Deadline</p>
+            <div className="bg-[var(--bg-primary)] rounded-md p-3 border border-[var(--border-subtle)]">
+              <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">Deadline</p>
               <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                <Calendar className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                 {new Date(task.deadline).toLocaleDateString()}
               </p>
             </div>
@@ -232,18 +235,13 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
 
         {/* Sub-tasks / Helpers */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide flex items-center gap-1.5">
-              <ClipboardList className="w-3.5 h-3.5" /> Sub-Tasks ({subTasks?.length ?? 0})
-            </p>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <SectionHeader title="Sub-tasks" count={subTasks?.length} className="" />
             {canAddHelper && task.status !== "done" && (
-              <button
-                onClick={() => setShowAddHelper(!showAddHelper)}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
-              >
-                <UserPlus className="h-3 w-3" />
+              <Button variant="secondary" onClick={() => setShowAddHelper(!showAddHelper)}>
+                <UserPlus className="h-3.5 w-3.5" />
                 Add Helper
-              </button>
+              </Button>
             )}
           </div>
 
@@ -284,7 +282,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               <select
                 value={helperAssignee}
                 onChange={(e) => setHelperAssignee(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                className={`w-full ${FIELD} bg-white`}
                 required
               >
                 <option value="">Select team member...</option>
@@ -298,11 +296,11 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
                 value={helperDesc}
                 onChange={(e) => setHelperDesc(e.target.value)}
                 placeholder="Describe the sub-task..."
-                className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[50px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                className={`w-full py-1.5 min-h-[50px] ${FIELD} bg-white`}
                 required
               />
               <div>
-                <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Deadline</label>
+                <label className="text-[12px] font-medium text-[var(--text-secondary)] block mb-1">Deadline</label>
                 <div className="flex gap-1.5">
                   <div className="flex-1">
                     <DatePicker value={helperDeadline} onChange={setHelperDeadline} placeholder="Set date" />
@@ -311,26 +309,18 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
                     type="time"
                     value={helperDeadlineTime}
                     onChange={(e) => setHelperDeadlineTime(e.target.value)}
-                    className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    className={`w-24 ${FIELD} bg-white`}
                   />
                 </div>
               </div>
               <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowAddHelper(false)}
-                  className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
+                <Button type="button" variant="ghost" onClick={() => setShowAddHelper(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingSubTask}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
-                >
-                  {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
-                  {isCreatingSubTask ? "Adding..." : "Add Helper"}
-                </button>
+                </Button>
+                <Button type="submit" loading={isCreatingSubTask}>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Add Helper
+                </Button>
               </div>
             </form>
           )}
@@ -338,21 +328,18 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
           {subTasks && subTasks.length > 0 ? (
             <div className="space-y-1.5">
               {subTasks.map((st: any) => (
-                <div key={st._id} className="flex items-center justify-between gap-2 bg-[var(--bg-primary)] rounded-lg px-3 py-2 border border-[var(--border-subtle)]">
+                <div key={st._id} className="flex items-center justify-between gap-2 bg-[var(--bg-primary)] rounded-md px-3 py-1.5 border border-[var(--border-subtle)]">
                   <div className="min-w-0">
-                    <p className="text-[12px] font-medium text-[var(--text-primary)]">{st.description || st.title}</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">{st.assigneeName}</p>
+                    <p className="text-[13px] font-medium text-[var(--text-primary)]">{st.description || st.title}</p>
+                    <p className="text-[12px] text-[var(--text-muted)]">{st.assigneeName}</p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 font-medium text-[11px] rounded-full"
-                      style={{ color: STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)", backgroundColor: `color-mix(in srgb, ${STATUS_LABELS[st.status]?.color ?? "var(--text-secondary)"} 12%, transparent)` }}
-                    >{STATUS_LABELS[st.status]?.label ?? st.status}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <StatusBadge color={taskStatusMeta(st.status).dot} label={taskStatusMeta(st.status).label} />
                     {canAddHelper && st.status !== "done" && (
                       <button
                         type="button"
                         onClick={() => setHelperToRemove({ id: st._id, name: st.assigneeName })}
-                        className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+                        className={ICON_BTN_DANGER}
                         aria-label={`Remove helper ${st.assigneeName}`}
                         title="Remove helper"
                       >
@@ -389,14 +376,12 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
 
         {/* Daily Summaries */}
         <div>
-          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> Daily Summaries
-          </p>
+          <SectionHeader title="Daily summaries" className="mb-2" />
           {dailySummaries && dailySummaries.length > 0 ? (
             <div className="space-y-2">
               {dailySummaries.map((s: any, idx: number) => (
-                <div key={s._id} className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-                  <p className="text-[11px] font-medium text-[var(--accent-admin-text)]">
+                <div key={s._id} className="bg-[var(--bg-primary)] rounded-md p-3 border border-[var(--border-subtle)]">
+                  <p className="text-[12px] font-medium text-[var(--text-muted)]">
                     Day {idx + 1} - {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </p>
                   <p className="text-[13px] text-[var(--text-primary)] mt-1 whitespace-pre-wrap">{s.summary}</p>
@@ -413,40 +398,40 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
       <div className="overflow-auto p-5 space-y-5">
         {/* Deliverables */}
         <div>
-          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-0.5 flex items-center gap-1.5">
-            <Paperclip className="w-3.5 h-3.5" /> Deliverables
-          </p>
-          <p className="text-[11px] text-[var(--text-muted)] mb-2">
+          <SectionHeader title="Deliverables" className="mb-0.5" />
+          <p className="text-[12px] text-[var(--text-muted)] mb-2">
             {showCreativeSlots
               ? `${sortedDeliverables.length} / ${creativesRequired} creative${creativesRequired !== 1 ? "s" : ""} submitted`
               : `${sortedDeliverables.length} deliverable${sortedDeliverables.length !== 1 ? "s" : ""} submitted`}
           </p>
           <div className="space-y-2">
             {sortedDeliverables.map((d: any, idx: number) => {
-              const badgeColor =
-                d.status === "approved" ? "var(--accent-employee)" :
-                d.status === "rejected" ? "#dc2626" :
-                d.status === "changes_requested" ? "#f59e0b" :
-                "var(--text-secondary)";
               return (
                 <Card key={d._id} className="!p-3">
-                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+                  <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">
                     {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                   </p>
                   <div className="flex items-center justify-between">
                     <div className="truncate mr-2">
-                      <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{d.message ?? d.fileName ?? "Deliverable"}</p>
-                      <p className="text-[11px] text-[var(--text-muted)]">
+                      <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{d.message ?? d.fileName ?? "Deliverable"}</p>
+                      <p className="text-[12px] text-[var(--text-muted)]">
                         by {d.submitterName ?? "Unknown"} · {new Date(d.submittedAt ?? d._creationTime).toLocaleDateString()}
                       </p>
                     </div>
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 font-medium text-[11px] rounded-full"
-                      style={{ color: badgeColor, backgroundColor: `color-mix(in srgb, ${badgeColor} 12%, transparent)` }}
-                    >{d.status}</span>
+                    <Badge
+                      variant={
+                        d.status === "approved" ? "employee" :
+                        d.status === "rejected" ? "danger" :
+                        d.status === "changes_requested" ? "warning" :
+                        "neutral"
+                      }
+                      className="capitalize"
+                    >
+                      {String(d.status).replace(/_/g, " ")}
+                    </Badge>
                   </div>
                   {(d.note || d.reviewNote) && (
-                    <p className="text-[11px] text-[var(--text-secondary)] mt-1">{d.note ?? d.reviewNote}</p>
+                    <p className="text-[12px] text-[var(--text-secondary)] mt-1">{d.note ?? d.reviewNote}</p>
                   )}
                 </Card>
               );
@@ -457,12 +442,12 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               return (
                 <div
                   key={`slot-${n}`}
-                  className="rounded-lg border border-dashed border-[var(--border)] p-3 bg-[var(--bg-hover)]/40"
+                  className="rounded-lg border border-dashed border-[var(--border)] p-3 bg-[var(--bg-primary)]"
                 >
-                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+                  <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">
                     Creative {n}
                   </p>
-                  <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>
+                  <p className="text-[12px] text-[var(--text-muted)]">Not submitted yet</p>
                 </div>
               );
             })}
@@ -472,19 +457,11 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
           </div>
         </div>
 
-        {/* Attachments */}
-        <div>
-          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-2">Attachments</p>
-          <AttachmentList parentType="brief" parentId={brief._id} />
-        </div>
+        {/* Attachments (AttachmentList brings its own "Files" heading) */}
+        <AttachmentList parentType="brief" parentId={brief._id} />
 
-        {/* Comments */}
-        <div>
-          <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <MessageCircle className="w-3.5 h-3.5" /> Comments
-          </p>
-          <CommentThread parentType="brief" parentId={brief._id} />
-        </div>
+        {/* Comments (CommentThread brings its own "Discussion" heading) */}
+        <CommentThread parentType="brief" parentId={brief._id} />
       </div>
     </div>
   );
@@ -708,7 +685,7 @@ export default function BriefPage() {
   if (brief === undefined || brief === null) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-muted)]">Loading...</p>
       </div>
     );
   }
@@ -720,13 +697,9 @@ export default function BriefPage() {
       {/* Brief Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)] bg-white">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={goBack}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all shrink-0"
-          >
+          <Button type="button" variant="ghost" onClick={goBack} className="shrink-0">
             <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
-          </button>
+          </Button>
           <div className="h-4 w-px bg-[var(--border)] hidden sm:block" aria-hidden />
           {isAdmin && brief.status !== "archived" ? (
             <input
@@ -743,17 +716,11 @@ export default function BriefPage() {
               {brief.title}
             </h1>
           )}
-          <Badge
-            variant={
-              brief.status === "archived"
-                ? "neutral"
-                : brief.assignedManagerId
-                  ? "manager"
-                  : "neutral"
-            }
-          >
-            {brief.status.replace(/[-_]/g, " ")}
-          </Badge>
+          <StatusBadge
+            className="shrink-0"
+            color={BRIEF_STATUS_COLORS[brief.status] ?? "var(--text-muted)"}
+            label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status.replace(/[-_]/g, " ")}
+          />
           {brief.briefType && (
             <Badge variant="neutral">
               {brief.briefType === "content_calendar" ? "Content Calendar" :
@@ -817,7 +784,8 @@ export default function BriefPage() {
                     celebrate("Brief completed", `${brief.title} is closed out`);
                   }
                 }}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                aria-label="Brief status"
+                className={`${FIELD} bg-[var(--bg-input)] font-medium`}
               >
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
@@ -841,8 +809,9 @@ export default function BriefPage() {
           {/* PDF Export */}
           <button
             onClick={() => window.print()}
-            className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all no-print"
+            className={`${ICON_BTN} no-print`}
             title="Export PDF"
+            aria-label="Export PDF"
           >
             <FileDown className="h-4 w-4" />
           </button>
@@ -851,39 +820,38 @@ export default function BriefPage() {
             <div className="relative">
               <button
                 onClick={() => setShowEditMenu(!showEditMenu)}
-                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all no-print"
+                className={`${ICON_BTN} no-print`}
                 title="Edit brief"
+                aria-label="Edit brief"
               >
                 <Pencil className="h-4 w-4" />
               </button>
               {showEditMenu && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setShowEditMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-xl shadow-xl border border-[var(--border)] py-1 min-w-[240px] max-w-[320px] max-h-[400px] overflow-auto animate-scaleIn">
+                  <div className={`absolute right-0 top-full mt-1 z-40 ${MENU} min-w-[240px] max-w-[320px] max-h-[400px] overflow-auto animate-scaleIn`}>
                     {/* Brief fields */}
-                    <div className="px-3 py-1.5">
-                      <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Brief</p>
-                    </div>
+                    <p className={MENU_HEADING}>Brief</p>
                     <button
                       onClick={() => {
                         setShowEditMenu(false);
                         const titleInput = document.querySelector<HTMLInputElement>('header input[class*="font-semibold"]');
                         if (titleInput) { titleInput.focus(); titleInput.select(); }
                       }}
-                      className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2"
+                      className={MENU_ITEM}
                     >
-                      <Pencil className="h-3 w-3 text-[var(--text-muted)]" />
-                      Edit Brief Title & Description
+                      <Pencil className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      Edit brief title & description
                     </button>
 
                     {/* Creatives required — designing briefs that already carry a count */}
                     {brief.briefType === "designing" &&
                       brief.creativesRequired != null &&
                       brief.creativesRequired >= 1 && (
-                        <div className="px-3 py-2 flex items-center gap-2">
-                          <Palette className="h-3 w-3 text-[var(--text-muted)] shrink-0" />
-                          <span className="text-[12px] text-[var(--text-primary)] flex-1">
-                            Creatives Required
+                        <div className="px-3 py-1.5 flex items-center gap-2">
+                          <Palette className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                          <span className="text-[13px] text-[var(--text-primary)] flex-1">
+                            Creatives required
                           </span>
                           <input
                             type="number"
@@ -908,7 +876,8 @@ export default function BriefPage() {
                                 toast("error", err instanceof Error ? err.message : "Failed to update");
                               }
                             }}
-                            className="w-14 bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2 py-1 text-[12px] text-[var(--text-primary)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                            aria-label="Creatives required"
+                            className="w-14 bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2 text-[13px] text-[var(--text-primary)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                           />
                         </div>
                       )}
@@ -917,13 +886,11 @@ export default function BriefPage() {
                     {allTasks.length > 0 && (
                       <>
                         <div className="border-t border-[var(--border-subtle)] mt-1" />
-                        <div className="px-3 py-1.5">
-                          <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-                            {brief.briefType === "content_calendar" ? "Calendar Events" : "Tasks"}
-                          </p>
-                        </div>
+                        <p className={MENU_HEADING}>
+                          {brief.briefType === "content_calendar" ? "Calendar events" : "Tasks"}
+                        </p>
                         {allTasks.map((task) => {
-                          const sc = task.status === "done" ? "#10b981" : task.status === "in-progress" ? "#f59e0b" : task.status === "review" ? "#8b5cf6" : "#6b7280";
+                          const sm = taskStatusMeta(task.status);
                           return (
                             <button
                               key={task._id}
@@ -932,11 +899,11 @@ export default function BriefPage() {
                                 setAutoEditTask(true);
                                 setSelectedTaskId(task._id);
                               }}
-                              className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-2"
+                              className={MENU_ITEM}
                             >
-                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sc }} />
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sm.dot }} />
                               <span className="truncate flex-1">{task.title}</span>
-                              <span className="text-[11px] text-[var(--text-muted)] shrink-0 capitalize">{task.status}</span>
+                              <span className="text-[12px] text-[var(--text-muted)] shrink-0">{sm.label}</span>
                             </button>
                           );
                         })}
@@ -950,8 +917,9 @@ export default function BriefPage() {
           {isAdmin && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
+              className={ICON_BTN_DANGER}
               title="Delete brief permanently"
+              aria-label="Delete brief permanently"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -997,23 +965,21 @@ export default function BriefPage() {
         {/* ── FLOW CANVAS (React Flow) ─────────────────────── */}
         <div className={`flex-1 overflow-hidden transition-all duration-300 ${panelMode !== "hidden" ? "mr-[420px]" : ""}`}>
           {/* Top toolbar */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-white z-10 relative">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 py-2.5 border-b border-[var(--border)] bg-white z-20 relative">
             <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 min-w-0">
-              <span className="text-[11px] font-medium text-[var(--text-secondary)]">Progress</span>
+              <span className="text-[12px] font-medium text-[var(--text-muted)]">Progress</span>
               <div className="w-24 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
                 <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${progressPct}%` }} />
               </div>
-              <span className="text-[11px] font-semibold text-[var(--accent-admin-text)] tabular-nums">{progressPct}%</span>
-              <span className="text-[11px] text-[var(--text-muted)]">({doneTasks}/{totalTasks})</span>
+              <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">{progressPct}%</span>
+              <span className="text-[12px] text-[var(--text-muted)] tabular-nums">({doneTasks}/{totalTasks})</span>
               {overdueTaskCount > 0 && (
-                <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--danger-dim)] text-[11px] font-semibold text-[var(--danger)]">
+                <Badge variant="danger" className="ml-1 gap-1">
                   <AlertTriangle className="h-3 w-3" /> {overdueTaskCount} overdue
-                </span>
+                </Badge>
               )}
               {reviewTaskCount > 0 && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--accent-manager-dim)] text-[11px] font-semibold text-[var(--accent-manager-text)]">
-                  {reviewTaskCount} in review
-                </span>
+                <StatusBadge color={taskStatusMeta("review").dot} label={`${reviewTaskCount} in review`} />
               )}
             </div>
 
@@ -1028,14 +994,15 @@ export default function BriefPage() {
               ]}
             />
             {isAdmin && briefView === "canvas" && totalTasks > 1 && (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={handleAutoLayout}
                 title="Re-arrange nodes into columns following the task flow"
-                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="shrink-0"
               >
-                <Wand2 className="h-3 w-3" /> Auto-layout
-              </button>
+                <Wand2 className="h-3.5 w-3.5" /> Auto-layout
+              </Button>
             )}
 
             {/* Team filter dropdown */}
@@ -1048,36 +1015,33 @@ export default function BriefPage() {
                     setShowTeamPicker(false);
                     setShowAddTaskTeamPicker(false);
                   }}
+                  aria-expanded={showViewTeamFilter}
                   className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                     viewTeamFilter
-                      ? "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
+                      ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
                       : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                   }`}
                 >
-                  <Filter className="h-3 w-3" />
+                  <Filter className="h-3.5 w-3.5" />
                   {viewTeamFilter
                     ? (teamsForBrief ?? []).find((t) => t?._id === viewTeamFilter)?.name ?? "Team"
-                    : "All Teams"}
+                    : "All teams"}
                 </button>
                 {showViewTeamFilter && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setShowViewTeamFilter(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[160px]">
+                    <div className={`absolute left-0 top-full mt-1 z-40 ${MENU} min-w-[160px]`}>
                       <button
                         onClick={() => { setViewTeamFilter(""); setShowViewTeamFilter(false); }}
-                        className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] flex items-center gap-2 ${
-                          !viewTeamFilter ? "text-[var(--accent-employee-text)] font-semibold" : "text-[var(--text-primary)]"
-                        }`}
+                        className={`${MENU_ITEM} ${!viewTeamFilter ? "bg-[var(--bg-hover)] font-medium" : ""}`}
                       >
-                        All Teams
+                        All teams
                       </button>
                       {(teamsForBrief ?? []).filter(Boolean).map((team: { _id: Id<"teams">; name?: string; color?: string }) => (
                         <button
                           key={team._id}
                           onClick={() => { setViewTeamFilter(team._id); setShowViewTeamFilter(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] flex items-center gap-2 ${
-                            viewTeamFilter === team._id ? "text-[var(--accent-employee-text)] font-semibold" : "text-[var(--text-primary)]"
-                          }`}
+                          className={`${MENU_ITEM} ${viewTeamFilter === team._id ? "bg-[var(--bg-hover)] font-medium" : ""}`}
                         >
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                           {team.name}
@@ -1095,9 +1059,9 @@ export default function BriefPage() {
                 {(teamsForBrief ?? []).filter(Boolean).map((team: any, idx: number) => (
                   <span
                     key={team._id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-full bg-white border border-[var(--border)]"
-                    style={{ borderLeftWidth: 3, borderLeftColor: team.color }}
+                    className="inline-flex items-center gap-1.5 h-6 pl-2 pr-1.5 text-[12px] font-medium rounded-full bg-white border border-[var(--border)] text-[var(--text-secondary)]"
                   >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                     {team.name}
                     <button
                       type="button"
@@ -1106,9 +1070,10 @@ export default function BriefPage() {
                           removeTeamFromBrief({ briefId, teamId: team._id });
                         }
                       }}
-                      className="text-[var(--text-muted)] hover:text-[var(--danger)] ml-0.5"
+                      aria-label={`Remove ${team.name} from this brief`}
+                      className="text-[var(--text-muted)] hover:text-[var(--danger)]"
                     >
-                      <X className="h-2.5 w-2.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   </span>
                 ))}
@@ -1119,14 +1084,15 @@ export default function BriefPage() {
                       setShowTeamPicker(!showTeamPicker);
                       setShowAddTaskTeamPicker(false);
                     }}
-                    className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-medium rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-colors"
+                    className={ADD_CHIP}
                   >
-                    <Plus className="h-2.5 w-2.5" /> Team
+                    <Plus className="h-3 w-3" /> Team
                   </button>
                   {showTeamPicker && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setShowTeamPicker(false)} />
-                      <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[140px]">
+                      <div className={`absolute right-0 top-full mt-1 z-40 ${MENU} min-w-[180px]`}>
+                        <p className={MENU_HEADING}>Add team</p>
                         {(allTeams ?? [])
                           .filter((t) => !teamsForBrief?.some((tb) => tb?._id === t._id))
                           .map((team) => (
@@ -1142,14 +1108,14 @@ export default function BriefPage() {
                                 });
                                 setShowTeamPicker(false);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                              className={MENU_ITEM}
                             >
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: team.color }} />
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                               {team.name}
                             </button>
                           ))}
                         {(allTeams ?? []).filter((t) => !teamsForBrief?.some((tb) => tb?._id === t._id)).length === 0 && (
-                          <p className="px-3 py-1.5 text-[11px] text-[var(--text-muted)]">All teams added</p>
+                          <p className="px-3 py-1.5 text-[13px] text-[var(--text-muted)]">All teams added</p>
                         )}
                       </div>
                     </>
@@ -1168,23 +1134,21 @@ export default function BriefPage() {
                         ? "Add a team first, then add tasks"
                         : "Add a task"
                     }
-                    className="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] font-medium rounded-full bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] hover:bg-[var(--accent-employee)] hover:text-white transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    className={ADD_CHIP}
                   >
-                    <Plus className="h-2.5 w-2.5" /> Task
+                    <Plus className="h-3 w-3" /> Task
                   </button>
                   {showAddTaskTeamPicker && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setShowAddTaskTeamPicker(false)} />
-                      <div className="absolute right-0 top-full mt-1 z-40 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[180px]">
-                        <p className="px-3 py-1 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-                          Add task for
-                        </p>
+                      <div className={`absolute right-0 top-full mt-1 z-40 ${MENU} min-w-[180px]`}>
+                        <p className={MENU_HEADING}>Add task for</p>
                         {(teamsForBrief ?? []).filter(Boolean).map((team: { _id: Id<"teams">; name?: string; color?: string }) => (
                           <button
                             key={team._id}
                             type="button"
                             onClick={() => openCreateTaskPanel(team._id)}
-                            className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                            className={MENU_ITEM}
                           >
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                             {team.name}
@@ -1201,23 +1165,20 @@ export default function BriefPage() {
           {/* React Flow canvas / List view */}
           <div className="flex-1 relative" style={{ height: "calc(100% - 42px)" }}>
             {(teamsForBrief?.length ?? 0) === 0 ? (
-              <div className="flex items-center justify-center h-full text-center">
-                <div>
-                  <ClipboardList className="h-10 w-10 text-[var(--text-disabled)] mx-auto mb-3" />
-                  <p className="text-[15px] font-medium text-[var(--text-secondary)]">No teams assigned</p>
-                  <p className="text-[12px] text-[var(--text-muted)] mt-1">
-                    A brief runs as a flow between teams. Add the first team to get started.
-                  </p>
-                  {isAdmin && brief.status !== "archived" && (
-                    <button
-                      type="button"
-                      onClick={() => setShowTeamPicker(true)}
-                      className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white"
-                    >
-                      <Plus className="h-4 w-4" /> Add a team
-                    </button>
-                  )}
-                </div>
+              <div className="flex items-center justify-center h-full p-4">
+                <EmptyState
+                  icon={ClipboardList}
+                  title="No teams assigned"
+                  description="A brief runs as a flow between teams. Add the first team to get started."
+                  action={
+                    isAdmin && brief.status !== "archived" ? (
+                      <Button type="button" onClick={() => setShowTeamPicker(true)}>
+                        <Plus className="h-3.5 w-3.5" /> Add a team
+                      </Button>
+                    ) : undefined
+                  }
+                  className="w-full max-w-md"
+                />
               </div>
             ) : briefView === "list" ? (
               <div className="h-full overflow-y-auto p-4">
@@ -1228,13 +1189,14 @@ export default function BriefPage() {
                     description={isAdmin ? "Add a task to get this brief moving." : undefined}
                   />
                 ) : (
-                  <table className="w-full border-collapse bg-white rounded-xl overflow-hidden border border-[var(--border-subtle)]">
+                  <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)] text-left text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)]">
-                        <th className="px-4 py-2 font-semibold">Task</th>
-                        <th className="px-4 py-2 font-semibold">Assignee</th>
-                        <th className="px-4 py-2 font-semibold">Status</th>
-                        <th className="px-4 py-2 font-semibold">Deadline</th>
+                      <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)] text-left text-[12px] text-[var(--text-muted)]">
+                        <th className="px-4 py-2 font-medium">Task</th>
+                        <th className="px-4 py-2 font-medium">Assignee</th>
+                        <th className="px-4 py-2 font-medium">Status</th>
+                        <th className="px-4 py-2 font-medium">Deadline</th>
                         {isAdmin && <th className="px-4 py-2" />}
                       </tr>
                     </thead>
@@ -1250,38 +1212,28 @@ export default function BriefPage() {
                           const assignee = briefTeamsList
                             .flatMap((g) => g.members)
                             .find((m) => m.user._id === t.assigneeId)?.user;
-                          const statusMeta: Record<string, { label: string; dot: string }> = {
-                            pending: { label: "Pending", dot: "#6b7280" },
-                            "in-progress": { label: "In Progress", dot: "#f59e0b" },
-                            review: { label: "Review", dot: "#8b5cf6" },
-                            done: { label: "Done", dot: "#10b981" },
-                            "on-hold": { label: "On Hold", dot: "#78716c" },
-                          };
-                          const sm = statusMeta[t.status] ?? statusMeta.pending;
+                          const sm = taskStatusMeta(t.status);
                           const overdue = t.deadline && t.deadline < Date.now() && t.status !== "done" && t.status !== "review";
                           return (
                             <tr
                               key={t._id}
                               onClick={() => setSelectedTaskId(t._id)}
-                              className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] cursor-pointer transition-colors"
+                              className="border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-primary)] cursor-pointer transition-colors"
                             >
-                              <td className="px-4 py-2.5 text-[13px] font-medium text-[var(--text-primary)]">{t.title}</td>
-                              <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">
+                              <td className="px-4 py-1.5 text-[14px] font-medium text-[var(--text-primary)]">{t.title}</td>
+                              <td className="px-4 py-1.5 text-[13px] text-[var(--text-secondary)]">
                                 {assignee?.name ?? assignee?.email ?? "-"}
                               </td>
-                              <td className="px-4 py-2.5">
-                                <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
-                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sm.dot }} />
-                                  {sm.label}
-                                </span>
+                              <td className="px-4 py-1.5">
+                                <StatusBadge color={sm.dot} label={sm.label} />
                               </td>
-                              <td className={`px-4 py-2.5 text-[12px] ${overdue ? "text-[var(--danger)] font-semibold" : "text-[var(--text-muted)]"}`}>
+                              <td className={`px-4 py-1.5 text-[13px] tabular-nums ${overdue ? "text-[var(--danger)] font-medium" : "text-[var(--text-muted)]"}`}>
                                 {t.deadline
                                   ? new Date(t.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
                                   : "-"}
                               </td>
                               {isAdmin && (
-                                <td className="px-4 py-2.5 text-right">
+                                <td className="px-4 py-1.5 text-right">
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1289,8 +1241,9 @@ export default function BriefPage() {
                                       setAutoEditTask(true);
                                       setSelectedTaskId(t._id);
                                     }}
-                                    className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white"
+                                    className={ICON_BTN}
                                     title="Edit task"
+                                    aria-label="Edit task"
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
                                   </button>
@@ -1301,6 +1254,7 @@ export default function BriefPage() {
                         })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             ) : (
@@ -1402,25 +1356,25 @@ export default function BriefPage() {
               totalTasks === 0 &&
               panelMode === "hidden" && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                  <div className="pointer-events-auto bg-white rounded-xl border border-[var(--border)] shadow-lg px-8 py-6 text-center max-w-sm">
-                    <ClipboardList className="h-8 w-8 text-[var(--text-disabled)] mx-auto mb-2.5" />
-                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">No tasks yet</p>
+                  <div className="pointer-events-auto bg-white rounded-lg border border-[var(--border)] px-8 py-6 text-center max-w-sm">
+                    <ClipboardList className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2.5" />
+                    <p className="text-[14px] font-medium text-[var(--text-primary)]">No tasks yet</p>
                     <p className="text-[12px] text-[var(--text-muted)] mt-1 leading-relaxed">
                       Each task is a step in the flow. Connect them by dragging
                       between node handles. The next step starts when the
                       previous one is approved.
                     </p>
                     {isAdmin && brief.status !== "archived" && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => {
                           const first = (teamsForBrief ?? []).filter(Boolean)[0];
                           if (first) openCreateTaskPanel(first._id);
                         }}
-                        className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white"
+                        className="mt-4"
                       >
-                        <Plus className="h-4 w-4" /> Add the first task
-                      </button>
+                        <Plus className="h-3.5 w-3.5" /> Add the first task
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -1437,10 +1391,8 @@ export default function BriefPage() {
                   {showAddPillPicker && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowAddPillPicker(false)} />
-                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 bg-white rounded-lg shadow-xl border border-[var(--border)] py-1 min-w-[180px]">
-                        <p className="px-3 py-1 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">
-                          Add task for
-                        </p>
+                      <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 ${MENU} min-w-[180px]`}>
+                        <p className={MENU_HEADING}>Add task for</p>
                         {(teamsForBrief ?? []).filter(Boolean).map((team: any) => (
                           <button
                             key={team._id}
@@ -1449,7 +1401,7 @@ export default function BriefPage() {
                               setShowAddPillPicker(false);
                               openCreateTaskPanel(team._id);
                             }}
-                            className="w-full text-left px-3 py-1.5 text-[11px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                            className={MENU_ITEM}
                           >
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
                             {team.name}
@@ -1458,17 +1410,16 @@ export default function BriefPage() {
                       </div>
                     </>
                   )}
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       const teams = (teamsForBrief ?? []).filter(Boolean);
                       if (teams.length === 1) openCreateTaskPanel(teams[0]._id);
                       else setShowAddPillPicker((v) => !v);
                     }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--text-primary)] text-white text-[12px] font-semibold shadow-lg hover:opacity-90 transition-opacity"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add task
-                  </button>
+                  </Button>
                 </div>
               )}
           </div>
@@ -1476,13 +1427,13 @@ export default function BriefPage() {
 
         {/* ── RIGHT: Sliding Task Panel ─────────────────── */}
         <div
-          className={`absolute top-0 right-0 h-full w-[420px] bg-white border-l border-[var(--border)] shadow-xl transition-transform duration-300 ease-in-out z-20 flex flex-col ${
+          className={`absolute top-0 right-0 h-full w-[420px] bg-white border-l border-[var(--border)] transition-transform duration-300 ease-in-out z-20 flex flex-col ${
             panelMode !== "hidden" ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--border)]">
             <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-              {panelMode === "create" ? "Create Task" : "Edit Task"}
+              {panelMode === "create" ? "Create task" : "Edit task"}
             </h3>
             <button
               onClick={() => {
@@ -1491,7 +1442,8 @@ export default function BriefPage() {
                 setPendingFlowPosition(null);
                 setPendingSourceHandle(null);
               }}
-              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              aria-label="Close panel"
+              className={ICON_BTN}
             >
               <X className="h-4 w-4" />
             </button>
@@ -1566,7 +1518,7 @@ export default function BriefPage() {
                 className="flex flex-col gap-3"
               >
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Team</label>
+                  <label htmlFor="create-task-team-select" className={FIELD_LABEL}>Team</label>
                   <select
                     id="create-task-team-select"
                     value={panelTeamId}
@@ -1576,7 +1528,7 @@ export default function BriefPage() {
                       setTaskTeamFilter(v);
                       setTaskAssignee("");
                     }}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD} bg-[var(--bg-input)]`}
                     required
                   >
                     <option value="">Select team...</option>
@@ -1589,7 +1541,7 @@ export default function BriefPage() {
                   <button
                     type="button"
                     onClick={() => setShowTeamPicker(true)}
-                    className="mt-1.5 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
+                    className="mt-1.5 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
                   >
                     + Add another team to this brief
                   </button>
@@ -1608,11 +1560,11 @@ export default function BriefPage() {
                   className="min-h-[64px]"
                 />
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Assignee</label>
+                  <label className={FIELD_LABEL}>Assignee</label>
                   <select
                     value={taskAssignee}
                     onChange={(e) => setTaskAssignee(e.target.value as Id<"users">)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD} bg-[var(--bg-input)]`}
                   >
                     <option value="">{panelTeamId ? "Select employee" : "Select team first"}</option>
                     {(panelTeamId
@@ -1624,7 +1576,7 @@ export default function BriefPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Deadline</label>
+                  <label className={FIELD_LABEL}>Deadline</label>
                   <div className="flex gap-1.5">
                     <div className="flex-1">
                       <DatePicker value={taskDeadline} onChange={setTaskDeadline} placeholder="Set date" />
@@ -1633,7 +1585,7 @@ export default function BriefPage() {
                       type="time"
                       value={taskDeadlineTime}
                       onChange={(e) => setTaskDeadlineTime(e.target.value)}
-                      className="w-24 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      className={`w-24 ${FIELD} bg-[var(--bg-input)]`}
                     />
                   </div>
                 </div>
@@ -1644,24 +1596,24 @@ export default function BriefPage() {
                     onChange={(e) => setTaskClientFacing(e.target.checked)}
                     className="h-3.5 w-3.5 rounded border-[var(--border)] accent-[var(--accent-admin)]"
                   />
-                  <span className="text-[11px] font-medium text-[var(--text-secondary)]">Client-facing task</span>
+                  <span className="text-[13px] font-medium text-[var(--text-secondary)]">Client-facing task</span>
                 </label>
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">Handoff Team (optional)</label>
+                  <label className={FIELD_LABEL}>Handoff team (optional)</label>
                   <select
                     value={taskHandoffTeam}
                     onChange={(e) => setTaskHandoffTeam(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD} bg-[var(--bg-input)]`}
                   >
                     <option value="">No handoff</option>
                     {(allTeams ?? []).map((t) => (
                       <option key={t._id} value={t._id}>{t.name}</option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">On approval, deliverable handed off to this team</p>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">On approval, deliverable handed off to this team</p>
                 </div>
                 <Button type="submit" variant="primary" className="mt-2" loading={isCreatingTask}>
-                  Create Task
+                  Create task
                 </Button>
               </form>
             )}

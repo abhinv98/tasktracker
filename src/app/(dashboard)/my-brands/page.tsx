@@ -4,14 +4,8 @@ import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, PageHeader } from "@/components/ui";
-import {
-  ArrowLeft,
-  ExternalLink,
-  FileText,
-  Link2,
-  Tag,
-} from "lucide-react";
+import { Card, PageHeader, Panel, PanelEmpty } from "@/components/ui";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 
 /**
  * Read-only brand view for employees: the brands they actually work on (derived
@@ -47,7 +41,7 @@ export default function MyBrandsPage() {
       />
 
       {brands === undefined ? (
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
       ) : brands.length === 0 ? (
         <Card>
           <p className="text-[13px] text-[var(--text-muted)] text-center py-6">
@@ -73,10 +67,13 @@ export default function MyBrandsPage() {
                       backgroundColor: `${brand.color ?? "#6b7280"}1a`,
                     }}
                   >
-                    <Tag
-                      className="h-4 w-4"
+                    <span
+                      className="text-[15px] font-semibold"
                       style={{ color: brand.color ?? "#6b7280" }}
-                    />
+                      aria-hidden
+                    >
+                      {brand.name.trim().charAt(0).toUpperCase()}
+                    </span>
                   </span>
                 )}
                 <span className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
@@ -111,13 +108,14 @@ function BrandDetail({
 
   return (
     <div className="p-4 sm:p-8">
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title="Back to brands"
+          aria-label="Back to brands"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4" />
         </button>
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -131,43 +129,41 @@ function BrandDetail({
             className="h-11 w-11 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${color ?? "#6b7280"}1a` }}
           >
-            <Tag className="h-5 w-5" style={{ color: color ?? "#6b7280" }} />
+            <span
+              className="text-[17px] font-semibold"
+              style={{ color: color ?? "#6b7280" }}
+              aria-hidden
+            >
+              {name.trim().charAt(0).toUpperCase()}
+            </span>
           </span>
         )}
-        <h1 className="font-semibold text-[20px] text-[var(--text-primary)]">
+        <h1 className="font-semibold text-[20px] sm:text-[26px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight">
           {name}
         </h1>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <FileText className="h-4 w-4 text-[var(--text-muted)]" />
-            <h2 className="font-semibold text-[13px] text-[var(--text-primary)] uppercase tracking-wide">
-              Important Files
-            </h2>
-          </div>
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
+        <Panel title="Important Files" count={docs?.length}>
           {docs === undefined ? (
-            <p className="text-[12px] text-[var(--text-muted)]">Loading...</p>
+            <PanelEmpty>Loading...</PanelEmpty>
           ) : docs.length === 0 ? (
-            <p className="text-[12px] text-[var(--text-muted)] py-2">
-              No files shared for this brand.
-            </p>
+            <PanelEmpty>No files shared for this brand.</PanelEmpty>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="divide-y divide-[var(--border-subtle)]">
               {docs.map((doc) => (
                 <li key={doc._id}>
                   <a
                     href={doc.url ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors group"
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--bg-primary)] transition-colors group"
                   >
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">
+                      <span className="block text-[14px] font-medium text-[var(--text-primary)] truncate">
                         {doc.fileName}
                       </span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">
+                      <span className="block text-[12px] text-[var(--text-muted)]">
                         Added by {doc.uploaderName}
                       </span>
                     </span>
@@ -177,37 +173,29 @@ function BrandDetail({
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
 
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <Link2 className="h-4 w-4 text-[var(--text-muted)]" />
-            <h2 className="font-semibold text-[13px] text-[var(--text-primary)] uppercase tracking-wide">
-              Important Links
-            </h2>
-          </div>
+        <Panel title="Important Links" count={links?.length}>
           {links === undefined ? (
-            <p className="text-[12px] text-[var(--text-muted)]">Loading...</p>
+            <PanelEmpty>Loading...</PanelEmpty>
           ) : links.length === 0 ? (
-            <p className="text-[12px] text-[var(--text-muted)] py-2">
-              No links shared for this brand.
-            </p>
+            <PanelEmpty>No links shared for this brand.</PanelEmpty>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="divide-y divide-[var(--border-subtle)]">
               {links.map((link) => (
                 <li key={link._id}>
                   <a
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors group"
+                    className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--bg-primary)] transition-colors group"
                   >
                     <span className="min-w-0">
-                      <span className="block text-[13px] font-medium text-[var(--text-primary)] truncate">
+                      <span className="block text-[14px] font-medium text-[var(--text-primary)] truncate">
                         {link.label}
                       </span>
                       {link.description && (
-                        <span className="block text-[11px] text-[var(--text-muted)] truncate">
+                        <span className="block text-[12px] text-[var(--text-muted)] truncate">
                           {link.description}
                         </span>
                       )}
@@ -218,7 +206,7 @@ function BrandDetail({
               ))}
             </ul>
           )}
-        </Card>
+        </Panel>
       </div>
     </div>
   );

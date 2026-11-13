@@ -81,7 +81,7 @@ export function CandidatePanel({
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-[#171717]/40" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
       <aside
         role="dialog"
         aria-modal="true"
@@ -95,12 +95,12 @@ export function CandidatePanel({
         ) : (
           <>
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-6 py-4">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-6 py-4">
               <div className="min-w-0">
-                <h2 className="text-[18px] font-semibold tracking-tight text-[var(--text-primary)] truncate">
+                <h2 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
                   {c.name}
                 </h2>
-                <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
+                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                   {c.position || c.jobName}
                   {c.createdAt ? ` · applied ${when(c.createdAt).split(",")[0]}` : ""}
                 </p>
@@ -108,7 +108,7 @@ export function CandidatePanel({
               <button
                 onClick={onClose}
                 aria-label="Close panel"
-                className="rounded-md p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X size={16} />
               </button>
@@ -122,13 +122,21 @@ export function CandidatePanel({
                   <button
                     key={s.value}
                     onClick={() => move(s.value)}
-                    className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+                    aria-pressed={active}
+                    className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-[13px] font-medium transition-colors ${
                       active
-                        ? "text-white"
-                        : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                        ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
+                        : "border-transparent text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                     }`}
-                    style={active ? { backgroundColor: s.color } : undefined}
                   >
+                    {/* The stage colour stays as the same dot the tables use. */}
+                    {active && (
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: s.color }}
+                        aria-hidden
+                      />
+                    )}
                     {s.label}
                   </button>
                 );
@@ -148,7 +156,7 @@ export function CandidatePanel({
                     ["Expected", formatLpa(parseCtcLpa(c.expectedCtc)), null],
                   ].map(([label, value, href]) => (
                     <div key={label as string} className="min-w-0">
-                      <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+                      <p className="text-[12px] font-medium text-[var(--text-muted)]">
                         {label}
                       </p>
                       {value ? (
@@ -160,14 +168,14 @@ export function CandidatePanel({
                           <p className="truncate text-[13px] text-[var(--text-primary)]">{value}</p>
                         )
                       ) : (
-                        <p className="text-[13px] text-[var(--text-disabled)]">Not provided</p>
+                        <p className="text-[13px] text-[var(--text-muted)]">Not provided</p>
                       )}
                     </div>
                   ))}
                 </div>
 
                 {c.alsoApplied.length > 0 && (
-                  <div className="mx-6 mb-4 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning-dim)] px-3 py-2">
+                  <div className="mx-6 mb-4 rounded-md bg-[var(--bg-primary)] px-3 py-2">
                     <p className="text-[12px] font-medium text-[var(--text-primary)]">
                       Also applied for {c.alsoApplied.length} other{" "}
                       {c.alsoApplied.length === 1 ? "role" : "roles"}
@@ -177,7 +185,7 @@ export function CandidatePanel({
                         <button
                           key={o._id}
                           onClick={() => onOpenOther?.(o._id, o.jobSourceId)}
-                          className="text-left text-[12px] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] hover:underline"
+                          className="text-left text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline underline-offset-2"
                         >
                           {o.jobName} — {stageMeta(o.stage as Stage).label}
                         </button>
@@ -204,7 +212,7 @@ export function CandidatePanel({
 
                 {/* Timeline */}
                 <div className="flex flex-col gap-2 px-6 pb-6">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  <p className="text-[12px] font-medium text-[var(--text-muted)]">
                     History
                   </p>
                   {c.timeline.length === 0 ? (
@@ -216,30 +224,30 @@ export function CandidatePanel({
                       <div key={t.id} className="group flex gap-2.5 border-b border-[var(--border-subtle)] pb-2 last:border-0">
                         <div className="mt-0.5 shrink-0 text-[var(--text-muted)]">
                           {t.kind === "note" ? (
-                            <StickyNote size={13} />
+                            <StickyNote size={14} />
                           ) : t.kind === "email" ? (
-                            <Mail size={13} className={t.ok ? "" : "text-[var(--danger)]"} />
+                            <Mail size={14} className={t.ok ? "" : "text-[var(--danger)]"} />
                           ) : (
-                            <ArrowRight size={13} />
+                            <ArrowRight size={14} />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           {t.kind === "stage" ? (
-                            <p className="text-[12px] text-[var(--text-primary)]">
+                            <p className="text-[13px] text-[var(--text-primary)]">
                               {stageMeta((t.fromStage ?? "applied") as Stage).label} →{" "}
                               <strong>{stageMeta((t.toStage ?? "applied") as Stage).label}</strong>
                               {t.body ? ` — ${t.body}` : ""}
                             </p>
                           ) : t.kind === "email" ? (
-                            <p className="text-[12px] text-[var(--text-primary)]">
+                            <p className="text-[13px] text-[var(--text-primary)]">
                               {t.ok ? "Emailed" : "Email failed"} — {t.body}
                             </p>
                           ) : (
-                            <p className="whitespace-pre-wrap text-[12px] text-[var(--text-primary)]">
+                            <p className="whitespace-pre-wrap text-[13px] text-[var(--text-primary)]">
                               {t.body}
                             </p>
                           )}
-                          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                          <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                             {t.who} · {when(t.at)}
                           </p>
                         </div>
@@ -249,9 +257,9 @@ export function CandidatePanel({
                               deleteActivity({ activityId: t.id as Id<"recruitActivity"> })
                             }
                             aria-label="Delete note"
-                            className="shrink-0 self-start p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:text-[var(--danger)] group-hover:opacity-100"
+                            className="shrink-0 self-start inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] opacity-0 transition-[opacity,color,background-color] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] group-hover:opacity-100 focus-visible:opacity-100"
                           >
-                            <Trash2 size={12} />
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>
@@ -263,7 +271,7 @@ export function CandidatePanel({
               {/* Right: the CV itself, rendered rather than linked away to */}
               <div className="flex min-w-0 flex-1 flex-col bg-[var(--bg-primary)]">
                 <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-2">
-                  <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                  <span className="text-[12px] font-medium text-[var(--text-muted)]">
                     Résumé
                   </span>
                   <div className="flex items-center gap-1">
@@ -272,9 +280,9 @@ export function CandidatePanel({
                         href={c.portfolioLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-admin-text)]"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                       >
-                        <ExternalLink size={12} />
+                        <ExternalLink size={14} />
                         Portfolio
                       </a>
                     )}
@@ -283,9 +291,9 @@ export function CandidatePanel({
                         href={c.resume}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--accent-admin-text)]"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                       >
-                        <FileText size={12} />
+                        <FileText size={14} />
                         Open
                       </a>
                     )}
@@ -299,7 +307,7 @@ export function CandidatePanel({
                   />
                 ) : (
                   <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-                    <FileText size={26} className="text-[var(--text-disabled)]" />
+                    <FileText size={26} className="text-[var(--text-muted)]" />
                     <p className="text-[13px] text-[var(--text-secondary)]">
                       {c.resume
                         ? "This CV is a link rather than a PDF, so it can't be shown here."

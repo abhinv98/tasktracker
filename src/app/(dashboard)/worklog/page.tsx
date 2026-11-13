@@ -5,21 +5,35 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Card, PageHeader, StatStrip, StatTile } from "@/components/ui";
+import { Badge, Button, Card, PageHeader, SegmentedTabs, StatStrip, StatTile, StatusBadge } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
-import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
+import { ChevronLeft, ChevronRight, Calendar, Users, X, Filter, Search, Eye, UsersRound } from "lucide-react";
+import { taskStatusMeta } from "@/lib/status";
 import ManagerWorklogPanel from "@/components/worklog/ManagerWorklogPanel";
 import OversightBoard from "@/components/oversight/OversightBoard";
+import { fieldClass, iconButtonClass } from "@/components/ui/classes";
 
-const STATUS_COLORS = TASK_STATUS_CONFIG;
-
-const LOAD_COLORS: Record<string, { label: string; color: string }> = {
-  idle: { label: "Idle", color: "#9ca3af" },
-  light: { label: "Light", color: "#10b981" },
-  moderate: { label: "Moderate", color: "#f59e0b" },
-  heavy: { label: "Heavy", color: "#ef4444" },
+const LOAD_LABELS: Record<string, string> = {
+  idle: "Idle",
+  light: "Light",
+  moderate: "Moderate",
+  heavy: "Heavy",
 };
+
+const ICON_BTN = iconButtonClass;
+const FIELD = fieldClass;
+const AVATAR =
+  "rounded-full bg-[var(--bg-hover)] flex items-center justify-center shrink-0 font-medium text-[var(--text-secondary)]";
+const TH = "text-[12px] font-medium text-[var(--text-muted)] px-3 py-2 whitespace-nowrap";
+
+function StatusDot({ status }: { status: string }) {
+  return (
+    <span
+      className="w-2 h-2 rounded-full shrink-0"
+      style={{ backgroundColor: taskStatusMeta(status).dot }}
+    />
+  );
+}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -47,11 +61,12 @@ function shiftDate(dateStr: string, days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const MEMBER_STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
-  "in-progress": { color: "#f59e0b", label: "In Progress", order: 1 },
-  pending: { color: "#6b7280", label: "Pending", order: 2 },
-  review: { color: "#8b5cf6", label: "Review", order: 3 },
-  done: { color: "#10b981", label: "Done", order: 4 },
+// Sort order of the member panel's task table; labels and colours come from the lib.
+const MEMBER_STATUS_ORDER: Record<string, number> = {
+  "in-progress": 1,
+  pending: 2,
+  review: 3,
+  done: 4,
 };
 
 type WorklogTab = "worklog" | "teamload" | "managerlog" | "oversight";
@@ -129,7 +144,7 @@ function WorkLogPageInner() {
   if (!user || (!isAdmin && !isTeamLead)) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Access denied. Admin or Team Lead only.</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">Access denied. Admin or Team Lead only.</p>
       </div>
     );
   }
@@ -142,42 +157,33 @@ function WorkLogPageInner() {
       />
 
       {/* Tab Bar */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
-        {[
-          { key: "worklog" as const, label: "Daily Work Log", icon: Calendar },
-          { key: "teamload" as const, label: "Team Load", icon: Users },
-          ...(user?.isSuperAdmin || isTeamLead
-            ? [
-                {
-                  key: "managerlog" as const,
-                  label: "Manager Worklog",
-                  icon: UsersRound,
-                },
-              ]
-            : []),
-          ...(hasOversight
-            ? [
-                {
-                  key: "oversight" as const,
-                  label: "Oversight",
-                  icon: Eye,
-                },
-              ]
-            : []),
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              activeTab === key
-                ? "bg-white shadow-sm text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="mb-4 overflow-x-auto">
+        <SegmentedTabs
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            { value: "worklog" as const, label: "Daily Work Log", icon: Calendar },
+            { value: "teamload" as const, label: "Team Load", icon: Users },
+            ...(user?.isSuperAdmin || isTeamLead
+              ? [
+                  {
+                    value: "managerlog" as const,
+                    label: "Manager Worklog",
+                    icon: UsersRound,
+                  },
+                ]
+              : []),
+            ...(hasOversight
+              ? [
+                  {
+                    value: "oversight" as const,
+                    label: "Oversight",
+                    icon: Eye,
+                  },
+                ]
+              : []),
+          ]}
+        />
       </div>
 
       {/* Tab Content */}
@@ -185,20 +191,22 @@ function WorkLogPageInner() {
       {activeTab === "worklog" && (
         <div>
           {/* Date Navigation */}
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-2 mb-4">
             <button
               onClick={() => setSelectedDate(shiftDate(selectedDate, -1))}
-              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+              className={ICON_BTN}
+              aria-label="Previous day"
             >
-              <ChevronLeft className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-[var(--accent-admin-text)]" />
+              <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                aria-label="Date"
+                className={FIELD}
               />
               <span className="text-[13px] text-[var(--text-secondary)] font-medium hidden sm:inline">
                 {formatDate(selectedDate)}
@@ -206,23 +214,21 @@ function WorkLogPageInner() {
             </div>
             <button
               onClick={() => setSelectedDate(shiftDate(selectedDate, 1))}
-              className="p-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+              className={ICON_BTN}
+              aria-label="Next day"
             >
-              <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+              <ChevronRight className="h-4 w-4" />
             </button>
             {selectedDate !== getTodayStr() && (
-              <button
-                onClick={() => setSelectedDate(getTodayStr())}
-                className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
-              >
+              <Button variant="secondary" onClick={() => setSelectedDate(getTodayStr())}>
                 Today
-              </button>
+              </Button>
             )}
           </div>
 
           {/* Summary Stats */}
           {worklog?.summary && (
-            <StatStrip className="mb-6">
+            <StatStrip className="mb-4">
               <StatTile label="Active employees" value={worklog.summary.employeesActive} />
               <StatTile label="Total tasks" value={worklog.summary.totalTasks} />
               <StatTile label="Completed" value={worklog.summary.completedTasks} />
@@ -246,7 +252,8 @@ function WorkLogPageInner() {
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}
                 placeholder="Search employee..."
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] w-[180px]"
+                aria-label="Search employee"
+                className={`${FIELD} w-[180px]`}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -254,7 +261,8 @@ function WorkLogPageInner() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                aria-label="Filter by status"
+                className={FIELD}
               >
                 <option value="">All Statuses</option>
                 <option value="pending">Pending</option>
@@ -264,9 +272,9 @@ function WorkLogPageInner() {
               </select>
             </div>
             {(filterSearch || filterStatus) && (
-              <button onClick={() => { setFilterSearch(""); setFilterStatus(""); }} className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline">
+              <Button variant="ghost" onClick={() => { setFilterSearch(""); setFilterStatus(""); }}>
                 Clear Filters
-              </button>
+              </Button>
             )}
           </div>
 
@@ -285,86 +293,76 @@ function WorkLogPageInner() {
               })
               .sort((a, b) => b.totalTasks - a.totalTasks).map((emp) => (
               <Card key={emp.user._id} className={emp.totalTasks === 0 ? "opacity-50" : ""}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                      <span className="text-[12px] font-bold text-[var(--accent-admin-text)]">
-                        {(emp.user.name ?? emp.user.email ?? "?")[0]?.toUpperCase()}
-                      </span>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`${AVATAR} w-8 h-8 text-[12px]`}>
+                      {(emp.user.name ?? emp.user.email ?? "?")[0]?.toUpperCase()}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="font-medium text-[13px] text-[var(--text-primary)]">
+                        <p className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                           {emp.user.name ?? emp.user.email ?? "Unknown"}
                         </p>
                         {emp.user.role === "admin" && (
-                          <span className="px-1 py-0.5 rounded text-[11px] font-semibold bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]">
-                            {emp.user.isSuperAdmin ? "SA" : "ADM"}
-                          </span>
+                          <Badge>{emp.user.isSuperAdmin ? "SA" : "Admin"}</Badge>
                         )}
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)]">{emp.user.designation ?? emp.user.role}</p>
+                      <p className="text-[12px] text-[var(--text-muted)] truncate">{emp.user.designation ?? emp.user.role}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span className="text-[var(--text-muted)]">
-                      {emp.completedTasks}/{emp.totalTasks} done
-                    </span>
-                  </div>
+                  <span className="text-[12px] tabular-nums text-[var(--text-muted)] shrink-0">
+                    {emp.completedTasks}/{emp.totalTasks} done
+                  </span>
                 </div>
                 {emp.tasks.length > 0 ? (
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col -mx-2">
                     {emp.tasks
                       .filter((task: any) => !filterStatus || task.status === filterStatus)
                       .map((task: any) => {
-                      const statusInfo = STATUS_COLORS[task.status];
+                      const statusInfo = taskStatusMeta(task.status);
                       const deadlineDate = task.deadline ? new Date(task.deadline) : null;
                       const isTaskOverdue = deadlineDate && deadlineDate.getTime() < Date.now() && task.status !== "done" && task.status !== "review";
                       return (
                         <div
                           key={task._id}
                           onClick={() => router.push(`/brief/${task.briefId}`)}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                          className="flex items-center gap-3 py-1.5 px-2 rounded-md hover:bg-[var(--bg-primary)] transition-colors cursor-pointer"
                         >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: statusInfo?.color ?? "#6b7280" }}
-                          />
-                          <span className="text-[12px] text-[var(--text-primary)] truncate flex-1">
+                          <span className="text-[13px] text-[var(--text-primary)] truncate flex-1 min-w-0">
                             {task.title}
                           </span>
-                          <span className="text-[11px] text-[var(--text-muted)] shrink-0">
+                          <span className="text-[12px] text-[var(--text-muted)] truncate max-w-[140px] shrink-0">
                             {task.briefTitle}
                           </span>
                           {deadlineDate && (
-                            <span className={`text-[11px] flex items-center gap-0.5 shrink-0 ${isTaskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
-                              <Calendar className="h-2.5 w-2.5" />
+                            <span
+                              title="Deadline"
+                              className={`text-[12px] tabular-nums shrink-0 ${isTaskOverdue ? "font-medium text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
+                            >
                               {deadlineDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </span>
                           )}
-                          <span
-                            className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0"
-                            style={{ color: statusInfo?.color, backgroundColor: statusInfo?.bg }}
-                          >
-                            {statusInfo?.label}
-                          </span>
                           {task.timeSpentMinutes > 0 && (
-                            <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-0.5 shrink-0">
-                              <Clock className="h-2.5 w-2.5" />
+                            <span title="Time spent" className="text-[12px] tabular-nums text-[var(--text-muted)] shrink-0">
                               {Math.round(task.timeSpentMinutes)}m
                             </span>
                           )}
                           {(task as any).changesCount > 0 && (
-                            <span className="text-[11px] font-medium px-1.5 py-0.5 rounded shrink-0 text-amber-700 bg-amber-50">
+                            <Badge className="shrink-0">
                               {(task as any).changesCount} {(task as any).changesCount === 1 ? "change" : "changes"}
-                            </span>
+                            </Badge>
                           )}
+                          <StatusBadge
+                            className="w-[88px] shrink-0"
+                            color={statusInfo.dot}
+                            label={statusInfo.label}
+                          />
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <p className="text-[12px] text-[var(--text-muted)]">No tasks for this day</p>
+                  <p className="text-[13px] text-[var(--text-muted)]">No tasks for this day</p>
                 )}
               </Card>
             ))}
@@ -384,88 +382,82 @@ function WorkLogPageInner() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {(teamLoad ?? []).map((team: any) => (
             <Card key={team.team._id}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
                   <div
-                    className="w-3 h-3 rounded-sm"
+                    className="w-3 h-3 rounded-sm shrink-0"
                     style={{ backgroundColor: team.team.color }}
                   />
-                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
+                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                     {team.team.name}
                   </h3>
                 </div>
-                <span
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{
-                    color: LOAD_COLORS[team.loadLevel]?.color,
-                    backgroundColor: LOAD_COLORS[team.loadLevel]?.color + "15",
-                  }}
-                >
-                  {LOAD_COLORS[team.loadLevel]?.label} Load
-                </span>
+                {team.loadLevel === "heavy" ? (
+                  <Badge variant="warning">{LOAD_LABELS[team.loadLevel]} Load</Badge>
+                ) : (
+                  <Badge>{LOAD_LABELS[team.loadLevel]} Load</Badge>
+                )}
               </div>
 
               {/* Task Distribution Bar */}
               <div className="mb-3">
-                <div className="flex h-2 rounded-full overflow-hidden bg-[var(--bg-hover)]">
+                <div className="flex h-1.5 rounded-full overflow-hidden bg-[var(--border-subtle)]">
                   {team.totalTasks > 0 && (
                     <>
-                      <div style={{ width: `${(team.statusCounts.done / team.totalTasks) * 100}%`, backgroundColor: "var(--accent-employee)" }} />
-                      <div style={{ width: `${(team.statusCounts.review / team.totalTasks) * 100}%`, backgroundColor: "var(--accent-admin)" }} />
-                      <div style={{ width: `${(team.statusCounts["in-progress"] / team.totalTasks) * 100}%`, backgroundColor: "var(--accent-manager)" }} />
-                      <div style={{ width: `${(team.statusCounts.pending / team.totalTasks) * 100}%`, backgroundColor: "var(--text-secondary)" }} />
+                      <div style={{ width: `${(team.statusCounts.done / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("done").dot }} />
+                      <div style={{ width: `${(team.statusCounts.review / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("review").dot }} />
+                      <div style={{ width: `${(team.statusCounts["in-progress"] / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("in-progress").dot }} />
+                      <div style={{ width: `${(team.statusCounts.pending / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("pending").dot }} />
                     </>
                   )}
                 </div>
-                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-[var(--text-muted)]">
-                  <span>{team.statusCounts.pending} pending</span>
-                  <span>{team.statusCounts["in-progress"]} in progress</span>
-                  <span>{team.statusCounts.review} review</span>
-                  <span>{team.statusCounts.done} done</span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[12px] tabular-nums text-[var(--text-muted)]">
+                  <span className="inline-flex items-center gap-1.5"><StatusDot status="pending" />{team.statusCounts.pending} pending</span>
+                  <span className="inline-flex items-center gap-1.5"><StatusDot status="in-progress" />{team.statusCounts["in-progress"]} in progress</span>
+                  <span className="inline-flex items-center gap-1.5"><StatusDot status="review" />{team.statusCounts.review} review</span>
+                  <span className="inline-flex items-center gap-1.5"><StatusDot status="done" />{team.statusCounts.done} done</span>
                 </div>
               </div>
 
               {/* Members */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col -mx-2">
                 {team.members.map((member: any) => (
                   <div
                     key={member._id}
                     onClick={() => openMemberPanel(member._id as Id<"users">)}
-                    className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                    className="flex items-center justify-between gap-3 py-1.5 px-2 rounded-md hover:bg-[var(--bg-primary)] transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center">
-                        <span className="text-[11px] font-bold text-[var(--accent-admin-text)]">
-                          {(member.name ?? member.email ?? "?")[0]?.toUpperCase()}
-                        </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`${AVATAR} w-6 h-6 text-[11px]`}>
+                        {(member.name ?? member.email ?? "?")[0]?.toUpperCase()}
                       </div>
-                      <span className="text-[12px] text-[var(--text-primary)]">
+                      <span className="text-[13px] text-[var(--text-primary)] truncate">
                         {member.name ?? member.email}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {member.supervisingCount > 0 && (
+                        <Badge>{member.supervisingCount} supervising</Badge>
+                      )}
+                      <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
                         {member.taskCount} tasks
                       </span>
-                      {member.supervisingCount > 0 && (
-                        <span className="text-[11px] font-medium tabular-nums px-1.5 py-0.5 rounded-full bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] whitespace-nowrap">
-                          {member.supervisingCount} supervising
-                        </span>
-                      )}
-                      {member.taskCount > 0 && (
-                        <div className="flex h-1.5 w-16 rounded-full overflow-hidden bg-[var(--bg-hover)]">
-                          <div style={{ width: `${(member.doneTasks / member.taskCount) * 100}%`, backgroundColor: "var(--accent-employee)" }} />
-                          <div style={{ width: `${(member.reviewTasks / member.taskCount) * 100}%`, backgroundColor: "var(--accent-admin)" }} />
-                          <div style={{ width: `${(member.inProgressTasks / member.taskCount) * 100}%`, backgroundColor: "var(--accent-manager)" }} />
-                        </div>
-                      )}
+                      <div className="flex h-1.5 w-16 rounded-full overflow-hidden bg-[var(--border-subtle)]">
+                        {member.taskCount > 0 && (
+                          <>
+                            <div style={{ width: `${(member.doneTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("done").dot }} />
+                            <div style={{ width: `${(member.reviewTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("review").dot }} />
+                            <div style={{ width: `${(member.inProgressTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("in-progress").dot }} />
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
-                <span className="text-[11px] text-[var(--text-muted)]">
+              <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
                   {team.members.length} members &middot; {team.totalTasks} total tasks
                 </span>
               </div>
@@ -497,19 +489,17 @@ function WorkLogPageInner() {
             }`}
           >
             {/* Panel Header */}
-            <div className="flex items-center justify-between px-5 h-14 border-b border-[var(--border)] shrink-0">
+            <div className="flex items-center justify-between gap-3 px-5 h-14 border-b border-[var(--border)] shrink-0">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-full bg-[var(--accent-admin-dim)] flex items-center justify-center shrink-0">
-                  <span className="text-[12px] font-bold text-[var(--accent-admin-text)]">
-                    {(memberTasks?.user?.name ?? memberTasks?.user?.email ?? "?")[0]?.toUpperCase()}
-                  </span>
+                <div className={`${AVATAR} w-8 h-8 text-[12px]`}>
+                  {(memberTasks?.user?.name ?? memberTasks?.user?.email ?? "?")[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                     {memberTasks?.user?.name ?? memberTasks?.user?.email ?? "Loading..."}
                   </h2>
                   {memberTasks?.user?.designation && (
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">
+                    <p className="text-[12px] text-[var(--text-muted)] truncate">
                       {memberTasks.user.designation}
                     </p>
                   )}
@@ -517,9 +507,10 @@ function WorkLogPageInner() {
               </div>
               <button
                 onClick={closeMemberPanel}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className={`${ICON_BTN} shrink-0`}
+                aria-label="Close"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -531,8 +522,8 @@ function WorkLogPageInner() {
                 <p className="text-[13px] text-[var(--text-muted)]">Could not load data.</p>
               ) : (
                 <>
-                  <div className="mb-4">
-                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                  <div className="mb-3">
+                    <span className="text-[12px] font-medium text-[var(--text-muted)]">
                       {memberTasks.tasks.length} active task{memberTasks.tasks.length !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -544,28 +535,28 @@ function WorkLogPageInner() {
                     <div className="rounded-lg border border-[var(--border)] overflow-x-auto">
                       <table className="w-full text-left min-w-[880px]">
                         <thead>
-                          <tr className="bg-[var(--bg-hover)]">
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Sent for Review</th>
-                            <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Approved</th>
+                          <tr className="bg-[var(--bg-primary)]">
+                            <th className={TH}>Task</th>
+                            <th className={TH}>Brand</th>
+                            <th className={TH}>Status</th>
+                            <th className={TH}>Assigned</th>
+                            <th className={TH}>Deadline</th>
+                            <th className={TH}>Sent for Review</th>
+                            <th className={TH}>Approved</th>
                           </tr>
                         </thead>
                         <tbody>
                           {[...memberTasks.tasks]
                             .sort((a: any, b: any) => {
                               const byStatus =
-                                (MEMBER_STATUS_CONFIG[a.status]?.order ?? 99) -
-                                (MEMBER_STATUS_CONFIG[b.status]?.order ?? 99);
+                                (MEMBER_STATUS_ORDER[a.status] ?? 99) -
+                                (MEMBER_STATUS_ORDER[b.status] ?? 99);
                               if (byStatus !== 0) return byStatus;
                               // Newest first within a status.
                               return (b.createdAt ?? 0) - (a.createdAt ?? 0);
                             })
-                            .map((task: any, idx: number) => {
-                              const config = MEMBER_STATUS_CONFIG[task.status] ?? { color: "var(--text-muted)", label: task.status, order: 99 };
+                            .map((task: any) => {
+                              const config = taskStatusMeta(task.status);
                               const fmtDate = (ts: number | null | undefined) => {
                                 if (!ts) return "-";
                                 return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -574,7 +565,7 @@ function WorkLogPageInner() {
                               return (
                                 <tr
                                   key={task._id}
-                                  className={`border-t border-[var(--border-subtle)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"} hover:bg-[var(--bg-hover)] transition-colors cursor-pointer`}
+                                  className="border-t border-[var(--border-subtle)] hover:bg-[var(--bg-primary)] transition-colors cursor-pointer"
                                   onClick={() => {
                                     // Content-calendar entries: carry the month
                                     // so the calendar opens on the right sheet
@@ -591,57 +582,51 @@ function WorkLogPageInner() {
                                   }}
                                 >
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
+                                    <span className="text-[13px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
                                       {task.title}
                                     </span>
-                                    <span className="text-[11px] text-[var(--text-muted)] block truncate max-w-[200px]">
+                                    <span className="text-[12px] text-[var(--text-muted)] block truncate max-w-[200px]">
                                       {task.briefTitle}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)] truncate block max-w-[100px]">
+                                    <span className="text-[12px] text-[var(--text-secondary)] truncate block max-w-[100px]">
                                       {task.brandName ?? "-"}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap"
-                                      style={{ color: config.color, backgroundColor: config.color + "18" }}
-                                    >
-                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
-                                      {config.label}
-                                    </span>
+                                    <StatusBadge color={config.dot} label={config.label} />
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
+                                    <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                       {fmtDate(task.assignedAt)}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
                                     {task.deadline ? (
-                                      <span className={`text-[11px] whitespace-nowrap ${isOverdue ? "text-[var(--danger)] font-semibold" : "text-[var(--text-secondary)]"}`}>
+                                      <span className={`text-[12px] tabular-nums whitespace-nowrap ${isOverdue ? "text-[var(--danger)] font-medium" : "text-[var(--text-secondary)]"}`}>
                                         {fmtDate(task.deadline)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
+                                      <span className="text-[12px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                   <td className="px-3 py-2.5">
                                     {task.submittedForReviewAt ? (
-                                      <span className="text-[11px] text-blue-600 whitespace-nowrap">
+                                      <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                         {fmtDate(task.submittedForReviewAt)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
+                                      <span className="text-[12px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                   <td className="px-3 py-2.5">
                                     {task.completedAt ? (
-                                      <span className="text-[11px] text-emerald-600 whitespace-nowrap">
+                                      <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                         {fmtDate(task.completedAt)}
                                       </span>
                                     ) : (
-                                      <span className="text-[11px] text-[var(--text-muted)]">-</span>
+                                      <span className="text-[12px] text-[var(--text-muted)]">-</span>
                                     )}
                                   </td>
                                 </tr>
@@ -654,57 +639,52 @@ function WorkLogPageInner() {
 
                   {/* Supervising — open delegated tasks */}
                   <div className="mt-6">
-                    <span className="text-[12px] font-medium text-[var(--text-secondary)]">
+                    <span className="text-[12px] font-medium text-[var(--text-muted)]">
                       {(memberTasks.supervising?.length ?? 0)} supervising (delegated) task{(memberTasks.supervising?.length ?? 0) !== 1 ? "s" : ""}
                     </span>
                     {(memberTasks.supervising?.length ?? 0) === 0 ? (
                       <p className="text-[13px] text-[var(--text-muted)] mt-1">None.</p>
                     ) : (
-                      <div className="mt-2 rounded-lg border border-[var(--border)] overflow-x-auto">
+                      <div className="mt-3 rounded-lg border border-[var(--border)] overflow-x-auto">
                         <table className="w-full text-left min-w-[640px]">
                           <thead>
-                            <tr className="bg-[var(--bg-hover)]">
-                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Task</th>
-                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Assigned to</th>
-                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Brand</th>
-                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Status</th>
-                              <th className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide px-3 py-2">Deadline</th>
+                            <tr className="bg-[var(--bg-primary)]">
+                              <th className={TH}>Task</th>
+                              <th className={TH}>Assigned to</th>
+                              <th className={TH}>Brand</th>
+                              <th className={TH}>Status</th>
+                              <th className={TH}>Deadline</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {memberTasks.supervising.map((t: any, idx: number) => {
-                              const config = MEMBER_STATUS_CONFIG[t.status] ?? { color: "var(--text-muted)", label: t.status, order: 99 };
+                            {memberTasks.supervising.map((t: any) => {
+                              const config = taskStatusMeta(t.status);
                               return (
                                 <tr
                                   key={t._id}
                                   onClick={() => setOpenTaskId(t._id)}
                                   title="Open task"
-                                  className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)] ${idx % 2 === 0 ? "bg-white" : "bg-[var(--bg-primary)]"}`}
+                                  className="border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-primary)] transition-colors"
                                 >
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[12px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
+                                    <span className="text-[13px] text-[var(--text-primary)] font-medium leading-snug line-clamp-2">
                                       {t.title}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)]">{t.assigneeName}</span>
+                                    <span className="text-[12px] text-[var(--text-secondary)]">{t.assigneeName}</span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium text-white" style={{ background: t.brandColor }}>
+                                    <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.brandColor }} />
                                       {t.brandName}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap"
-                                      style={{ color: config.color, backgroundColor: config.color + "18" }}
-                                    >
-                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.color }} />
-                                      {config.label}
-                                    </span>
+                                    <StatusBadge color={config.dot} label={config.label} />
                                   </td>
                                   <td className="px-3 py-2.5">
-                                    <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">
+                                    <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                       {t.deadline ? new Date(t.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-"}
                                     </span>
                                   </td>

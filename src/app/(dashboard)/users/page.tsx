@@ -6,7 +6,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import TeamsPanel from "@/components/teams/TeamsPanel";
-import { Badge, Button, Card, ConfirmModal, Input, PageHeader, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, useToast, SkeletonTable, SkeletonPageHeader } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, Input, PageHeader, PanelEmpty, SegmentedTabs, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, useToast, SkeletonTable, SkeletonPageHeader } from "@/components/ui";
 import { Trash2, UserPlus, Copy, X, Check, Link2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { getDisplayRole } from "@/lib/roles";
 
@@ -70,30 +70,26 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   return (
     /* overlay */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* modal card */}
       <div
-        className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-200"
       >
         {/* header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <UserPlus size={16} className="text-[var(--accent-admin-text)]" />
-            </div>
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
-              Create User Invite
-            </h2>
-          </div>
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
+            Create User Invite
+          </h2>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[var(--bg-hover)] transition-colors duration-150"
+            aria-label="Close"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            <X size={16} className="text-[var(--text-secondary)]" />
+            <X size={16} />
           </button>
         </div>
 
@@ -107,11 +103,11 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
                 Invite created successfully
               </div>
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-3.5">
-                <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                  Invite Link
+                <p className="text-[12px] font-medium text-[var(--text-muted)] mb-2">
+                  Invite link
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0 bg-white border border-[var(--border)] rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0 bg-white border border-[var(--border)] rounded-md px-3 py-2">
                     <Link2 size={14} className="shrink-0 text-[var(--text-disabled)]" />
                     <span className="text-[13px] text-[var(--text-primary)] font-mono truncate">
                       {inviteLink}
@@ -192,7 +188,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
               )}
 
               <div className="flex items-center justify-end gap-2 pt-2">
-                <Button variant="secondary" type="button" onClick={onClose}>
+                <Button variant="ghost" type="button" onClick={onClose}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={submitting}>
@@ -262,27 +258,23 @@ function ResetPasswordModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-200">
         {/* header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <KeyRound size={16} className="text-[var(--accent-admin-text)]" />
-            </div>
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
-              Reset Password
-            </h2>
-          </div>
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
+            Reset Password
+          </h2>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[var(--bg-hover)] transition-colors duration-150"
+            aria-label="Close"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            <X size={16} className="text-[var(--text-secondary)]" />
+            <X size={16} />
           </button>
         </div>
 
@@ -295,11 +287,11 @@ function ResetPasswordModal({
                 Password updated for {user.name}
               </div>
               <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-hover)] p-3.5">
-                <p className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                  New Password. Share it securely
+                <p className="text-[12px] font-medium text-[var(--text-muted)] mb-2">
+                  New password. Share it securely
                 </p>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center flex-1 min-w-0 bg-white border border-[var(--border)] rounded-lg px-3 py-2">
+                  <div className="flex items-center flex-1 min-w-0 bg-white border border-[var(--border)] rounded-md px-3 py-2">
                     <span className="text-[13px] text-[var(--text-primary)] font-mono truncate">
                       {password}
                     </span>
@@ -344,8 +336,9 @@ function ResetPasswordModal({
                   <button
                     type="button"
                     onClick={() => setShow((s) => !s)}
-                    className="absolute right-2.5 top-[30px] flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="absolute right-2.5 top-[30px] flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                     title={show ? "Hide" : "Show"}
+                    aria-label={show ? "Hide password" : "Show password"}
                   >
                     {show ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
@@ -366,7 +359,7 @@ function ResetPasswordModal({
               )}
 
               <div className="flex items-center justify-end gap-2 pt-2">
-                <Button variant="secondary" type="button" onClick={onClose}>
+                <Button variant="ghost" type="button" onClick={onClose}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={submitting}>
@@ -438,26 +431,22 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#171717]/40 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-xl shadow-lg animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-[480px] mx-4 bg-white border border-[var(--border)] rounded-lg shadow-lg animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent-admin-dim)]">
-              <UserPlus size={16} className="text-[var(--accent-admin-text)]" />
-            </div>
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">
-              Create Client Login
-            </h2>
-          </div>
+          <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
+            Create Client Login
+          </h2>
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-[var(--bg-hover)] transition-colors duration-150"
+            aria-label="Close"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
-            <X size={16} className="text-[var(--text-secondary)]" />
+            <X size={16} />
           </button>
         </div>
         <div className="px-6 py-5">
@@ -502,8 +491,9 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   onClick={() => setShow((s) => !s)}
-                  className="absolute right-2.5 top-[30px] flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className="absolute right-2.5 top-[30px] flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   title={show ? "Hide" : "Show"}
+                  aria-label={show ? "Hide password" : "Show password"}
                 >
                   {show ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -518,7 +508,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
             </div>
             {error && <p className="text-[13px] font-medium text-[var(--danger)]">{error}</p>}
             <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="secondary" type="button" onClick={onClose}>
+              <Button variant="ghost" type="button" onClick={onClose}>
                 Cancel
               </Button>
               <Button type="submit" disabled={submitting}>
@@ -564,13 +554,11 @@ function ClientsPanel() {
 
   return (
     <>
-      <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
         {clients.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-[13px] text-[var(--text-muted)]">
-              No client logins yet. Create one to give a client access to their brand portal.
-            </p>
-          </div>
+          <PanelEmpty>
+            No client logins yet. Create one to give a client access to their brand portal.
+          </PanelEmpty>
         ) : (
           <Table>
             <TableHeader>
@@ -618,7 +606,7 @@ function ClientsPanel() {
                               }
                             }}
                             placeholder="New password (min 8 chars)"
-                            className="w-44 px-2 py-1.5 rounded-lg border border-[var(--border)] text-[12px] bg-white focus:outline-none"
+                            className="w-44 px-2 py-1.5 rounded-md border border-[var(--border)] text-[12px] bg-white focus:outline-none"
                             autoFocus
                           />
                           {newPassword.length > 0 && newPassword.length < 8 && (
@@ -630,14 +618,16 @@ function ClientsPanel() {
                         <button
                           onClick={() => void handleReset()}
                           disabled={newPassword.length < 8 || resetting}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--accent-employee-text)] hover:bg-[var(--bg-hover)] disabled:opacity-40"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
                           title="Save new password"
+                          aria-label="Save new password"
                         >
                           <Check size={15} />
                         </button>
                         <button
                           onClick={() => { setResetId(null); setNewPassword(""); }}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:bg-[var(--bg-hover)]"
+                          aria-label="Cancel password reset"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <X size={15} />
                         </button>
@@ -646,15 +636,17 @@ function ClientsPanel() {
                       <div className="flex items-center justify-end gap-0.5">
                         <button
                           onClick={() => { setResetId(c._id); setNewPassword(""); }}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                           title="Reset password"
+                          aria-label="Reset password"
                         >
                           <KeyRound size={15} />
                         </button>
                         <button
                           onClick={() => setDeleting({ id: c._id, name: c.name ?? c.email ?? "Client" })}
-                          className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all duration-150"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           title="Delete client login"
+                          aria-label="Delete client login"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -697,13 +689,13 @@ function AuditLogPanel() {
   const log = useQuery(api.users.listUserAuditLog);
   if (!log) return null;
   return (
-    <div className="mt-6 rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-[var(--border)]">
-        <h2 className="text-[13px] font-semibold text-[var(--text-primary)]">Audit log</h2>
+    <div className="mt-4 rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+        <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Audit log</h2>
         <p className="text-[12px] text-[var(--text-muted)]">Role changes and deletions. Only you can see this.</p>
       </div>
       {log.length === 0 ? (
-        <p className="px-4 py-6 text-[12px] text-[var(--text-muted)]">Nothing changed yet.</p>
+        <PanelEmpty>Nothing changed yet.</PanelEmpty>
       ) : (
         <Table>
           <TableHeader>
@@ -826,32 +818,23 @@ export default function UsersPage() {
       />
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
-        {([
-          { key: "users", label: "Users" },
-          { key: "teams", label: "Teams" },
-          { key: "clients", label: "Clients" },
-        ] as const).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => router.replace(key === "users" ? "/users" : `/users?tab=${key}`)}
-            className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              tab === key
-                ? "bg-white shadow-sm text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        className="mb-4"
+        value={tab}
+        options={[
+          { value: "users", label: "Users" },
+          { value: "teams", label: "Teams" },
+          { value: "clients", label: "Clients" },
+        ] as const}
+        onChange={(key) => router.replace(key === "users" ? "/users" : `/users?tab=${key}`)}
+      />
 
       {tab === "teams" && <TeamsPanel />}
       {tab === "clients" && <ClientsPanel />}
 
       {/* Table */}
       {tab === "users" && (
-      <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+      <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
         <Table>
           <TableHeader>
             <TableHead>Name</TableHead>
@@ -879,9 +862,7 @@ export default function UsersPage() {
                 </TableCell>
                 <TableCell>
                   {(user as any).isSuperAdmin ? (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                      Super Admin
-                    </span>
+                    <Badge variant="admin">Super Admin</Badge>
                   ) : (
                     <select
                       value={
@@ -935,8 +916,9 @@ export default function UsersPage() {
                             name: user.name ?? user.email ?? "User",
                           })
                         }
-                        className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all duration-150"
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         title="Reset password"
+                        aria-label="Reset password"
                       >
                         <KeyRound size={15} />
                       </button>
@@ -945,8 +927,9 @@ export default function UsersPage() {
                       onClick={() =>
                         setDeletingUser({ id: user._id, name: user.name ?? user.email ?? "User" })
                       }
-                      className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--text-disabled)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all duration-150"
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                       title="Delete user"
+                      aria-label="Delete user"
                     >
                       <Trash2 size={15} />
                     </button>

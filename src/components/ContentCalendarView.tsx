@@ -6,7 +6,8 @@ import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, StatusBadge, useToast } from "@/components/ui";
+import { TASK_STATUS_META, taskStatusMeta } from "@/lib/status";
 import {
   Plus,
   Trash2,
@@ -16,15 +17,14 @@ import {
   Loader2,
   ChevronRight,
   Calendar,
-  Link2,
   ExternalLink,
   Send,
   CheckCircle2,
   AlertCircle,
   Clock,
-  Users,
   RotateCcw,
 } from "lucide-react";
+import { fieldClass, iconButtonClass } from "@/components/ui/classes";
 
 const PLATFORMS = [
   "Instagram",
@@ -47,13 +47,25 @@ const CONTENT_TYPES = [
   "Other",
 ];
 
-const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
-  { value: "pending", label: "Pending", color: "#6b7280" },
-  { value: "in-progress", label: "In Progress", color: "#f59e0b" },
-  { value: "on-hold", label: "On Hold", color: "#ef4444" },
-  { value: "review", label: "Review", color: "#8b5cf6" },
-  { value: "done", label: "Done", color: "#10b981" },
-];
+// The order the status dropdown offers them in; labels and dot colours come
+// from src/lib/status.ts.
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  "pending",
+  "in-progress",
+  "on-hold",
+  "review",
+  "done",
+].map((value) => ({ value, label: TASK_STATUS_META[value].label }));
+
+// One look for every field, label and icon button in this file.
+const FIELD = `w-full ${fieldClass}`;
+const TEXTAREA =
+  "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none";
+const LABEL = "block mb-1 text-[12px] font-medium text-[var(--text-muted)]";
+const ICON_BTN = iconButtonClass;
+// Same button for inside a list row, where 32px would stretch the row.
+const ICON_BTN_SM =
+  "inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors";
 
 /** Non-admins send work for review by submitting a deliverable (that is what
  *  notifies the team lead and brand manager), so the dropdown doesn't offer
@@ -62,16 +74,6 @@ function statusOptionsFor(user: { role?: string } | null | undefined, current: s
   if (user?.role === "admin") return STATUS_OPTIONS;
   return STATUS_OPTIONS.filter(
     (s) => (s.value !== "review" && s.value !== "done") || s.value === current
-  );
-}
-
-function statusInfo(status: string) {
-  return (
-    STATUS_OPTIONS.find((s) => s.value === status) ?? {
-      value: status,
-      label: status,
-      color: "#6b7280",
-    }
   );
 }
 
@@ -396,8 +398,8 @@ export function ContentCalendarView({
   if (sheets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <Calendar className="h-10 w-10 text-[var(--text-muted)]" />
-        <p className="text-[15px] text-[var(--text-secondary)]">
+        <Calendar className="h-8 w-8 text-[var(--text-muted)]" aria-hidden />
+        <p className="text-[14px] font-medium text-[var(--text-primary)]">
           No content calendar sheets yet
         </p>
         {isEditable && (
@@ -406,7 +408,8 @@ export function ContentCalendarView({
               type="month"
               value={newSheetMonth}
               onChange={(e) => setNewSheetMonth(e.target.value)}
-              className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px]"
+              aria-label="Month"
+              className={fieldClass}
             />
             <Button
               variant="primary"
@@ -429,8 +432,8 @@ export function ContentCalendarView({
                   )
               }
             >
-              <Plus className="h-4 w-4 mr-1" />
-              Create First Sheet
+              <Plus className="h-4 w-4" />
+              Create first sheet
             </Button>
           </div>
         )}
@@ -467,12 +470,13 @@ export function ContentCalendarView({
           {isEditable && currentSheetMonth && (
             <>
               <Button
-                variant={showBreakDayPicker ? "destructive" : "secondary"}
+                variant="secondary"
+                aria-pressed={showBreakDayPicker}
                 onClick={() => setShowBreakDayPicker((v) => !v)}
-                className="text-[12px] px-3 py-1.5 h-auto"
+                className={showBreakDayPicker ? "!bg-[var(--bg-hover)] !border-[var(--border-strong)]" : ""}
               >
-                <Calendar className="h-3.5 w-3.5 mr-1" />
-                {showBreakDayPicker ? "Done" : "Break Days"}
+                <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                {showBreakDayPicker ? "Done" : "Break days"}
               </Button>
               <Button
                 variant="primary"
@@ -484,10 +488,9 @@ export function ContentCalendarView({
                   }
                   setShowAddEntry(true);
                 }}
-                className="text-[12px] px-3 py-1.5 h-auto"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Entry
+                <Plus className="h-3.5 w-3.5" />
+                Add entry
               </Button>
             </>
           )}
@@ -496,9 +499,9 @@ export function ContentCalendarView({
 
       {/* Break Day Picker */}
       {showBreakDayPicker && currentSheetMonth && (
-        <div className="px-4 py-3 border-b border-[var(--border)] bg-red-50/40 shrink-0">
-          <p className="text-[11px] font-semibold text-red-700 mb-1">
-            Click a day to toggle a break. Rows in the table below show a BREAK badge when that post date matches (entries with no row still show as breaks in the month strip).
+        <div className="px-4 py-3 border-b border-[var(--border)] bg-white shrink-0">
+          <p className="text-[12px] text-[var(--text-secondary)] mb-2">
+            Click a day to toggle a break. Rows in the table below show a Break badge when that post date matches (entries with no row still show as breaks in the month strip).
           </p>
           {(() => {
             const [y, m] = currentSheetMonth.split("-").map(Number);
@@ -512,7 +515,7 @@ export function ContentCalendarView({
             return (
               <div className="grid grid-cols-7 gap-1 max-w-[420px]">
                 {weekdays.map((wd) => (
-                  <div key={wd} className="text-center text-[11px] font-semibold text-[var(--text-muted)] py-0.5">
+                  <div key={wd} className="text-center text-[12px] font-medium text-[var(--text-muted)] py-0.5">
                     {wd}
                   </div>
                 ))}
@@ -523,6 +526,7 @@ export function ContentCalendarView({
                   return (
                     <button
                       key={dateStr}
+                      aria-pressed={isBreak}
                       onClick={() =>
                         toggleBreakDay({ briefId, date: dateStr })
                           .then((r) =>
@@ -537,8 +541,8 @@ export function ContentCalendarView({
                       }
                       className={`rounded-md text-[12px] font-medium py-1.5 transition-colors ${
                         isBreak
-                          ? "bg-red-500 text-white hover:bg-red-600"
-                          : "bg-white text-[var(--text-primary)] hover:bg-red-100 border border-[var(--border-subtle)]"
+                          ? "bg-[var(--text-primary)] text-white border border-[var(--text-primary)] hover:opacity-90"
+                          : "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:bg-[var(--bg-hover)]"
                       }`}
                     >
                       {day}
@@ -554,8 +558,8 @@ export function ContentCalendarView({
       {/* Month strip: break days visible even when no entry exists for that date */}
       {currentSheetMonth && (
         <div className="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-primary)] shrink-0">
-          <p className="text-[11px] font-medium text-[var(--text-muted)] mb-1.5">
-            {monthLabel(currentSheetMonth)} - break days (red)
+          <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
+            {monthLabel(currentSheetMonth)} - break days (dark)
           </p>
           <div className="flex flex-wrap gap-1 max-w-full">
             {Array.from(
@@ -568,10 +572,10 @@ export function ContentCalendarView({
                   <div
                     key={dateStr}
                     title={dateStr}
-                    className={`w-7 h-7 flex items-center justify-center rounded text-[11px] font-medium shrink-0 ${
+                    className={`w-7 h-7 flex items-center justify-center rounded text-[11px] font-medium tabular-nums shrink-0 ${
                       isBreak
-                        ? "bg-red-500 text-white"
-                        : "bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+                        ? "bg-[var(--text-primary)] text-white"
+                        : "bg-white text-[var(--text-secondary)] border border-[var(--border-subtle)]"
                     }`}
                   >
                     {d}
@@ -598,44 +602,44 @@ export function ContentCalendarView({
             const noDeadline = incomplete.filter((t: any) => rowDeadlineInfo(t).dl == null).length;
             if (incomplete.length === 0) return null;
             return (
-              <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
-                <span className="text-[12px] font-semibold text-amber-800">
+              <div className="px-4 py-2 bg-[var(--warning-dim)] border-b border-[var(--border)] flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-[12px] font-medium text-[var(--warning)]">
                   {incomplete.length} task{incomplete.length !== 1 ? "s" : ""} need attention
                 </span>
-                <span className="text-[11px] text-amber-700">
+                <span className="text-[12px] text-[var(--text-secondary)]">
                   {noAssignee > 0 && `${noAssignee} unassigned`}
                   {noAssignee > 0 && noDeadline > 0 && " · "}
                   {noDeadline > 0 && `${noDeadline} no deadline`}
                 </span>
-                <span className="text-[11px] text-amber-600 ml-auto">Click a row to assign</span>
+                <span className="text-[12px] text-[var(--text-muted)] ml-auto">Click a row to assign</span>
               </div>
             );
           })()}
           <table className="w-full min-w-[1050px]">
             <thead className="sticky top-0 z-10">
               <tr className="bg-[var(--bg-primary)] border-b border-[var(--border)]">
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[120px]">
+                <th className="text-left px-4 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[120px]">
                   Date
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[120px]">
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[120px]">
                   Platform
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[110px]">
-                  Content Type
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[110px]">
+                  Content type
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
-                  Title / Caption
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)]">
+                  Title / caption
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[100px]">
                   Status
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
-                  Copy Assignee
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[140px]">
+                  Copy assignee
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[140px]">
-                  Design Assignee
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[140px]">
+                  Design assignee
                 </th>
-                <th className="text-left px-3 py-2.5 text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide w-[100px]">
+                <th className="text-left px-3 py-2.5 text-[12px] font-medium text-[var(--text-muted)] w-[100px]">
                   Deadline
                 </th>
                 {canDelete && <th className="w-[40px]" />}
@@ -646,77 +650,62 @@ export function ContentCalendarView({
                 const pd = task.postDate
                   ? formatPostDate(task.postDate)
                   : null;
-                const si = statusInfo(task.status);
+                const si = taskStatusMeta(task.status);
                 const isSelected = selectedTaskId === task._id;
                 const isBreakDay = task.postDate && breakDaySet.has(task.postDate);
                 return (
                   <tr
                     key={task._id}
                     onClick={() => setSelectedTaskId(task._id)}
+                    // Break and "needs attention" are said by the badges in
+                    // the row, not by tinting the whole row.
                     className={`border-b border-[var(--border-subtle)] cursor-pointer transition-colors ${
                       isSelected
-                        ? "bg-[var(--accent-admin-dim)]"
-                        : isBreakDay
-                          ? "bg-red-100 hover:bg-red-200"
-                          : ((!task.assigneeId || task.assigneeId === task.assignedBy) ||
-                              rowDeadlineInfo(task).dl == null)
-                            ? "bg-amber-50/50 hover:bg-amber-50"
-                            : "hover:bg-[var(--bg-hover)]"
+                        ? "bg-[var(--bg-hover)]"
+                        : "bg-white hover:bg-[var(--bg-primary)]"
                     }`}
                   >
                     <td className="px-4 py-2.5">
                       {pd ? (
                         <div className="flex items-center gap-1.5">
                           <div>
-                            <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                            <span className="text-[13px] font-medium text-[var(--text-primary)] tabular-nums">
                               {pd.display}
                             </span>
-                            <span className="text-[11px] text-[var(--text-muted)] ml-1">
+                            <span className="text-[12px] text-[var(--text-muted)] ml-1">
                               {pd.weekday}
                             </span>
                           </div>
-                          {isBreakDay && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold text-white bg-red-500">
-                              BREAK
-                            </span>
-                          )}
+                          {isBreakDay && <Badge variant="neutral">Break</Badge>}
                         </div>
                       ) : (
-                        <span className="text-[12px] text-[var(--text-muted)]">
+                        <span className="text-[13px] text-[var(--text-muted)]">
                           -
                         </span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-[12px] text-[var(--text-primary)]">
+                      <span className="text-[13px] text-[var(--text-primary)]">
                         {task.platform ?? "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-[12px] text-[var(--text-primary)]">
+                      <span className="text-[13px] text-[var(--text-primary)]">
                         {task.contentType ?? "-"}
                       </span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-[12px] text-[var(--text-primary)] font-medium">
+                      <span className="text-[13px] text-[var(--text-primary)] font-medium">
                         {task.title}
                       </span>
                       {task.description && (
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate max-w-[200px]">
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5 truncate max-w-[200px]">
                           {task.description}
                         </p>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium"
-                        style={{
-                          color: si.color,
-                          backgroundColor: `${si.color}15`,
-                        }}
-                      >
-                        {si.label}
-                      </span>
+                      <StatusBadge color={si.dot} label={si.label} />
                     </td>
                     <td className="px-3 py-2.5">
                       {/* Copy Assignee — resolved server-side from team
@@ -725,36 +714,34 @@ export function ContentCalendarView({
                           the design assignee and the child holds the copy. */}
                       {task.copyAssigneeName ? (
                         <div>
-                          <span className="text-[12px] text-[var(--text-primary)]">
+                          <span className="text-[13px] text-[var(--text-primary)]">
                             {task.copyAssigneeName}
                           </span>
                           {task.copyAssigneeDesignation && (
-                            <p className="text-[11px] text-[var(--text-muted)]">
+                            <p className="text-[12px] text-[var(--text-muted)]">
                               {task.copyAssigneeDesignation}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-amber-700 bg-amber-100">
-                          Unassigned
-                        </span>
+                        <Badge variant="warning">Unassigned</Badge>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
                       {/* Design Assignee — resolved by entry schema. */}
                       {task.designAssigneeName ? (
                         <div>
-                          <span className="text-[12px] text-[var(--text-primary)]">
+                          <span className="text-[13px] text-[var(--text-primary)]">
                             {task.designAssigneeName}
                           </span>
                           {task.designAssigneeDesignation && (
-                            <p className="text-[11px] text-[var(--text-muted)]">
+                            <p className="text-[12px] text-[var(--text-muted)]">
                               {task.designAssigneeDesignation}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">-</span>
+                        <span className="text-[13px] text-[var(--text-muted)]">-</span>
                       )}
                     </td>
                     <td className="px-3 py-2.5">
@@ -762,18 +749,16 @@ export function ContentCalendarView({
                         const { dl, overdue } = rowDeadlineInfo(task);
                         return dl != null ? (
                           <span
-                            className={`text-[11px] font-medium ${
+                            className={`text-[12px] tabular-nums ${
                               overdue
-                                ? "text-[var(--danger)]"
+                                ? "font-medium text-[var(--danger)]"
                                 : "text-[var(--text-secondary)]"
                             }`}
                           >
                             {formatDeadline(dl)}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-amber-700 bg-amber-100">
-                            No Deadline
-                          </span>
+                          <Badge variant="warning">No deadline</Badge>
                         );
                       })()}
                     </td>
@@ -799,9 +784,11 @@ export function ContentCalendarView({
                                 )
                               )
                           }
-                          className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors p-1"
+                          aria-label="Delete entry"
+                          title="Delete entry"
+                          className={`${ICON_BTN_SM} hover:text-[var(--danger)]`}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </td>
                     )}
@@ -886,7 +873,8 @@ export function ContentCalendarView({
                     e.stopPropagation();
                     setDeleteSheetId(sheet._id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 ml-1 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-all"
+                  aria-label={`Delete ${monthLabel(sheet.month)} sheet`}
+                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 ml-1 p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-all"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -897,7 +885,8 @@ export function ContentCalendarView({
         {isEditable && (
           <button
             onClick={() => setShowNewSheet(true)}
-            className="flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+            aria-label="Add month sheet"
+            className="flex items-center gap-1 px-3 py-2 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -906,22 +895,23 @@ export function ContentCalendarView({
 
       {/* New Sheet Modal */}
       {showNewSheet && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                Add Month Sheet
+                Add month sheet
               </h3>
               <button
                 onClick={() => setShowNewSheet(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+                className={ICON_BTN}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleCreateSheet} className="flex flex-col gap-3">
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                <label className={LABEL}>
                   Month
                 </label>
                 <input
@@ -929,7 +919,7 @@ export function ContentCalendarView({
                   value={newSheetMonth}
                   onChange={(e) => setNewSheetMonth(e.target.value)}
                   required
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div className="flex gap-2 mt-1">
@@ -938,7 +928,7 @@ export function ContentCalendarView({
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   onClick={() => setShowNewSheet(false)}
                 >
                   Cancel
@@ -951,22 +941,23 @@ export function ContentCalendarView({
 
       {/* Add Entry Modal */}
       {showAddEntry && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                Add Content Entry
+                Add content entry
               </h3>
               <button
                 onClick={() => setShowAddEntry(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+                className={ICON_BTN}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleAddEntry} className="flex flex-col gap-3">
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                <label className={LABEL}>
                   Title
                 </label>
                 <input
@@ -974,12 +965,12 @@ export function ContentCalendarView({
                   onChange={(e) => setNewTitle(e.target.value)}
                   required
                   placeholder="e.g. Instagram Post - Product Launch"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                  Post Date
+                <label className={LABEL}>
+                  Post date
                 </label>
                 <input
                   type="date"
@@ -988,18 +979,18 @@ export function ContentCalendarView({
                   max={currentSheetMonth ? monthDateBounds(currentSheetMonth).max : undefined}
                   onChange={(e) => setNewPostDate(e.target.value)}
                   required
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                  <label className={LABEL}>
                     Platform
                   </label>
                   <select
                     value={newPlatform}
                     onChange={(e) => setNewPlatform(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD}
                   >
                     {PLATFORMS.map((p) => (
                       <option key={p} value={p}>
@@ -1009,13 +1000,13 @@ export function ContentCalendarView({
                   </select>
                 </div>
                 <div>
-                  <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                    Content Type
+                  <label className={LABEL}>
+                    Content type
                   </label>
                   <select
                     value={newContentType}
                     onChange={(e) => setNewContentType(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD}
                   >
                     {CONTENT_TYPES.map((t) => (
                       <option key={t} value={t}>
@@ -1028,8 +1019,8 @@ export function ContentCalendarView({
               {/* Copy Team → Copy Assignee flow (primary).
                   Design assignee is added later via the sidebar's "Assign task" panel. */}
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                  Copy Team
+                <label className={LABEL}>
+                  Copy team
                 </label>
                 <select
                   value={newTeamFilter}
@@ -1037,7 +1028,7 @@ export function ContentCalendarView({
                     setNewTeamFilter(e.target.value);
                     setNewAssignee(""); // Reset assignee when team changes
                   }}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 >
                   <option value="">Select copy team</option>
                   {(allTeams ?? [])
@@ -1051,18 +1042,18 @@ export function ContentCalendarView({
                       </option>
                     ))}
                 </select>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                <p className="text-[12px] text-[var(--text-muted)] mt-1">
                   The copy team owns the entry. Design is assigned separately from the entry's sidebar.
                 </p>
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
-                  Copy Assignee
+                <label className={LABEL}>
+                  Copy assignee
                 </label>
                 <select
                   value={newAssignee}
                   onChange={(e) => setNewAssignee(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 >
                   <option value="">Unassigned</option>
                   {(newTeamFilter && newTeamMembers
@@ -1075,27 +1066,27 @@ export function ContentCalendarView({
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                <p className="text-[12px] text-[var(--text-muted)] mt-1">
                   Assignor is auto-set to the brand manager.
                 </p>
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1">
+                <label className={LABEL}>
                   Deadline (optional)
                 </label>
                 <DeadlineInput
                   value={newDeadline}
                   onChange={setNewDeadline}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               </div>
               <div className="flex gap-2 mt-1">
                 <Button type="submit" variant="primary" loading={addingEntry} disabled={addingEntry}>
-                  Add Entry
+                  Add entry
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   onClick={() => setShowAddEntry(false)}
                 >
                   Cancel
@@ -1108,10 +1099,10 @@ export function ContentCalendarView({
 
       {/* Delete Sheet Confirmation */}
       {deleteSheetId && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">
             <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-2">
-              Delete Sheet
+              Delete sheet
             </h3>
             <p className="text-[13px] text-[var(--text-secondary)] mb-4">
               This will permanently delete this month's sheet and all its
@@ -1125,7 +1116,7 @@ export function ContentCalendarView({
                 Delete
               </Button>
               <Button
-                variant="secondary"
+                variant="ghost"
                 onClick={() => setDeleteSheetId(null)}
               >
                 Cancel
@@ -1135,6 +1126,28 @@ export function ContentCalendarView({
         </div>
       )}
     </div>
+  );
+}
+
+/** One titled group of fields in the entry side panel. The first group in
+ *  the panel drops its top rule. */
+function SidebarSection({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4 first:border-t-0 first:pt-0">
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</h4>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -1568,7 +1581,7 @@ export function ContentCalendarEntrySidebar({
     }
   }
 
-  const si = statusInfo(task.status);
+  const si = taskStatusMeta(task.status);
 
   const isViewingLinkedChild = !!task.parentTaskId;
 
@@ -1634,12 +1647,13 @@ export function ContentCalendarEntrySidebar({
   }, [task, linkedTasks, parentEntryDetail, isViewingLinkedChild]);
 
   function upstreamStatusBadge(statusValue?: string) {
-    const map: Record<string, { label: string; bg: string; fg: string }> = {
-      pending: { label: "Pending", bg: "#fef3c7", fg: "#92400e" },
-      "in-progress": { label: "In Progress", bg: "#dbeafe", fg: "#1e40af" },
-      review: { label: "Review", bg: "#fae8ff", fg: "#86198f" },
-      done: { label: "Approved", bg: "#dcfce7", fg: "#166534" },
-      "on-hold": { label: "On Hold", bg: "#f3f4f6", fg: "#374151" },
+    // Only "approved" is news worth a colour; the rest stay neutral.
+    const map: Record<string, { label: string; variant: "neutral" | "employee" }> = {
+      pending: { label: "Pending", variant: "neutral" },
+      "in-progress": { label: "In Progress", variant: "neutral" },
+      review: { label: "Review", variant: "neutral" },
+      done: { label: "Approved", variant: "employee" },
+      "on-hold": { label: "On Hold", variant: "neutral" },
     };
     return map[statusValue ?? "pending"] ?? map.pending;
   }
@@ -1653,13 +1667,14 @@ export function ContentCalendarEntrySidebar({
             <button
               type="button"
               onClick={() => onSelectTask(task.parentTaskId as string)}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              className={`${ICON_BTN} -ml-1.5 shrink-0`}
               title="Back to parent entry"
+              aria-label="Back to parent entry"
             >
-              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+              <ChevronRight className="h-4 w-4 rotate-180" />
             </button>
           )}
-          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: si.color }} />
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: si.dot }} title={si.label} />
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
             {isViewingLinkedChild
               ? selfLinked?.teamName ??
@@ -1667,19 +1682,19 @@ export function ContentCalendarEntrySidebar({
                   ? "Copy Team"
                   : selfLinked?.role === "design"
                     ? "Design Team"
-                    : "Team Task")
-              : "Entry Details"}
+                    : "Team task")
+              : "Entry details"}
           </h3>
         </div>
         <div className="flex items-center gap-1">
           {user?.role === "admin" && (
             <button
               onClick={() => setConfirmDelete(true)}
-              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+              className={`${ICON_BTN} hover:!text-[var(--danger)]`}
               title={isLinkedTask ? "Remove team task" : "Delete entry"}
               aria-label={isLinkedTask ? "Remove team task" : "Delete entry"}
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
           <ConfirmModal
@@ -1698,7 +1713,8 @@ export function ContentCalendarEntrySidebar({
           />
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            aria-label="Close"
+            className={ICON_BTN}
           >
             <X className="h-4 w-4" />
           </button>
@@ -1795,12 +1811,11 @@ export function ContentCalendarEntrySidebar({
           }
 
           return (
-            <div className="space-y-2">
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block">
-                Roles
-              </label>
+            <>
+            <SidebarSection title="Roles">
+              <div className="space-y-2">
               {cards.length === 0 && (
-                <p className="text-[11px] text-amber-700 italic px-2.5 py-2 rounded-md bg-amber-50 border border-amber-200">
+                <p className="rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
                   No teams assigned yet.
                 </p>
               )}
@@ -1822,12 +1837,12 @@ export function ContentCalendarEntrySidebar({
                       setOpenTaskId(c.taskId);
                     }
                   }}
-                  className="w-full text-left p-2.5 rounded-lg border border-[var(--border-subtle)] bg-white hover:border-[var(--accent-admin)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className="w-full text-left px-3 py-2.5 rounded-md border border-[var(--border)] bg-white hover:border-[var(--border-strong)] hover:bg-[var(--bg-primary)] transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.accent }} />
-                      <span className="text-[11px] font-semibold text-[var(--text-primary)] uppercase tracking-wide">
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.accent }} />
+                      <span className="text-[13px] font-medium text-[var(--text-primary)]">
                         {/* Avoid doubling: a label resolved from userTeams
                             (e.g. "Copy Team") already ends with "Team", so
                             only append the suffix to bare role names. */}
@@ -1835,17 +1850,17 @@ export function ContentCalendarEntrySidebar({
                         {/\bteam\s*$/i.test(c.label) ? "" : " Team"}
                       </span>
                     </div>
-                    <span className="text-[11px] text-[var(--accent-admin-text)]">Open →</span>
+                    <span className="text-[12px] text-[var(--text-muted)]">Open →</span>
                   </div>
                   {c.assigneeName ? (
-                    <p className="text-[12px] text-[var(--text-primary)] truncate">
+                    <p className="text-[12px] text-[var(--text-secondary)] truncate">
                       {c.assigneeName}
                       {c.assigneeDesignation ? (
                         <span className="text-[var(--text-muted)]"> · {c.assigneeDesignation}</span>
                       ) : null}
                     </p>
                   ) : (
-                    <p className="text-[11px] text-amber-700">Not assigned</p>
+                    <p className="text-[12px] font-medium text-[var(--warning)]">Not assigned</p>
                   )}
                 </button>
               ))}
@@ -1856,60 +1871,62 @@ export function ContentCalendarEntrySidebar({
                     setCreatingNew(true);
                     setOpenTaskId(null);
                   }}
-                  className="w-full text-left p-2.5 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin-text)] transition-colors text-[12px] font-medium"
+                  className="w-full text-left px-3 py-2 rounded-md border border-dashed border-[var(--border-strong)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)] transition-colors text-[12px] font-medium"
                 >
                   + Add team task
                 </button>
               )}
+              </div>
 
               {/* Brief Info chips — brand / brief type / manager. Surfaces
                   the metadata an admin filled in when the entry was created
                   through the multi-team brief form. */}
               {(briefMeta?.brand?.name || briefMeta?.briefType || briefMeta?.manager) && (
-                <div className="pt-2 flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   {briefMeta?.brand?.name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                      {briefMeta.brand.name}
-                    </span>
+                    <Badge variant="neutral">{briefMeta.brand.name}</Badge>
                   )}
                   {briefMeta?.briefType && briefMeta.briefType !== "content_calendar" && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-100">
-                      {briefMeta.briefType === "video_editing" ? "Video Editing"
-                        : briefMeta.briefType === "single_task" ? "Single Task"
+                    <Badge variant="neutral">
+                      {briefMeta.briefType === "video_editing" ? "Video editing"
+                        : briefMeta.briefType === "single_task" ? "Single task"
                         : briefMeta.briefType.replace(/_/g, " ")}
-                    </span>
+                    </Badge>
                   )}
                   {briefMeta?.manager?.name && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
-                      Manager: {briefMeta.manager.name}
-                    </span>
+                    <Badge variant="neutral">Manager: {briefMeta.manager.name}</Badge>
                   )}
                 </div>
               )}
+            </SidebarSection>
 
               {/* Submitted Creative Copy + Caption preview (read-only here;
                   edit inside the relevant team tab) */}
+              {(task.creativeCopy?.trim() || task.caption?.trim()) && (
+              <SidebarSection title="Copy">
               {task.creativeCopy?.trim() && (
-                <div className="pt-2">
-                  <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                    Creative Copy
+                <div>
+                  <label className={LABEL}>
+                    Creative copy
                   </label>
-                  <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap px-2.5 py-2 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                     {task.creativeCopy}
                   </p>
                 </div>
               )}
               {task.caption?.trim() && (
                 <div>
-                  <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+                  <label className={LABEL}>
                     Caption
                   </label>
-                  <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                  <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap px-2.5 py-2 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
                     {task.caption}
                   </p>
                 </div>
               )}
-            </div>
+              </SidebarSection>
+              )}
+            </>
           );
         })()}
 
@@ -1917,19 +1934,20 @@ export function ContentCalendarEntrySidebar({
             create-new form is active. Drilled-into-child mode (legacy) keeps
             its own back arrow in the sidebar header. */}
         {!isViewingLinkedChild && editingTaskMode && (
-          <div className="flex items-center gap-2 pb-2 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => {
                 setOpenTaskId(null);
                 setCreatingNew(false);
               }}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+              className={`${ICON_BTN} -ml-1.5`}
               title="Back to entry"
+              aria-label="Back to entry"
             >
-              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+              <ChevronRight className="h-4 w-4 rotate-180" />
             </button>
-            <h4 className="font-semibold text-[13px] text-[var(--text-primary)]">
+            <h4 className="font-semibold text-[14px] text-[var(--text-primary)]">
               {creatingNew ? "New team task" : editingRoleLabel}
             </h4>
           </div>
@@ -1940,11 +1958,11 @@ export function ContentCalendarEntrySidebar({
             createLinkedCalendarTask. */}
         {!isViewingLinkedChild && creatingNew && (
           <div className="space-y-3">
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-[12px] text-[var(--text-secondary)]">
               Pick a team and the person who will own the task. After creating it, click the card on the entry view to fill in the rest.
             </p>
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              <label className={LABEL}>
                 Team
               </label>
               <select
@@ -1954,7 +1972,7 @@ export function ContentCalendarEntrySidebar({
                   setOAssignee("");
                 }}
                 disabled={!isEditable}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                className={FIELD}
               >
                 <option value="">Select team</option>
                 {teams.map((team: any) => (
@@ -1963,14 +1981,14 @@ export function ContentCalendarEntrySidebar({
               </select>
             </div>
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              <label className={LABEL}>
                 Assignee
               </label>
               <select
                 value={oAssignee}
                 onChange={(e) => setOAssignee(e.target.value)}
                 disabled={!isEditable}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                className={FIELD}
               >
                 <option value="">Select member</option>
                 {(oTeam && oTeamMembers ? oTeamMembers : employees).map((emp: any) => (
@@ -1982,20 +2000,20 @@ export function ContentCalendarEntrySidebar({
               </select>
             </div>
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              <label className={LABEL}>
                 Deadline
               </label>
               <DeadlineInput
                 value={oDeadline}
                 onChange={setODeadline}
                 disabled={!isEditable}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                className={FIELD}
               />
             </div>
             {editingTaskRole === "design" && (
               <div>
-                <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                  Number of Creatives
+                <label className={LABEL}>
+                  Number of creatives
                 </label>
                 <input
                   type="number"
@@ -2005,40 +2023,44 @@ export function ContentCalendarEntrySidebar({
                   onChange={(e) => setEditCreativesRequired(e.target.value)}
                   disabled={!isEditable}
                   placeholder="e.g. 4"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-50"
+                  className={FIELD}
                 />
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                <p className="text-[12px] text-[var(--text-muted)] mt-1">
                   Shows on this design assignee's task as "X / N creatives required" with separate deliverable slots.
                 </p>
               </div>
             )}
             {isEditable && (
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 disabled={oSaving || !oAssignee || (creatingNew && !oTeam)}
                 onClick={() => {
                   const teamLabel = (teams.find((t: any) => t._id === oTeam)?.name as string | undefined) ?? "Team";
                   handleSaveOpenTask(teamLabel);
                 }}
-                className="w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full"
               >
                 {oSaving ? "Creating…" : "Create team task"}
-              </button>
+              </Button>
             )}
           </div>
         )}
 
+        {/* Main view: what the post is */}
+        {viewingMain && (
+        <SidebarSection title="Post">
         {/* Title — entry-level (Main view + linked-child drill-down) */}
         {viewingMain && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Title
             </label>
             {isEditable ? (
               <input
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             ) : (
               <p className="text-[13px] text-[var(--text-primary)] font-medium">
@@ -2051,7 +2073,7 @@ export function ContentCalendarEntrySidebar({
         {/* Description — entry-level */}
         {viewingMain && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Description
             </label>
             {isEditable ? (
@@ -2060,7 +2082,7 @@ export function ContentCalendarEntrySidebar({
                 onChange={(e) => setEditDescription(e.target.value)}
                 rows={2}
                 placeholder="Add description..."
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                className={TEXTAREA}
               />
             ) : (
               <p className="text-[13px] text-[var(--text-secondary)]">
@@ -2070,183 +2092,18 @@ export function ContentCalendarEntrySidebar({
           </div>
         )}
 
-        {/* Creative Copy — editable for the first team, read-only upstream
-            display for any downstream team. Hidden when the editor is the
-            Design role (which doesn't author copy). */}
-        {(isViewingLinkedChild || editingTaskMode) && editingTaskRole !== "design" && (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
-                Creative Copy
-              </label>
-              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
-                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
-                return (
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold"
-                    style={{ backgroundColor: b.bg, color: b.fg }}
-                  >
-                    From {upstreamInfo.label} · {b.label}
-                  </span>
-                );
-              })()}
-            </div>
-            {upstreamInfo.isFirstTeam ? (
-              isEditable ? (
-                <textarea
-                  value={editCreativeCopy}
-                  onChange={(e) => setEditCreativeCopy(e.target.value)}
-                  rows={3}
-                  placeholder="Add creative copy..."
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-                />
-              ) : (
-                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {task.creativeCopy || "No creative copy"}
-                </p>
-              )
-            ) : (
-              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                {upstreamInfo.upstream?.creativeCopy?.trim() || (
-                  <span className="text-[var(--text-muted)] italic text-[12px]">
-                    Waiting on the {upstreamInfo.label} team to submit creative copy.
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Caption — same upstream-pass-through rule as Creative Copy.
-            Hidden when editing the Design role. */}
-        {(isViewingLinkedChild || editingTaskMode) && editingTaskRole !== "design" && (
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide">
-                Caption
-              </label>
-              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
-                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
-                return (
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold"
-                    style={{ backgroundColor: b.bg, color: b.fg }}
-                  >
-                    From {upstreamInfo.label} · {b.label}
-                  </span>
-                );
-              })()}
-            </div>
-            {upstreamInfo.isFirstTeam ? (
-              isEditable ? (
-                <textarea
-                  value={editCaption}
-                  onChange={(e) => setEditCaption(e.target.value)}
-                  rows={3}
-                  placeholder="Add caption..."
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
-                />
-              ) : (
-                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {task.caption || "No caption"}
-                </p>
-              )
-            ) : (
-              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap p-2.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                {upstreamInfo.upstream?.caption?.trim() || (
-                  <span className="text-[var(--text-muted)] italic text-[12px]">
-                    Waiting on the {upstreamInfo.label} team to submit caption.
-                  </span>
-                )}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Reference Links — entry-level, lives on Main view (shared across
-            all teams). Hidden inside team-task editors. */}
-        {viewingMain && (
-        <div className="pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5">
-              <Link2 className="h-3.5 w-3.5" />
-              Reference Links
-            </label>
-            {isEditable && user?.role === "admin" && (
-              <button
-                onClick={() => setShowLinkInput(true)}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
-              >
-                <Plus className="h-3 w-3" />
-                Add Link
-              </button>
-            )}
-          </div>
-          {showLinkInput && (
-            <div className="flex gap-1.5 mb-2">
-              <input
-                value={newLink}
-                onChange={(e) => setNewLink(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLink(); } }}
-                placeholder="https://..."
-                autoFocus
-                className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
-              />
-              <button
-                onClick={handleAddLink}
-                className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90"
-              >
-                Add
-              </button>
-              <button
-                onClick={() => { setShowLinkInput(false); setNewLink(""); }}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {refLinks.map((link, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 group">
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--accent-admin-text)] hover:underline flex-1 min-w-0"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{link}</span>
-                </a>
-                {isEditable && user?.role === "admin" && (
-                  <button
-                    onClick={() => handleRemoveLink(idx)}
-                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            {refLinks.length === 0 && !showLinkInput && (
-              <p className="text-[11px] text-[var(--text-muted)]">No reference links added</p>
-            )}
-          </div>
-        </div>
-        )}
-
         {/* Platform + Content Type — entry-level (Main view + drill-down) */}
         {viewingMain && (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Platform
             </label>
             {isEditable ? (
               <select
                 value={editPlatform}
                 onChange={(e) => setEditPlatform(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               >
                 <option value="">-</option>
                 {PLATFORMS.map((p) => (
@@ -2262,14 +2119,14 @@ export function ContentCalendarEntrySidebar({
             )}
           </div>
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Content Type
+            <label className={LABEL}>
+              Content type
             </label>
             {isEditable ? (
               <select
                 value={editContentType}
                 onChange={(e) => setEditContentType(e.target.value)}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               >
                 <option value="">-</option>
                 {CONTENT_TYPES.map((t) => (
@@ -2286,20 +2143,185 @@ export function ContentCalendarEntrySidebar({
           </div>
         </div>
         )}
+        </SidebarSection>
+        )}
+
+        {(isViewingLinkedChild || editingTaskMode) && editingTaskRole !== "design" && (
+        <SidebarSection title="Copy">
+        {/* Creative Copy — editable for the first team, read-only upstream
+            display for any downstream team. Hidden when the editor is the
+            Design role (which doesn't author copy). */}
+        {(isViewingLinkedChild || editingTaskMode) && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[12px] font-medium text-[var(--text-muted)]">
+                Creative copy
+              </label>
+              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
+                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
+                return (
+                  <Badge variant={b.variant}>
+                    From {upstreamInfo.label} · {b.label}
+                  </Badge>
+                );
+              })()}
+            </div>
+            {upstreamInfo.isFirstTeam ? (
+              isEditable ? (
+                <textarea
+                  value={editCreativeCopy}
+                  onChange={(e) => setEditCreativeCopy(e.target.value)}
+                  rows={3}
+                  placeholder="Add creative copy..."
+                  className={TEXTAREA}
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {task.creativeCopy || "No creative copy"}
+                </p>
+              )
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap px-2.5 py-2 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                {upstreamInfo.upstream?.creativeCopy?.trim() || (
+                  <span className="text-[var(--text-muted)] text-[12px]">
+                    Waiting on the {upstreamInfo.label} team to submit creative copy.
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Caption — same upstream-pass-through rule as Creative Copy.
+            Hidden when editing the Design role. */}
+        {(isViewingLinkedChild || editingTaskMode) && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[12px] font-medium text-[var(--text-muted)]">
+                Caption
+              </label>
+              {!upstreamInfo.isFirstTeam && upstreamInfo.upstream && (() => {
+                const b = upstreamStatusBadge(upstreamInfo.upstream.status);
+                return (
+                  <Badge variant={b.variant}>
+                    From {upstreamInfo.label} · {b.label}
+                  </Badge>
+                );
+              })()}
+            </div>
+            {upstreamInfo.isFirstTeam ? (
+              isEditable ? (
+                <textarea
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  rows={3}
+                  placeholder="Add caption..."
+                  className={TEXTAREA}
+                />
+              ) : (
+                <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
+                  {task.caption || "No caption"}
+                </p>
+              )
+            ) : (
+              <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap px-2.5 py-2 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                {upstreamInfo.upstream?.caption?.trim() || (
+                  <span className="text-[var(--text-muted)] text-[12px]">
+                    Waiting on the {upstreamInfo.label} team to submit caption.
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+        )}
+        </SidebarSection>
+        )}
+
+        {/* Reference Links — entry-level, lives on Main view (shared across
+            all teams). Hidden inside team-task editors. */}
+        {viewingMain && (
+        <SidebarSection
+          title="Reference links"
+          action={
+            isEditable && user?.role === "admin" && (
+              <button
+                onClick={() => setShowLinkInput(true)}
+                className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
+              >
+                <Plus className="h-3 w-3" />
+                Add link
+              </button>
+            )
+          }
+        >
+          {showLinkInput && (
+            <div className="flex items-center gap-1.5">
+              <input
+                value={newLink}
+                onChange={(e) => setNewLink(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddLink(); } }}
+                placeholder="https://..."
+                autoFocus
+                aria-label="Reference link"
+                className={`${fieldClass} flex-1 min-w-0`}
+              />
+              <Button variant="secondary" onClick={handleAddLink}>
+                Add
+              </Button>
+              <button
+                onClick={() => { setShowLinkInput(false); setNewLink(""); }}
+                aria-label="Cancel"
+                className={`${ICON_BTN} shrink-0`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            {refLinks.map((link, idx) => (
+              <div key={idx} className="flex items-center gap-1.5 group">
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[var(--bg-primary)] text-[12px] text-[var(--accent-admin-text)] hover:underline underline-offset-2 flex-1 min-w-0"
+                >
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{link}</span>
+                </a>
+                {isEditable && user?.role === "admin" && (
+                  <button
+                    onClick={() => handleRemoveLink(idx)}
+                    aria-label="Remove link"
+                    className={`${ICON_BTN_SM} hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {refLinks.length === 0 && !showLinkInput && (
+              <p className="text-[12px] text-[var(--text-muted)]">No reference links added</p>
+            )}
+          </div>
+        </SidebarSection>
+        )}
+
 
         {/* Go Live Date + Status side-by-side — entry-level */}
         {viewingMain && (
+          <SidebarSection title="Schedule and status">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                Go Live Date
+              <label className={LABEL}>
+                Go live date
               </label>
               {isEditable ? (
                 <input
                   type="date"
                   value={editPostDate}
                   onChange={(e) => setEditPostDate(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               ) : (
                 <p className="text-[13px] text-[var(--text-primary)]">
@@ -2310,7 +2332,7 @@ export function ContentCalendarEntrySidebar({
               )}
             </div>
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+              <label className={LABEL}>
                 Status
               </label>
               {(isEditable || (user && task.assigneeId === user._id)) ? (
@@ -2327,7 +2349,7 @@ export function ContentCalendarEntrySidebar({
                       )
                     )
                   }
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 >
                   {statusOptionsFor(user, task.status).map((s) => (
                     <option key={s.value} value={s.value}>
@@ -2336,30 +2358,28 @@ export function ContentCalendarEntrySidebar({
                   ))}
                 </select>
               ) : (
-                <Badge variant="neutral">{si.label}</Badge>
+                <StatusBadge color={si.dot} label={si.label} />
               )}
             </div>
           </div>
+          </SidebarSection>
         )}
 
         {/* Post Title + Description — the CLIENT-FACING copy for this entry.
             The client portal calendar shows these instead of the raw internal
             title, keeping the client view clean. Entry-level only. */}
         {viewingMain && (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3 flex flex-col gap-2.5">
-            <p className="font-medium text-[11px] text-[var(--accent-admin-text)] uppercase tracking-wide">
-              Client Portal Display
-            </p>
+          <SidebarSection title="Client portal display">
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                Post Title
+              <label className={LABEL}>
+                Post title
               </label>
               {isEditable ? (
                 <input
                   value={editPostTitle}
                   onChange={(e) => setEditPostTitle(e.target.value)}
                   placeholder="Shown to the client instead of the internal title"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
               ) : (
                 <p className="text-[13px] text-[var(--text-primary)]">
@@ -2368,8 +2388,8 @@ export function ContentCalendarEntrySidebar({
               )}
             </div>
             <div>
-              <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-                Post Description
+              <label className={LABEL}>
+                Post description
               </label>
               {isEditable ? (
                 <textarea
@@ -2377,7 +2397,7 @@ export function ContentCalendarEntrySidebar({
                   onChange={(e) => setEditPostDescription(e.target.value)}
                   rows={3}
                   placeholder="Client-facing description for this post..."
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] resize-none"
+                  className={TEXTAREA}
                 />
               ) : (
                 <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">
@@ -2385,7 +2405,7 @@ export function ContentCalendarEntrySidebar({
                 </p>
               )}
             </div>
-          </div>
+          </SidebarSection>
         )}
 
         {/* Request Changes — entry-level. Reopens the parent calendar
@@ -2402,9 +2422,10 @@ export function ContentCalendarEntrySidebar({
             task so the design assignee sees "X / N creatives" on their
             task. */}
         {viewingMain && (task as any).designTaskId && (
+          <SidebarSection title="Design">
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Number of Creatives
+            <label className={LABEL}>
+              Number of creatives
             </label>
             {isEditable ? (
               <>
@@ -2415,9 +2436,9 @@ export function ContentCalendarEntrySidebar({
                   value={editCreativesRequired}
                   onChange={(e) => setEditCreativesRequired(e.target.value)}
                   placeholder="e.g. 4"
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD}
                 />
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                <p className="text-[12px] text-[var(--text-muted)] mt-1">
                   Shows on the design assignee's task as "X / N creatives required" with separate deliverable slots.
                 </p>
               </>
@@ -2427,6 +2448,7 @@ export function ContentCalendarEntrySidebar({
               </p>
             )}
           </div>
+          </SidebarSection>
         )}
 
         {/* Assignor field removed — every calendar task's assignor is the
@@ -2434,10 +2456,13 @@ export function ContentCalendarEntrySidebar({
             / createIndividualTaskBrief). The Brief Info "Manager" chip on
             Main view already surfaces who that is. */}
 
+        {/* Task view: who it is with */}
+        {!viewingMain && (
+        <SidebarSection title="People">
         {/* Team filter → Assignee — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && isEditable && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Team
             </label>
             <select
@@ -2447,9 +2472,9 @@ export function ContentCalendarEntrySidebar({
                 setSidebarTeamFilter(e.target.value);
                 setEditAssignee(""); // Reset assignee when team changes
               }}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              className={FIELD}
             >
-              <option value="">All Teams</option>
+              <option value="">All teams</option>
               {teams.map((team: any) => (
                 <option key={team._id} value={team._id}>
                   {team.name}
@@ -2460,12 +2485,12 @@ export function ContentCalendarEntrySidebar({
         )}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               {isViewingLinkedChild
                 ? "Assignee"
                 : ((linkedTasks?.[0] as any)?.parentRole === "design"
-                    ? "Design Assignee"
-                    : "Copy Assignee")}
+                    ? "Design assignee"
+                    : "Copy assignee")}
             </label>
             {isEditable ? (
               (() => {
@@ -2483,7 +2508,7 @@ export function ContentCalendarEntrySidebar({
                   <select
                     value={editAssignee}
                     onChange={(e) => setEditAssignee(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD}
                   >
                     <option value="">Unassigned</option>
                     {!hasCurrent && (
@@ -2507,7 +2532,7 @@ export function ContentCalendarEntrySidebar({
                   {task.assigneeName}
                 </p>
                 {task.assigneeDesignation && (
-                  <p className="text-[11px] text-[var(--text-muted)]">
+                  <p className="text-[12px] text-[var(--text-muted)]">
                     {task.assigneeDesignation}
                   </p>
                 )}
@@ -2520,15 +2545,15 @@ export function ContentCalendarEntrySidebar({
             happens on the entry's Main view ("+ Add team task"), which
             wires the sequential handoff chain for any team. */}
         {isViewingLinkedChild && isEditable && (
-          <div className="pt-3 border-t border-[var(--border)]">
-            <p className="text-[11px] text-[var(--text-muted)]">
+          <div>
+            <p className="rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
               Teams work this entry in sequence — an approved deliverable is
               passed to the next team&apos;s task automatically. Add teams from
               the entry view.
             </p>
             {linkedTasks && linkedTasks.filter((lt: any) => lt._id !== task._id).length > 0 && (
               <div className="mt-2 space-y-1">
-                <p className="text-[11px] font-medium text-[var(--text-muted)] uppercase">Linked tasks</p>
+                <p className="text-[12px] font-medium text-[var(--text-muted)]">Linked tasks</p>
                 {linkedTasks
                   .filter((lt: any) => lt._id !== task._id)
                   .map((lt: any) => (
@@ -2543,11 +2568,11 @@ export function ContentCalendarEntrySidebar({
                         disabled={!onSelectTask}
                         title={onSelectTask ? "Open this linked task to edit it" : ""}
                       >
-                        <p className="text-[11px] text-[var(--text-secondary)] truncate hover:text-[var(--accent-admin-text)]">
+                        <p className="text-[12px] text-[var(--text-secondary)] truncate hover:text-[var(--text-primary)]">
                           · {lt.title}
                         </p>
                         {lt.assigneeName && (
-                          <p className="text-[11px] text-[var(--text-muted)] ml-2.5">
+                          <p className="text-[12px] text-[var(--text-muted)] ml-2.5">
                             Assigned to: <span className="font-medium text-[var(--text-secondary)]">{lt.assigneeName}</span>
                             {lt.assigneeDesignation ? ` - ${lt.assigneeDesignation}` : ""}
                           </p>
@@ -2558,6 +2583,7 @@ export function ContentCalendarEntrySidebar({
                         type="button"
                         disabled={deletingLinkedId === lt._id}
                         title="Remove linked task"
+                        aria-label="Remove linked task"
                         onClick={async () => {
                           if (
                             !confirm(
@@ -2580,12 +2606,12 @@ export function ContentCalendarEntrySidebar({
                             setDeletingLinkedId(null);
                           }
                         }}
-                        className="p-1 rounded-md shrink-0 text-[var(--text-muted)] opacity-70 hover:opacity-100 hover:text-[var(--danger)] hover:bg-red-50 transition-colors disabled:opacity-40"
+                        className={`${ICON_BTN_SM} shrink-0 hover:text-[var(--danger)] disabled:opacity-40`}
                       >
                         {deletingLinkedId === lt._id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         )}
                       </button>
                       )}
@@ -2599,8 +2625,8 @@ export function ContentCalendarEntrySidebar({
         {/* Assigned At — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
-              Assigned At
+            <label className={LABEL}>
+              Assigned at
             </label>
             <p className="text-[13px] text-[var(--text-primary)]">
               {task.assignedAt
@@ -2613,18 +2639,22 @@ export function ContentCalendarEntrySidebar({
             </p>
           </div>
         )}
+        </SidebarSection>
+        )}
 
+        {!viewingMain && (
+        <SidebarSection title="Schedule and status">
         {/* Deadline — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Deadline
             </label>
             {isEditable ? (
               <DeadlineInput
                 value={editDeadline}
                 onChange={setEditDeadline}
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               />
             ) : (
               <p className="text-[13px] text-[var(--text-primary)]">
@@ -2640,7 +2670,7 @@ export function ContentCalendarEntrySidebar({
         {/* Status — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && (
           <div>
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-1">
+            <label className={LABEL}>
               Status
             </label>
             {(isEditable || (user && task.assigneeId === user._id)) ? (
@@ -2659,7 +2689,7 @@ export function ContentCalendarEntrySidebar({
                     )
                   )
                 }
-                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={FIELD}
               >
                 {statusOptionsFor(user, task.status).map((s) => (
                   <option key={s.value} value={s.value}>
@@ -2668,7 +2698,7 @@ export function ContentCalendarEntrySidebar({
                 ))}
               </select>
             ) : (
-              <Badge variant="neutral">{si.label}</Badge>
+              <StatusBadge color={si.dot} label={si.label} />
             )}
           </div>
         )}
@@ -2684,6 +2714,8 @@ export function ContentCalendarEntrySidebar({
             />
           </div>
         )}
+        </SidebarSection>
+        )}
 
         {/* Auto-Handoff UI removed per design refinement — the schema field
             `handoffTargetTeamId` still drives the post-approval chain in
@@ -2691,73 +2723,63 @@ export function ContentCalendarEntrySidebar({
 
         {/* ── Deliverable Submission — Copy tab ──────── */}
         {(isViewingLinkedChild || editingTaskMode) && task.assigneeId && (task.status === "in-progress" || task.status === "pending") && (
-          <div className="pt-3 border-t border-[var(--border)]">
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
-              Submit Deliverable
-            </label>
+          <SidebarSection title="Submit deliverable">
             {(upstreamInfo.isFirstTeam && !editCreativeCopy?.trim() && !editCaption?.trim()) ? (
-              <p className="text-[11px] text-[var(--text-muted)] italic">
+              <p className="text-[12px] text-[var(--text-muted)]">
                 Fill in Creative Copy or Caption above to enable submission.
               </p>
             ) : (
               <div className="flex flex-col gap-2">
-                <button
+                {/* Three routes for the same hand-in, so three equal buttons;
+                    the panel's one primary is Save changes. */}
+                <Button
+                  variant="secondary"
+                  className="w-full"
                   disabled={submittingTo !== null}
+                  loading={submittingTo === "tl"}
                   onClick={() => handleSubmitCopyDeliverable("tl")}
-                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
-                  {submittingTo === "tl" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  Send to Team Lead
-                </button>
-                <button
+                  <Send className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  Send to team lead
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full"
                   disabled={submittingTo !== null}
+                  loading={submittingTo === "bm"}
                   onClick={() => handleSubmitCopyDeliverable("bm")}
-                  className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                 >
-                  {submittingTo === "bm" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  Send to Brand Manager
-                </button>
+                  <Send className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  Send to brand manager
+                </Button>
                 {task.assignedBy && task.assignedBy !== user?._id && (
-                  <button
+                  <Button
+                    variant="secondary"
+                    className="w-full"
                     disabled={submittingTo !== null}
+                    loading={submittingTo === "as"}
                     onClick={() => handleSubmitCopyDeliverable("as")}
-                    className="flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                   >
-                    {submittingTo === "as" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Send className="h-3.5 w-3.5" />
-                    )}
-                    Send to Assignor
-                  </button>
+                    <Send className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                    Send to assignor
+                  </Button>
                 )}
               </div>
             )}
-          </div>
+          </SidebarSection>
         )}
 
         {/* ── Approval Status — Copy tab ──────── */}
         {(isViewingLinkedChild || editingTaskMode) && deliverables && deliverables.length > 0 && (
-          <div className="pt-3 border-t border-[var(--border)]">
-            <label className="font-medium text-[11px] text-[var(--text-muted)] uppercase tracking-wide block mb-2">
-              Approval Status
-            </label>
+          <SidebarSection title="Approval status">
             <div className="flex flex-col gap-2">
               {[...deliverables].sort((a: any, b: any) => b.submittedAt - a.submittedAt).map((d: any) => {
                 const tlStatus = d.teamLeadStatus;
                 const bmStatus = d.status;
                 const isPassed = !!d.passedToManagerAt;
                 return (
-                  <div key={d._id} className="p-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-[11px]">
+                  <div key={d._id} className="px-3 py-2.5 rounded-md border border-[var(--border)] bg-white space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[12px] tabular-nums">
                       <span className="text-[var(--text-muted)]">
                         {new Date(d.submittedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                       </span>
@@ -2765,18 +2787,18 @@ export function ContentCalendarEntrySidebar({
                     {/* Team Lead status */}
                     <div className="flex items-center gap-1.5">
                       {tlStatus === "approved" ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)]" />
                       ) : tlStatus === "changes_requested" ? (
-                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                        <AlertCircle className="h-3.5 w-3.5 text-[var(--warning)]" />
                       ) : (
-                        <Clock className="h-3.5 w-3.5 text-slate-400" />
+                        <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       )}
-                      <span className="text-[11px] font-medium text-[var(--text-primary)]">
-                        Team Lead: {tlStatus === "approved" ? "Approved" : tlStatus === "changes_requested" ? "Changes Requested" : "Pending"}
+                      <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                        Team lead: {tlStatus === "approved" ? "Approved" : tlStatus === "changes_requested" ? "Changes requested" : "Pending"}
                       </span>
                     </div>
                     {d.teamLeadReviewNote && (
-                      <p className="text-[11px] text-[var(--text-secondary)] pl-5 italic">
+                      <p className="text-[12px] text-[var(--text-secondary)] pl-5">
                         {d.teamLeadReviewNote}
                       </p>
                     )}
@@ -2784,19 +2806,19 @@ export function ContentCalendarEntrySidebar({
                     {isPassed && (
                       <div className="flex items-center gap-1.5">
                         {bmStatus === "approved" ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)]" />
                         ) : bmStatus === "rejected" ? (
-                          <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                          <AlertCircle className="h-3.5 w-3.5 text-[var(--danger)]" />
                         ) : (
-                          <Clock className="h-3.5 w-3.5 text-slate-400" />
+                          <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                         )}
-                        <span className="text-[11px] font-medium text-[var(--text-primary)]">
-                          Brand Manager: {bmStatus === "approved" ? "Approved" : bmStatus === "rejected" ? "Changes Requested" : "Pending"}
+                        <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                          Brand manager: {bmStatus === "approved" ? "Approved" : bmStatus === "rejected" ? "Changes requested" : "Pending"}
                         </span>
                       </div>
                     )}
                     {d.reviewNote && (
-                      <p className="text-[11px] text-[var(--text-secondary)] pl-5 italic">
+                      <p className="text-[12px] text-[var(--text-secondary)] pl-5">
                         {d.reviewNote}
                       </p>
                     )}
@@ -2804,7 +2826,7 @@ export function ContentCalendarEntrySidebar({
                 );
               })}
             </div>
-          </div>
+          </SidebarSection>
         )}
 
         {/* Save button — shown on Main view, when editing the parent in-place,
@@ -2817,27 +2839,19 @@ export function ContentCalendarEntrySidebar({
             onClick={handleSave}
             disabled={saving}
           >
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? "Saving..." : "Save changes"}
           </Button>
         )}
 
         {/* Files section — Copy tab */}
         {(isViewingLinkedChild || editingTaskMode) && (
-        <div className="pt-2 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="font-semibold text-[12px] text-[var(--text-secondary)] uppercase tracking-wide">
-              Files ({attachments?.length ?? 0})
-            </h4>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              onChange={handleUpload}
-            />
+        <SidebarSection
+          title={`Files (${attachments?.length ?? 0})`}
+          action={
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline disabled:opacity-50"
+              className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2 disabled:opacity-50"
             >
               {isUploading ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -2846,33 +2860,41 @@ export function ContentCalendarEntrySidebar({
               )}
               {isUploading ? "Uploading..." : "Attach file"}
             </button>
-          </div>
+          }
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleUpload}
+          />
 
           <div className="flex flex-col gap-1.5">
             {attachments?.map((att: any) => (
               <div
                 key={att._id}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)] group"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] group"
               >
                 <Paperclip className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                     {att.fileName}
                   </p>
-                  <p className="text-[11px] text-[var(--text-muted)]">
+                  <p className="text-[12px] text-[var(--text-muted)]">
                     {att.uploaderName}
                     {att.uploaderDesignation
                       ? ` - ${att.uploaderDesignation}`
                       : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                   {att.url && (
                     <a
                       href={att.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
+                      aria-label="Download file"
+                      className={`${ICON_BTN_SM} hover:text-[var(--text-primary)]`}
                     >
                       <Download className="h-3.5 w-3.5" />
                     </a>
@@ -2883,7 +2905,8 @@ export function ContentCalendarEntrySidebar({
                       onClick={() =>
                         deleteAttachment({ attachmentId: att._id })
                       }
-                      className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)]"
+                      aria-label="Delete file"
+                      className={`${ICON_BTN_SM} hover:text-[var(--danger)]`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -2892,12 +2915,12 @@ export function ContentCalendarEntrySidebar({
               </div>
             ))}
             {attachments?.length === 0 && (
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-[12px] text-[var(--text-muted)]">
                 No files attached.
               </p>
             )}
           </div>
-        </div>
+        </SidebarSection>
         )}
       </div>
     </div>
@@ -2940,27 +2963,24 @@ function RequestChangesControl({
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
+        variant="secondary"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
         title="Reopen this task and send it back for changes"
       >
-        <RotateCcw className="h-3 w-3" />
-        Request Changes
-      </button>
+        <RotateCcw className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+        Request changes
+      </Button>
     );
   }
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-      <div className="flex items-center gap-1.5">
-        <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
-        <p className="text-[12px] font-semibold text-amber-800">
-          Request changes
-        </p>
-      </div>
-      <p className="text-[11px] text-amber-700">
+    <div className="rounded-lg border border-[var(--border)] bg-white p-3 space-y-2.5">
+      <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+        Request changes
+      </p>
+      <p className="text-[12px] text-[var(--text-secondary)]">
         Reopens this task (status returns to In Progress), pushes the latest
         deliverable back through approvals, and counts as one more iteration.
       </p>
@@ -2969,29 +2989,32 @@ function RequestChangesControl({
         onChange={(e) => setNote(e.target.value)}
         placeholder="Why does this need to be redone? (required)"
         rows={2}
-        className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+        aria-label="Why does this need to be redone?"
+        className={TEXTAREA}
         autoFocus
       />
       <div>
-        <label className="text-[11px] font-medium text-amber-800 block mb-1">
+        <label className={LABEL}>
           New deadline
           {deadlinePast ? " (required, old deadline has passed)" : " (optional)"}
         </label>
         <DeadlineInput
           value={newDeadline}
           onChange={setNewDeadline}
-          className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className={FIELD}
         />
         {deadlinePast && !newDeadline && (
-          <p className="text-[11px] text-amber-700 mt-1">
+          <p className="text-[12px] text-[var(--warning)] mt-1">
             The old deadline already passed. Set a new one so the assignee
             isn't flagged overdue immediately.
           </p>
         )}
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          loading={submitting}
           disabled={
             submitting ||
             !note.trim() ||
@@ -3029,26 +3052,21 @@ function RequestChangesControl({
               setSubmitting(false);
             }
           }}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
         >
-          {submitting ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <RotateCcw className="h-3 w-3" />
-          )}
-          Send Back for Changes
-        </button>
-        <button
+          <RotateCcw className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          Send back for changes
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
           onClick={() => {
             setOpen(false);
             setNote("");
             setNewDeadline("");
           }}
-          className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

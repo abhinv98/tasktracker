@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import {
+  EmptyState,
   PageHeader,
   StatusBadge,
   SkeletonPageHeader,
@@ -52,22 +53,17 @@ export default function RecruitmentActivityPage() {
       />
 
       {logs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Mail size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            Nothing sent yet
-          </p>
-        </div>
+        <EmptyState icon={Mail} title="Nothing sent yet" />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
                   {["Sent", "Candidate", "Position", "Template", "Result"].map((h) => (
                     <th
                       key={h}
-                      className="px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap"
+                      className="h-8 px-3 text-left font-medium text-[12px] text-[var(--text-muted)] whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -78,26 +74,26 @@ export default function RecruitmentActivityPage() {
                 {logs.map((l) => (
                   <tr
                     key={l._id}
-                    className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-primary)] transition-colors"
                   >
-                    <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                    <td className="px-3 py-2 text-[12px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
                       {fmt(l.sentAt)}
                     </td>
-                    <td className="px-3 py-2 text-[12px] whitespace-nowrap">
+                    <td className="px-3 py-2 text-[13px] whitespace-nowrap">
                       <span className="text-[var(--text-primary)]">{l.contactName || "—"}</span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">
+                      <span className="block text-[12px] text-[var(--text-muted)]">
                         {l.contactEmail}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                    <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-nowrap">
                       {l.jobName || "—"}
                     </td>
-                    <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                    <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] whitespace-nowrap">
                       {l.templateName || "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {l.status === "sent" ? (
-                        <StatusBadge color="#059669" label="Delivered" />
+                        <StatusBadge color="var(--accent-employee)" label="Delivered" />
                       ) : (
                         <span
                           className="inline-flex items-center gap-1.5 font-medium text-[12px] text-[var(--danger)]"

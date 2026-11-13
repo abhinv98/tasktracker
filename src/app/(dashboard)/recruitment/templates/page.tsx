@@ -7,7 +7,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
   PageHeader,
+  Badge,
   Button,
+  EmptyState,
   Modal,
   Input,
   Select,
@@ -103,33 +105,27 @@ export default function RecruitmentTemplatesPage() {
       />
 
       {templates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FileText size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            No templates yet
-          </p>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1">
-            Create one to send interview invites or rejections in a click.
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No templates yet"
+          description="Create one to send interview invites or rejections in a click."
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {templates.map((t) => (
             <div
               key={t._id}
-              className="group rounded-lg border border-[var(--border)] bg-white px-4 py-3"
+              className="group rounded-lg border border-[var(--border)] bg-white px-4 py-2.5"
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-[13px] text-[var(--text-primary)]">
+                    <span className="font-medium text-[14px] text-[var(--text-primary)]">
                       {t.name}
                     </span>
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
-                      {t.jobName}
-                    </span>
+                    <Badge>{t.jobName}</Badge>
                   </div>
-                  <p className="mt-1 text-[12px] text-[var(--text-secondary)] truncate">
+                  <p className="mt-0.5 text-[12px] text-[var(--text-muted)] truncate">
                     {t.subject}
                   </p>
                 </div>
@@ -145,14 +141,14 @@ export default function RecruitmentTemplatesPage() {
                       })
                     }
                     aria-label={`Edit ${t.name}`}
-                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => setDeleting(t._id)}
                     aria-label={`Delete ${t.name}`}
-                    className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--danger)]"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -171,7 +167,7 @@ export default function RecruitmentTemplatesPage() {
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setEditing(null)}>
+            <Button variant="ghost" onClick={() => setEditing(null)}>
               Cancel
             </Button>
             <Button
@@ -214,7 +210,7 @@ export default function RecruitmentTemplatesPage() {
               placeholder="<p>Hi {{name}},</p>"
             />
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1.5">
+              <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                 Placeholders
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -225,7 +221,7 @@ export default function RecruitmentTemplatesPage() {
                     onClick={() =>
                       setEditing({ ...editing, body: editing.body + `{{${p}}}` })
                     }
-                    className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] font-mono text-[var(--text-secondary)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin-text)] transition-colors"
+                    className="h-7 px-2 rounded-md text-[12px] border border-[var(--border)] bg-[var(--bg-primary)] font-mono text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     {`{{${p}}}`}
                   </button>

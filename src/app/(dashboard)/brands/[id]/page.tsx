@@ -5,12 +5,35 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { useState, useRef, useCallback, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, Input, useToast } from "@/components/ui";
-import { ArrowLeft, Tag, UserPlus, Trash2, Briefcase, Upload, FileText, Eye, EyeOff, Plus, ChevronDown, ChevronRight, KeyRound, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, AlertCircle, CheckCircle2, XCircle, Users, FileEdit, Pencil, PauseCircle, PlayCircle } from "lucide-react";
+import { Badge, Button, ConfirmModal, Input, Panel, PanelEmpty, StatStrip, StatTile, StatusBadge, useToast } from "@/components/ui";
+import { ArrowLeft, UserPlus, Trash2, Briefcase, Upload, Eye, EyeOff, Plus, ChevronDown, ChevronRight, Link2, Copy, ExternalLink, ImagePlus, X, MessageCircle, Send, Users, FileEdit, Pencil, PauseCircle, PlayCircle } from "lucide-react";
 import ClientPortalTab from "@/components/brand/ClientPortalTab";
 import InternalJsrTab from "@/components/brand/InternalJsrTab";
 import MomTab from "@/components/brand/MomTab";
 import { useSmartBack } from "@/lib/useSmartBack";
+import { taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
+
+const ICON_BTN = iconButtonClass;
+const ICON_BTN_DANGER = iconButtonDangerClass;
+// Same frame and title bar as <Panel>, for blocks whose header carries a
+// button or drop handlers (Panel's header only takes a link).
+const BLOCK = "rounded-lg border border-[var(--border)] bg-white overflow-hidden";
+const BLOCK_HEAD =
+  "flex items-center justify-between gap-3 h-11 px-4 border-b border-[var(--border-subtle)]";
+const FIELD = fieldClass;
+
+function BlockTitle({ title, count }: { title: string; count?: number }) {
+  return (
+    <h3 className="flex items-center gap-2 font-semibold text-[14px] text-[var(--text-primary)]">
+      {title}
+      {count !== undefined && count > 0 && (
+        <span className="font-normal tabular-nums text-[var(--text-muted)]">{count}</span>
+      )}
+    </h3>
+  );
+}
 
 type BrandTab = "overview" | "client-jsr" | "internal-jsr" | "mom";
 
@@ -201,7 +224,7 @@ export default function BrandDetailPage() {
   if (brand === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
@@ -209,7 +232,7 @@ export default function BrandDetailPage() {
   if (brand === null) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Brand not found.</p>
+        <p className="text-[13px] text-[var(--text-secondary)]">Brand not found.</p>
       </div>
     );
   }
@@ -391,25 +414,17 @@ export default function BrandDetailPage() {
     toast("success", "Link copied to clipboard");
   }
 
-  const STATUS_COLORS: Record<string, string> = {
-    draft: "var(--text-secondary)",
-    active: "var(--accent-employee)",
-    "in-progress": "var(--accent-manager)",
-    review: "var(--accent-admin)",
-    completed: "var(--accent-employee)",
-    archived: "var(--text-disabled)",
-  };
-
   return (
     <div className="p-4 sm:p-8">
       {/* Header */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 mb-8">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-3 mb-6">
         <button
           onClick={goBack}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className={ICON_BTN}
           title="Back"
+          aria-label="Back"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="relative group">
           <input
@@ -424,14 +439,15 @@ export default function BrandDetailPage() {
               <img
                 src={(brand as any).logoUrl}
                 alt={brand.name}
-                className="w-14 h-14 rounded-xl object-cover border border-[var(--border-primary)]"
+                className="w-14 h-14 rounded-lg object-cover border border-[var(--border)]"
               />
               {isAdmin && (
-                <div className="absolute inset-0 rounded-xl bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                <div className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center gap-1">
                   <button
                     onClick={() => logoInputRef.current?.click()}
                     className="p-1 rounded bg-white/20 hover:bg-white/30 transition-colors"
                     title="Change logo"
+                    aria-label="Change logo"
                   >
                     <ImagePlus className="h-3.5 w-3.5 text-white" />
                   </button>
@@ -439,6 +455,7 @@ export default function BrandDetailPage() {
                     onClick={handleRemoveLogo}
                     className="p-1 rounded bg-white/20 hover:bg-white/30 transition-colors"
                     title="Remove logo"
+                    aria-label="Remove logo"
                   >
                     <X className="h-3.5 w-3.5 text-white" />
                   </button>
@@ -451,19 +468,22 @@ export default function BrandDetailPage() {
                 if (isAdmin) logoInputRef.current?.click();
               }}
               disabled={uploadingLogo}
-              className="w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 border-dashed transition-colors"
+              className="w-14 h-14 rounded-lg flex flex-col items-center justify-center border border-dashed transition-colors"
               style={{
                 borderColor: brand.color + "40",
                 backgroundColor: brand.color + "08",
               }}
               title={isAdmin ? "Upload brand logo" : brand.name}
+              aria-label={isAdmin ? "Upload brand logo" : brand.name}
             >
               {uploadingLogo ? (
                 <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: brand.color + "30", borderTopColor: brand.color }} />
               ) : isAdmin ? (
                 <ImagePlus className="h-5 w-5" style={{ color: brand.color + "80" }} />
               ) : (
-                <Tag className="h-5 w-5" style={{ color: brand.color }} />
+                <span className="text-[20px] font-semibold" style={{ color: brand.color }} aria-hidden>
+                  {brand.name.trim().charAt(0).toUpperCase()}
+                </span>
               )}
             </button>
           )}
@@ -480,11 +500,12 @@ export default function BrandDetailPage() {
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 if (e.key === "Escape") setEditingName(false);
               }}
-              className="font-bold text-[24px] text-[var(--text-primary)] tracking-tight bg-transparent border-b border-[var(--accent-admin)] focus:outline-none w-full max-w-md"
+              aria-label="Brand name"
+              className="font-semibold text-[20px] sm:text-[26px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight bg-transparent border-b border-[var(--accent-admin)] focus:outline-none w-full max-w-md"
             />
           ) : (
             <div className="flex items-center gap-2 group">
-              <h1 className="font-bold text-[20px] sm:text-[24px] text-[var(--text-primary)] tracking-tight truncate">
+              <h1 className="font-semibold text-[20px] sm:text-[26px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight truncate">
                 {brand.name}
               </h1>
               {brand.onHold && <Badge variant="neutral">On hold</Badge>}
@@ -496,7 +517,8 @@ export default function BrandDetailPage() {
                     setEditingName(true);
                   }}
                   title="Rename brand"
-                  className="shrink-0 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Rename brand"
+                  className={`${ICON_BTN} shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
@@ -504,7 +526,7 @@ export default function BrandDetailPage() {
             </div>
           )}
           {brand.description && (
-            <p className="text-[15px] text-[var(--text-secondary)]">{brand.description}</p>
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">{brand.description}</p>
           )}
           {(brand as any).creatorName && (
             <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
@@ -514,13 +536,13 @@ export default function BrandDetailPage() {
         </div>
         {isAdmin && (
           <Button variant="secondary" onClick={() => setShowHoldBrand(true)} className="whitespace-nowrap">
-            {brand.onHold ? <PlayCircle className="h-4 w-4 mr-1.5" /> : <PauseCircle className="h-4 w-4 mr-1.5" />}
+            {brand.onHold ? <PlayCircle className="h-4 w-4" /> : <PauseCircle className="h-4 w-4" />}
             {brand.onHold ? "Resume" : "Put on hold"}
           </Button>
         )}
         {isAdmin && (
-          <Button variant="secondary" onClick={() => setShowDeleteBrand(true)} className="whitespace-nowrap">
-            <Trash2 className="h-4 w-4 mr-1.5" />
+          <Button variant="ghost" onClick={() => setShowDeleteBrand(true)} className="whitespace-nowrap">
+            <Trash2 className="h-4 w-4" />
             Delete
           </Button>
         )}
@@ -528,7 +550,7 @@ export default function BrandDetailPage() {
 
       {/* ═══ TAB BAR ═══ */}
       {/* Scrolls sideways on phones instead of cutting tabs off. */}
-      <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)] -mx-4 px-4 sm:-mx-8 sm:px-8 overflow-x-auto">
+      <div className="flex items-center gap-1 mb-4 border-b border-[var(--border)] -mx-4 px-4 sm:-mx-8 sm:px-8 overflow-x-auto">
         {([
           { id: "overview" as BrandTab, label: "Overview", icon: Briefcase },
           { id: "client-jsr" as BrandTab, label: "Client Portal", icon: ExternalLink },
@@ -541,8 +563,8 @@ export default function BrandDetailPage() {
             onClick={() => navigateToTab(tab.id)}
             className={`flex shrink-0 whitespace-nowrap items-center gap-2 px-3 sm:px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
-                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
+                ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
             }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -568,181 +590,130 @@ export default function BrandDetailPage() {
 
       {/* ═══ TAB: OVERVIEW (TWO-COLUMN LAYOUT) ═══ */}
       {activeTab === "overview" && (
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-4">
 
         {/* ── LEFT COLUMN ── */}
-        <div className="min-w-0">
-          {/* Stats 2×2 */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <Card>
-              <p className="text-[12px] font-medium text-[var(--text-secondary)]">Managers</p>
-              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                {brand.managers.length}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-[12px] font-medium text-[var(--text-secondary)]">Briefs</p>
-              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                {brand.briefs.length}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-[12px] font-medium text-[var(--text-secondary)]">Employees</p>
-              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                {brand.employeeCount}
-              </p>
-            </Card>
-            <Card>
-              <p className="text-[12px] font-medium text-[var(--text-secondary)]">Tasks</p>
-              <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                {brand.totalTasks}
-              </p>
-            </Card>
-          </div>
+        <div className="min-w-0 flex flex-col gap-4">
+          {/* Stats */}
+          <StatStrip>
+            <StatTile label="Managers" value={brand.managers.length} />
+            <StatTile label="Briefs" value={brand.briefs.length} />
+            <StatTile label="Employees" value={brand.employeeCount} />
+            <StatTile label="Tasks" value={brand.totalTasks} />
+          </StatStrip>
 
           {/* Managers */}
-          <div className="mb-8">
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
-              Managers
-            </h2>
-            <Card>
-              {brand.managers.length === 0 && (
-                <p className="text-[13px] text-[var(--text-muted)]">No managers assigned yet.</p>
-              )}
-              <div className="flex flex-col gap-2">
-                {validManagers.map((manager) => (
-                  <div
-                    key={manager._id}
-                    className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-[15px] text-[var(--text-primary)]">
-                        {manager.name ?? manager.email ?? "Unknown"}
-                      </p>
-                      {manager.email && manager.name && (
-                        <p className="text-[12px] text-[var(--text-secondary)]">{manager.email}</p>
-                      )}
-                    </div>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setRemovingManagerId(manager._id as Id<"users">)}
-                        className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+          <Panel title="Managers">
+            {brand.managers.length === 0 && (
+              <PanelEmpty>No managers assigned yet.</PanelEmpty>
+            )}
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {validManagers.map((manager) => (
+                <div
+                  key={manager._id}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--bg-primary)] transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-[14px] text-[var(--text-primary)] truncate">
+                      {manager.name ?? manager.email ?? "Unknown"}
+                    </p>
+                    {manager.email && manager.name && (
+                      <p className="text-[12px] text-[var(--text-muted)] truncate">{manager.email}</p>
                     )}
                   </div>
-                ))}
-              </div>
-              {isAdmin && availableManagers.length > 0 && (
-                <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
-                  <select
-                    value={addManagerId}
-                    onChange={(e) => setAddManagerId(e.target.value)}
-                    className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                  >
-                    <option value="">Select a manager...</option>
-                    {availableManagers.map((m) => (
-                      <option key={m._id} value={m._id}>
-                        {m.name ?? m.email}
-                      </option>
-                    ))}
-                  </select>
-                  <Button variant="primary" onClick={handleAssignManager}>
-                    <UserPlus className="h-4 w-4" />
-                  </Button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setRemovingManagerId(manager._id as Id<"users">)}
+                      className={`${ICON_BTN_DANGER} shrink-0`}
+                      aria-label="Remove manager"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              )}
-            </Card>
-          </div>
-
-          {/* Task Status 2×2 */}
-          {brand.totalTasks > 0 && (
-            <div className="mb-8">
-              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
-                Task Status
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <p className="text-[12px] font-medium text-[var(--text-secondary)]">Pending</p>
-                  <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                    {brand.taskStatusCounts.pending}
-                  </p>
-                </Card>
-                <Card accent="manager">
-                  <p className="text-[12px] font-medium text-[var(--text-secondary)]">In Progress</p>
-                  <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                    {brand.taskStatusCounts["in-progress"]}
-                  </p>
-                </Card>
-                <Card accent="admin">
-                  <p className="text-[12px] font-medium text-[var(--text-secondary)]">Review</p>
-                  <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                    {brand.taskStatusCounts.review}
-                  </p>
-                </Card>
-                <Card accent="employee">
-                  <p className="text-[12px] font-medium text-[var(--text-secondary)]">Done</p>
-                  <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                    {brand.taskStatusCounts.done}
-                  </p>
-                </Card>
-              </div>
+              ))}
             </div>
+            {isAdmin && availableManagers.length > 0 && (
+              <div className="flex gap-2 px-4 py-3 border-t border-[var(--border-subtle)]">
+                <select
+                  value={addManagerId}
+                  onChange={(e) => setAddManagerId(e.target.value)}
+                  className={`${FIELD} flex-1 min-w-0`}
+                >
+                  <option value="">Select a manager...</option>
+                  {availableManagers.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.name ?? m.email}
+                    </option>
+                  ))}
+                </select>
+                <Button variant="secondary" onClick={handleAssignManager} aria-label="Assign manager">
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </Panel>
+
+          {/* Task Status */}
+          {brand.totalTasks > 0 && (
+            <Panel title="Task Status">
+              <StatStrip bare>
+                <StatTile label="Pending" value={brand.taskStatusCounts.pending} />
+                <StatTile label="In Progress" value={brand.taskStatusCounts["in-progress"]} />
+                <StatTile label="Review" value={brand.taskStatusCounts.review} />
+                <StatTile label="Done" value={brand.taskStatusCounts.done} />
+              </StatStrip>
+            </Panel>
           )}
 
           {/* Employees */}
           {brand.employees.length > 0 && (
-            <div className="mb-8">
-              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
-                Team Members Working on This Brand
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
+            <Panel title="Team Members Working on This Brand">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {brand.employees.filter((e): e is NonNullable<typeof e> => !!e).map((emp) => {
                   // "Brand Manager" only for managers actually assigned to THIS
                   // brand — admins from other brands are just contributors here.
                   const isManagerHere = assignedManagerIds.includes(emp._id);
                   return (
-                  <Card key={emp._id}>
-                    <p className="font-medium text-[15px] text-[var(--text-primary)]">
-                      {emp.name ?? emp.email ?? "Unknown"}
-                    </p>
-                    <p className="text-[12px] text-[var(--text-secondary)]">{emp.email}</p>
+                  <div key={emp._id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="font-medium text-[14px] text-[var(--text-primary)] truncate">
+                        {emp.name ?? emp.email ?? "Unknown"}
+                      </p>
+                      <p className="text-[12px] text-[var(--text-muted)] truncate">{emp.email}</p>
+                    </div>
                     <Badge
                       variant={isManagerHere ? "admin" : emp.role === "admin" ? "manager" : "employee"}
-                      className="mt-1"
+                      className="shrink-0"
                     >
                       {isManagerHere ? "Brand Manager" : emp.role === "admin" ? "Contributor" : "Employee"}
                     </Badge>
-                  </Card>
+                  </div>
                   );
                 })}
               </div>
-            </div>
+            </Panel>
           )}
         </div>
 
         {/* ── RIGHT COLUMN ── */}
-        <div className="flex flex-col gap-6">
+        <div className="min-w-0 flex flex-col gap-4">
           {/* Files / Documents with drag & drop */}
           <div
-            className={`rounded-xl border-2 bg-white overflow-hidden transition-colors ${dragOver ? "border-[var(--accent-admin)] bg-[var(--accent-admin)]/5" : "border-[var(--border)]"}`}
+            className={`rounded-lg border bg-white overflow-hidden transition-colors ${dragOver ? "border-[var(--accent-admin)]" : "border-[var(--border)]"}`}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); if (isAdmin) setDragOver(true); }}
             onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (isAdmin) setDragOver(true); }}
             onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); }}
             onDrop={isAdmin ? handleFileDrop : undefined}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Files</h3>
-                <span className="text-[11px] text-[var(--text-muted)]">({brandDocs?.length ?? 0})</span>
-              </div>
+            <div className={BLOCK_HEAD}>
+              <BlockTitle title="Files" count={brandDocs?.length ?? 0} />
               {isAdmin && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingDoc}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
+                  className={`${ICON_BTN} disabled:opacity-50`}
+                  aria-label="Upload file"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -756,23 +727,23 @@ export default function BrandDetailPage() {
             />
             <div className="p-4">
               {dragOver && (
-                <div className="flex flex-col items-center justify-center py-10 mb-3 rounded-lg border-2 border-dashed border-[var(--accent-admin)] bg-[var(--accent-admin)]/5">
-                  <Upload className="h-8 w-8 text-[var(--accent-admin-text)] mb-2" />
+                <div className="flex items-center justify-center gap-2 py-8 mb-3 rounded-md border border-dashed border-[var(--accent-admin)] bg-[var(--accent-admin-dim)]">
+                  <Upload className="h-4 w-4 text-[var(--accent-admin-text)]" />
                   <p className="text-[13px] font-medium text-[var(--accent-admin-text)]">Drop files here</p>
                 </div>
               )}
               {!dragOver && (brandDocs ?? []).length === 0 && !uploadingDoc && (
                 <div
-                  className="text-center py-8 rounded-lg border-2 border-dashed border-[var(--border)] cursor-pointer hover:border-[var(--accent-admin)] transition-colors"
+                  className="flex items-center justify-center gap-2 py-6 rounded-md border border-dashed border-[var(--border)] cursor-pointer hover:border-[var(--border-strong)] transition-colors"
                   onClick={() => { if (isAdmin) fileInputRef.current?.click(); }}
                 >
-                  <Upload className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                  <p className="text-[12px] text-[var(--text-muted)]">{isAdmin ? "Drop files or click to upload" : "No files uploaded yet"}</p>
+                  <Upload className="h-4 w-4 text-[var(--text-muted)]" />
+                  <p className="text-[13px] text-[var(--text-muted)]">{isAdmin ? "Drop files or click to upload" : "No files uploaded yet"}</p>
                 </div>
               )}
               {uploadingDoc && (
                 <div className="flex items-center justify-center py-3 mb-3">
-                  <div className="w-4 h-4 border-2 border-[var(--border)] border-t-[var(--accent-admin)] rounded-full animate-spin mr-2" />
+                  <div className="w-4 h-4 border-2 border-[var(--border)] border-t-[var(--text-secondary)] rounded-full animate-spin mr-2" />
                   <span className="text-[12px] text-[var(--text-muted)]">Uploading...</span>
                 </div>
               )}
@@ -786,18 +757,16 @@ export default function BrandDetailPage() {
                         href={doc.url ?? "#"}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group relative rounded-lg border border-[var(--border)] hover:border-[var(--accent-admin)] bg-[var(--bg-primary)] hover:shadow-sm transition-all p-3 block"
+                        className="group relative rounded-md border border-[var(--border)] hover:border-[var(--border-strong)] bg-[var(--bg-primary)] transition-colors p-3 block"
                       >
-                        <p className="font-medium text-[11px] text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5 min-h-[30px]">
+                        <p className="font-medium text-[12px] text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5 min-h-[32px]">
                           {doc.fileName}
                         </p>
                         <p className="text-[11px] text-[var(--text-muted)] mb-2">
                           {doc.uploaderName} · {new Date(doc.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </p>
                         <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-[var(--bg-hover)] text-[var(--text-secondary)] uppercase tracking-wider">
-                            {ext}
-                          </span>
+                          <Badge>{ext}</Badge>
                           {doc.visibility === "admin_only" && (
                             <Badge variant="admin">Admin</Badge>
                           )}
@@ -805,9 +774,10 @@ export default function BrandDetailPage() {
                         {(isAdmin || doc.uploadedBy === user?._id) && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeletingDocId(doc._id); }}
-                            className="absolute top-2 right-2 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors opacity-0 group-hover:opacity-100 p-0.5"
+                            className="absolute top-1 right-1 inline-flex items-center justify-center h-7 w-7 rounded-md bg-white border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                            aria-label="Delete file"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </a>
@@ -819,426 +789,388 @@ export default function BrandDetailPage() {
           </div>
 
           {/* Important Links */}
-          <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Important Links</h3>
-                <span className="text-[11px] text-[var(--text-muted)]">({brandLinks?.length ?? 0})</span>
-              </div>
+          <div className={BLOCK}>
+            <div className={BLOCK_HEAD}>
+              <BlockTitle title="Important Links" count={brandLinks?.length ?? 0} />
               {canManageLinks && !showAddLink && (
                 <button
                   onClick={() => setShowAddLink(true)}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  className={ICON_BTN}
+                  aria-label="Add link"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               )}
             </div>
-            <div className="p-4">
-              {(brandLinks ?? []).length === 0 && !showAddLink && (
-                <div className="text-center py-6">
-                  <Link2 className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                  <p className="text-[12px] text-[var(--text-muted)]">No links added yet</p>
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                {(brandLinks ?? []).map((link) => (
-                  <div
-                    key={link._id}
-                    className="flex items-start justify-between py-2 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] transition-colors group"
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                      <ExternalLink className="h-3.5 w-3.5 text-[var(--accent-admin-text)] mt-0.5 shrink-0" />
-                      <div className="min-w-0">
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-[12px] text-[var(--accent-admin-text)] hover:underline block"
-                        >
-                          {link.label}
-                        </a>
-                        {link.description && (
-                          <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{link.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    {canManageLinks && (
-                      <button
-                        onClick={() => setDeletingLinkId(link._id)}
-                        className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+            {(brandLinks ?? []).length === 0 && !showAddLink && (
+              <PanelEmpty>No links added yet</PanelEmpty>
+            )}
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {(brandLinks ?? []).map((link) => (
+                <div
+                  key={link._id}
+                  className="group flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-[var(--bg-primary)] transition-colors"
+                >
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <ExternalLink className="h-3.5 w-3.5 text-[var(--text-muted)] mt-1 shrink-0" />
+                    <div className="min-w-0">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-[13px] text-[var(--accent-admin-text)] hover:underline underline-offset-2 block"
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
+                        {link.label}
+                      </a>
+                      {link.description && (
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{link.description}</p>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-              {showAddLink && (
-                <form onSubmit={handleAddBrandLink} className="mt-2 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]">
-                  <div className="flex flex-col gap-2 mb-2">
-                    <input
-                      value={linkLabel}
-                      onChange={(e) => setLinkLabel(e.target.value)}
-                      placeholder="Link name"
-                      required
-                      className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    />
-                    <input
-                      value={linkUrl}
-                      onChange={(e) => setLinkUrl(e.target.value)}
-                      placeholder="URL"
-                      required
-                      className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    />
-                    <input
-                      value={linkDesc}
-                      onChange={(e) => setLinkDesc(e.target.value)}
-                      placeholder="Description (optional)"
-                      className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" variant="primary">Save</Button>
-                    <Button type="button" variant="secondary" onClick={() => { setShowAddLink(false); setLinkUrl(""); setLinkLabel(""); setLinkDesc(""); }}>Cancel</Button>
-                  </div>
-                </form>
-              )}
+                  {canManageLinks && (
+                    <button
+                      onClick={() => setDeletingLinkId(link._id)}
+                      className={`${ICON_BTN_DANGER} shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100`}
+                      aria-label="Delete link"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
+            {showAddLink && (
+              <form onSubmit={handleAddBrandLink} className="m-4 p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)]">
+                <div className="flex flex-col gap-2 mb-2">
+                  <Input
+                    value={linkLabel}
+                    onChange={(e) => setLinkLabel(e.target.value)}
+                    placeholder="Link name"
+                    required
+                  />
+                  <Input
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="URL"
+                    required
+                  />
+                  <Input
+                    value={linkDesc}
+                    onChange={(e) => setLinkDesc(e.target.value)}
+                    placeholder="Description (optional)"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary">Save</Button>
+                  <Button type="button" variant="ghost" onClick={() => { setShowAddLink(false); setLinkUrl(""); setLinkLabel(""); setLinkDesc(""); }}>Cancel</Button>
+                </div>
+              </form>
+            )}
           </div>
 
           {/* Credentials (Admin Only) */}
           {isAdmin && (
-            <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+            <div className={BLOCK}>
               <button
                 onClick={() => setCredsExpanded(!credsExpanded)}
-                className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border)] w-full text-left"
+                aria-expanded={credsExpanded}
+                className={`flex items-center gap-2 h-11 px-4 w-full text-left hover:bg-[var(--bg-primary)] transition-colors ${credsExpanded ? "border-b border-[var(--border-subtle)]" : ""}`}
               >
-                <KeyRound className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">Credentials</h3>
+                <span className="flex-1 min-w-0">
+                  <BlockTitle title="Credentials" count={credentials?.length ?? 0} />
+                </span>
                 <Badge variant="admin">Admin Only</Badge>
-                <span className="text-[11px] text-[var(--text-muted)] ml-1">({credentials?.length ?? 0})</span>
-                {credsExpanded ? <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)]" /> : <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
+                {credsExpanded ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />}
               </button>
               {credsExpanded && (
-                <div className="p-4">
+                <>
                   {(credentials ?? []).length === 0 && !showAddCred && (
-                    <p className="text-[12px] text-[var(--text-muted)] text-center py-4">No credentials stored yet.</p>
+                    <p className="px-4 pt-3.5 text-[13px] text-[var(--text-muted)]">No credentials stored yet.</p>
                   )}
-                  <div className="flex flex-col gap-2.5">
+                  <div className="divide-y divide-[var(--border-subtle)]">
                     {(credentials ?? []).map((cred) => (
-                      <div
-                        key={cred._id}
-                        className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-[12px] text-[var(--text-primary)]">
+                      <div key={cred._id} className="px-4 py-3">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                             {cred.platform}
                           </span>
                           <button
                             onClick={() => setDeletingCredId(cred._id)}
-                            className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                            className={`${ICON_BTN_DANGER} shrink-0 -my-1`}
+                            aria-label="Delete credential"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                         {cred.username && (
-                          <div className="flex items-center gap-2 text-[11px] mb-1">
-                            <span className="text-[var(--text-muted)] w-12">User:</span>
+                          <div className="flex items-center gap-2 text-[12px] mb-1">
+                            <span className="text-[var(--text-muted)] w-12 shrink-0">User:</span>
                             <span className="text-[var(--text-primary)] font-mono">{cred.username}</span>
                           </div>
                         )}
                         {cred.password && (
-                          <div className="flex items-center gap-2 text-[11px] mb-1">
-                            <span className="text-[var(--text-muted)] w-12">Pass:</span>
+                          <div className="flex items-center gap-2 text-[12px] mb-1">
+                            <span className="text-[var(--text-muted)] w-12 shrink-0">Pass:</span>
                             <span className="text-[var(--text-primary)] font-mono">
                               {visiblePasswords.has(cred._id) ? cred.password : "••••••••"}
                             </span>
                             <button
                               onClick={() => togglePasswordVisibility(cred._id)}
-                              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                              className={`${ICON_BTN} -my-2`}
+                              aria-label={visiblePasswords.has(cred._id) ? "Hide password" : "Show password"}
                             >
-                              {visiblePasswords.has(cred._id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                              {visiblePasswords.has(cred._id) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         )}
                         {cred.url && (
-                          <div className="flex items-center gap-2 text-[11px] mb-1">
-                            <span className="text-[var(--text-muted)] w-12">URL:</span>
+                          <div className="flex items-center gap-2 text-[12px] mb-1">
+                            <span className="text-[var(--text-muted)] w-12 shrink-0">URL:</span>
                             <a href={cred.url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-admin-text)] hover:underline truncate">
                               {cred.url}
                             </a>
                           </div>
                         )}
                         {cred.notes && (
-                          <p className="text-[11px] text-[var(--text-secondary)] mt-1">{cred.notes}</p>
+                          <p className="text-[12px] text-[var(--text-secondary)] mt-1">{cred.notes}</p>
                         )}
                       </div>
                     ))}
                   </div>
+                  <div className={`p-4 ${(credentials ?? []).length > 0 ? "border-t border-[var(--border-subtle)]" : ""}`}>
                   {showAddCred ? (
-                    <form onSubmit={handleAddCredential} className="mt-2.5 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]">
+                    <form onSubmit={handleAddCredential} className="p-3 rounded-md border border-[var(--border)] bg-[var(--bg-primary)]">
                       <div className="grid grid-cols-2 gap-2 mb-2">
-                        <input
+                        <Input
                           value={credPlatform}
                           onChange={(e) => setCredPlatform(e.target.value)}
                           placeholder="Platform"
                           required
-                          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
-                        <input
+                        <Input
                           value={credUrl}
                           onChange={(e) => setCredUrl(e.target.value)}
                           placeholder="URL"
-                          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
-                        <input
+                        <Input
                           value={credUsername}
                           onChange={(e) => setCredUsername(e.target.value)}
                           placeholder="Username"
-                          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
-                        <input
+                        <Input
                           value={credPassword}
                           onChange={(e) => setCredPassword(e.target.value)}
                           placeholder="Password"
                           type="password"
-                          className="bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
                       </div>
-                      <input
+                      <Input
                         value={credNotes}
                         onChange={(e) => setCredNotes(e.target.value)}
                         placeholder="Notes (optional)"
-                        className="w-full mb-2 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className="mb-2"
                       />
                       <div className="flex gap-2">
                         <Button type="submit" variant="primary">Save</Button>
-                        <Button type="button" variant="secondary" onClick={() => setShowAddCred(false)}>Cancel</Button>
+                        <Button type="button" variant="ghost" onClick={() => setShowAddCred(false)}>Cancel</Button>
                       </div>
                     </form>
                   ) : (
-                    <Button variant="secondary" className="mt-2.5 w-full" onClick={() => setShowAddCred(true)}>
-                      <Plus className="h-4 w-4 mr-1.5" />
+                    <Button variant="secondary" className="w-full" onClick={() => setShowAddCred(true)}>
+                      <Plus className="h-4 w-4" />
                       Add Credential
                     </Button>
                   )}
-                </div>
+                  </div>
+                </>
               )}
             </div>
           )}
 
           {/* Briefs (in right sidebar, below credentials) */}
-          <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-[var(--text-secondary)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Briefs</h3>
-                <span className="text-[11px] text-[var(--text-muted)]">({brand.briefs.length})</span>
-              </div>
-            </div>
-            <div className="p-4">
-              {brand.briefs.length === 0 && (
-                <div className="text-center py-6">
-                  <Briefcase className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                  <p className="text-[12px] text-[var(--text-muted)]">No briefs yet</p>
-                </div>
-              )}
-              <div className="flex flex-col gap-2.5">
-                {brand.briefs.map((brief) => (
-                  <div
-                    key={brief._id}
-                    onClick={() => {
-                      // Back from this brief returns to this brand page,
-                      // preserving the brand page's own back target.
-                      const brandSelf = `/brands/${brandId}${
-                        returnTo
-                          ? `?returnTo=${encodeURIComponent(returnTo)}`
-                          : ""
-                      }`;
-                      router.push(
-                        `/brief/${brief._id}?returnTo=${encodeURIComponent(
-                          brandSelf
-                        )}`
-                      );
-                    }}
-                    className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)] hover:border-[var(--accent-admin)] cursor-pointer transition-all"
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h4 className="font-medium text-[12px] text-[var(--text-primary)] truncate flex-1 mr-2">
-                        {brief.title}
-                      </h4>
-                      <span
-                        className="font-medium text-[11px] capitalize shrink-0"
-                        style={{ color: STATUS_COLORS[brief.status] ?? "var(--text-secondary)" }}
-                      >
-                        {brief.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 rounded-full bg-[var(--bg-hover)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent-employee)]"
-                          style={{ width: `${brief.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                        {brief.doneCount}/{brief.taskCount}
-                      </span>
-                    </div>
+          <Panel title="Briefs" count={brand.briefs.length}>
+            {brand.briefs.length === 0 && (
+              <PanelEmpty>No briefs yet</PanelEmpty>
+            )}
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {brand.briefs.map((brief) => (
+                <div
+                  key={brief._id}
+                  onClick={() => {
+                    // Back from this brief returns to this brand page,
+                    // preserving the brand page's own back target.
+                    const brandSelf = `/brands/${brandId}${
+                      returnTo
+                        ? `?returnTo=${encodeURIComponent(returnTo)}`
+                        : ""
+                    }`;
+                    router.push(
+                      `/brief/${brief._id}?returnTo=${encodeURIComponent(
+                        brandSelf
+                      )}`
+                    );
+                  }}
+                  className="px-4 py-2.5 hover:bg-[var(--bg-primary)] cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-1.5">
+                    <h4 className="font-medium text-[14px] text-[var(--text-primary)] truncate flex-1">
+                      {brief.title}
+                    </h4>
+                    <StatusBadge
+                      className="shrink-0"
+                      color={BRIEF_STATUS_COLORS[brief.status] ?? BRIEF_STATUS_COLORS.draft}
+                      label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                    />
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[var(--accent-employee)]"
+                        style={{ width: `${brief.progress}%` }}
+                      />
+                    </div>
+                    <span className="text-[12px] text-[var(--text-secondary)] tabular-nums">
+                      {brief.doneCount}/{brief.taskCount}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          </Panel>
           {/* JSR Links (in right sidebar, under Briefs) */}
           {canManageLinks && (
-            <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <div className="flex items-center gap-2">
-                  <ExternalLink className="h-4 w-4 text-[var(--text-secondary)]" />
-                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">JSR Links</h3>
-                  <span className="text-[11px] text-[var(--text-muted)]">({(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length})</span>
-                </div>
+            <div className={BLOCK}>
+              <div className={BLOCK_HEAD}>
+                <BlockTitle title="JSR Links" count={(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length} />
                 <button
                   onClick={handleGenerateJsr}
-                  className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                  className={ICON_BTN}
+                  aria-label="Generate JSR link"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              <div className="p-4">
-                {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length === 0 && (
-                  <div className="text-center py-6">
-                    <ExternalLink className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                    <p className="text-[12px] text-[var(--text-muted)]">No active JSR links. Click + to generate one.</p>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").map((link) => (
-                    <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)] shrink-0" />
-                        <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
-                          {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => copyJsrLink(link.token)}
-                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                        >
-                          <Copy className="h-3 w-3" /> Copy
-                        </button>
-                        <button
-                          onClick={() => setChatSidebarOpen(true)}
-                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
-                        >
-                          <MessageCircle className="h-3 w-3" /> Show Chat
-                        </button>
-                        <button
-                          onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
-                        >
-                          Deactivate
-                        </button>
-                      </div>
+              {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").length === 0 && (
+                <PanelEmpty>No active JSR links. Click + to generate one.</PanelEmpty>
+              )}
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {(jsrLinks ?? []).filter((l) => l.isActive && l.linkType !== "intake").map((link) => (
+                  <div key={link._id} className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link2 className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                      <span className="text-[12px] text-[var(--text-primary)] font-mono truncate flex-1">
+                        {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="secondary" onClick={() => copyJsrLink(link.token)}>
+                        <Copy className="h-3.5 w-3.5" /> Copy
+                      </Button>
+                      <Button variant="secondary" onClick={() => setChatSidebarOpen(true)}>
+                        <MessageCircle className="h-3.5 w-3.5" /> Show Chat
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="ml-auto"
+                        onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
+                      >
+                        Deactivate
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Manage Client Tasks (in right sidebar, under JSR links) */}
           {canManageLinks && (
-            <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-[var(--text-secondary)]" />
-                  <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Manage Client Tasks</h3>
-                </div>
-              </div>
-              <div className="p-4 max-h-[400px] overflow-y-auto">
+            <Panel title="Manage Client Tasks">
+              <div className="max-h-[400px] overflow-y-auto">
                 {(brandClientTasks ?? []).length === 0 && (
-                  <p className="text-[12px] text-[var(--text-muted)] text-center py-4">No tasks for this brand.</p>
+                  <PanelEmpty>No tasks for this brand.</PanelEmpty>
                 )}
-                <div className="flex flex-col gap-2">
+                <div className="divide-y divide-[var(--border-subtle)]">
                   {(brandClientTasks ?? []).map((task) => (
-                    <div key={task._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-[12px] font-medium text-[var(--text-primary)] truncate flex-1 mr-2">{task.title}</p>
-                        <span className="text-[11px] text-[var(--text-muted)] shrink-0 capitalize">{task.status}</span>
+                    <div key={task._id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[14px] font-medium text-[var(--text-primary)] truncate flex-1">{task.title}</p>
+                        <StatusBadge
+                          className="shrink-0"
+                          color={taskStatusMeta(task.status).dot}
+                          label={taskStatusMeta(task.status).label}
+                        />
                       </div>
-                      <p className="text-[11px] text-[var(--text-secondary)] mb-2">{task.briefTitle}</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mb-2">{task.briefTitle}</p>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {task.clientFacing && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700">Client-facing</span>
+                          <Badge>Client-facing</Badge>
                         )}
                         {task.needsClientInput && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-orange-50 text-orange-700">Needs client input</span>
+                          <Badge variant="warning">Needs client input</Badge>
                         )}
                         {task.clientStatus === "pending_client" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700">Sent to client</span>
+                          <Badge>Sent to client</Badge>
                         )}
                         {task.clientStatus === "client_approved" && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700"><CheckCircle2 className="h-2.5 w-2.5" />Approved</span>
+                          <Badge variant="employee">Approved</Badge>
                         )}
                         {task.clientStatus === "client_changes_requested" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700">Changes requested</span>
+                          <Badge variant="warning">Changes requested</Badge>
                         )}
                         {task.clientStatus === "client_denied" && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-700"><XCircle className="h-2.5 w-2.5" />Denied</span>
+                          <Badge variant="danger">Denied</Badge>
                         )}
                       </div>
                       {/* Actions */}
-                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                      <div className="flex flex-wrap gap-2 mt-2 empty:hidden">
                         {!task.needsClientInput && task.clientFacing && (
-                          <button
+                          <Button
+                            variant="secondary"
                             onClick={() => { setClientInputTaskId(task._id); setClientInputMsg(""); }}
-                            className="h-8 px-3 rounded-md text-[13px] font-medium text-orange-600 hover:bg-orange-50 transition-colors"
                           >
                             Request Client Input
-                          </button>
+                          </Button>
                         )}
                         {task.needsClientInput && (
-                          <button
+                          <Button
+                            variant="secondary"
                             onClick={async () => {
                               try {
                                 await clearClientInputFlag({ taskId: task._id as Id<"tasks"> });
                                 toast("success", "Client input flag cleared");
                               } catch { toast("error", "Failed to clear flag"); }
                             }}
-                            className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             Clear Input Request
-                          </button>
+                          </Button>
                         )}
                         {task.clientFacing && task.deliverableStatus === "approved" && !task.clientStatus && task.deliverableId && (
-                          <button
+                          <Button
+                            variant="secondary"
                             onClick={async () => {
                               try {
                                 await sendToClientMut({ deliverableId: task.deliverableId as Id<"deliverables"> });
                                 toast("success", "Sent to client for review");
                               } catch (err) { toast("error", err instanceof Error ? err.message : "Failed"); }
                             }}
-                            className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
                           >
                             Send to Client
-                          </button>
+                          </Button>
                         )}
                       </div>
                       {/* Client input message textbox */}
                       {clientInputTaskId === task._id && (
-                        <div className="mt-2 flex gap-1.5">
+                        <div className="mt-2 flex gap-2">
                           <input
                             value={clientInputMsg}
                             onChange={(e) => setClientInputMsg(e.target.value)}
                             placeholder="What do you need from the client?"
-                            className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[11px] focus:outline-none focus:ring-2 focus:ring-orange-400"
+                            className={`${FIELD} flex-1 min-w-0`}
                           />
-                          <button
+                          <Button
+                            variant="primary"
+                            className="shrink-0"
                             onClick={async () => {
                               if (!clientInputMsg.trim()) return;
                               try {
@@ -1248,23 +1180,23 @@ export default function BrandDetailPage() {
                                 setClientInputMsg("");
                               } catch { toast("error", "Failed"); }
                             }}
-                            className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium bg-orange-500 text-white"
                           >
                             Send
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="shrink-0"
                             onClick={() => { setClientInputTaskId(null); setClientInputMsg(""); }}
-                            className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            </Panel>
           )}
         </div>
       </div>
@@ -1275,12 +1207,9 @@ export default function BrandDetailPage() {
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setChatSidebarOpen(false)} />
           <div className="fixed top-0 right-0 h-full w-[500px] max-w-[90vw] bg-white border-l border-[var(--border)] shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
-              </div>
-              <button onClick={() => setChatSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+            <div className="flex items-center justify-between h-12 px-4 border-b border-[var(--border)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
+              <button onClick={() => setChatSidebarOpen(false)} className={ICON_BTN} aria-label="Close chat">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1311,10 +1240,10 @@ export default function BrandDetailPage() {
                         const el = document.getElementById(`chat-date-${d}`);
                         el?.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/5 transition-colors"
+                      className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
-                      <span className="text-[11px] font-semibold text-[var(--text-primary)]">{dateLabel(d)}</span>
-                      <span className="text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded-full">{dateCounts[d]}</span>
+                      <span className="text-[var(--text-primary)]">{dateLabel(d)}</span>
+                      <span className="tabular-nums text-[var(--text-muted)]">{dateCounts[d]}</span>
                     </button>
                   ))}
                 </div>
@@ -1324,7 +1253,7 @@ export default function BrandDetailPage() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-1" style={{ overscrollBehavior: "contain" }}>
               {(jsrMessages ?? []).length === 0 && (
-                <p className="text-[12px] text-[var(--text-muted)] text-center py-8">No messages yet. Start a conversation with the client.</p>
+                <p className="text-[13px] text-[var(--text-muted)] text-center py-8">No messages yet. Start a conversation with the client.</p>
               )}
               {(() => {
                 const msgs = jsrMessages ?? [];
@@ -1341,19 +1270,19 @@ export default function BrandDetailPage() {
                   return (
                     <div key={msg._id}>
                       {showDateHeader && (
-                        <div id={`chat-date-${dateKey}`} className="sticky top-0 z-10 flex items-center gap-3 my-3 py-1 bg-white/95 backdrop-blur-sm">
-                          <div className="flex-1 h-px bg-[var(--border)]" />
-                          <span className="text-[11px] font-bold text-[var(--accent-admin-text)] bg-[var(--accent-admin)]/8 px-3 py-1 rounded-full shrink-0">{dateLabel}</span>
-                          <div className="flex-1 h-px bg-[var(--border)]" />
+                        <div id={`chat-date-${dateKey}`} className="sticky top-0 z-10 flex items-center gap-3 my-3 py-1 bg-white">
+                          <div className="flex-1 h-px bg-[var(--border-subtle)]" />
+                          <span className="text-[12px] font-medium text-[var(--text-muted)] shrink-0">{dateLabel}</span>
+                          <div className="flex-1 h-px bg-[var(--border-subtle)]" />
                         </div>
                       )}
                       <div className={`flex ${msg.senderType === "manager" ? "justify-end" : "justify-start"} mb-1.5`}>
-                        <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin-strong)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
-                          <p className={`text-[11px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
+                        <div className={`max-w-[75%] rounded-lg px-3 py-2 ${msg.senderType === "manager" ? "bg-[var(--text-primary)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
+                          <p className={`text-[11px] font-medium mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                             {msg.senderName || (msg.senderType === "client" ? "Client" : "You")}
                           </p>
-                          <p className="text-[12px] leading-relaxed">{msg.content}</p>
-                          <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
+                          <p className="text-[13px] leading-relaxed">{msg.content}</p>
+                          <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                             {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </p>
                         </div>
@@ -1380,9 +1309,11 @@ export default function BrandDetailPage() {
                   }
                 }}
                 placeholder="Type a message..."
-                className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={`${FIELD} flex-1 min-w-0`}
               />
-              <button
+              <Button
+                variant="primary"
+                aria-label="Send message"
                 onClick={() => {
                   if (!jsrMsgContent.trim()) return;
                   setSendingJsrMsg(true);
@@ -1392,10 +1323,10 @@ export default function BrandDetailPage() {
                     .finally(() => setSendingJsrMsg(false));
                 }}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
-                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white disabled:opacity-50 transition-colors"
+                className="shrink-0"
               >
                 <Send className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </>

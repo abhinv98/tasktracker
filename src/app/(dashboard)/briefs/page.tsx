@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, DatePicker, EmptyState, Input, Modal, PageHeader, SegmentedTabs, Select, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, ConfirmModal, DatePicker, EmptyState, Input, Modal, PageHeader, SegmentedTabs, Select, StatusBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 
 // The date filters store YYYY-MM-DD (they always have; the filtering below
 // parses that). DatePicker speaks timestamps. Convert at the boundary rather
@@ -28,8 +28,10 @@ function fmtYmd(ymd: string): string {
     : "";
 }
 
-import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, FolderOpen, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { taskStatusMeta } from "@/lib/status";
+import { fieldClass } from "@/components/ui/classes";
 
 /** Designing / copywriting only. */
 function showCreativesRequiredField(
@@ -45,7 +47,13 @@ type IndividualTaskTeam = {
   deadline?: number;
 };
 
-const STATUS_COLORS = BRIEF_STATUS_COLORS;
+// One look for every hand-rolled field in the Create Brief dialog: the same
+// box the shared Input / Select draw.
+const FIELD_CLASS = `w-full ${fieldClass}`;
+const FIELD_LABEL_CLASS = "block mb-1.5 font-medium text-[13px] text-[var(--text-secondary)]";
+// Icon-only buttons inside table rows; the negative margin keeps the row height.
+const ICON_BUTTON_CLASS =
+  "inline-flex items-center justify-center h-8 w-8 -my-1 rounded-md text-[var(--text-muted)] transition-colors";
 
 const STORAGE_BRIEF_DRAFT = "tasktracker_briefDraft";
 const STORAGE_BRIEFS_UI = "tasktracker_briefsUi";
@@ -706,7 +714,7 @@ export default function BriefsPage() {
         actions={
           isAdmin && (
             <Button variant="primary" onClick={() => openCreateModalForBrand()}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              <Plus className="h-3.5 w-3.5" />
               Create Brief
             </Button>
           )
@@ -731,26 +739,22 @@ export default function BriefsPage() {
           filter is never hidden behind a closed popover. */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="relative" ref={filterPopoverRef}>
-          <button
+          <Button
+            variant="secondary"
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
-              activeFilterCount > 0
-                ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-            }`}
           >
-            <Filter className="h-3.5 w-3.5" />
+            <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-semibold tabular-nums">
+              <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--text-primary)] text-white text-[11px] font-semibold tabular-nums">
                 {activeFilterCount}
               </span>
             )}
-          </button>
+          </Button>
 
           {filtersOpen && (
-            <div className="animate-scaleIn absolute left-0 top-full mt-1.5 z-30 w-[280px] rounded-xl border border-[var(--border)] bg-white p-3 shadow-lg flex flex-col gap-3">
+            <div className="animate-scaleIn absolute left-0 top-full mt-1.5 z-30 w-[280px] rounded-lg border border-[var(--border)] bg-white p-3 shadow-lg flex flex-col gap-3">
               <Select
                 label="Manager"
                 value={filterManagerId}
@@ -830,34 +834,20 @@ export default function BriefsPage() {
           </button>
         ))}
         {activeFilterCount > 1 && (
-          <button
-            onClick={clearAllFilters}
-            className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
-          >
+          <Button variant="ghost" onClick={clearAllFilters}>
             Clear all
-          </button>
+          </Button>
         )}
 
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-auto">
-          <button
-            onClick={() => setViewMode("folders")}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
-              viewMode === "folders" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            <FolderClosed className="h-3 w-3" />
-            Folders
-          </button>
-          <button
-            onClick={() => setViewMode("all")}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
-              viewMode === "all" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            <List className="h-3 w-3" />
-            Show All
-          </button>
-        </div>
+        <SegmentedTabs
+          className="ml-auto"
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: "folders", label: "Folders", icon: FolderClosed },
+            { value: "all", label: "Show All", icon: List },
+          ]}
+        />
         <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
           {completedLoading
             ? "Loading completed briefs…"
@@ -871,21 +861,16 @@ export default function BriefsPage() {
           screen; this fits three times as many and the page becomes scannable.
           Cards also can't nest cleanly around the table that expands below. */}
       {viewMode === "folders" && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
+          {sortedBrandFolders.length > 0 && (
+          <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden divide-y divide-[var(--border-subtle)]">
           {sortedBrandFolders.map((folder) => {
             const isExpanded = expandedBrands.has(folder.brandId);
             // Only overdue is rendered now; open/done were for the removed bar.
             const { overdue: overdueCount } = folderCounts(folder.briefs);
 
             return (
-              <div
-                key={folder.brandId}
-                className={`rounded-lg border bg-white overflow-hidden transition-colors ${
-                  isExpanded
-                    ? "border-[var(--border-strong)]"
-                    : "border-[var(--border)]"
-                }`}
-              >
+              <div key={folder.brandId}>
                 {/* Folder Header */}
                 <div
                   className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors group"
@@ -903,7 +888,7 @@ export default function BriefsPage() {
                     style={{ backgroundColor: folder.brandColor }}
                     aria-hidden
                   />
-                  <span className="font-medium text-[13px] text-[var(--text-primary)] truncate">
+                  <span className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                     {folder.brandName}
                   </span>
 
@@ -918,12 +903,13 @@ export default function BriefsPage() {
 
                   <div className="ml-auto flex items-center gap-2 shrink-0">
                     {overdueCount > 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold text-[var(--danger)] bg-[var(--danger-dim)] tabular-nums">
+                      <Badge variant="danger" className="tabular-nums">
                         {overdueCount} overdue
-                      </span>
+                      </Badge>
                     )}
                     {isAdmin && (
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={(e) => {
                           e.stopPropagation();
                           openCreateModalForBrand(folder.brandId.startsWith("__") ? undefined : folder.brandId);
@@ -931,17 +917,17 @@ export default function BriefsPage() {
                         // Hidden until the row is hovered or focused: it's on
                         // every row, and 15 identical buttons compete with the
                         // brand names people are actually scanning for.
-                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--accent-admin-dim)] transition-all"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100"
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-3.5 w-3.5" />
                         New Brief
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
                 {/* Folder Body - Briefs Table */}
                 {isExpanded && (
-                  <div className="border-t border-[var(--border)] overflow-x-auto">
+                  <div className="border-t border-[var(--border-subtle)] overflow-x-auto [&_tbody>tr:last-child]:border-b-0">
                     <Table>
                       <TableHeader>
                         <TableHead>S.No</TableHead>
@@ -965,10 +951,10 @@ export default function BriefsPage() {
                             <TableRow
                               onClick={() => router.push(`/brief/${brief._id}`)}
                             >
-                              <TableCell>
+                              <TableCell className="tabular-nums text-[var(--text-muted)]">
                                 {index + 1}
                               </TableCell>
-                              <TableCell className="font-semibold">
+                              <TableCell className="font-medium">
                                 {brief.title}
                               </TableCell>
                               <TableCell className="hidden md:table-cell">
@@ -1023,14 +1009,10 @@ export default function BriefsPage() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                <span
-                                  className="font-medium text-[12px]"
-                                  style={{
-                                    color: STATUS_COLORS[brief.status] ?? "#6b7280",
-                                  }}
-                                >
-                                  {BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
-                                </span>
+                                <StatusBadge
+                                  color={BRIEF_STATUS_COLORS[brief.status] ?? BRIEF_STATUS_COLORS.draft}
+                                  label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                                />
                               </TableCell>
                               <TableCell className="hidden sm:table-cell">
                                 {(() => {
@@ -1040,13 +1022,10 @@ export default function BriefsPage() {
                                   const pct = b.progress ?? 0;
                                   return (
                                     <div className="flex items-center gap-2 min-w-[120px]">
-                                      <div className="w-20 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                                      <div className="w-20 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                                         <div
-                                          className="h-full rounded-full"
-                                          style={{
-                                            width: `${pct}%`,
-                                            backgroundColor: "#10b981",
-                                          }}
+                                          className="h-full rounded-full bg-[var(--accent-employee)]"
+                                          style={{ width: `${pct}%` }}
                                         />
                                       </div>
                                       <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
@@ -1063,8 +1042,9 @@ export default function BriefsPage() {
                                       e.stopPropagation();
                                       setDeletingBriefId(brief._id);
                                     }}
-                                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
+                                    className={`${ICON_BUTTON_CLASS} hover:text-[var(--danger)] hover:bg-[var(--danger-dim)]`}
                                     title="Delete brief"
+                                    aria-label="Delete brief"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </button>
@@ -1088,6 +1068,8 @@ export default function BriefsPage() {
               </div>
             );
           })}
+          </div>
+          )}
 
           {brandFolders.length === 0 && briefs !== undefined && !completedLoading && (
             <EmptyState
@@ -1102,12 +1084,12 @@ export default function BriefsPage() {
 
       {/* Show All View */}
       {viewMode === "all" && (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           {brandFolders.map((folder) => {
             let globalIndex = 0;
             return (
-              <div key={folder.brandId}>
-                <div className="flex items-center gap-2 mb-2 px-1">
+              <section key={folder.brandId} className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
+                <div className="flex items-center gap-2 h-11 px-4 border-b border-[var(--border-subtle)]">
                   {/* Brand dot, matching the folders view — the 3px left stripe
                       that used to sit here is the same accent-bar tell. */}
                   <span
@@ -1124,18 +1106,18 @@ export default function BriefsPage() {
                       title={`Open ${folder.brandName}`}
                     >
                       {folder.brandName}
-                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ExternalLink className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                   ) : (
                     <span className="font-semibold text-[15px] text-[var(--text-primary)]">
                       {folder.brandName}
                     </span>
                   )}
-                  <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                    ({folder.briefs.length} brief{folder.briefs.length !== 1 ? "s" : ""})
+                  <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
+                    {folder.briefs.length} brief{folder.briefs.length !== 1 ? "s" : ""}
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto [&_tbody>tr:last-child]:border-b-0">
                   <Table>
                     <TableHeader>
                       <TableHead className="w-8"></TableHead>
@@ -1172,8 +1154,10 @@ export default function BriefsPage() {
                                     e.stopPropagation();
                                     toggleBriefExpand(brief._id);
                                   }}
-                                  className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
+                                  className={`${ICON_BUTTON_CLASS} hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]`}
                                   title={isExpanded ? "Collapse" : "Expand"}
+                                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                                  aria-expanded={isExpanded}
                                 >
                                   {isExpanded ? (
                                     <ChevronDown className="h-3.5 w-3.5" />
@@ -1183,8 +1167,8 @@ export default function BriefsPage() {
                                 </button>
                               ) : null}
                             </TableCell>
-                            <TableCell>{globalIndex}</TableCell>
-                            <TableCell className="font-semibold">{brief.title}</TableCell>
+                            <TableCell className="tabular-nums text-[var(--text-muted)]">{globalIndex}</TableCell>
+                            <TableCell className="font-medium">{brief.title}</TableCell>
                             <TableCell className="hidden md:table-cell">
                               {(brief as { managerName?: string }).managerName ? (
                                 <Badge variant="manager">
@@ -1233,12 +1217,10 @@ export default function BriefsPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <span
-                                className="font-medium text-[12px]"
-                                style={{ color: STATUS_COLORS[brief.status] ?? "#6b7280" }}
-                              >
-                                {BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
-                              </span>
+                              <StatusBadge
+                                color={BRIEF_STATUS_COLORS[brief.status] ?? BRIEF_STATUS_COLORS.draft}
+                                label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                              />
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
                               {(() => {
@@ -1248,10 +1230,10 @@ export default function BriefsPage() {
                                 const pct = b.progress ?? 0;
                                 return (
                                   <div className="flex items-center gap-2 min-w-[120px]">
-                                    <div className="w-20 h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                                    <div className="w-20 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                                       <div
-                                        className="h-full rounded-full"
-                                        style={{ width: `${pct}%`, backgroundColor: "#10b981" }}
+                                        className="h-full rounded-full bg-[var(--accent-employee)]"
+                                        style={{ width: `${pct}%` }}
                                       />
                                     </div>
                                     <span className="text-[11px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
@@ -1268,8 +1250,9 @@ export default function BriefsPage() {
                                     e.stopPropagation();
                                     setDeletingBriefId(brief._id);
                                   }}
-                                  className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
+                                  className={`${ICON_BUTTON_CLASS} hover:text-[var(--danger)] hover:bg-[var(--danger-dim)]`}
                                   title="Delete brief"
+                                  aria-label="Delete brief"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </button>
@@ -1300,7 +1283,7 @@ export default function BriefsPage() {
                     </TableBody>
                   </Table>
                 </div>
-              </div>
+              </section>
             );
           })}
 
@@ -1322,27 +1305,16 @@ export default function BriefsPage() {
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               {/* Brief Mode Toggle */}
               <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Brief Mode</label>
-                <div className="flex gap-1 p-1 rounded-xl bg-[var(--bg-hover)]">
-                  <button
-                    type="button"
-                    onClick={() => setBriefMode("master")}
-                    className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
-                      briefMode === "master" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    Master Brief
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBriefMode("individual")}
-                    className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
-                      briefMode === "individual" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    Individual Task
-                  </button>
-                </div>
+                <label className={FIELD_LABEL_CLASS}>Brief mode</label>
+                <SegmentedTabs
+                  className="w-full [&>button]:flex-1 [&>button]:justify-center"
+                  value={briefMode}
+                  onChange={setBriefMode}
+                  options={[
+                    { value: "master", label: "Master Brief" },
+                    { value: "individual", label: "Individual Task" },
+                  ]}
+                />
               </div>
 
               <Input
@@ -1361,11 +1333,11 @@ export default function BriefsPage() {
 
               {briefMode === "master" && (
                 <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">Brief Type (optional)</label>
+                  <label className={FIELD_LABEL_CLASS}>Brief type (optional)</label>
                   <select
                     value={briefType}
                     onChange={(e) => setBriefType(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD_CLASS}
                   >
                     <option value="">No specific type</option>
                     <option value="developmental">Developmental</option>
@@ -1402,28 +1374,26 @@ export default function BriefsPage() {
                   has its own. */}
               {briefMode === "master" && briefType !== "content_calendar" && (
                 <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                  <label className={FIELD_LABEL_CLASS}>
                     Deadline (optional)
                   </label>
                   <DatePicker value={deadline} onChange={setDeadline} placeholder="Set deadline" />
                 </div>
               )}
               {briefMode === "master" && briefType === "content_calendar" && (
-                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)] px-3 py-2">
-                  <p className="text-[12px] text-[var(--text-secondary)]">
-                    Content Calendar briefs run month after month. Deadlines live on the individual entries inside, not on the brief itself.
-                  </p>
-                </div>
+                <p className="rounded-md bg-[var(--bg-primary)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+                  Content Calendar briefs run month after month. Deadlines live on the individual entries inside, not on the brief itself.
+                </p>
               )}
               <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                <label className={FIELD_LABEL_CLASS}>
                   Brand{briefMode === "individual" && itAddToCalendar ? " *" : ""}
                 </label>
                 <select
                   value={brandId}
                   onChange={(e) => { setBrandId(e.target.value); setManagerId(""); }}
                   required={briefMode === "individual" && itAddToCalendar}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD_CLASS}
                 >
                   <option value="">No brand</option>
                   {(brands ?? []).map((b: any) => (
@@ -1433,13 +1403,13 @@ export default function BriefsPage() {
               </div>
               {isAdmin && (
                 <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-                    {briefMode === "individual" ? "Assignor / Manager (optional)" : "Assign Manager (optional)"}
+                  <label className={FIELD_LABEL_CLASS}>
+                    {briefMode === "individual" ? "Assignor / manager (optional)" : "Assign manager (optional)"}
                   </label>
                   <select
                     value={managerId}
                     onChange={(e) => setManagerId(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD_CLASS}
                   >
                     <option value="">No manager</option>
                     {(managers ?? [])
@@ -1449,7 +1419,7 @@ export default function BriefsPage() {
                       ))}
                   </select>
                   {brandId && brandManagerIds && brandManagerIds.length === 0 && (
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1">No managers assigned to this brand yet.</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-1">No managers assigned to this brand yet.</p>
                   )}
                 </div>
               )}
@@ -1463,14 +1433,14 @@ export default function BriefsPage() {
                   className="h-4 w-4 rounded border-[var(--border)] accent-[var(--accent-admin)]"
                 />
                 <div>
-                  <span className="font-medium text-[13px] text-[var(--text-primary)]">Client Review Required</span>
-                  <p className="text-[11px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
+                  <span className="font-medium text-[13px] text-[var(--text-primary)]">Client review required</span>
+                  <p className="text-[12px] text-[var(--text-muted)]">Tasks will require client approval before marking complete</p>
                 </div>
               </label>
               )}
               {showCreativesRequiredField(briefMode, briefType) && (
                 <div>
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                  <label className={FIELD_LABEL_CLASS}>
                     Creatives required
                   </label>
                   <input
@@ -1489,9 +1459,9 @@ export default function BriefsPage() {
                         setCreativesRequired(1);
                       }
                     }}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={FIELD_CLASS}
                   />
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">
                     Designer sees separate deliverable slots (e.g. 4 creatives = 4). Shown for Designing and Copywriting only.
                   </p>
                 </div>
@@ -1500,7 +1470,7 @@ export default function BriefsPage() {
                 <Button type="submit" variant="primary" disabled={isSubmitting}>
                   {isSubmitting ? "Creating…" : "Create"}
                 </Button>
-                <Button type="button" variant="secondary" onClick={closeCreateModal}>Cancel</Button>
+                <Button type="button" variant="ghost" onClick={closeCreateModal}>Cancel</Button>
               </div>
             </form>
       </Modal>
@@ -1550,7 +1520,7 @@ function BriefSubRowsPanel({
 
   if (!data) {
     return (
-      <div className="px-6 py-3 bg-[var(--bg-primary)] text-[11px] text-[var(--text-muted)]">
+      <div className="px-6 py-3 bg-[var(--bg-primary)] text-[12px] text-[var(--text-muted)]">
         Loading…
       </div>
     );
@@ -1562,7 +1532,7 @@ function BriefSubRowsPanel({
 
   if (rootTasks.length === 0) {
     return (
-      <div className="px-6 py-3 bg-[var(--bg-primary)] text-[11px] text-[var(--text-muted)]">
+      <div className="px-6 py-3 bg-[var(--bg-primary)] text-[12px] text-[var(--text-muted)]">
         No {briefType === "content_calendar" ? "entries" : "tasks"} yet.
       </div>
     );
@@ -1613,16 +1583,16 @@ function BriefSubRowsPanel({
   }
 
   return (
-    <div className="bg-[var(--bg-primary)] border-l-2 border-[var(--accent-admin)]">
+    <div className="bg-[var(--bg-primary)]">
       {buckets.map((bucket) => (
         <div key={bucket.key}>
           {bucket.label && (
             <div className="px-6 py-1.5 bg-[var(--bg-hover)] border-y border-[var(--border-subtle)]">
-              <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+              <span className="text-[12px] font-medium text-[var(--text-muted)]">
                 {bucket.label}
               </span>
-              <span className="text-[11px] text-[var(--text-muted)] ml-2 tabular-nums">
-                ({bucket.tasks.length})
+              <span className="text-[12px] text-[var(--text-muted)] ml-2 tabular-nums">
+                {bucket.tasks.length}
               </span>
             </div>
           )}
@@ -1633,61 +1603,40 @@ function BriefSubRowsPanel({
               const dl = t.deadline;
               const taskOverdue =
                 dl && t.status !== "done" && dl < Date.now();
-              const statusColor =
-                t.status === "done"
-                  ? "#10b981"
-                  : t.status === "review"
-                    ? "#8b5cf6"
-                    : t.status === "in-progress"
-                      ? "#f59e0b"
-                      : t.status === "on-hold"
-                        ? "#ef4444"
-                        : "#6b7280";
+              const statusMeta = taskStatusMeta(t.status);
               return (
                 <div
                   key={t._id}
                   onClick={() => onOpen(t._id)}
                   className="flex items-center gap-3 px-6 py-2 hover:bg-[var(--bg-hover)] cursor-pointer text-[12px]"
                 >
-                  <span
-                    className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: statusColor }}
-                  />
                   <span className="flex-1 font-medium text-[var(--text-primary)] truncate">
                     {t.title}
                   </span>
                   {briefType === "content_calendar" && t.postDate && (
-                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                    <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
                       {new Date(t.postDate + "T00:00:00").toLocaleDateString(
                         "en-US",
                         { month: "short", day: "numeric" }
                       )}
                     </span>
                   )}
-                  <span className="text-[11px] text-[var(--text-secondary)] truncate max-w-[160px]">
+                  <span className="text-[12px] text-[var(--text-secondary)] truncate max-w-[160px]">
                     {assigneeName}
                   </span>
-                  <span
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium"
-                    style={{
-                      color: statusColor,
-                      backgroundColor: `${statusColor}15`,
-                    }}
-                  >
-                    {t.status === "done"
-                      ? briefType === "content_calendar"
+                  {/* A finished calendar entry reads "Completed"; every other
+                      label and dot colour comes from the lib. */}
+                  <StatusBadge
+                    className="w-[96px] shrink-0"
+                    color={statusMeta.dot}
+                    label={
+                      t.status === "done" && briefType === "content_calendar"
                         ? "Completed"
-                        : "Done"
-                      : t.status === "in-progress"
-                        ? "In Progress"
-                        : t.status === "on-hold"
-                          ? "On Hold"
-                          : t.status === "review"
-                            ? "Review"
-                            : "Pending"}
-                  </span>
+                        : statusMeta.label
+                    }
+                  />
                   <span
-                    className={`text-[11px] tabular-nums w-[80px] text-right ${
+                    className={`text-[12px] tabular-nums w-[80px] text-right ${
                       taskOverdue ? "text-[var(--danger)]" : "text-[var(--text-muted)]"
                     }`}
                   >
@@ -1780,13 +1729,13 @@ function IndividualTaskFields({
     <div className="flex flex-col gap-4">
       {/* Brief Type (optional) */}
       <div>
-        <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-          Task Type (optional)
+        <label className={FIELD_LABEL_CLASS}>
+          Task type (optional)
         </label>
         <select
           value={briefType}
           onChange={(e) => setBriefType(e.target.value)}
-          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          className={FIELD_CLASS}
         >
           <option value="">No specific type</option>
           <option value="developmental">Developmental</option>
@@ -1800,9 +1749,9 @@ function IndividualTaskFields({
       {/* Team Blocks */}
       <div className="flex flex-col gap-3">
         <label className="font-medium text-[13px] text-[var(--text-secondary)] block">
-          Team Assignment{isMultiTeam ? "s" : ""}
+          Team assignment{isMultiTeam ? "s" : ""}
           {isMultiTeam && (
-            <span className="ml-2 text-[11px] font-normal text-[var(--text-muted)]">
+            <span className="ml-2 text-[12px] font-normal text-[var(--text-muted)]">
               (Sequential handoff: first team → next team)
             </span>
           )}
@@ -1820,28 +1769,24 @@ function IndividualTaskFields({
           />
         ))}
 
-        <button
-          type="button"
-          onClick={addTeamBlock}
-          className="self-start inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all"
-        >
-          <Plus className="h-3 w-3" />
+        <Button type="button" variant="secondary" onClick={addTeamBlock} className="self-start">
+          <Plus className="h-3.5 w-3.5" />
           Add another team
-        </button>
+        </Button>
       </div>
 
       {/* Single-team deadline */}
       {!isMultiTeam && (
         <div>
-          <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-            Task Deadline (optional)
+          <label className={FIELD_LABEL_CLASS}>
+            Task deadline (optional)
           </label>
           <DatePicker
             value={singleTaskDeadline}
             onChange={setSingleTaskDeadline}
             placeholder="Set task deadline"
           />
-          <p className="text-[11px] text-[var(--text-muted)] mt-1">
+          <p className="text-[12px] text-[var(--text-muted)] mt-1">
             If you set a per-team deadline above, it takes priority over this.
           </p>
         </div>
@@ -1851,15 +1796,15 @@ function IndividualTaskFields({
       {isMultiTeam && (
         <>
           <div>
-            <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
-              Combined / Overall Deadline (optional)
+            <label className={FIELD_LABEL_CLASS}>
+              Combined / overall deadline (optional)
             </label>
             <DatePicker
               value={itOverallDeadline}
               onChange={setItOverallDeadline}
               placeholder="Overall deadline for the full task"
             />
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
               Used as fallback for any team block without its own deadline.
             </p>
           </div>
@@ -1875,34 +1820,34 @@ function IndividualTaskFields({
               <span className="font-medium text-[13px] text-[var(--text-primary)]">
                 Add to content calendar
               </span>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-[12px] text-[var(--text-muted)]">
                 Adds this task as a calendar entry under the brand&apos;s Content Calendar brief.
               </p>
             </div>
           </label>
 
           {itAddToCalendar && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-[var(--bg-hover)] border border-[var(--border-subtle)]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-[var(--bg-primary)]">
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1.5">
+                <label className={FIELD_LABEL_CLASS}>
                   Month
                 </label>
                 <input
                   type="month"
                   value={itCalMonth}
                   onChange={(e) => setItCalMonth(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD_CLASS}
                 />
               </div>
               <div>
-                <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1.5">
-                  Go-Live Date
+                <label className={FIELD_LABEL_CLASS}>
+                  Go-live date
                 </label>
                 <input
                   type="date"
                   value={itCalGoLiveDate}
                   onChange={(e) => setItCalGoLiveDate(e.target.value)}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  className={FIELD_CLASS}
                 />
               </div>
             </div>
@@ -1937,17 +1882,18 @@ function TeamBlockRow({
   );
 
   return (
-    <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col gap-2.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+    <div className="p-3 rounded-lg border border-[var(--border)] bg-white flex flex-col gap-2.5">
+      <div className="flex items-center justify-between min-h-8">
+        <span className="text-[12px] font-medium text-[var(--text-muted)]">
           {isMultiTeam ? `Step ${index + 1}` : "Team"}
         </span>
         {onRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
             title="Remove team block"
+            aria-label="Remove team block"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -1955,7 +1901,7 @@ function TeamBlockRow({
       </div>
 
       <div>
-        <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1.5">
+        <label className={FIELD_LABEL_CLASS}>
           Team
         </label>
         <select
@@ -1964,7 +1910,7 @@ function TeamBlockRow({
             // Clear assignee when team changes
             onChange({ teamId: e.target.value, assigneeId: "" });
           }}
-          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          className={FIELD_CLASS}
         >
           <option value="">Select team</option>
           {allTeams.map((t) => (
@@ -1976,14 +1922,14 @@ function TeamBlockRow({
       </div>
 
       <div>
-        <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1.5">
+        <label className={FIELD_LABEL_CLASS}>
           Assignee
         </label>
         <select
           value={block.assigneeId}
           onChange={(e) => onChange({ assigneeId: e.target.value })}
           disabled={!block.teamId}
-          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] disabled:opacity-60 disabled:cursor-not-allowed"
+          className={`${FIELD_CLASS} disabled:opacity-60 disabled:cursor-not-allowed`}
         >
           <option value="">
             {!block.teamId
@@ -2003,7 +1949,7 @@ function TeamBlockRow({
       </div>
 
       <div>
-        <label className="font-medium text-[12px] text-[var(--text-secondary)] block mb-1.5">
+        <label className={FIELD_LABEL_CLASS}>
           Deadline {isMultiTeam && <span className="text-[var(--text-muted)] font-normal">(for this step)</span>}
         </label>
         <DatePicker

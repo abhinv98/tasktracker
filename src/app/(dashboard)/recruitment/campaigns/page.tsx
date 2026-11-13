@@ -4,7 +4,10 @@ import { useQuery } from "convex/react";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import {
+  Badge,
+  EmptyState,
   PageHeader,
+  Panel,
   SkeletonPageHeader,
   SkeletonList,
 } from "@/components/ui";
@@ -36,23 +39,17 @@ export default function RecruitmentCampaignsPage() {
     return (
       <Link
         href={`/recruitment/campaigns/${c._id}`}
-        className="group flex items-center gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors"
+        className="group flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-primary)] transition-colors focus-visible:outline-offset-[-2px]"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-[13px] text-[var(--text-primary)]">
+            <span className="font-medium text-[14px] text-[var(--text-primary)]">
               {c.name || "Untitled campaign"}
             </span>
-            <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
-              {c.jobName}
-            </span>
-            {c.source === "manual" && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]">
-                Manual
-              </span>
-            )}
+            <Badge>{c.jobName}</Badge>
+            {c.source === "manual" && <Badge>Manual</Badge>}
           </div>
-          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+          <p className="mt-0.5 text-[12px] tabular-nums text-[var(--text-muted)]">
             Started {fmt(c.startDate)}
             {c.endDate ? ` · closed ${fmt(c.endDate)}` : ""}
           </p>
@@ -62,14 +59,14 @@ export default function RecruitmentCampaignsPage() {
             {c.memberCount} {c.memberCount === 1 ? "person" : "people"}
           </span>
           {c.sent > 0 && (
-            <span className="text-[var(--accent-employee-text)]">{c.sent} sent</span>
+            <span className="text-[var(--text-secondary)]">{c.sent} sent</span>
           )}
           {c.failed > 0 && (
             <span className="text-[var(--danger)]">{c.failed} failed</span>
           )}
           <ChevronRight
             size={15}
-            className="text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] group-hover:translate-x-0.5 transition-all"
+            className="text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]"
           />
         </div>
       </Link>
@@ -93,37 +90,26 @@ export default function RecruitmentCampaignsPage() {
       />
 
       {campaigns.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Megaphone size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            No campaigns yet
-          </p>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1 max-w-[380px]">
-            Open a position, tick the candidates you want, and choose
-            “Add to campaign”. You can mail the whole group from here afterwards.
-          </p>
-        </div>
+        <EmptyState
+          icon={Megaphone}
+          title="No campaigns yet"
+          description="Open a position, tick the candidates you want, and choose “Add to campaign”. You can mail the whole group from here afterwards."
+        />
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {open.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Open
-              </h2>
-              <div className="flex flex-col gap-2">
+            <Panel title="Open" count={open.length}>
+              <div className="flex flex-col divide-y divide-[var(--border-subtle)]">
                 {open.map((c) => <Row key={c._id} c={c} />)}
               </div>
-            </section>
+            </Panel>
           )}
           {closed.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Closed
-              </h2>
-              <div className="flex flex-col gap-2 opacity-70">
+            <Panel title="Closed" count={closed.length}>
+              <div className="flex flex-col divide-y divide-[var(--border-subtle)] opacity-70">
                 {closed.map((c) => <Row key={c._id} c={c} />)}
               </div>
-            </section>
+            </Panel>
           )}
         </div>
       )}

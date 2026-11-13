@@ -13,7 +13,6 @@ import {
   Bot,
   User,
   FileText,
-  Sparkles,
   ChevronDown,
   ChevronRight,
   Wrench,
@@ -49,23 +48,21 @@ function renderSpecialBlocks(text: string): React.ReactNode[] | null {
     const messageLines = afterRole.split("\n").filter((l) => l.trim());
 
     blocks.push(
-      <div key="access-block" className="rounded-lg border border-amber-200 bg-amber-50 p-3 my-1">
+      <div key="access-block" className="rounded-md bg-[var(--danger-dim)] px-3 py-2 my-1">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
-            <ShieldAlert className="h-4 w-4 text-amber-600" />
-          </div>
-          <span className="font-semibold text-[13px] text-amber-800">Access Restricted</span>
+          <ShieldAlert className="h-4 w-4 text-[var(--danger)]" />
+          <span className="font-medium text-[13px] text-[var(--danger)]">Access Restricted</span>
         </div>
-        <div className="flex items-center gap-2 mb-2 px-1">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-100/80 text-[11px] font-medium text-amber-700">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 px-1.5 py-px rounded bg-white/70 text-[11px] leading-[16px] font-medium text-[var(--text-secondary)]">
             <User className="h-3 w-3" />
             {userName}
           </div>
-          <div className="px-2 py-1 rounded-md bg-amber-100/80 text-[11px] font-medium text-amber-700 capitalize">
+          <div className="px-1.5 py-px rounded bg-white/70 text-[11px] leading-[16px] font-medium text-[var(--text-secondary)] capitalize">
             {userRole}
           </div>
         </div>
-        <div className="text-[12px] text-amber-700 leading-relaxed space-y-1 px-1">
+        <div className="text-[12px] text-[var(--text-primary)] leading-relaxed space-y-1">
           {messageLines.map((line, i) => (
             <p key={i}>{line}</p>
           ))}
@@ -349,7 +346,7 @@ function ConversationList({
       <div className="px-3 pt-3 pb-2">
         <button
           onClick={onNew}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] hover:border-[var(--accent-admin)] transition-all"
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-md border border-dashed border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
         >
           <Plus className="h-4 w-4" />
           New chat
@@ -360,11 +357,9 @@ function ConversationList({
       <div className="flex-1 overflow-y-auto px-3 pb-3">
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <div className="w-10 h-10 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-3">
-              <MessageSquare className="h-5 w-5 text-[var(--text-muted)]" />
-            </div>
-            <p className="text-[13px] text-[var(--text-muted)] mb-1">No conversations yet</p>
-            <p className="text-[11px] text-[var(--text-disabled)]">
+            <MessageSquare className="h-8 w-8 text-[var(--text-muted)] mb-3" aria-hidden />
+            <p className="text-[14px] font-medium text-[var(--text-primary)] mb-1">No conversations yet</p>
+            <p className="text-[12px] text-[var(--text-muted)]">
               Start a new chat to begin
             </p>
           </div>
@@ -373,7 +368,7 @@ function ConversationList({
             {conversations.map((convo) => (
               <div
                 key={convo._id}
-                className="group relative rounded-lg border border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-hover)] transition-all"
+                className="group relative rounded-md hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {renaming === convo._id ? (
                   <form
@@ -396,7 +391,7 @@ function ConversationList({
                         }
                         setRenaming(null);
                       }}
-                      className="flex-1 text-[13px] px-1.5 py-0.5 rounded border border-[var(--accent-admin)] focus:outline-none bg-white"
+                      className="flex-1 text-[13px] px-1.5 py-0.5 rounded-md border border-[var(--border-strong)] focus:outline-none bg-white"
                     />
                   </form>
                 ) : (
@@ -410,8 +405,8 @@ function ConversationList({
                         {convo.title}
                       </p>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <Clock className="h-3 w-3 text-[var(--text-disabled)]" />
-                        <span className="text-[11px] text-[var(--text-disabled)]">
+                        <Clock className="h-3 w-3 text-[var(--text-muted)]" />
+                        <span className="text-[12px] text-[var(--text-muted)]">
                           {timeAgo(convo.updatedAt)}
                         </span>
                       </div>
@@ -421,20 +416,27 @@ function ConversationList({
 
                 {/* Context menu trigger */}
                 {renaming !== convo._id && (
-                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div
+                    className={`absolute right-2 top-1.5 transition-opacity ${
+                      menuOpen === convo._id
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                    }`}
+                  >
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setMenuOpen(menuOpen === convo._id ? null : convo._id);
                       }}
-                      className="p-1 rounded hover:bg-[var(--bg-secondary)] text-[var(--text-muted)]"
+                      aria-label="Conversation options"
+                      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white transition-colors"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
 
                     {/* Dropdown */}
                     {menuOpen === convo._id && (
-                      <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-[var(--border)] rounded-lg shadow-lg z-10 py-1 animate-[scaleIn_0.1s_ease-out]">
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-[var(--border)] rounded-lg shadow-lg z-20 py-1 animate-[scaleIn_0.1s_ease-out]">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -442,9 +444,9 @@ function ConversationList({
                             setRenaming(convo._id);
                             setMenuOpen(null);
                           }}
-                          className="w-full text-left px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] flex items-center gap-2"
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
                         >
-                          <Pencil className="h-3 w-3" /> Rename
+                          <Pencil className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Rename
                         </button>
                         <button
                           onClick={(e) => {
@@ -452,9 +454,9 @@ function ConversationList({
                             setMenuOpen(null);
                             onDelete(convo._id);
                           }}
-                          className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-red-50 flex items-center gap-2"
+                          className="w-full text-left px-3 py-1.5 text-[13px] text-[var(--danger)] hover:bg-[var(--danger-dim)] flex items-center gap-2 transition-colors"
                         >
-                          <Trash2 className="h-3 w-3" /> Delete
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
                         </button>
                       </div>
                     )}
@@ -610,14 +612,15 @@ function ChatView({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Sub-header with back button and convo title */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/50 shrink-0">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--border-subtle)] shrink-0">
         <button
           onClick={onBack}
-          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Back to conversations"
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <span className="text-[12px] font-medium text-[var(--text-secondary)] truncate flex-1">
+        <span className="text-[13px] font-medium text-[var(--text-primary)] truncate flex-1">
           {convoTitle}
         </span>
       </div>
@@ -626,10 +629,8 @@ function ChatView({
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {allMessages.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
-            <div className="w-12 h-12 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-3">
-              <Bot className="h-6 w-6 text-[var(--text-muted)]" />
-            </div>
-            <p className="text-[15px] font-medium text-[var(--text-primary)] mb-1">
+            <Bot className="h-8 w-8 text-[var(--text-muted)] mb-3" aria-hidden />
+            <p className="text-[14px] font-medium text-[var(--text-primary)] mb-1">
               How can I help?
             </p>
             <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
@@ -648,7 +649,7 @@ function ChatView({
                     setMessage(suggestion);
                     inputRef.current?.focus();
                   }}
-                  className="text-left px-3 py-2 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+                  className="text-left px-3 py-2 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   {suggestion}
                 </button>
@@ -676,7 +677,7 @@ function ChatView({
               )}
             </div>
             <div
-              className={`max-w-[80%] rounded-xl px-3.5 py-2.5 ${
+              className={`max-w-[80%] rounded-lg px-3.5 py-2.5 ${
                 msg.role === "user"
                   ? "bg-[var(--accent-admin-strong)] text-white"
                   : "bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
@@ -702,9 +703,9 @@ function ChatView({
             <div className="shrink-0 w-7 h-7 rounded-full bg-[var(--bg-hover)] flex items-center justify-center">
               <Bot className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             </div>
-            <div className="bg-[var(--bg-secondary)] rounded-xl px-4 py-3 border border-[var(--border-subtle)]">
+            <div className="bg-[var(--bg-secondary)] rounded-lg px-4 py-3 border border-[var(--border-subtle)]">
               <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-admin-text)]" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span>Thinking...</span>
               </div>
             </div>
@@ -716,14 +717,15 @@ function ChatView({
 
       {/* Pending file indicator */}
       {pendingFile && (
-        <div className="mx-4 mb-2 px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center gap-2">
-          <FileText className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0" />
+        <div className="mx-4 mb-2 pl-3 pr-1 py-1 rounded-md bg-[var(--bg-primary)] flex items-center gap-2">
+          <FileText className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
           <span className="text-[12px] text-[var(--text-secondary)] truncate flex-1">
             {pendingFile.name}
           </span>
           <button
             onClick={() => setPendingFile(null)}
-            className="text-[var(--text-muted)] hover:text-red-500 transition-colors"
+            aria-label="Remove file"
+            className="inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -731,7 +733,7 @@ function ChatView({
       )}
 
       {/* Input area */}
-      <div className="border-t border-[var(--border)] px-4 py-3 shrink-0">
+      <div className="border-t border-[var(--border-subtle)] px-4 py-3 shrink-0">
         <div className="flex items-end gap-2">
           <input
             ref={fileInputRef}
@@ -743,8 +745,9 @@ function ChatView({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="shrink-0 p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
             title="Attach file"
+            aria-label="Attach file"
           >
             {isUploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -760,7 +763,7 @@ function ChatView({
             onKeyDown={handleKeyDown}
             placeholder="Ask anything..."
             rows={1}
-            className="flex-1 resize-none rounded-lg border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white max-h-[120px]"
+            className="flex-1 resize-none rounded-md border border-[var(--border)] px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white max-h-[120px]"
             style={{ minHeight: "38px" }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
@@ -772,8 +775,9 @@ function ChatView({
           <button
             onClick={handleSend}
             disabled={isLoading || (!message.trim() && !pendingFile)}
-            className="shrink-0 p-2 rounded-lg bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-8 w-8 rounded-md bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             title="Send message"
+            aria-label="Send message"
           >
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -848,21 +852,17 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-white" />
-            </div>
-            <span className="font-semibold text-[15px] text-[var(--text-primary)]">
-              AI Assistant
-            </span>
-          </div>
+          <span className="font-semibold text-[15px] text-[var(--text-primary)]">
+            AI Assistant
+          </span>
           <div className="flex items-center gap-1">
             {activeConversationId && (
               <button
                 onClick={handleNewChat}
                 disabled={isCreating}
-                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
                 title="New chat"
+                aria-label="New chat"
               >
                 {isCreating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -873,7 +873,8 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              aria-label="Close"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <X className="h-4 w-4" />
             </button>

@@ -137,34 +137,38 @@ export default function TeamsPanel() {
 
   return (
     <div>
-      <div className="flex justify-end mb-5">
+      <div className="flex justify-end mb-4">
         <Button variant="primary" onClick={() => setShowModal(true)}>
           Create Team
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {teams?.map((team) => (
           <Card
             key={team._id}
             hover
             onClick={() => openPanel(team._id)}
-            className={`border-l-4 transition-all duration-150 ${
+            className={`transition-all duration-150 ${
               selectedTeamId === team._id
                 ? "ring-2 ring-[var(--accent-admin)] ring-offset-1"
                 : ""
             }`}
-            style={{ borderLeftColor: team.color }}
           >
             <div className="flex justify-between items-start">
-              <div>
-                <h3 className="font-semibold text-[var(--text-primary)]">
-                  {team.name}
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-2 font-medium text-[14px] text-[var(--text-primary)]">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: team.color }}
+                    aria-hidden
+                  />
+                  <span className="truncate">{team.name}</span>
                 </h3>
-                <p className="text-sm text-[var(--text-secondary)] mt-1">
+                <p className="text-[12px] text-[var(--text-secondary)] mt-1">
                   Lead: {team.leadName}
                 </p>
-                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                <p className="text-[12px] tabular-nums text-[var(--text-muted)] mt-0.5">
                   {team.memberCount} members
                 </p>
               </div>
@@ -175,9 +179,9 @@ export default function TeamsPanel() {
 
       {/* ─── Create Team Modal ─── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <h2 className="font-semibold text-[20px] text-[var(--text-primary)] mb-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md shadow-lg">
+            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-4">
               Create Team
             </h2>
             <form onSubmit={handleCreateTeam} className="flex flex-col gap-4">
@@ -200,7 +204,7 @@ export default function TeamsPanel() {
                 placeholder="Select manager"
               />
               <div>
-                <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-2">
+                <label className="font-medium text-[12px] text-[var(--text-muted)] block mb-2">
                   Color
                 </label>
                 <div className="flex gap-2">
@@ -209,6 +213,8 @@ export default function TeamsPanel() {
                       key={c}
                       type="button"
                       onClick={() => setColor(c)}
+                      aria-label={`Use colour ${c}`}
+                      aria-pressed={color === c}
                       className={`w-8 h-8 rounded-full border-2 transition-colors ${
                         color === c ? "border-[var(--text-primary)]" : "border-transparent"
                       }`}
@@ -221,7 +227,7 @@ export default function TeamsPanel() {
                 <Button type="submit" variant="primary">
                   Create
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>
                   Cancel
                 </Button>
               </div>
@@ -233,7 +239,7 @@ export default function TeamsPanel() {
       {/* ─── Slide-in Panel Backdrop ─── */}
       {selectedTeamId && (
         <div
-          className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px] transition-opacity duration-300 ${
+          className={`fixed inset-0 z-40 bg-black/20 transition-opacity duration-300 ${
             panelOpen ? "opacity-100" : "opacity-0"
           }`}
           onClick={closePanel}
@@ -252,15 +258,15 @@ export default function TeamsPanel() {
             ${panelOpen ? "translate-x-0" : "translate-x-full"}
           `}
         >
-          <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2.5 min-w-0">
               {selectedTeam && (
                 <span
-                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: selectedTeam.color }}
                 />
               )}
-              <h2 className="font-semibold text-[20px] text-[var(--text-primary)] truncate">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
                 {selectedTeam?.name ?? "Loading..."}
               </h2>
             </div>
@@ -268,17 +274,19 @@ export default function TeamsPanel() {
               {isAdmin && (
                 <button
                   onClick={() => setConfirmDeleteTeam(true)}
-                  className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-[var(--text-secondary)] hover:text-[var(--danger)]"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   title="Delete team"
+                  aria-label="Delete team"
                 >
                   <Trash2 size={16} />
                 </button>
               )}
               <button
                 onClick={closePanel}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                aria-label="Close"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
           </div>
@@ -288,10 +296,10 @@ export default function TeamsPanel() {
               <div className="flex flex-col gap-6">
                 {selectedTeam.description && (
                   <div>
-                    <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                       Description
                     </p>
-                    <p className="text-[15px] text-[var(--text-primary)] leading-relaxed">
+                    <p className="text-[13px] text-[var(--text-primary)] leading-relaxed">
                       {selectedTeam.description}
                     </p>
                   </div>
@@ -299,27 +307,27 @@ export default function TeamsPanel() {
 
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                       Lead
                     </p>
                     {isAdmin ? (
                       <select
                         value={selectedTeam.leadId}
                         onChange={(e) => handleChangeTeamLead(e.target.value as Id<"users">)}
-                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2.5 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                       >
                         {leadOptions.map((opt) => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
                     ) : (
-                      <p className="text-[15px] text-[var(--text-primary)] font-medium">
+                      <p className="text-[13px] text-[var(--text-primary)] font-medium">
                         {selectedTeam.leadName}
                       </p>
                     )}
                   </div>
                   <div>
-                    <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-1.5">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
                       Color
                     </p>
                     <div className="flex items-center gap-2">
@@ -334,11 +342,11 @@ export default function TeamsPanel() {
                   </div>
                 </div>
 
-                <hr className="border-[var(--border)]" />
+                <hr className="border-[var(--border-subtle)]" />
 
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                    <p className="text-[12px] font-medium text-[var(--text-muted)]">
                       Members
                     </p>
                     <Badge variant="neutral">
@@ -347,32 +355,32 @@ export default function TeamsPanel() {
                   </div>
 
                   {!teamMembers ? (
-                    <div className="py-4 text-center text-[13px] text-[var(--text-secondary)]">
+                    <div className="py-4 text-[13px] text-[var(--text-muted)]">
                       Loading members...
                     </div>
                   ) : teamMembers.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <p className="text-[13px] text-[var(--text-secondary)]">
+                    <div className="py-4">
+                      <p className="text-[13px] text-[var(--text-muted)]">
                         No members yet
                       </p>
                       {isAdmin && (
-                        <p className="text-[12px] text-[var(--text-secondary)] mt-1">
+                        <p className="text-[12px] text-[var(--text-muted)] mt-1">
                           Use the form below to add members
                         </p>
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col divide-y divide-[var(--border-subtle)] -mx-3">
                       {teamMembers.filter((m): m is NonNullable<typeof m> => !!m).map((member) => (
                         <div
                           key={member._id}
-                          className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors group"
+                          className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[var(--bg-primary)] transition-colors group"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">
+                            <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">
                               {member.name ?? "Unnamed"}
                             </p>
-                            <p className="text-[12px] text-[var(--text-secondary)] truncate">
+                            <p className="text-[12px] text-[var(--text-muted)] truncate">
                               {member.email ?? "-"}
                             </p>
                           </div>
@@ -389,8 +397,9 @@ export default function TeamsPanel() {
                             {isAdmin && (
                               <button
                                 onClick={() => setRemovingMemberId(member._id)}
-                                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 text-[var(--text-secondary)] hover:text-[var(--danger)] transition-all"
+                                className="inline-flex items-center justify-center h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-all"
                                 title="Remove from team"
+                                aria-label="Remove from team"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -404,13 +413,13 @@ export default function TeamsPanel() {
 
                 {isAdmin && (
                   <>
-                    <hr className="border-[var(--border)]" />
+                    <hr className="border-[var(--border-subtle)]" />
                     <div>
-                      <p className="text-[12px] font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                        Add Member
+                      <p className="text-[12px] font-medium text-[var(--text-muted)] mb-2">
+                        Add member
                       </p>
                       {addMemberOptions.length === 0 ? (
-                        <p className="text-[13px] text-[var(--text-secondary)]">
+                        <p className="text-[13px] text-[var(--text-muted)]">
                           All users are already in this team
                         </p>
                       ) : (

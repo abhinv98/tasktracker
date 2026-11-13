@@ -9,8 +9,10 @@ import { Id } from "@/convex/_generated/dataModel";
 import {
   PageHeader,
   Button,
+  EmptyState,
   Modal,
   Input,
+  SegmentedTabs,
   Select,
   Textarea,
   StatusBadge,
@@ -239,39 +241,30 @@ export default function RecruitmentJobPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Name, email, phone…"
-            className="w-[240px] bg-[var(--bg-input)] border border-[var(--border)] rounded-lg pl-8 pr-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            className="w-[240px] bg-[var(--bg-input)] border border-[var(--border)] rounded-md pl-8 pr-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           />
         </div>
-        <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] flex-wrap">
-          {/* "In play" first and selected by default — the closed-out majority
-              is history, and opening a position to 1,437 rejected+applied rows
-              buries the handful actually moving. */}
-          {[{ value: "open", label: "In play" }, { value: "", label: "All" }, ...STAGES].map((t) => (
-            <button
-              key={t.value || "all"}
-              onClick={() => setStage(t.value as Stage | "" | "open")}
-              className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-                stage === t.value
-                  ? "bg-white shadow-sm text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {/* "In play" first and selected by default — the closed-out majority
+            is history, and opening a position to 1,437 rejected+applied rows
+            buries the handful actually moving. */}
+        <SegmentedTabs<Stage | "" | "open">
+          value={stage}
+          options={[{ value: "open", label: "In play" }, { value: "", label: "All" }, ...STAGES]}
+          onChange={setStage}
+          className="flex-wrap"
+        />
       </div>
 
       {/* Batch bar. One primary action, a status menu, one secondary, one
           destructive icon — six competing buttons was the old version. */}
       {selected.size > 0 && (
-        <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent-admin)] bg-white px-3 py-2 shadow-sm">
-          <span className="text-[12px] font-medium text-[var(--text-primary)]">
+        <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 shadow-sm">
+          <span className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">
             {selected.size} selected
           </span>
           <button
             onClick={() => setSelected(new Set())}
-            className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline"
+            className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
           >
             Clear
           </button>
@@ -288,7 +281,7 @@ export default function RecruitmentJobPage() {
               value=""
               onChange={(e) => e.target.value && applyStage(e.target.value as Stage)}
               aria-label="Move to stage"
-              className="bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+              className="bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[13px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             >
               <option value="">Move to…</option>
               {STAGES.map((t) => (
@@ -298,7 +291,7 @@ export default function RecruitmentJobPage() {
             <button
               onClick={() => setConfirmDelete(true)}
               aria-label="Delete selected"
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
             >
               <Trash2 size={15} />
             </button>
@@ -307,19 +300,14 @@ export default function RecruitmentJobPage() {
       )}
 
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <UserSearch size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            No candidates match
-          </p>
-        </div>
+        <EmptyState icon={UserSearch} title="No candidates match" />
       ) : (
         <>
-          <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+          <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
                     <th className="px-3 py-2 w-8">
                       <input
                         type="checkbox"
@@ -328,7 +316,7 @@ export default function RecruitmentJobPage() {
                           setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.c._id)))
                         }
                         aria-label="Select all shown"
-                        className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                        className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
                       />
                     </th>
                     {COLUMNS.map((col, i) => {
@@ -336,7 +324,7 @@ export default function RecruitmentJobPage() {
                       return (
                         <th
                           key={col.label || i}
-                          className={`${col.cls} px-3 py-2 font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap ${
+                          className={`${col.cls} h-8 px-3 font-medium text-[12px] text-[var(--text-muted)] whitespace-nowrap ${
                             col.align === "right" ? "text-right" : "text-left"
                           }`}
                         >
@@ -355,7 +343,7 @@ export default function RecruitmentJobPage() {
                             >
                               {col.label}
                               {active &&
-                                (sort.dir === 1 ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+                                (sort.dir === 1 ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
                             </button>
                           ) : (
                             col.label
@@ -373,7 +361,7 @@ export default function RecruitmentJobPage() {
                       <tr
                         key={c._id}
                         className={`border-b border-[var(--border-subtle)] transition-colors ${
-                          highlight === c._id ? "bg-[var(--accent-admin-dim)]" : "hover:bg-[var(--bg-hover)]"
+                          highlight === c._id ? "bg-[var(--accent-admin-dim)]" : "hover:bg-[var(--bg-primary)]"
                         }`}
                       >
                         <td className="px-3 py-2">
@@ -382,7 +370,7 @@ export default function RecruitmentJobPage() {
                             checked={selected.has(c._id)}
                             onChange={() => toggle(c._id)}
                             aria-label={`Select ${c.name}`}
-                            className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                            className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -395,61 +383,61 @@ export default function RecruitmentJobPage() {
                           <button
                             onClick={() => setOpenId(c._id)}
                             title={c.name}
-                            className="block max-w-[200px] truncate text-left text-[13px] font-medium text-[var(--text-primary)] hover:text-[var(--accent-admin-text)] hover:underline"
+                            className="block max-w-[200px] truncate text-left text-[13px] font-medium text-[var(--text-primary)] hover:underline underline-offset-2"
                           >
                             {c.name}
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-[12px]">
+                        <td className="px-3 py-2 text-[13px]">
                           {c.email ? (
                             <a
                               href={`mailto:${c.email}`}
                               title={c.email}
-                              className="block max-w-[220px] truncate text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] hover:underline"
+                              className="block max-w-[220px] truncate text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline underline-offset-2"
                             >
                               {c.email}
                             </a>
                           ) : dash}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
                           {c.number || dash}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)]">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)]">
                           {/* Blank position = the old form recorded no sub-position,
                               so they applied for the job itself. */}
                           <div className="max-w-[160px] truncate" title={c.position || job?.name || ""}>
                             {c.position || job?.name || dash}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
                           {years == null ? dash : formatYears(years)}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
                           {current == null ? dash : formatLpa(current)}
                         </td>
-                        <td className="px-3 py-2 text-[12px] font-medium text-[var(--text-primary)] tabular-nums text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-primary)] tabular-nums text-right whitespace-nowrap">
                           {expected == null ? dash : formatLpa(expected)}
                         </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
                           {notice == null ? dash : formatNotice(notice)}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <StatusBadge color={meta.color} label={meta.label} />
                         </td>
-                        <td className="px-3 py-2 text-[11px] text-[var(--text-muted)] tabular-nums text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-[12px] text-[var(--text-muted)] tabular-nums text-right whitespace-nowrap">
                           {fmt(c.createdAt) || dash}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             {c.resume && (
-                              <a href={c.resume} target="_blank" rel="noreferrer" title="Open résumé"
-                                className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                              <a href={c.resume} target="_blank" rel="noreferrer" title="Open résumé" aria-label="Open résumé"
+                                className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                                 <FileText size={14} />
                               </a>
                             )}
                             {c.portfolioLink && (
-                              <a href={c.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio"
-                                className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                              <a href={c.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio" aria-label="Open portfolio"
+                                className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                                 <ExternalLink size={14} />
                               </a>
                             )}
@@ -464,7 +452,7 @@ export default function RecruitmentJobPage() {
           </div>
 
           {undatedCount > 0 && (
-            <p className="mt-3 text-[11px] text-[var(--text-muted)]">
+            <p className="mt-3 text-[12px] text-[var(--text-muted)]">
               {undatedCount} of these {candidates.length} came through the older
               application form, which didn&apos;t record a date or salary details.
             </p>
@@ -480,7 +468,7 @@ export default function RecruitmentJobPage() {
         icon={Mail}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setMailOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setMailOpen(false)}>Cancel</Button>
             <Button loading={busy} disabled={!templateId} onClick={handleSend}>Send now</Button>
           </>
         }
@@ -508,7 +496,7 @@ export default function RecruitmentJobPage() {
         icon={Megaphone}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setCampOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setCampOpen(false)}>Cancel</Button>
             <Button
               loading={busy}
               disabled={campTarget === "new" && !campName.trim()}

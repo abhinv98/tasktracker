@@ -9,6 +9,9 @@ import { AttachmentList } from "./AttachmentList";
 import { CommentThread } from "../comments/CommentThread";
 import { DatePicker } from "./DatePicker";
 import { useToast } from "./Toast";
+import { Badge, StatusBadge } from "./Badge";
+import { Button } from "./Button";
+import { SectionHeader } from "./StatTile";
 import {
   X,
   Clock,
@@ -34,14 +37,15 @@ import {
   Play,
   RotateCcw,
   Lock,
-  Pause,
   CheckCircle2,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { ConfirmModal } from "./ConfirmModal";
 import { TaskTimeSection } from "./TaskTimeSection";
-import { isTaskOverdue } from "@/lib/status";
+import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS } from "@/lib/statusColors";
 import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
+import { fieldBaseClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -60,31 +64,12 @@ interface TaskDetailModalProps {
   autoEdit?: boolean;
 }
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; color: string; bg: string }
-> = {
-  pending: {
-    label: "Pending",
-    color: "#6b7280",
-    bg: "rgba(107,114,128,0.1)",
-  },
-  "in-progress": {
-    label: "In Progress",
-    color: "#3B82F6",
-    bg: "#EFF6FF",
-  },
-  review: {
-    label: "Review",
-    color: "#F59E0B",
-    bg: "#FFFBEB",
-  },
-  done: {
-    label: "Done",
-    color: "#10b981",
-    bg: "rgba(16,185,129,0.1)",
-  },
-};
+// One look for every icon-only button and every boxed field in this dialog.
+const ICON_BTN = iconButtonClass;
+const ICON_BTN_DANGER = iconButtonDangerClass;
+const FIELD = fieldBaseClass; // also on textareas, so no fixed height
+const FIELD_LABEL = "text-[12px] font-medium text-[var(--text-secondary)] block mb-1";
+const SECTION = "p-5 space-y-3 border-t border-[var(--border-subtle)]";
 
 const STATUS_FLOW: Record<string, string> = {
   pending: "in-progress",
@@ -238,7 +223,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
         />
         <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[520px] bg-white shadow-2xl border-l border-[var(--border)] flex items-center justify-center animate-slidePanelIn">
           {detail === null ? (
-            <p className="p-6 text-sm text-[var(--text-secondary)]">This task no longer exists.</p>
+            <p className="p-6 text-[13px] text-[var(--text-secondary)]">This task no longer exists.</p>
           ) : (
             <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
           )}
@@ -251,7 +236,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   if (!task) return null;
 
   const status = task.status;
-  const statusInfo = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
+  const statusInfo = taskStatusMeta(status);
   const isAssignee = user._id === task.assigneeId;
   const isAdmin = user.role === "admin";
   // Team leads can add helpers from their own team (server enforces which).
@@ -421,23 +406,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
   const DELIVERABLE_STATUS: Record<
     string,
-    { label: string; color: string; bg: string }
+    { label: string; variant: "neutral" | "employee" | "danger" }
   > = {
-    pending: {
-      label: "Pending Review",
-      color: "var(--accent-admin)",
-      bg: "var(--accent-admin-dim)",
-    },
-    approved: {
-      label: "Approved",
-      color: "var(--accent-employee)",
-      bg: "var(--accent-employee-dim)",
-    },
-    rejected: {
-      label: "Changes Requested",
-      color: "var(--danger)",
-      bg: "var(--danger-dim)",
-    },
+    pending: { label: "Pending review", variant: "neutral" },
+    approved: { label: "Approved", variant: "employee" },
+    rejected: { label: "Changes requested", variant: "danger" },
   };
 
   return (
@@ -460,35 +433,20 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               {brief?.title ?? "Unknown brief"}
             </p>
             {/* At a glance: status, due date, who has it */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                style={{
-                  color: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).color,
-                  backgroundColor: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).bg,
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: (STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).color }} />
-                {(STATUS_CONFIG[task.status] ?? STATUS_CONFIG.pending).label}
-              </span>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 mt-2.5">
+              <StatusBadge color={statusInfo.dot} label={statusInfo.label} />
               {task.deadline && (
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                    isTaskOverdue(task)
-                      ? "bg-[var(--danger-dim)] text-[var(--danger)] font-semibold"
-                      : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                  }`}
-                >
+                <Badge variant={isTaskOverdue(task) ? "danger" : "neutral"} className="gap-1">
                   <Calendar className="h-3 w-3" />
                   {isTaskOverdue(task) ? "Overdue · " : "Due "}
                   {new Date(task.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                </span>
+                </Badge>
               )}
               {assignee && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-hover)] text-[11px] font-medium text-[var(--text-secondary)]">
+                <Badge className="gap-1">
                   <User className="h-3 w-3" />
                   {assignee.name ?? assignee.email}
-                </span>
+                </Badge>
               )}
             </div>
             <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
@@ -508,7 +466,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     setEditingTag(false);
                   }}
                   placeholder="Tag name"
-                  className="w-32 px-2 py-1 rounded-md border border-[var(--border)] text-[11px] bg-white focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                  className={`w-32 ${FIELD}`}
                   autoFocus
                 />
               ) : (
@@ -520,8 +478,8 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   }}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
                     (task as { tag?: string }).tag
-                      ? "text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:opacity-80"
-                      : "text-[var(--text-disabled)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                      ? "text-[var(--text-secondary)] bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                      : "text-[var(--text-muted)] border border-dashed border-[var(--border-strong)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
                   }`}
                   title="Edit category tag"
                 >
@@ -531,12 +489,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center">
             {isAdmin && !isEditLocked && (
               <button
                 onClick={openEditForm}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+                className={ICON_BTN}
                 title="Edit task"
+                aria-label="Edit task"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -544,17 +503,19 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {isAdmin && (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+                className={ICON_BTN_DANGER}
                 title="Delete task"
+                aria-label="Delete task"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className={ICON_BTN}
+              aria-label="Close"
             >
-              <X className="h-4.5 w-4.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -564,11 +525,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           {/* Brief-status notice — explains why this task can show in
               Worklog / My Tasks / Oversight but not on the Briefs page. */}
           {!brief && (
-            <div className="px-5 py-3 bg-red-50 border-b border-red-200">
-              <p className="text-[12px] font-semibold text-[var(--danger)]">
+            <div className="px-5 py-3 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">
                 The brief this task belonged to was deleted.
               </p>
-              <p className="text-[11px] text-red-700 mt-0.5">
+              <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                 The task still appears in Worklog / My Tasks / Oversight
                 because the task record itself still exists, but it is
                 gone from the Briefs page because its brief no longer
@@ -577,11 +538,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             </div>
           )}
           {brief && brief.status === "archived" && (
-            <div className="px-5 py-3 bg-amber-50 border-b border-amber-200">
-              <p className="text-[12px] font-semibold text-amber-800">
-                This task's brief is archived.
+            <div className="px-5 py-3 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)]">
+              <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                This task&apos;s brief is archived.
               </p>
-              <p className="text-[11px] text-amber-700 mt-0.5">
+              <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                 Archived briefs are hidden from the Briefs page, so this
                 task still shows in Worklog / My Tasks / Oversight but not
                 under Briefs. Restore the brief from Archive to bring it
@@ -591,53 +552,43 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           )}
           {/* Delete confirmation */}
           {confirmDelete && (
-            <div className="px-5 py-3 bg-red-50 border-b border-red-200 flex items-center justify-between gap-3">
+            <div className="px-5 py-3 bg-[var(--danger-dim)] border-b border-[var(--border-subtle)] flex items-center justify-between gap-3">
               <p className="text-[13px] text-[var(--danger)] font-medium">
                 Delete this task permanently?
               </p>
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={handleDeleteTask}
-                  disabled={isDeleting}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--danger)] hover:bg-red-700 transition-colors disabled:opacity-60"
-                >
-                  {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] bg-white hover:bg-[var(--bg-hover)] transition-colors"
-                >
+                <Button variant="destructive" onClick={handleDeleteTask} loading={isDeleting}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
           {/* Reassign: unassigned (admin) or assignee handoff */}
           {showReassignBanner && (
-            <div className={`px-5 py-3 border-b ${!assignee ? "bg-amber-50 border-amber-200" : "bg-sky-50 border-sky-200"}`}>
+            <div className={`px-5 py-3 border-b border-[var(--border-subtle)] ${!assignee ? "bg-[var(--warning-dim)]" : "bg-[var(--bg-primary)]"}`}>
               {!showReassign && !assignee ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                    <p className="text-[13px] text-amber-700 font-medium">
+                    <AlertTriangle className="h-4 w-4 text-[var(--warning)] shrink-0" />
+                    <p className="text-[13px] text-[var(--warning)] font-medium">
                       This task&apos;s assignee has been removed. Please reassign.
                     </p>
                   </div>
-                  <button
-                    onClick={() => setShowReassign(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shrink-0"
-                  >
-                    <UserPlus className="h-3 w-3" />
+                  <Button variant="secondary" onClick={() => setShowReassign(true)} className="shrink-0">
+                    <UserPlus className="h-3.5 w-3.5" />
                     Reassign
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <UserPlus className={`h-4 w-4 shrink-0 ${!assignee ? "text-amber-500" : "text-sky-600"}`} />
-                    <p className={`text-[13px] font-medium ${!assignee ? "text-amber-700" : "text-sky-800"}`}>
+                    <UserPlus className={`h-4 w-4 shrink-0 ${!assignee ? "text-[var(--warning)]" : "text-[var(--text-muted)]"}`} />
+                    <p className={`text-[13px] font-medium ${!assignee ? "text-[var(--warning)]" : "text-[var(--text-primary)]"}`}>
                       Select a new assignee
                     </p>
                   </div>
@@ -645,11 +596,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     <select
                       value={reassignTarget}
                       onChange={(e) => setReassignTarget(e.target.value)}
-                      className={`flex-1 px-3 py-1.5 rounded-lg border bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-2 ${
-                        !assignee
-                          ? "border-amber-300 focus:ring-amber-400"
-                          : "border-sky-300 focus:ring-sky-400"
-                      }`}
+                      className={`flex-1 min-w-0 ${FIELD}`}
                     >
                       <option value="">Select employee</option>
                       {editAllMembers.map((emp) => (
@@ -658,7 +605,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         </option>
                       ))}
                     </select>
-                    <button
+                    <Button
                       onClick={async () => {
                         if (!reassignTarget || isReassigning) return;
                         setIsReassigning(true);
@@ -674,102 +621,78 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         }
                       }}
                       disabled={!reassignTarget || isReassigning}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white transition-colors disabled:opacity-50 ${
-                        !assignee ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
-                      }`}
                     >
-                      {isReassigning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                      {isReassigning ? "Saving..." : "Confirm"}
-                    </button>
-                    <button
+                      <Check className="h-3.5 w-3.5" />
+                      Confirm
+                    </Button>
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         setShowReassign(false);
                         setReassignTarget("");
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border bg-white transition-colors ${
-                        !assignee
-                          ? "text-amber-700 border-amber-300 hover:bg-amber-50"
-                          : "text-sky-800 border-sky-300 hover:bg-sky-100"
-                      }`}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Status & Meta */}
-          <div className="p-5 space-y-4">
+          {/* Status: where the task is, and the one step that moves it on */}
+          <div className="p-5 space-y-3">
             {/* Status bar */}
-            <div className="flex items-center justify-between">
-              <span
-                className="inline-flex items-center px-2.5 py-1 rounded-md text-[12px] font-semibold"
-                style={{ color: statusInfo.color, backgroundColor: statusInfo.bg }}
-              >
-                {statusInfo.label}
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <StatusBadge color={statusInfo.dot} label={statusInfo.label} />
               {isDelivered && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)]">
+                <Badge className="gap-1">
                   <Lock className="h-3 w-3" />
                   Task done by employee
-                </span>
+                </Badge>
               )}
               {isDelivered && canRedo && !showRedoForm && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => setShowRedoForm(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
                   title="Send this task back for changes"
                 >
-                  <RotateCcw className="h-3 w-3" />
+                  <RotateCcw className="h-3.5 w-3.5" />
                   Request Redo
-                </button>
+                </Button>
               )}
               {isBriefOnHold && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200">
-                  <Pause className="h-3 w-3" />
-                  Brief on hold
-                </span>
+                <StatusBadge color={BRIEF_STATUS_COLORS.on_hold} label="Brief on hold" />
               )}
               {/* Employees: only show a "Start" button when task is pending */}
               {canUpdateStatus && isAssignee && !isAdmin && status === "pending" && (
-                <button
-                  onClick={() => setStatus("in-progress")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60"
-                >
-                  <Play className="h-3 w-3" />
+                <Button onClick={() => setStatus("in-progress")}>
+                  <Play className="h-3.5 w-3.5" />
                   Start Task
-                </button>
+                </Button>
               )}
               {/* Admins: keep full status flow control */}
               {canUpdateStatus && isAdmin && nextStatus && status !== "done" && (
-                <button
-                  onClick={handleStatusUpdate}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-60"
-                >
-                  <ChevronRight className="h-3 w-3" />
-                  Move to {STATUS_CONFIG[nextStatus]?.label}
-                </button>
+                <Button onClick={handleStatusUpdate}>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  Move to {taskStatusMeta(nextStatus).label}
+                </Button>
               )}
               {/* Super admins can close a task outright, from any status. */}
               {user?.isSuperAdmin && status !== "done" && nextStatus !== "done" && (
-                <button
-                  onClick={() => setStatus("done")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-primary)] bg-white border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  <CheckCircle2 className="h-3 w-3" />
+                <Button variant="secondary" onClick={() => setStatus("done")}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
                   Close task
-                </button>
+                </Button>
               )}
               {isAssignee && !isAdmin && status === "in-progress" && (
-                <span className="text-[11px] text-[var(--text-muted)] italic">
+                <span className="text-[12px] text-[var(--text-muted)]">
                   Submit a deliverable when ready
                 </span>
               )}
               {isAssignee && !isAdmin && status === "review" && (
-                <span className="text-[11px] text-[var(--text-muted)] italic">
+                <span className="text-[12px] text-[var(--text-muted)]">
                   Submit a deliverable for approval
                 </span>
               )}
@@ -777,14 +700,11 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
             {/* Redo prompt: visible only when admin clicked Request Redo on a done task */}
             {showRedoForm && isDelivered && isAdmin && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
-                  <p className="text-[12px] font-semibold text-amber-800">
-                    Request a redo for this task
-                  </p>
-                </div>
-                <p className="text-[11px] text-amber-700">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-3 space-y-2">
+                <p className="text-[13px] font-medium text-[var(--text-primary)]">
+                  Request a redo for this task
+                </p>
+                <p className="text-[12px] text-[var(--text-secondary)]">
                   This reopens the task (status returns to In Progress) and pushes the latest deliverable back through the approval flow. The brief will move out of Completed automatically.
                 </p>
                 <textarea
@@ -792,7 +712,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   onChange={(e) => setRedoNote(e.target.value)}
                   placeholder="Why does this need to be redone? (required)"
                   rows={2}
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  className={`w-full py-1.5 ${FIELD}`}
                   autoFocus
                 />
                 {(() => {
@@ -800,25 +720,25 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     !!task.deadline && task.deadline < Date.now();
                   return (
                     <div>
-                      <label className="text-[11px] font-medium text-amber-800 block mb-1">
+                      <label className={FIELD_LABEL}>
                         New deadline{deadlinePast ? " (required, old deadline has passed)" : " (optional)"}
                       </label>
                       <input
                         type="date"
                         value={redoDeadline}
                         onChange={(e) => setRedoDeadline(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-amber-300 bg-white text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        className={`w-full ${FIELD}`}
                       />
                       {deadlinePast && !redoDeadline && (
-                        <p className="text-[11px] text-amber-700 mt-1">
-                          This task's deadline already passed. Set a new one so the assignee isn't flagged overdue immediately.
+                        <p className="text-[12px] text-[var(--warning)] mt-1">
+                          This task&apos;s deadline already passed. Set a new one so the assignee isn&apos;t flagged overdue immediately.
                         </p>
                       )}
                     </div>
                   );
                 })()}
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     type="button"
                     disabled={
                       isSubmittingRedo ||
@@ -866,33 +786,33 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         setIsSubmittingRedo(false);
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
                   >
-                    {isSubmittingRedo ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RotateCcw className="h-3 w-3" />
-                    )}
+                    <RotateCcw className="h-3.5 w-3.5" />
                     Send Back for Redo
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => {
                       setShowRedoForm(false);
                       setRedoNote("");
                       setRedoDeadline("");
                     }}
-                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
 
+          </div>
+
+          {/* Details: who, when, and what was asked for */}
+          <div className={SECTION}>
+            <SectionHeader title="Details" className="" />
             {/* Meta grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)] flex-wrap">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] flex-wrap">
                 <User className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                 <span>
                   {assignee?.name ?? assignee?.email ?? "Unassigned"}
@@ -901,7 +821,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <button
                     type="button"
                     onClick={() => setShowReassign(true)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-[var(--text-secondary)] bg-white border border-[var(--border)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <UserPlus className="h-3 w-3" />
                     Reassign
@@ -909,13 +829,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 )}
               </div>
               {task.duration && (
-                <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+                <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
                   <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                   <span>{task.duration}</span>
                 </div>
               )}
               {task.deadline && (
-                <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
+                <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] flex-wrap">
                   <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                   <span>
                     {new Date(task.deadline).toLocaleDateString("en-US", {
@@ -926,20 +846,18 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     {new Date(task.deadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
                   </span>
                   {task.deadlineExtended && (
-                    <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700">
-                      EXTENDED
-                    </span>
+                    <Badge>Extended</Badge>
                   )}
                 </div>
               )}
               {task.deadlineExtended && task.originalDeadline && (
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
                   <span>Original deadline: {new Date(task.originalDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })} {new Date(task.originalDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
                 </div>
               )}
               {assignedBy && (
-                <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-                  <User className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] min-w-0">
+                  <User className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
                   <span className="truncate">
                     Assigned by {assignedBy.name ?? assignedBy.email}
                   </span>
@@ -963,7 +881,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             {task.creativeCopy && (
               <div>
                 <h4 className="font-medium text-[12px] text-[var(--text-muted)] mb-1.5">
-                  Creative Copy
+                  Creative copy
                 </h4>
                 <p className="text-[13px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
                   {task.creativeCopy}
@@ -983,44 +901,42 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           </div>
 
           {/* Daily Summaries Section */}
-          <div className="p-5 space-y-3 border-t border-[var(--border)]">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-                Daily Summaries ({dailySummaries?.length ?? 0})
-              </h4>
+          <div className={SECTION}>
+            <div className="flex items-center justify-between gap-3">
+              <SectionHeader title="Daily summaries" count={dailySummaries?.length} className="" />
               {isAssignee && task.status !== "done" && (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => { setShowSummaryForm(!showSummaryForm); setSummaryDate(new Date().toLocaleDateString("en-CA")); setSummaryText(""); }}
-                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
-                  <FileText className="h-3 w-3" />
+                  <FileText className="h-3.5 w-3.5" />
                   {showSummaryForm ? "Cancel" : "Add Daily Update"}
-                </button>
+                </Button>
               )}
             </div>
 
             {showSummaryForm && (
               <div className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)] space-y-2">
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Date</label>
+                  <label className={FIELD_LABEL}>Date</label>
                   <input
                     type="date"
                     value={summaryDate}
                     onChange={(e) => setSummaryDate(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD}`}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)] block mb-1">Summary</label>
+                  <label className={FIELD_LABEL}>Summary</label>
                   <textarea
                     value={summaryText}
                     onChange={(e) => setSummaryText(e.target.value)}
                     placeholder="What did you work on today?"
                     rows={3}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full py-1.5 resize-none ${FIELD}`}
                   />
                 </div>
-                <button
+                <Button
                   onClick={async () => {
                     if (!summaryText.trim()) return;
                     setIsAddingSummary(true);
@@ -1034,10 +950,9 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     } finally { setIsAddingSummary(false); }
                   }}
                   disabled={isAddingSummary || !summaryText.trim()}
-                  className="px-3 py-1.5 bg-[var(--accent-admin-strong)] text-white rounded-lg text-[11px] font-semibold disabled:opacity-50"
                 >
-                  {isAddingSummary ? "Saving..." : "Save"}
-                </button>
+                  Save
+                </Button>
               </div>
             )}
 
@@ -1045,23 +960,25 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               <div className="space-y-2">
                 {(dailySummaries ?? []).map((s: any, idx: number) => (
                   <div key={s._id} className="bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-subtle)]">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-[11px] font-medium text-[var(--accent-admin-text)]">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="text-[12px] font-medium text-[var(--text-muted)]">
                         Day {idx + 1} - {new Date(s.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p>
                       {isAssignee && (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center">
                           <button
                             onClick={() => { setEditingSummaryId(s._id); setEditingSummaryText(s.summary); }}
-                            className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]"
+                            className={ICON_BTN}
+                            aria-label="Edit summary"
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={async () => { await deleteDailySummary({ summaryId: s._id }); }}
-                            className="text-[var(--text-muted)] hover:text-red-500"
+                            className={ICON_BTN_DANGER}
+                            aria-label="Delete summary"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       )}
@@ -1072,26 +989,25 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                           value={editingSummaryText}
                           onChange={(e) => setEditingSummaryText(e.target.value)}
                           rows={2}
-                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[12px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          className={`w-full py-1.5 resize-none ${FIELD}`}
                         />
-                        <div className="flex gap-1.5">
-                          <button
+                        <div className="flex gap-2">
+                          <Button
                             onClick={async () => {
                               await updateDailySummary({ summaryId: s._id as Id<"taskDailySummaries">, summary: editingSummaryText.trim() });
                               setEditingSummaryId(null);
                             }}
-                            className="px-2.5 py-1 bg-[var(--accent-admin-strong)] text-white rounded text-[11px] font-semibold"
-                          >Save</button>
-                          <button
+                          >Save</Button>
+                          <Button
+                            variant="ghost"
                             onClick={() => setEditingSummaryId(null)}
-                            className="px-2.5 py-1 bg-[var(--bg-hover)] text-[var(--text-secondary)] rounded text-[11px] font-semibold"
-                          >Cancel</button>
+                          >Cancel</Button>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[12px] text-[var(--text-primary)] whitespace-pre-wrap">{s.summary}</p>
+                      <p className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap">{s.summary}</p>
                     )}
-                    <p className="text-[11px] text-[var(--text-muted)] mt-1">- {s.authorName}</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mt-1">- {s.authorName}</p>
                   </div>
                 ))}
               </div>
@@ -1108,19 +1024,14 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
 
           {/* Sub-Tasks Section */}
           {((subTasks ?? []).length > 0 || canAddHelper) && (
-            <div className="p-5 space-y-3 border-t border-[var(--border)]">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-                  Sub-Tasks ({subTasks?.length ?? 0})
-                </h4>
+            <div className={SECTION}>
+              <div className="flex items-center justify-between gap-3">
+                <SectionHeader title="Sub-tasks" count={subTasks?.length} className="" />
                 {canAddHelper && task.status !== "done" && (
-                  <button
-                    onClick={() => setShowAddHelper(!showAddHelper)}
-                    className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
-                  >
-                    <UserPlus className="h-3 w-3" />
+                  <Button variant="secondary" onClick={() => setShowAddHelper(!showAddHelper)}>
+                    <UserPlus className="h-3.5 w-3.5" />
                     Add Helper
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -1153,7 +1064,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <select
                     value={helperAssignee}
                     onChange={(e) => setHelperAssignee(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD}`}
                     required
                   >
                     <option value="">Select team member...</option>
@@ -1169,57 +1080,40 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     value={helperDesc}
                     onChange={(e) => setHelperDesc(e.target.value)}
                     placeholder="Describe the sub-task..."
-                    className="w-full px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] min-h-[50px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    className={`w-full py-1.5 min-h-[50px] ${FIELD}`}
                     required
                   />
                   <div className="flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddHelper(false)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                    >
+                    <Button type="button" variant="ghost" onClick={() => setShowAddHelper(false)}>
                       Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isCreatingSubTask}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
-                    >
-                      {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
-                      {isCreatingSubTask ? "Adding..." : "Add Helper"}
-                    </button>
+                    </Button>
+                    <Button type="submit" loading={isCreatingSubTask}>
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Add Helper
+                    </Button>
                   </div>
                 </form>
               )}
 
               <div className="space-y-1.5">
                 {(subTasks ?? []).map((st: any) => {
-                  const stStatus = STATUS_CONFIG[st.status] ?? STATUS_CONFIG.pending;
+                  const stStatus = taskStatusMeta(st.status);
                   return (
-                    <div key={st._id} className="flex items-center gap-2 p-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: stStatus.color }}
-                      />
+                    <div key={st._id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] text-[var(--text-primary)] leading-snug">
+                        <p className="text-[13px] text-[var(--text-primary)] leading-snug">
                           {st.description ?? st.title}
                         </p>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                           {st.assigneeName}{st.duration ? ` · ${st.duration}` : ""}
                         </p>
                       </div>
-                      <span
-                        className="px-2 py-0.5 rounded-md text-[11px] font-medium shrink-0"
-                        style={{ color: stStatus.color, backgroundColor: stStatus.bg }}
-                      >
-                        {stStatus.label}
-                      </span>
+                      <StatusBadge color={stStatus.dot} label={stStatus.label} className="shrink-0" />
                       {canAddHelper && st.status !== "done" && (
                         <button
                           type="button"
                           onClick={() => setHelperToRemove({ id: st._id, name: st.assigneeName })}
-                          className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors shrink-0"
+                          className={ICON_BTN_DANGER}
                           aria-label={`Remove helper ${st.assigneeName}`}
                           title="Remove helper"
                         >
@@ -1255,12 +1149,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           {/* Upstream resources from connected tasks */}
           {task.referenceLinks && task.referenceLinks.length > 0 && (
             <>
-              <div className="border-t border-[var(--border)]" />
+              <div className="border-t border-[var(--border-subtle)]" />
               <div className="p-5 space-y-3">
-                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-                  Resources from upstream tasks
-                </h4>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                <SectionHeader title="Resources from upstream tasks" className="" />
+                <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                   {task.referenceLinks.length} resource{task.referenceLinks.length !== 1 ? "s" : ""} passed from connected tasks
                 </p>
                 <div className="space-y-2 mt-2">
@@ -1277,14 +1169,14 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-2 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-secondary)] transition-colors group"
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-[var(--border-subtle)] hover:bg-[var(--bg-primary)] transition-colors group"
                       >
                         {isFile ? (
                           <FileText className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                         ) : (
                           <ExternalLink className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                         )}
-                        <span className="text-[12px] text-[var(--accent)] group-hover:underline truncate">
+                        <span className="text-[13px] text-[var(--accent-admin-text)] group-hover:underline truncate">
                           {label}
                         </span>
                       </a>
@@ -1295,29 +1187,24 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
             </>
           )}
 
-          <div className="border-t border-[var(--border)]" />
+          <div className="border-t border-[var(--border-subtle)]" />
 
           {/* Deliverables section */}
           <div className="p-5 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div>
-                <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-                  Deliverables
-                </h4>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                <SectionHeader title="Deliverables" className="" />
+                <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                   {showCreativeSlots
                     ? `${deliverables?.length ?? 0} / ${creativesRequired} creative${creativesRequired !== 1 ? "s" : ""} submitted`
                     : `${deliverables?.length ?? 0} deliverable${(deliverables?.length ?? 0) !== 1 ? "s" : ""} submitted`}
                 </p>
               </div>
               {isAssignee && status !== "done" && (
-                <button
-                  onClick={() => setShowDeliverableForm(!showDeliverableForm)}
-                  className="flex items-center gap-1 text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
-                >
-                  <Send className="h-3 w-3" />
+                <Button variant="secondary" onClick={() => setShowDeliverableForm(!showDeliverableForm)}>
+                  <Send className="h-3.5 w-3.5" />
                   Submit deliverable
-                </button>
+                </Button>
               )}
             </div>
 
@@ -1328,14 +1215,14 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 className="space-y-2.5 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]"
               >
                 <div>
-                  <label className="text-[11px] font-medium text-[var(--text-secondary)] mb-1 block">
+                  <label className={FIELD_LABEL}>
                     Description <span className="text-[var(--danger)]">*</span>
                   </label>
                   <textarea
                     value={deliverableMessage}
                     onChange={(e) => setDeliverableMessage(e.target.value)}
                     placeholder="Describe what you're delivering..."
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] min-h-[70px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    className={`w-full py-1.5 min-h-[70px] ${FIELD}`}
                     required
                   />
                 </div>
@@ -1345,12 +1232,12 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     value={deliverableLink}
                     onChange={(e) => setDeliverableLink(e.target.value)}
                     placeholder="Link (optional): Figma, Drive, etc."
-                    className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                    className={`flex-1 min-w-0 ${FIELD}`}
                   />
                 </div>
                 <div>
-                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
-                    <Paperclip className="h-3 w-3" />
+                  <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-[var(--border-strong)] bg-white text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                    <Paperclip className="h-3.5 w-3.5" />
                     Attach files
                     <input
                       type="file"
@@ -1366,12 +1253,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   {deliverableFiles.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {deliverableFiles.map((f, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)]">
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[12px] text-[var(--text-secondary)]">
                           {f.type.startsWith("image/") ? <ImageIcon className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                           <span className="max-w-[120px] truncate">{f.name}</span>
                           <button
                             type="button"
                             onClick={() => setDeliverableFiles((prev) => prev.filter((_, j) => j !== i))}
+                            aria-label={`Remove ${f.name}`}
                             className="text-[var(--text-muted)] hover:text-[var(--danger)]"
                           >
                             <X className="h-3 w-3" />
@@ -1384,46 +1272,43 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 <div className="flex flex-col gap-1.5">
                   <p className="text-[12px] text-[var(--text-muted)]">Route to</p>
                   <div className="flex flex-wrap gap-2">
-                    <button
+                    <Button
                       type="submit"
                       disabled={!deliverableMessage.trim() || isSubmitting}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
+                      loading={isSubmitting}
                     >
-                      {isSubmitting ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Send className="h-3 w-3" />
-                      )}
+                      <Send className="h-3.5 w-3.5" />
                       Team Lead
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="secondary"
                       disabled={!deliverableMessage.trim() || isSubmitting}
                       onClick={() => handleSubmitDeliverable(null, "bm")}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-primary)] bg-white border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
                     >
-                      <Send className="h-3 w-3" />
+                      <Send className="h-3.5 w-3.5" />
                       Brand Manager
-                    </button>
+                    </Button>
                     {task?.assignedBy && task.assignedBy !== user?._id && (
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         disabled={!deliverableMessage.trim() || isSubmitting}
                         onClick={() => handleSubmitDeliverable(null, "as")}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
-                        <Send className="h-3 w-3" />
+                        <Send className="h-3.5 w-3.5" />
                         Assignor
-                      </button>
+                      </Button>
                     )}
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => setShowDeliverableForm(false)}
-                    className="self-start mt-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="self-start mt-1"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </form>
             )}
@@ -1442,7 +1327,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1">
                       {showCreativeSlots ? `Creative ${idx + 1}` : `Deliverable ${idx + 1}`}
                     </p>
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
                       <span className="text-[12px] text-[var(--text-secondary)]">
                         {d.submitterName} &middot;{" "}
                         {new Date(d.submittedAt).toLocaleDateString("en-US", {
@@ -1451,24 +1336,20 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         })}
                       </span>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                          className="px-2 py-0.5 rounded-md text-[11px] font-medium"
-                          style={{ backgroundColor: ds.bg, color: ds.color }}
-                        >
-                          {ds.label}
-                        </span>
+                        <Badge variant={ds.variant}>{ds.label}</Badge>
                         {user?.role === "admin" && (
                           <button
                             onClick={() => setConfirmDeleteDeliverableId(d._id)}
-                            className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50 transition-colors"
+                            className={ICON_BTN_DANGER}
                             title="Delete deliverable"
+                            aria-label="Delete deliverable"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
                       </div>
                     </div>
-                    <p className="text-[12px] text-[var(--text-primary)] leading-relaxed break-words">
+                    <p className="text-[13px] text-[var(--text-primary)] leading-relaxed break-words">
                       {d.message}
                     </p>
                     {d.link && (
@@ -1476,7 +1357,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                         href={d.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-start gap-1 mt-1.5 text-[11px] text-[var(--accent-admin-text)] hover:underline min-w-0"
+                        className="flex items-start gap-1 mt-1.5 text-[12px] text-[var(--accent-admin-text)] hover:underline min-w-0"
                       >
                         <ExternalLink className="h-3 w-3 shrink-0 mt-0.5" />
                         <span className="min-w-0 break-all">{d.link}</span>
@@ -1491,7 +1372,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                               key={idx}
                               type="button"
                               onClick={() => setPreviewFile(file)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                             >
                               {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
                               <span className="max-w-[120px] truncate">{file.name}</span>
@@ -1502,23 +1383,24 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       </div>
                     )}
                     {d.reviewNote && (
-                      <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-lg bg-white border border-[var(--border-subtle)]">
-                        <MessageSquare className="h-3 w-3 text-[var(--text-muted)] mt-0.5 shrink-0" />
+                      <div className="flex items-start gap-1.5 mt-2 px-2.5 py-2 rounded-md bg-white border border-[var(--border-subtle)]">
+                        <MessageSquare className="h-3.5 w-3.5 text-[var(--text-muted)] mt-0.5 shrink-0" />
                         <div>
-                          <p className="text-[11px] font-medium text-[var(--text-secondary)]">
+                          <p className="text-[12px] font-medium text-[var(--text-secondary)]">
                             {d.reviewerName ?? "Reviewer"}:
                           </p>
-                          <p className="text-[11px] text-[var(--text-secondary)]">
+                          <p className="text-[12px] text-[var(--text-secondary)]">
                             {d.reviewNote}
                           </p>
                         </div>
                       </div>
                     )}
                     {confirmDeleteDeliverableId === d._id && (
-                      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-red-200">
-                        <p className="text-[11px] text-[var(--danger)] font-medium">Delete this deliverable?</p>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
+                      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
+                        <p className="text-[12px] text-[var(--danger)] font-medium">Delete this deliverable?</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="destructive"
                             onClick={async () => {
                               setIsDeletingDeliverable(true);
                               await deleteDeliverable({ deliverableId: d._id });
@@ -1526,17 +1408,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                               setConfirmDeleteDeliverableId(null);
                             }}
                             disabled={isDeletingDeliverable}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium text-white bg-[var(--danger)] hover:bg-red-700 transition-colors disabled:opacity-60"
                           >
-                            {isDeletingDeliverable ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                            {isDeletingDeliverable ? "Deleting..." : "Delete"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteDeliverableId(null)}
-                            className="px-2.5 py-1 rounded-md text-[11px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                          <Button variant="ghost" onClick={() => setConfirmDeleteDeliverableId(null)}>
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -1549,31 +1427,31 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                 return (
                   <div
                     key={`empty-creative-${n}`}
-                    className="p-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-hover)]/40"
+                    className="p-3 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-primary)]"
                   >
                     <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">
                       Creative {n}
                     </p>
-                    <p className="text-[11px] text-[var(--text-muted)] italic">Not submitted yet</p>
+                    <p className="text-[12px] text-[var(--text-muted)]">Not submitted yet</p>
                   </div>
                 );
               })}
               {sortedDeliverables.length === 0 && emptySlots === 0 && (
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-[12px] text-[var(--text-muted)]">
                   No deliverables submitted yet.
                 </p>
               )}
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)]" />
+          <div className="border-t border-[var(--border-subtle)]" />
 
           {/* Attachments */}
           <div className="p-5">
             <AttachmentList parentType="task" parentId={taskId} />
           </div>
 
-          <div className="border-t border-[var(--border)]" />
+          <div className="border-t border-[var(--border-subtle)]" />
 
           {/* Comments / Chat */}
           <div className="p-5">
@@ -1591,11 +1469,12 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           />
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-white rounded-xl border border-[var(--border)] shadow-2xl">
-              <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Edit Task</h3>
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
+                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Edit task</h3>
                 <button
                   onClick={() => setShowEditForm(false)}
-                  className="p-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className={ICON_BTN}
+                  aria-label="Close"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -1607,7 +1486,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     required
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD}`}
                   />
                 </div>
                 <div>
@@ -1616,7 +1495,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full py-1.5 ${FIELD}`}
                   />
                 </div>
                 <div>
@@ -1624,7 +1503,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <select
                     value={editTeamFilter}
                     onChange={(e) => { setEditTeamFilter(e.target.value); setEditAssignee(""); }}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD}`}
                   >
                     <option value="">All teams</option>
                     {editBriefTeams.map((t) => (
@@ -1637,7 +1516,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   <select
                     value={editAssignee}
                     onChange={(e) => setEditAssignee(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className={`w-full ${FIELD}`}
                   >
                     <option value="">Select employee</option>
                     {editFilteredEmployees.map((emp) => (
@@ -1661,26 +1540,18 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                       type="time"
                       value={editDeadlineTime}
                       onChange={(e) => setEditDeadlineTime(e.target.value)}
-                      className="w-28 px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                      className={`w-28 ${FIELD}`}
                     />
                   </div>
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={isSavingEdit}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-60"
-                  >
-                    {isSavingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                    {isSavingEdit ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowEditForm(false)}
-                    className="px-4 py-2 rounded-lg text-[13px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                  >
+                  <Button type="submit" loading={isSavingEdit}>
+                    <Check className="h-3.5 w-3.5" />
+                    Save Changes
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setShowEditForm(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>

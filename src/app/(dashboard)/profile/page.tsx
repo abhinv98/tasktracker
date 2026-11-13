@@ -7,8 +7,11 @@ import {
   Badge,
   Button,
   Card,
+  EmptyState,
   Input,
   PageHeader,
+  SectionHeader,
+  SegmentedTabs,
   Select,
   Textarea,
   useToast,
@@ -20,7 +23,6 @@ import {
   Lightbulb,
   Paperclip,
   Pencil,
-  Plus,
   Shield,
   Trash2,
   User as UserIcon,
@@ -41,31 +43,18 @@ const STATUS_LABELS: Record<SuggestionStatus, string> = {
   declined: "Declined",
 };
 
-// Explicit hex values via Tailwind arbitrary classes so the JIT cannot
-// drop them and a stale CSS variable cannot wash out the text. Each chip
-// pairs a saturated background with near-black text for clear contrast.
-//   Reviewing -> deep purple (chosen so it does not collide with the
-//                accent-admin orange that flooded the previous amber pill).
-//   Planned   -> deep blue.
-const STATUS_STYLES: Record<SuggestionStatus, string> = {
-  new: "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] border border-[var(--accent-admin)]",
-  reviewing:
-    "bg-[#ede9fe] text-[#4c1d95] border border-[#7c3aed]",
-  planned:
-    "bg-[#dbeafe] text-[#1e3a8a] border border-[#2563eb]",
-  done: "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)] border border-[var(--accent-employee)]",
-  declined:
-    "bg-[var(--bg-muted)] text-[var(--text-muted)] border border-[var(--border)]",
+// The label carries the stage; colour is kept for the one that means
+// something on its own (done).
+const STATUS_VARIANT: Record<SuggestionStatus, "status" | "neutral" | "success"> = {
+  new: "status",
+  reviewing: "neutral",
+  planned: "neutral",
+  done: "success",
+  declined: "neutral",
 };
 
 function StatusPill({ status }: { status: SuggestionStatus }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${STATUS_STYLES[status]}`}
-    >
-      {STATUS_LABELS[status]}
-    </span>
-  );
+  return <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABELS[status]}</Badge>;
 }
 
 function formatWhen(ts: number) {
@@ -107,7 +96,7 @@ export default function ProfilePage() {
   if (user === undefined) {
     return (
       <div className="p-8">
-        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-muted)]">Loading...</p>
       </div>
     );
   }
@@ -237,8 +226,8 @@ export default function ProfilePage() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-px ${
               activeTab === tab.id
-                ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
+                ? "border-[var(--text-primary)] text-[var(--text-primary)]"
+                : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -255,7 +244,7 @@ export default function ProfilePage() {
               {/* Profile Photo */}
               <div>
                 <label className="font-medium text-[13px] text-[var(--text-secondary)] block mb-3">
-                  Profile Photo
+                  Profile photo
                 </label>
                 <div className="flex items-center gap-4">
                   <div className="relative group">
@@ -278,6 +267,7 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingPhoto}
+                      aria-label="Change profile photo"
                       className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-colors cursor-pointer"
                     >
                       {uploadingPhoto ? (
@@ -311,12 +301,12 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={handleRemovePhoto}
-                        className="text-[13px] font-medium text-[var(--danger)] hover:underline text-left"
+                        className="text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] hover:underline text-left transition-colors"
                       >
                         Remove photo
                       </button>
                     )}
-                    <p className="text-[11px] text-[var(--text-muted)]">
+                    <p className="text-[12px] text-[var(--text-muted)]">
                       JPG, PNG or GIF. Max 5MB.
                     </p>
                   </div>
@@ -350,7 +340,7 @@ export default function ProfilePage() {
             </form>
           </Card>
 
-          <Card className="mt-6">
+          <Card className="mt-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
@@ -368,7 +358,7 @@ export default function ProfilePage() {
             </div>
 
             {pwSuccess && (
-              <div className="bg-[var(--accent-employee-dim)] border border-[var(--accent-employee)] text-[var(--accent-employee-text)] rounded-lg px-4 py-2 text-[13px] mb-4">
+              <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 text-[12px] text-[var(--accent-employee-text)] mb-4">
                 Password updated successfully
               </div>
             )}
@@ -379,21 +369,21 @@ export default function ProfilePage() {
                 className="flex flex-col gap-4"
               >
                 <Input
-                  label="Current Password"
+                  label="Current password"
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter your current password"
                 />
                 <Input
-                  label="New Password"
+                  label="New password"
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password (min 8 characters)"
                 />
                 <Input
-                  label="Confirm New Password"
+                  label="Confirm new password"
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -408,7 +398,7 @@ export default function ProfilePage() {
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => {
                       setShowPwForm(false);
                       setPwError("");
@@ -445,9 +435,8 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="font-semibold text-[20px] text-[var(--text-primary)] flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-[var(--accent-admin-text)]" />
+      <div className="mb-4">
+        <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
           Suggestion Box
         </h2>
         <p className="text-[13px] text-[var(--text-secondary)] mt-1">
@@ -457,31 +446,15 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       </div>
 
       {isSuperAdmin && (
-        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[var(--bg-muted)] border border-[var(--border)] mb-6">
-          <button
-            type="button"
-            onClick={() => setView("mine")}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              view === "mine"
-                ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <UserIcon className="h-3.5 w-3.5" />
-            My Suggestions
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("all")}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              view === "all"
-                ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <Shield className="h-3.5 w-3.5" />
-            All Suggestions
-          </button>
+        <div className="mb-4">
+          <SegmentedTabs
+            value={view}
+            options={[
+              { value: "mine", label: "My Suggestions", icon: UserIcon },
+              { value: "all", label: "All Suggestions", icon: Shield },
+            ]}
+            onChange={setView}
+          />
         </div>
       )}
 
@@ -556,12 +529,11 @@ function MySuggestionsView() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-1 flex items-center gap-1.5">
-              <Plus className="h-4 w-4" />
+            <h3 className="font-semibold text-[14px] text-[var(--text-primary)] mb-1">
               New suggestion
             </h3>
             <p className="text-[12px] text-[var(--text-muted)]">
@@ -582,7 +554,7 @@ function MySuggestionsView() {
             placeholder="Describe your idea. What would it change? Why would it help?"
             maxLength={5000}
           />
-          <label className="flex flex-col gap-1 text-[12px] font-medium text-[var(--text-secondary)]">
+          <label className="flex flex-col gap-1.5 text-[13px] font-medium text-[var(--text-secondary)]">
             Screenshot or PDF (optional, max 10 MB)
             <input
               ref={fileInputRef}
@@ -593,7 +565,7 @@ function MySuggestionsView() {
             />
           </label>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
               {content.length}/5000
             </span>
             <Button type="submit" variant="primary" disabled={submitting}>
@@ -604,23 +576,12 @@ function MySuggestionsView() {
       </Card>
 
       <div>
-        <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
-          Your submissions
-          {mySuggestions && mySuggestions.length > 0 && (
-            <span className="ml-2 text-[12px] font-normal text-[var(--text-muted)]">
-              ({mySuggestions.length})
-            </span>
-          )}
-        </h3>
+        <SectionHeader title="Your submissions" count={mySuggestions?.length} />
 
         {mySuggestions === undefined ? (
-          <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
+          <p className="text-[13px] text-[var(--text-muted)]">Loading...</p>
         ) : mySuggestions.length === 0 ? (
-          <Card>
-            <p className="text-[13px] text-[var(--text-secondary)] text-center py-6">
-              You haven&apos;t submitted any suggestions yet.
-            </p>
-          </Card>
+          <EmptyState title="You haven't submitted any suggestions yet." />
         ) : (
           <div className="flex flex-col gap-3">
             {mySuggestions.map((s) => (
@@ -721,13 +682,13 @@ function MySuggestionItem({
               maxLength={200}
             />
           ) : (
-            <h4 className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
+            <h4 className="font-medium text-[14px] text-[var(--text-primary)] truncate">
               {suggestion.title || "Untitled suggestion"}
             </h4>
           )}
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <StatusPill status={suggestion.status} />
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-[12px] text-[var(--text-muted)]">
               Submitted {formatWhen(suggestion.createdAt)}
               {suggestion.updatedAt !== suggestion.createdAt &&
                 ` · edited ${formatWhen(suggestion.updatedAt)}`}
@@ -743,16 +704,18 @@ function MySuggestionItem({
                 setEditContent(suggestion.content);
                 setEditing(true);
               }}
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Edit"
+              aria-label="Edit suggestion"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--danger)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
               title="Delete"
+              aria-label="Delete suggestion"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -778,7 +741,7 @@ function MySuggestionItem({
             </Button>
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               onClick={() => setEditing(false)}
             >
               Cancel
@@ -793,10 +756,9 @@ function MySuggestionItem({
       <SuggestionFile suggestion={suggestion} />
 
       {suggestion.adminNote && !editing && (
-        <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Shield className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
-            <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+        <div className="mt-3 rounded-md bg-[var(--bg-primary)] px-3 py-2">
+          <div className="mb-1">
+            <span className="text-[12px] font-medium text-[var(--text-muted)]">
               Response from admin
             </span>
           </div>
@@ -807,14 +769,14 @@ function MySuggestionItem({
       )}
 
       {confirmingDelete && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-dim,rgba(239,68,68,0.08))] p-3">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-[var(--danger-dim)] pl-3 pr-2 py-2">
           <p className="text-[13px] text-[var(--text-primary)]">
             Delete this suggestion?
           </p>
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               onClick={() => setConfirmingDelete(false)}
             >
               Cancel
@@ -845,17 +807,15 @@ function AllSuggestionsView() {
 
   if (allSuggestions === undefined) {
     return (
-      <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
+      <p className="text-[13px] text-[var(--text-muted)]">Loading...</p>
     );
   }
 
   if (allSuggestions === null) {
     return (
-      <Card>
-        <p className="text-[13px] text-[var(--text-secondary)] text-center py-6">
-          Only super admins can view all suggestions.
-        </p>
-      </Card>
+      <p className="text-[13px] text-[var(--text-muted)]">
+        Only super admins can view all suggestions.
+      </p>
     );
   }
 
@@ -870,41 +830,28 @@ function AllSuggestionsView() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-[12px] text-[var(--text-secondary)] font-medium">
+        <span className="text-[12px] text-[var(--text-muted)] font-medium">
           Filter:
         </span>
-        {(
-          [
-            ["all", `All (${allSuggestions.length})`],
-            ["new", `New (${counts.new ?? 0})`],
-            ["reviewing", `Reviewing (${counts.reviewing ?? 0})`],
-            ["planned", `Planned (${counts.planned ?? 0})`],
-            ["done", `Done (${counts.done ?? 0})`],
-            ["declined", `Declined (${counts.declined ?? 0})`],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setStatusFilter(key as SuggestionStatus | "all")}
-            className={`text-[12px] px-2.5 py-1 rounded-full border transition-colors ${
-              statusFilter === key
-                ? "bg-[var(--accent-admin-strong)] text-white border-[var(--accent-admin)]"
-                : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        <SegmentedTabs<SuggestionStatus | "all">
+          value={statusFilter}
+          options={[
+            { value: "all", label: `All (${allSuggestions.length})` },
+            { value: "new", label: `New (${counts.new ?? 0})` },
+            { value: "reviewing", label: `Reviewing (${counts.reviewing ?? 0})` },
+            { value: "planned", label: `Planned (${counts.planned ?? 0})` },
+            { value: "done", label: `Done (${counts.done ?? 0})` },
+            { value: "declined", label: `Declined (${counts.declined ?? 0})` },
+          ]}
+          onChange={setStatusFilter}
+          className="flex-wrap"
+        />
       </div>
 
       {!filtered || filtered.length === 0 ? (
-        <Card>
-          <p className="text-[13px] text-[var(--text-secondary)] text-center py-6">
-            No suggestions
-            {statusFilter !== "all" ? ` with status "${STATUS_LABELS[statusFilter]}"` : ""}.
-          </p>
-        </Card>
+        <EmptyState
+          title={`No suggestions${statusFilter !== "all" ? ` with status "${STATUS_LABELS[statusFilter]}"` : ""}.`}
+        />
       ) : (
         // Two-column masonry layout. CSS `columns` keeps the natural
         // newest-first order (the listAll query already sorts createdAt
@@ -1035,7 +982,7 @@ function AdminSuggestionItem({
                 )}
                 <StatusPill status={suggestion.status} />
               </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+              <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
                 {suggestion.authorEmail ?? "-"} ·{" "}
                 {formatWhen(suggestion.createdAt)}
                 {suggestion.updatedAt !== suggestion.createdAt &&
@@ -1045,15 +992,16 @@ function AdminSuggestionItem({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--danger)] transition-colors"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
               title="Delete suggestion"
+              aria-label="Delete suggestion"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
 
           {suggestion.title && (
-            <h4 className="font-semibold text-[15px] text-[var(--text-primary)] mt-3">
+            <h4 className="font-medium text-[14px] text-[var(--text-primary)] mt-3">
               {suggestion.title}
             </h4>
           )}
@@ -1064,7 +1012,7 @@ function AdminSuggestionItem({
 
           {/* Quick status pills */}
           <div className="flex items-center gap-2 mt-4 flex-wrap">
-            <span className="text-[11px] text-[var(--text-muted)] font-medium uppercase tracking-wide">
+            <span className="text-[12px] text-[var(--text-muted)] font-medium">
               Set status:
             </span>
             {(
@@ -1075,11 +1023,11 @@ function AdminSuggestionItem({
                 type="button"
                 disabled={suggestion.status === s}
                 onClick={() => handleQuickStatus(s)}
-                className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                aria-pressed={suggestion.status === s}
+                className={`text-[12px] px-2 py-0.5 rounded-full border transition-colors ${
                   suggestion.status === s
-                    ? STATUS_STYLES[s] +
-                      " ring-2 ring-offset-1 ring-[var(--accent-admin)] cursor-default font-semibold"
-                    : "border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--text-secondary)]"
+                    ? "bg-[var(--bg-hover)] border-[var(--border-strong)] text-[var(--text-primary)] font-medium cursor-default"
+                    : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]"
                 }`}
               >
                 {STATUS_LABELS[s]}
@@ -1089,9 +1037,9 @@ function AdminSuggestionItem({
 
           {/* Admin note */}
           {suggestion.adminNote && !editingNote && (
-            <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--bg-muted)] p-3">
+            <div className="mt-3 rounded-md bg-[var(--bg-primary)] px-3 py-2">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                <span className="text-[12px] font-medium text-[var(--text-muted)]">
                   Your response
                   {suggestion.reviewerName
                     ? ` · by ${suggestion.reviewerName}`
@@ -1104,7 +1052,7 @@ function AdminSuggestionItem({
                     setDraftStatus(suggestion.status);
                     setEditingNote(true);
                   }}
-                  className="text-[11px] text-[var(--accent-admin-text)] hover:underline"
+                  className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline"
                 >
                   Edit
                 </button>
@@ -1130,7 +1078,7 @@ function AdminSuggestionItem({
           )}
 
           {editingNote && (
-            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-[var(--border)] p-3">
+            <div className="mt-3 flex flex-col gap-3 rounded-lg border border-[var(--border)] p-3">
               <Select
                 label="Status"
                 value={draftStatus}
@@ -1163,7 +1111,7 @@ function AdminSuggestionItem({
                 </Button>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   onClick={() => setEditingNote(false)}
                 >
                   <X className="h-3.5 w-3.5 mr-1" />
@@ -1174,14 +1122,14 @@ function AdminSuggestionItem({
           )}
 
           {confirmingDelete && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--danger)] bg-[var(--danger-dim,rgba(239,68,68,0.08))] p-3">
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-[var(--danger-dim)] pl-3 pr-2 py-2">
               <p className="text-[13px] text-[var(--text-primary)]">
                 Delete this suggestion? This cannot be undone.
               </p>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
                   onClick={() => setConfirmingDelete(false)}
                 >
                   Cancel

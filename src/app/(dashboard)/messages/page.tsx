@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useToast } from "@/components/ui";
+import { Button, useToast } from "@/components/ui";
 import {
   MessageSquare,
   Search,
@@ -245,19 +245,16 @@ export default function MessagesPage() {
       {/* Phones show one pane at a time: the contacts, or the open chat. */}
       <div className={`${selectedContactId ? "hidden md:flex" : "flex"} w-full md:w-80 shrink-0 flex-col border-r border-[var(--border)] bg-white`}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-[var(--border)]">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="h-4 w-4 text-[var(--accent-admin-text)]" />
-            <h1 className="font-semibold text-[15px] text-[var(--text-primary)]">Messages</h1>
-          </div>
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <h1 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">Messages</h1>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or email…"
-              className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              className="w-full pl-8 pr-3 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-input)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
             />
           </div>
         </div>
@@ -265,7 +262,7 @@ export default function MessagesPage() {
         {/* Contact List */}
         <div className="flex-1 overflow-y-auto">
           {filteredContacts.length === 0 ? (
-            <p className="px-4 py-8 text-[11px] text-[var(--text-disabled)] text-center">No contacts found</p>
+            <p className="px-4 py-8 text-[12px] text-[var(--text-muted)] text-center">No contacts found</p>
           ) : (
             filteredContacts.map((contact) => {
               const isActive = String(selectedContactId) === String(contact._id);
@@ -275,22 +272,14 @@ export default function MessagesPage() {
                   key={contact._id}
                   onClick={() => setSelectedContactId(contact._id as Id<"users">)}
                   className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors border-b border-[var(--border-subtle)] ${
-                    isActive
-                      ? "bg-[var(--accent-admin-dim)] border-l-[3px] border-l-[var(--accent-admin)]"
-                      : hasUnread
-                        ? "bg-[#fef9f7] hover:bg-[var(--bg-hover)] border-l-[3px] border-l-transparent"
-                        : "hover:bg-[var(--bg-hover)] border-l-[3px] border-l-transparent"
+                    isActive ? "bg-[var(--bg-hover)]" : "hover:bg-[var(--bg-primary)]"
                   }`}
                 >
                   {/* Avatar */}
                   {contact.avatarUrl ? (
                     <img src={contact.avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
                   ) : (
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${
-                      hasUnread
-                        ? "bg-[var(--accent-admin-strong)] text-white"
-                        : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
-                    }`}>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold shrink-0 bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                       {contact.name.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -298,17 +287,17 @@ export default function MessagesPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`text-[12px] truncate ${hasUnread ? "font-bold text-[var(--text-primary)]" : "font-medium text-[var(--text-primary)]"}`}>
+                      <span className={`text-[14px] truncate text-[var(--text-primary)] ${hasUnread ? "font-semibold" : "font-medium"}`}>
                         {contact.name}
                       </span>
                       {contact.lastMessageTime && (
-                        <span className="text-[11px] text-[var(--text-muted)] shrink-0 tabular-nums">
+                        <span className="text-[12px] text-[var(--text-muted)] shrink-0 tabular-nums">
                           {formatTime(contact.lastMessageTime)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <span className={`text-[11px] truncate ${hasUnread ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"}`}>
+                      <span className={`text-[12px] truncate ${hasUnread ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-muted)]"}`}>
                         {contact.lastMessage
                           ? contact.lastMessage.length > 40
                             ? contact.lastMessage.slice(0, 40) + "..."
@@ -316,7 +305,7 @@ export default function MessagesPage() {
                           : `${contact.role}`}
                       </span>
                       {hasUnread && (
-                        <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-bold px-1 shrink-0">
+                        <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-white text-[11px] font-semibold tabular-nums px-1 shrink-0">
                           {contact.unreadCount}
                         </span>
                       )}
@@ -338,7 +327,7 @@ export default function MessagesPage() {
               <button
                 type="button"
                 onClick={() => setSelectedContactId(null)}
-                className="md:hidden -ml-1 p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                className="md:hidden -ml-1 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 aria-label="Back to list"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -346,13 +335,13 @@ export default function MessagesPage() {
               {selectedContact.avatarUrl ? (
                 <img src={selectedContact.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[11px] font-bold text-[var(--text-secondary)]">
+                <div className="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[12px] font-semibold text-[var(--text-secondary)]">
                   {selectedContact.name.charAt(0).toUpperCase()}
                 </div>
               )}
               <div>
-                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{selectedContact.name}</p>
-                <p className="text-[11px] text-[var(--text-muted)] capitalize">
+                <p className="text-[15px] font-semibold leading-snug text-[var(--text-primary)]">{selectedContact.name}</p>
+                <p className="text-[12px] text-[var(--text-muted)] capitalize">
                   {String(selectedContactId) === String(user._id)
                     ? "Messages to yourself"
                     : selectedContact.role}
@@ -364,11 +353,9 @@ export default function MessagesPage() {
             <div className="flex-1 overflow-y-auto px-4 py-4">
               {groupedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center">
-                  <div className="w-12 h-12 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-3">
-                    <MessageSquare className="h-5 w-5 text-[var(--text-muted)]" />
-                  </div>
-                  <p className="text-[13px] font-medium text-[var(--text-secondary)]">No messages yet</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Send a message to start the conversation</p>
+                  <MessageSquare className="h-8 w-8 text-[var(--text-muted)] mb-3" aria-hidden />
+                  <p className="text-[14px] font-medium text-[var(--text-primary)]">No messages yet</p>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">Send a message to start the conversation</p>
                 </div>
               ) : (
                 groupedMessages.map((group, gi) => (
@@ -387,7 +374,7 @@ export default function MessagesPage() {
                       >
                         <div className={`max-w-[70%] ${msg.isMine ? "order-1" : ""}`}>
                           <div
-                            className={`px-3 py-2 rounded-2xl text-[12px] leading-relaxed ${
+                            className={`px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                               msg.isMine
                                 ? "bg-[var(--accent-admin-strong)] text-white rounded-br-md"
                                 : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-md"
@@ -396,12 +383,12 @@ export default function MessagesPage() {
                             {msg.content}
                           </div>
                           <div className={`flex items-center gap-1 mt-0.5 ${msg.isMine ? "justify-end" : "justify-start"}`}>
-                            <span className="text-[11px] text-[var(--text-disabled)] tabular-nums">{formatTime(msg.createdAt)}</span>
+                            <span className="text-[11px] text-[var(--text-muted)] tabular-nums">{formatTime(msg.createdAt)}</span>
                             {msg.isMine && (
                               msg.readAt ? (
                                 <CheckCheck className="h-3 w-3 text-[var(--accent-employee-text)]" />
                               ) : (
-                                <Check className="h-3 w-3 text-[var(--text-disabled)]" />
+                                <Check className="h-3 w-3 text-[var(--text-muted)]" />
                               )
                             )}
                           </div>
@@ -432,27 +419,26 @@ export default function MessagesPage() {
                       ? "Write a note to yourself…"
                       : `Message ${selectedContact.name}...`
                   }
-                  className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] resize-none"
+                  className="flex-1 px-3 py-2 rounded-md border border-[var(--border)] bg-[var(--bg-input)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] resize-none"
                   rows={1}
                   style={{ maxHeight: 120 }}
                 />
-                <button
+                <Button
                   onClick={handleSend}
                   disabled={!messageText.trim()}
-                  className="p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525] disabled:opacity-30 transition-colors shrink-0"
+                  aria-label="Send message"
+                  className="w-8 !px-0 shrink-0"
                 >
                   <Send className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
             </div>
           </>
         ) : (
           /* No conversation selected */
           <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-            <div className="w-16 h-16 rounded-full bg-[var(--bg-hover)] flex items-center justify-center mb-4">
-              <MessageSquare className="h-7 w-7 text-[var(--text-muted)]" />
-            </div>
-            <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-1">Your Messages</h2>
+            <MessageSquare className="h-8 w-8 text-[var(--text-muted)] mb-3" aria-hidden />
+            <h2 className="text-[14px] font-medium text-[var(--text-primary)] mb-1">Your Messages</h2>
             <p className="text-[12px] text-[var(--text-muted)] max-w-[300px]">
               Select someone from the list, or search your own name to message yourself. Direct messages are private.
             </p>

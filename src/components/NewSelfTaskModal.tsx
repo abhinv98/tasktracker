@@ -78,7 +78,7 @@ export function NewSelfTaskModal({
       title="New task for myself"
       footer={
         <>
-          <Button variant="secondary" type="button" onClick={onClose}>
+          <Button variant="ghost" type="button" onClick={onClose}>
             Cancel
           </Button>
           <Button

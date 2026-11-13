@@ -21,6 +21,10 @@ import {
   TableRow,
   SkeletonPageHeader,
   SkeletonCards,
+  EmptyState,
+  SectionHeader,
+  StatStrip,
+  StatTile,
   useToast,
 } from "@/components/ui";
 import {
@@ -34,7 +38,6 @@ import {
   ChevronDown,
   ChevronRight,
   Undo2,
-  CircleAlert,
 } from "lucide-react";
 import {
   type Allocation,
@@ -105,7 +108,7 @@ function AllocationModal({
       icon={ArrowDownLeft}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="pc-alloc" loading={saving} disabled={!valid}>
@@ -219,7 +222,7 @@ function HandoutModal({
       icon={HandCoins}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="pc-handout" loading={saving} disabled={!valid}>
@@ -328,7 +331,7 @@ function SettleModal({
       icon={Undo2}
       footer={
         <>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" form="pc-settle" loading={saving} disabled={!valid}>
@@ -338,7 +341,7 @@ function SettleModal({
       }
     >
       <form id="pc-settle" onSubmit={submit} className="flex flex-col gap-4">
-        <div className="rounded-lg bg-[var(--bg-hover)] px-4 py-3">
+        <div className="rounded-md bg-[var(--bg-primary)] px-3 py-2">
           <div className="text-[13px] text-[var(--text-secondary)]">
             <span className="font-medium text-[var(--text-primary)]">
               {handout.recipient}
@@ -379,19 +382,10 @@ function SettleModal({
             { label: "Handed out", value: handout.amountGiven },
             { label: "Returned", value: returnedNum },
             { label: "Spent", value: Math.max(0, spent) },
-          ].map((c, i) => (
-            <div
-              key={c.label}
-              className={`rounded-lg px-3 py-2 ${
-                i === 2 ? "bg-[var(--accent-admin-dim)]" : "bg-[var(--bg-hover)]"
-              }`}
-            >
-              <div className="text-[11px] text-[var(--text-muted)]">{c.label}</div>
-              <div
-                className={`text-[15px] font-semibold tabular-nums ${
-                  i === 2 ? "text-[var(--accent-admin-text)]" : "text-[var(--text-primary)]"
-                }`}
-              >
+          ].map((c) => (
+            <div key={c.label} className="rounded-md bg-[var(--bg-primary)] px-3 py-2">
+              <div className="text-[12px] text-[var(--text-muted)]">{c.label}</div>
+              <div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">
                 {money(c.value)}
               </div>
             </div>
@@ -483,7 +477,7 @@ export default function PettyCashPage() {
   const noHolders = holders.length === 0;
 
   return (
-    <div className="p-8 flex flex-col gap-6">
+    <div className="p-8 flex flex-col gap-4">
       <PageHeader
         title="Petty Cash"
         subtitle="Floats held by HR and accounts, what's out with the office boys, and what it went on"
@@ -510,56 +504,25 @@ export default function PettyCashPage() {
 
       {/* The four numbers, in the order the money moves. "In hand" leads
           because it's the one you can check against the actual drawer. */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          {
-            label: "In hand",
-            value: totals.inHand,
-            hint: "should be in the drawer",
-            accent: true,
-          },
-          {
-            label: "Out with office boys",
-            value: totals.outstanding,
-            hint: `${open.length} open ${open.length === 1 ? "handout" : "handouts"}`,
-            warn: totals.outstanding > 0,
-          },
-          { label: "Spent", value: totals.spent, hint: "settled and explained" },
-          {
-            label: "Allocated",
-            value: totals.allocated,
-            hint: "put into floats so far",
-          },
-        ].map((c) => (
-          <Card key={c.label} className="p-4">
-            <div className="text-[12px] font-medium text-[var(--text-muted)]">
-              {c.label}
-            </div>
-            <div
-              className={`mt-1 text-[24px] font-semibold tabular-nums ${
-                c.accent
-                  ? "text-[var(--text-primary)]"
-                  : c.warn
-                    ? "text-[var(--accent-admin-text)]"
-                    : "text-[var(--text-primary)]"
-              }`}
-            >
-              {money(c.value)}
-            </div>
-            <div className="text-[11px] text-[var(--text-muted)]">{c.hint}</div>
-          </Card>
-        ))}
-      </div>
+      <StatStrip>
+        <StatTile label="In hand" value={money(totals.inHand)} hint="should be in the drawer" />
+        <StatTile
+          label="Out with office boys"
+          value={money(totals.outstanding)}
+          hint={`${open.length} open ${open.length === 1 ? "handout" : "handouts"}`}
+        />
+        <StatTile label="Spent" value={money(totals.spent)} hint="settled and explained" />
+        <StatTile label="Allocated" value={money(totals.allocated)} hint="put into floats so far" />
+      </StatStrip>
 
       {/* Awaiting settlement — the live obligation, above the history. */}
       {open.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <CircleAlert className="h-4 w-4 text-[var(--accent-admin-text)]" />
-            <span className="text-[13px] font-semibold text-[var(--text-primary)]">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
               Awaiting settlement
-            </span>
-            <span className="text-[12px] text-[var(--text-muted)]">
+            </h2>
+            <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
               {money(totals.outstanding)} out with{" "}
               {new Set(open.map((h) => h.recipient)).size}{" "}
               {new Set(open.map((h) => h.recipient)).size === 1 ? "person" : "people"}
@@ -569,7 +532,7 @@ export default function PettyCashPage() {
             {open.map((h) => (
               <Card
                 key={h._id}
-                className="p-4 border-[var(--accent-admin)]/40 flex flex-col gap-3"
+                className="p-4 flex flex-col gap-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -580,15 +543,15 @@ export default function PettyCashPage() {
                       {h.purpose}
                     </div>
                   </div>
-                  <div className="text-[18px] font-semibold tabular-nums text-[var(--accent-admin-text)] shrink-0">
+                  <div className="text-[16px] font-semibold tabular-nums text-[var(--text-primary)] shrink-0">
                     {money(h.amountGiven)}
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-[var(--text-muted)]">
+                  <span className="text-[12px] text-[var(--text-muted)]">
                     {formatDay(h.givenDate)} · from {h.holderName}
                   </span>
-                  <Button onClick={() => setSettling(h)}>Settle</Button>
+                  <Button variant="secondary" onClick={() => setSettling(h)}>Settle</Button>
                 </div>
               </Card>
             ))}
@@ -599,9 +562,7 @@ export default function PettyCashPage() {
       {/* Per-holder balances — doubles as the holder filter. */}
       {byHolder.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            Floats
-          </div>
+          <SectionHeader title="Floats" className="" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {byHolder.map((h) => {
               const active = holderFilter === h.holderId;
@@ -622,7 +583,7 @@ export default function PettyCashPage() {
                       {money(h.totals.inHand)}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[11px] text-[var(--text-muted)]">
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px] text-[var(--text-muted)]">
                     <span>
                       Allocated{" "}
                       <span className="text-[var(--text-secondary)] tabular-nums">
@@ -636,7 +597,7 @@ export default function PettyCashPage() {
                       </span>
                     </span>
                     {h.totals.outstanding > 0 && (
-                      <span className="text-[var(--accent-admin-text)] font-medium tabular-nums">
+                      <span className="text-[var(--text-primary)] font-medium tabular-nums">
                         {money(h.totals.outstanding)} out
                       </span>
                     )}
@@ -684,7 +645,7 @@ export default function PettyCashPage() {
         </div>
         {filtersOn && (
           <Button
-            variant="secondary"
+            variant="ghost"
             onClick={() => {
               setHolderFilter("");
               setStatusFilter("");
@@ -698,23 +659,23 @@ export default function PettyCashPage() {
 
       {/* Ledger */}
       {months.length === 0 ? (
-        <Card className="p-10 flex flex-col items-center gap-2 text-center">
-          <Wallet className="h-6 w-6 text-[var(--text-muted)]" />
-          <div className="font-medium text-[14px] text-[var(--text-primary)]">
-            {filtersOn
+        <EmptyState
+          icon={Wallet}
+          title={
+            filtersOn
               ? "Nothing matches those filters"
               : allocations.length === 0
                 ? "No float allocated yet"
-                : "No cash handed out yet"}
-          </div>
-          <div className="text-[13px] text-[var(--text-muted)] max-w-md">
-            {filtersOn
+                : "No cash handed out yet"
+          }
+          description={
+            filtersOn
               ? "Clear the filters to see the whole ledger."
               : allocations.length === 0
                 ? "Start with Allocate — put an amount into someone's float. Handouts are drawn from it."
-                : "Hand out cash and it'll appear here until the remainder is settled."}
-          </div>
-        </Card>
+                : "Hand out cash and it'll appear here until the remainder is settled."
+          }
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {months.map((m) => {
@@ -757,7 +718,7 @@ export default function PettyCashPage() {
                 </div>
 
                 {isOpen && (
-                  <div className="border-t border-[var(--border)] overflow-x-auto">
+                  <div className="border-t border-[var(--border-subtle)] overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableHead>Date</TableHead>
@@ -773,7 +734,7 @@ export default function PettyCashPage() {
                         {m.items.map((h) => (
                           <TableRow key={h._id}>
                             <TableCell>
-                              <span className="text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                              <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                                 {formatDay(h.givenDate)}
                               </span>
                             </TableCell>
@@ -794,7 +755,7 @@ export default function PettyCashPage() {
                               {h.settled ? (
                                 money(spentOf(h))
                               ) : (
-                                <span className="text-[var(--accent-admin-text)] font-medium">
+                                <span className="font-medium">
                                   {money(outstandingOf(h))} out
                                 </span>
                               )}
@@ -833,7 +794,8 @@ export default function PettyCashPage() {
                                       }
                                     }}
                                     title="Reopen — puts the cash back out"
-                                    className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+                                    aria-label="Reopen handout"
+                                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                   >
                                     <Undo2 className="h-3.5 w-3.5" />
                                   </button>
@@ -844,14 +806,16 @@ export default function PettyCashPage() {
                                     setHandoutOpen(true);
                                   }}
                                   title="Edit"
-                                  className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+                                  aria-label="Edit handout"
+                                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setDeleting(h)}
                                   title="Delete"
-                                  className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--danger-dim)] hover:text-[var(--danger)] transition-colors"
+                                  aria-label="Delete handout"
+                                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -890,7 +854,7 @@ export default function PettyCashPage() {
             </span>
           </div>
           {showAllocations && (
-            <div className="border-t border-[var(--border)] overflow-x-auto">
+            <div className="border-t border-[var(--border-subtle)] overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableHead>Date</TableHead>
@@ -903,7 +867,7 @@ export default function PettyCashPage() {
                   {allocations.map((a) => (
                     <TableRow key={a._id}>
                       <TableCell>
-                        <span className="text-[12px] text-[var(--text-secondary)] whitespace-nowrap">
+                        <span className="text-[12px] tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                           {formatDay(a.date)}
                         </span>
                       </TableCell>
@@ -921,7 +885,8 @@ export default function PettyCashPage() {
                           <button
                             onClick={() => setDeletingAlloc(a)}
                             title="Delete"
-                            className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-[var(--danger-dim)] hover:text-[var(--danger)] transition-colors"
+                            aria-label="Delete allocation"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

@@ -158,14 +158,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#171717]/30 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/30 z-50" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
-        className="animate-scaleIn fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-[90vw] max-w-[560px] bg-white rounded-xl shadow-2xl border border-[var(--border)] overflow-hidden"
+        className="animate-scaleIn fixed top-[15%] left-1/2 -translate-x-1/2 z-50 w-[90vw] max-w-[560px] bg-white rounded-lg shadow-2xl border border-[var(--border)] overflow-hidden"
       >
-        <div className="flex items-center gap-3 px-4 h-12 border-b border-[var(--border)]">
+        <div className="flex items-center gap-3 pl-4 pr-2 h-12 border-b border-[var(--border-subtle)]">
           <Search className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
           <input
             ref={inputRef}
@@ -178,7 +178,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           <button
             onClick={onClose}
             aria-label="Close command palette"
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -205,7 +205,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 return (
                   <div key={`${item.type}-${item.label}-${i}`}>
                     {startsSearch && (
-                      <div className="px-4 pt-2 pb-1 text-[12px] font-mediumr text-[var(--text-muted)]">
+                      <div className="px-4 pt-2 pb-1 text-[12px] font-medium text-[var(--text-muted)]">
                         Results
                       </div>
                     )}
@@ -220,7 +220,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       <Icon
                         className={`h-4 w-4 shrink-0 ${
                           active
-                            ? "text-[var(--accent-admin-text)]"
+                            ? "text-[var(--text-primary)]"
                             : "text-[var(--text-muted)]"
                         }`}
                       />
@@ -231,7 +231,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {item.sub && (
-                          <span className="text-[11px] text-[var(--text-muted)] capitalize">
+                          <span className="text-[12px] text-[var(--text-muted)] capitalize">
                             {item.sub}
                           </span>
                         )}
@@ -247,7 +247,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-3 px-4 py-2 border-t border-[var(--border)] bg-[var(--bg-primary)] text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-3 px-4 py-2 border-t border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[11px] text-[var(--text-muted)]">
           <span>
             <kbd className="px-1 py-0.5 rounded bg-white border border-[var(--border)]">↑↓</kbd>{" "}
             Navigate

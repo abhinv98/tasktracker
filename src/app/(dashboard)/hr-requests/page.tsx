@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, Button, StatusBadge, useToast, SkeletonPageHeader, SkeletonCards } from "@/components/ui";
+import { PageHeader, Badge, Button, EmptyState, SegmentedTabs, SectionHeader, StatusBadge, useToast, SkeletonPageHeader, SkeletonCards } from "@/components/ui";
 import {
   HR_CATEGORIES,
   HR_STATUSES,
@@ -112,7 +112,7 @@ function RequestCard({
 
   return (
     <div
-      className={`flex flex-col rounded-xl border bg-white shadow-sm p-4 h-full transition-colors ${
+      className={`flex flex-col rounded-lg border bg-white p-4 h-full transition-colors ${
         selected
           ? "border-[var(--accent-admin)] ring-1 ring-[var(--accent-admin)]"
           : "border-[var(--border)]"
@@ -129,11 +129,11 @@ function RequestCard({
             className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent-admin-strong)]"
           />
           <div className="min-w-0">
-            <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
+            <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">
               {req.requesterName}
             </p>
             {req.requesterDesignation && (
-              <p className="text-[11px] text-[var(--text-muted)] truncate">
+              <p className="text-[12px] text-[var(--text-muted)] truncate">
                 {req.requesterDesignation}
               </p>
             )}
@@ -147,7 +147,7 @@ function RequestCard({
             label={meta.label}
             mine={req.status === "pending"}
           />
-          <span className="text-[11px] text-[var(--text-muted)]">
+          <span className="text-[12px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
         </div>
@@ -155,14 +155,12 @@ function RequestCard({
 
       {/* What */}
       <div className="mt-3">
-        <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
-          {categoryLabel(req.category)}
-        </span>
-        <h3 className="mt-1.5 font-medium text-[15px] text-[var(--text-primary)] leading-snug">
+        <Badge>{categoryLabel(req.category)}</Badge>
+        <h3 className="mt-1.5 font-medium text-[14px] text-[var(--text-primary)] leading-snug">
           {req.subject}
         </h3>
         {req.details && (
-          <p className="mt-1 text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap">
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)] whitespace-pre-wrap">
             {req.details}
           </p>
         )}
@@ -173,27 +171,34 @@ function RequestCard({
           {req.documents.map((d) => (
             <div
               key={d.fileId}
-              className="flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--bg-primary)] border border-[var(--border-subtle)] group"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[var(--bg-primary)] group"
             >
-              <Paperclip size={12} className="text-[var(--text-muted)] shrink-0" />
+              <Paperclip size={14} className="text-[var(--text-muted)] shrink-0" />
               <a
                 href={d.url ?? "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 truncate text-[11px] text-[var(--text-primary)] hover:underline"
+                className="flex-1 truncate text-[12px] text-[var(--text-primary)] hover:underline"
               >
                 {d.fileName}
               </a>
-              <a href={d.url ?? "#"} target="_blank" rel="noreferrer">
-                <Download size={12} className="text-[var(--text-muted)]" />
+              <a
+                href={d.url ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Download ${d.fileName}`}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <Download size={14} />
               </a>
               <button
                 onClick={() =>
                   removeDocument({ requestId: req._id, fileId: d.fileId })
                 }
-                className="text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100"
+                aria-label={`Remove ${d.fileName}`}
+                className="text-[var(--text-muted)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors"
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           ))}
@@ -219,7 +224,7 @@ function RequestCard({
               <select
                 value={req.status}
                 onChange={(e) => update(e.target.value as HrStatus)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2 py-1.5 text-[12px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md h-8 px-2.5 text-[13px] text-[var(--text-primary)] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
                 {HR_STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -248,7 +253,7 @@ function RequestCard({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Status note for the employee…"
-                className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md h-8 px-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               />
               <Button
                 variant="secondary"
@@ -299,7 +304,7 @@ export default function HrRequestsPage() {
 
   if (requests === undefined) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <SkeletonPageHeader />
         <SkeletonCards count={6} what="requests" />
       </div>
@@ -330,7 +335,7 @@ export default function HrRequestsPage() {
     visible.length > 0 && selectedVisible.length === visible.length;
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Requests"
         subtitle={`${pendingCount} awaiting your response`}
@@ -338,6 +343,7 @@ export default function HrRequestsPage() {
         actions={
           <Button
             variant={openOnly ? "primary" : "secondary"}
+            aria-pressed={openOnly}
             onClick={() => setOpenOnly((v) => !v)}
           >
             Open only
@@ -346,41 +352,23 @@ export default function HrRequestsPage() {
       />
 
       {/* Category tabs */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6 flex-wrap">
-        {tabs.map(({ key, label, count }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              tab === key
-                ? "bg-white shadow-sm text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {label}
-            <span
-              className={`px-1.5 rounded text-[11px] ${
-                tab === key
-                  ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                  : "bg-white/60 text-[var(--text-muted)]"
-              }`}
-            >
-              {count}
-            </span>
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        value={tab}
+        onChange={setTab}
+        options={tabs.map(({ key, label, count }) => ({ value: key, label, count }))}
+        className="mb-4 max-w-full flex-wrap"
+      />
 
       {/* Batch bar — sticks to the top of the scroll area so it stays reachable
           in a long list, and only exists while something is selected. */}
       {selectedVisible.length > 0 && (
-        <div className="sticky top-2 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--accent-admin)] bg-white px-3 py-2 shadow-sm">
-          <span className="text-[12px] font-medium text-[var(--text-primary)]">
+        <div className="sticky top-2 z-10 mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 shadow-sm">
+          <span className="text-[13px] font-medium text-[var(--text-primary)]">
             {selectedVisible.length} selected
           </span>
           <button
             onClick={() => setSelected(new Set())}
-            className="text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline"
+            className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2 transition-colors"
           >
             Clear
           </button>
@@ -423,26 +411,16 @@ export default function HrRequestsPage() {
       )}
 
       {visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Inbox size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            No requests here
-          </p>
-        </div>
+        <EmptyState icon={Inbox} title="No requests here" />
       ) : tab === "all" ? (
         // Grouped by category so "All" still reads as segregated.
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-6">
           {HR_CATEGORIES.map(({ value, label }) => {
             const group = visible.filter((r) => r.category === value);
             if (group.length === 0) return null;
             return (
               <section key={value}>
-                <h2 className="mb-3 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                  {label}
-                  <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)] normal-case tracking-normal">
-                    {group.length}
-                  </span>
-                </h2>
+                <SectionHeader title={label} count={group.length} />
                 <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                   {group.map((r) => (
                     <RequestCard

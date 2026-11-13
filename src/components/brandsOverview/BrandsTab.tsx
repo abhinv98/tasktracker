@@ -66,13 +66,13 @@ export default function BrandsTab() {
 
   if (brands === undefined) {
     return (
-      <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+      <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
     );
   }
 
   return (
     <div>
-      <div className="flex justify-end items-center gap-3 mb-6">
+      <div className="flex justify-end items-center gap-2 mb-4">
         <SegmentedTabs
           className="mr-auto"
           value={holdTab}
@@ -85,9 +85,10 @@ export default function BrandsTab() {
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => setFilterMine((p) => !p)}
+            aria-pressed={filterMine}
             className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors border ${
               filterMine
-                ? "bg-[var(--accent-admin-strong)] text-white border-[var(--accent-admin)]"
+                ? "bg-[var(--bg-hover)] text-[var(--text-primary)] border-[var(--border-strong)]"
                 : "bg-white text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-hover)]"
             }`}
           >
@@ -97,7 +98,7 @@ export default function BrandsTab() {
         )}
         {isAdmin && (
           <Button variant="primary" onClick={() => setShowModal(true)}>
-            <Plus className="h-4 w-4 mr-1.5" />
+            <Plus className="h-4 w-4" />
             Create Brand
           </Button>
         )}
@@ -119,7 +120,7 @@ export default function BrandsTab() {
                 <img
                   src={brand.logoUrl}
                   alt={brand.name}
-                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border-primary)]"
+                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border)]"
                 />
               ) : (
                 <div
@@ -144,19 +145,19 @@ export default function BrandsTab() {
             </div>
             <div className="flex gap-3 text-[12px]">
               <span className="text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--text-primary)]">{brand.managerCount}</span> manager{brand.managerCount !== 1 ? "s" : ""}
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.managerCount}</span> manager{brand.managerCount !== 1 ? "s" : ""}
               </span>
               <span className="text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--text-primary)]">{brand.briefCount}</span> brief{brand.briefCount !== 1 ? "s" : ""}
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.briefCount}</span> brief{brand.briefCount !== 1 ? "s" : ""}
               </span>
               <span className="text-[var(--text-secondary)]">
-                <span className="font-semibold text-[var(--accent-employee-text)]">{brand.activeBriefCount}</span> active
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.activeBriefCount}</span> active
               </span>
             </div>
             {brand.managerNames.length > 0 && (
               <div className="flex gap-1 flex-wrap mt-3">
                 {brand.managerNames.map((name: string) => (
-                  <Badge key={name} variant="manager">{name}</Badge>
+                  <Badge key={name}>{name}</Badge>
                 ))}
               </div>
             )}
@@ -173,14 +174,18 @@ export default function BrandsTab() {
 
       {/* Create Brand Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-[20px] text-[var(--text-primary)]">
+              <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
                 Create Brand
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
-                <X className="h-5 w-5" />
+              <button
+                onClick={() => setShowModal(false)}
+                aria-label="Close"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
@@ -207,7 +212,9 @@ export default function BrandsTab() {
                       key={c}
                       type="button"
                       onClick={() => setColor(c)}
-                      className={`w-8 h-8 rounded-lg border-2 transition-all ${
+                      aria-label={`Color ${c}`}
+                      aria-pressed={color === c}
+                      className={`w-8 h-8 rounded-md border-2 transition-all ${
                         color === c ? "border-[var(--text-primary)] scale-110" : "border-transparent"
                       }`}
                       style={{ backgroundColor: c }}
@@ -219,7 +226,7 @@ export default function BrandsTab() {
                 <Button type="submit" variant="primary">
                   Create
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => setShowModal(false)}>
+                <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>
                   Cancel
                 </Button>
               </div>

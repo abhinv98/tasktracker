@@ -95,7 +95,7 @@ export function EchoCard({ email }: { email?: string }) {
             href={STORE_URL || "/echo/echo-extension.zip"}
             {...(STORE_URL ? { target: "_blank", rel: "noreferrer" } : { download: true })}
             onClick={() => setShowSteps(true)}
-            className="inline-flex shrink-0 items-center rounded-md h-8 px-3 text-[13px] font-medium bg-[var(--text-primary)] text-white"
+            className="inline-flex shrink-0 items-center rounded-md h-8 px-3 text-[13px] font-medium bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity"
           >
             Add Echo to your browser
           </a>
@@ -120,7 +120,7 @@ export function EchoCard({ email }: { email?: string }) {
             <button
               type="button"
               onClick={() => setShowSteps(true)}
-              className="text-[13px] text-[var(--accent-admin-text)] underline"
+              className="text-[13px] text-[var(--accent-admin-text)] hover:underline underline-offset-2"
             >
               How to add it
             </button>
@@ -139,9 +139,9 @@ export function EchoCard({ email }: { email?: string }) {
       )}
 
       {calendar?.available && (
-        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-start justify-between gap-4">
+        <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-medium text-[13px] text-[var(--text-primary)]">Google Calendar</h3>
+            <h3 className="font-medium text-[14px] text-[var(--text-primary)]">Google Calendar</h3>
             <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
               {calendar.email
                 ? `Connected as ${calendar.email}. Echo only reads your invites, to fill in who was in each meeting.`

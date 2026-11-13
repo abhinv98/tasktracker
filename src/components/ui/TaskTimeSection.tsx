@@ -6,6 +6,7 @@ import { Play, Square, Plus } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "./Button";
+import { SectionHeader } from "./StatTile";
 import { useToast } from "./Toast";
 
 export function formatMinutes(min: number) {
@@ -54,11 +55,9 @@ export function TaskTimeSection({
   }
 
   return (
-    <div className="p-5 space-y-3 border-t border-[var(--border)]">
-      <div className="flex items-center justify-between">
-        <h4 className="font-medium text-[12px] text-[var(--text-secondary)]">
-          Time
-        </h4>
+    <div className="p-5 space-y-3 border-t border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between gap-3">
+        <SectionHeader title="Time" className="" />
         <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">
           {formatMinutes(closed + live)}
         </span>
@@ -105,7 +104,7 @@ export function TaskTimeSection({
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               placeholder="Hours"
-              className="w-20 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+              className="w-20 px-2.5 rounded-md border border-[var(--border)] bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             />
             <Button type="submit" variant="ghost" disabled={!manual}>
               <Plus className="h-3.5 w-3.5" /> Add
@@ -120,7 +119,7 @@ export function TaskTimeSection({
             .sort((a, b) => b.startedAt - a.startedAt)
             .slice(0, 5)
             .map((e) => (
-              <li key={e._id} className="flex justify-between text-[11px] text-[var(--text-muted)]">
+              <li key={e._id} className="flex justify-between text-[12px] text-[var(--text-muted)]">
                 <span>
                   {e.userName} · {new Date(e.startedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                   {e.manual ? " · manual" : ""}

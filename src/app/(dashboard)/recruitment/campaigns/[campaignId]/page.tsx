@@ -9,6 +9,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import {
   PageHeader,
   Button,
+  EmptyState,
   Modal,
   Select,
   StatusBadge,
@@ -95,7 +96,7 @@ export default function CampaignDetailPage() {
     );
   }
   if (campaign === null) {
-    return <div className="p-8"><p className="text-[15px] text-[var(--text-secondary)]">Campaign not found.</p></div>;
+    return <div className="p-8"><p className="text-[13px] text-[var(--text-secondary)]">Campaign not found.</p></div>;
   }
 
   const allSelected = members.length > 0 && selected.size === members.length;
@@ -135,27 +136,23 @@ export default function CampaignDetailPage() {
       />
 
       {campaign.notes && (
-        <p className="mb-4 rounded-lg bg-[var(--bg-hover)] px-3 py-2 text-[13px] text-[var(--text-secondary)]">
+        <p className="mb-4 rounded-md bg-[var(--bg-hover)] px-3 py-2 text-[12px] text-[var(--text-secondary)]">
           {campaign.notes}
         </p>
       )}
 
       {members.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Megaphone size={28} className="text-[var(--text-disabled)] mb-3" />
-          <p className="text-[15px] font-medium text-[var(--text-secondary)]">
-            Nobody in this campaign yet
-          </p>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1">
-            Add people from a position&apos;s candidate list.
-          </p>
-        </div>
+        <EmptyState
+          icon={Megaphone}
+          title="Nobody in this campaign yet"
+          description="Add people from a position's candidate list."
+        />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
+        <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--bg-hover)]">
+                <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
                   <th className="px-3 py-2 w-8">
                     <input
                       type="checkbox"
@@ -164,12 +161,12 @@ export default function CampaignDetailPage() {
                         setSelected(allSelected ? new Set() : new Set(members.map((m) => m._id)))
                       }
                       aria-label="Select all members"
-                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                      className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
                     />
                   </th>
                   {["Candidate", "Status", "Mailed", ""].map((h, i) => (
                     <th key={h || i}
-                      className="px-3 py-2 text-left font-semibold text-[11px] uppercase tracking-[0.04em] text-[var(--text-secondary)] whitespace-nowrap">
+                      className="h-8 px-3 text-left font-medium text-[12px] text-[var(--text-muted)] whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -180,7 +177,7 @@ export default function CampaignDetailPage() {
                   const meta = stageMeta((m.stage ?? "applied") as Stage);
                   const done = mailedTo.has(m.email.toLowerCase());
                   return (
-                    <tr key={m._id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors">
+                    <tr key={m._id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-primary)] transition-colors">
                       <td className="px-3 py-2">
                         <input
                           type="checkbox"
@@ -193,12 +190,12 @@ export default function CampaignDetailPage() {
                             })
                           }
                           aria-label={`Select ${m.name}`}
-                          className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-admin-strong)]"
+                          className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
                         />
                       </td>
                       <td className="px-3 py-2 min-w-[220px]">
                         <p className="text-[13px] font-medium text-[var(--text-primary)]">{m.name}</p>
-                        <p className="text-[11px] text-[var(--text-muted)]">
+                        <p className="text-[12px] text-[var(--text-muted)]">
                           <a href={`mailto:${m.email}`} className="hover:underline">{m.email}</a>
                           {m.number && <span> · {m.number}</span>}
                         </p>
@@ -208,7 +205,7 @@ export default function CampaignDetailPage() {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-[12px]">
                         {done ? (
-                          <span className="text-[var(--accent-employee-text)]">Sent</span>
+                          <span className="text-[var(--text-secondary)]">Sent</span>
                         ) : (
                           <span className="text-[var(--text-muted)]">—</span>
                         )}
@@ -216,14 +213,14 @@ export default function CampaignDetailPage() {
                       <td className="px-3 py-2 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           {m.resume && (
-                            <a href={m.resume} target="_blank" rel="noreferrer" title="Open résumé"
-                              className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                            <a href={m.resume} target="_blank" rel="noreferrer" title="Open résumé" aria-label="Open résumé"
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                               <FileText size={14} />
                             </a>
                           )}
                           {m.portfolioLink && (
-                            <a href={m.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio"
-                              className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-admin-text)]">
+                            <a href={m.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio" aria-label="Open portfolio"
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                               <ExternalLink size={14} />
                             </a>
                           )}
@@ -234,7 +231,7 @@ export default function CampaignDetailPage() {
                             }}
                             aria-label={`Remove ${m.name} from campaign`}
                             title="Remove from campaign"
-                            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--danger)]"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <UserMinus size={14} />
                           </button>
@@ -251,7 +248,7 @@ export default function CampaignDetailPage() {
 
       <button
         onClick={() => setConfirmDelete(true)}
-        className="mt-6 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+        className="mt-4 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
       >
         Delete this campaign
       </button>
@@ -263,7 +260,7 @@ export default function CampaignDetailPage() {
         icon={Mail}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setMailOpen(false)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setMailOpen(false)}>Cancel</Button>
             <Button loading={busy} disabled={!templateId} onClick={handleSend}>Send now</Button>
           </>
         }

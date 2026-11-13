@@ -23,6 +23,7 @@ export function ChatBubble({ isOpen, onClick }: ChatBubbleProps) {
         }
       `}
       title={isOpen ? "Close chat" : "Open AI Assistant"}
+      aria-label={isOpen ? "Close chat" : "Open AI Assistant"}
     >
       {isOpen ? (
         <X className="h-5 w-5 text-white" />

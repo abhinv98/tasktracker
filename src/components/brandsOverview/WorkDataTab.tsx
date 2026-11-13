@@ -3,8 +3,9 @@
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Badge, Card } from "@/components/ui";
-import { Users, Briefcase, CheckCircle2, Clock, AlertCircle, Eye } from "lucide-react";
+import { Badge, Card, StatStrip, StatTile } from "@/components/ui";
+import { Users, Briefcase, Eye } from "lucide-react";
+import { taskStatusMeta } from "@/lib/status";
 
 const RETURN_TO = "/brands-overview?tab=work-data";
 
@@ -15,13 +16,13 @@ export default function WorkDataTab() {
 
   if (user === undefined || overview === undefined) {
     return (
-      <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+      <p className="text-[13px] text-[var(--text-secondary)]">Loading...</p>
     );
   }
 
   if (!user || user.role !== "admin") {
     return (
-      <p className="text-[15px] text-[var(--text-secondary)]">
+      <p className="text-[13px] text-[var(--text-secondary)]">
         Access denied. Work Data is for brand managers &amp; super-admins.
       </p>
     );
@@ -37,39 +38,24 @@ export default function WorkDataTab() {
   return (
     <div>
       {/* Global Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <Card>
-          <p className="text-[12px] font-medium text-[var(--text-secondary)]">Brands</p>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBrands}</p>
-        </Card>
-        <Card accent="admin">
-          <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Briefs</p>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalBriefs}</p>
-        </Card>
-        <Card accent="manager">
-          <p className="text-[12px] font-medium text-[var(--text-secondary)]">Active Briefs</p>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalActiveBriefs}</p>
-        </Card>
-        <Card>
-          <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Tasks</p>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{totalTasks}</p>
-        </Card>
-        <Card accent="employee">
-          <p className="text-[12px] font-medium text-[var(--text-secondary)]">Overall Progress</p>
-          <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">{Math.round(overallProgress)}%</p>
-        </Card>
-      </div>
+      <StatStrip className="mb-4">
+        <StatTile label="Brands" value={totalBrands} />
+        <StatTile label="Total Briefs" value={totalBriefs} />
+        <StatTile label="Active Briefs" value={totalActiveBriefs} />
+        <StatTile label="Total Tasks" value={totalTasks} />
+        <StatTile label="Overall Progress" value={`${Math.round(overallProgress)}%`} />
+      </StatStrip>
 
       {/* Brand Cards */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {overview.map((brand) => (
           <Card key={brand._id} className="!p-0 overflow-hidden">
-            <div className="flex items-center gap-4 px-6 py-4 border-b border-[var(--border)]">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-subtle)]">
               {brand.logoUrl ? (
                 <img
                   src={brand.logoUrl}
                   alt={brand.name}
-                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border-primary)]"
+                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-[var(--border)]"
                 />
               ) : (
                 <div
@@ -95,69 +81,64 @@ export default function WorkDataTab() {
                     `/brands/${brand._id}?returnTo=${encodeURIComponent(RETURN_TO)}`
                   )
                 }
-                className="text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] transition-colors"
+                aria-label={`Open ${brand.name}`}
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
-                <Eye className="h-5 w-5" />
+                <Eye className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="px-6 py-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+            <div className="px-4 py-3.5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-1 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                   <div
                     className="h-full rounded-full bg-[var(--accent-employee)] transition-all"
                     style={{ width: `${brand.progress}%` }}
                   />
                 </div>
-                <span className="text-[13px] font-semibold text-[var(--text-primary)] tabular-nums w-12 text-right">
+                <span className="text-[13px] font-medium text-[var(--text-primary)] tabular-nums w-12 text-right">
                   {Math.round(brand.progress)}%
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[var(--text-muted)]" />
-                  <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.pending ?? 0}</span> pending
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-[var(--accent-manager-text)]" />
-                  <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.["in-progress"] ?? 0}</span> in progress
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-[var(--accent-admin-text)]" />
-                  <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.review ?? 0}</span> in review
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[var(--accent-employee-text)]" />
-                  <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.taskStatusCounts?.done ?? 0}</span> done
-                  </span>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mb-3">
+                {(
+                  [
+                    ["pending", "pending"],
+                    ["in-progress", "in progress"],
+                    ["review", "in review"],
+                    ["done", "done"],
+                  ] as const
+                ).map(([status, word]) => (
+                  <div key={status} className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: taskStatusMeta(status).dot }}
+                    />
+                    <span className="text-[13px] text-[var(--text-secondary)]">
+                      <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.taskStatusCounts?.[status] ?? 0}</span> {word}
+                    </span>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-[var(--text-muted)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.employeeCount}</span> employee{brand.employeeCount !== 1 ? "s" : ""}
+                    <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.employeeCount}</span> employee{brand.employeeCount !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Briefcase className="h-4 w-4 text-[var(--text-muted)]" />
                   <span className="text-[13px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)]">{brand.activeBriefCount}</span>/{brand.briefCount} brief{brand.briefCount !== 1 ? "s" : ""} active
+                    <span className="font-semibold tabular-nums text-[var(--text-primary)]">{brand.activeBriefCount}</span>/{brand.briefCount} brief{brand.briefCount !== 1 ? "s" : ""} active
                   </span>
                 </div>
                 {brand.managers.length > 0 && (
                   <div className="flex gap-1 flex-wrap">
                     {brand.managers.map((m) => (
-                      <Badge key={m._id} variant="manager">
+                      <Badge key={m._id}>
                         {m.name ?? m.email ?? "Unknown"}
                       </Badge>
                     ))}

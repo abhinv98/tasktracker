@@ -15,6 +15,7 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
+import { Button } from "@/components/ui";
 
 // ─── Copyable Link ──────────────────────────
 export function CopyableLink({ url }: { url: string }) {
@@ -27,16 +28,16 @@ export function CopyableLink({ url }: { url: string }) {
   }
 
   return (
-    <div className="flex items-center gap-0 mt-2 rounded-lg border border-blue-200 bg-blue-50 overflow-hidden">
+    <div className="flex items-center gap-0 mt-2 rounded-md border border-[var(--border)] bg-white overflow-hidden">
       <input
         readOnly
         value={url}
-        className="flex-1 px-3 py-2 text-[12px] font-mono text-blue-800 bg-transparent border-none outline-none select-all min-w-0"
+        className="flex-1 px-3 py-2 text-[12px] font-mono text-[var(--text-primary)] bg-transparent border-none outline-none select-all min-w-0"
         onClick={(e) => (e.target as HTMLInputElement).select()}
       />
       <button
         onClick={handleCopy}
-        className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium border-l border-blue-200 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
+        className="shrink-0 h-8 px-3 text-[13px] font-medium border-l border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1.5"
       >
         {copied ? (
           <>
@@ -99,14 +100,14 @@ export function CreateUserForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2 mb-1.5">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             Invite Created for {result.name}
           </span>
         </div>
-        <p className="text-[11px] text-emerald-700 mb-1">
+        <p className="text-[12px] text-[var(--text-secondary)] mb-1">
           Share this signup link with the user:
         </p>
         <CopyableLink url={result.signupUrl} />
@@ -119,16 +120,15 @@ export function CreateUserForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <UserPlus className="h-4 w-4 text-[var(--accent-admin-text)]" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Create New User
         </span>
       </div>
 
       {/* Name */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Name *
         </label>
         <input
@@ -137,13 +137,13 @@ export function CreateUserForm() {
           onChange={(e) => setName(e.target.value)}
           placeholder="Full name"
           required
-          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
         />
       </div>
 
       {/* Email */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Email *
         </label>
         <input
@@ -152,20 +152,20 @@ export function CreateUserForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="user@company.com"
           required
-          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
         />
       </div>
 
       {/* Role */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Role *
         </label>
         <div className="relative">
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "employee")}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="employee">Employee</option>
             <option value="admin">Admin</option>
@@ -176,7 +176,7 @@ export function CreateUserForm() {
 
       {/* Designation */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Designation
         </label>
         <input
@@ -184,22 +184,22 @@ export function CreateUserForm() {
           value={designation}
           onChange={(e) => setDesignation(e.target.value)}
           placeholder="e.g. Senior Designer (optional)"
-          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+          className="w-full px-2.5 py-1.5 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
         />
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">
           {error}
         </p>
       )}
 
       {/* Buttons */}
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !name.trim() || !email.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -207,11 +207,12 @@ export function CreateUserForm() {
             <UserPlus className="h-3.5 w-3.5" />
           )}
           {isSubmitting ? "Creating..." : "Create & Get Link"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -267,16 +268,16 @@ export function DeleteBriefForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             Brief &quot;{result.briefTitle}&quot; deleted successfully
           </span>
         </div>
         <button
           onClick={handleClear}
-          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+          className="mt-2 text-[12px] font-medium text-[var(--accent-employee-text)] underline underline-offset-2"
         >
           Delete another
         </button>
@@ -289,16 +290,15 @@ export function DeleteBriefForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <Trash2 className="h-4 w-4 text-red-500" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Delete Brief
         </span>
       </div>
 
       {/* Brand selector */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select Brand *
         </label>
         <div className="relative">
@@ -309,7 +309,7 @@ export function DeleteBriefForm() {
               setSelectedBriefId("");
               setError(null);
             }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a brand...</option>
             {brands.map((b) => (
@@ -324,7 +324,7 @@ export function DeleteBriefForm() {
 
       {/* Brief selector */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select Brief *
         </label>
         <div className="relative">
@@ -335,7 +335,7 @@ export function DeleteBriefForm() {
               setError(null);
             }}
             disabled={!selectedBrandId || brandBriefs.length === 0}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="">
               {!selectedBrandId
@@ -356,7 +356,7 @@ export function DeleteBriefForm() {
           const brief = brandBriefs.find((b) => b._id === selectedBriefId);
           if (!brief) return null;
           return (
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
               {brief.taskCount} task{brief.taskCount !== 1 ? "s" : ""} will also be deleted
             </p>
           );
@@ -364,17 +364,18 @@ export function DeleteBriefForm() {
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">
           {error}
         </p>
       )}
 
       {/* Buttons */}
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !selectedBriefId}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          variant="destructive"
+          className="flex-1"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -382,11 +383,12 @@ export function DeleteBriefForm() {
             <Trash2 className="h-3.5 w-3.5" />
           )}
           {isSubmitting ? "Deleting..." : "Delete Brief"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -434,16 +436,16 @@ export function DeleteUserForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             User &quot;{result.userName}&quot; has been deleted
           </span>
         </div>
         <button
           onClick={handleClear}
-          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+          className="mt-2 text-[12px] font-medium text-[var(--accent-employee-text)] underline underline-offset-2"
         >
           Delete another
         </button>
@@ -456,16 +458,15 @@ export function DeleteUserForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <UserMinus className="h-4 w-4 text-red-500" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Delete User
         </span>
       </div>
 
       {/* User selector */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select User *
         </label>
         <div className="relative">
@@ -475,7 +476,7 @@ export function DeleteUserForm() {
               setSelectedUserId(e.target.value);
               setError(null);
             }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a user...</option>
             {allUsers.map((u) => (
@@ -490,7 +491,7 @@ export function DeleteUserForm() {
           const user = allUsers.find((u) => u._id === selectedUserId);
           if (!user) return null;
           return (
-            <div className="mt-1.5 flex items-center gap-2 text-[11px] text-[var(--text-muted)]">
+            <div className="mt-1.5 flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
               <span>{user.email}</span>
               <span className="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] capitalize font-medium">
                 {user.role}
@@ -501,17 +502,18 @@ export function DeleteUserForm() {
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">
           {error}
         </p>
       )}
 
       {/* Buttons */}
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !selectedUserId}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          variant="destructive"
+          className="flex-1"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -519,11 +521,12 @@ export function DeleteUserForm() {
             <UserMinus className="h-3.5 w-3.5" />
           )}
           {isSubmitting ? "Deleting..." : "Delete User"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -571,16 +574,16 @@ export function DeleteTeamForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             Team &quot;{result.teamName}&quot; has been deleted
           </span>
         </div>
         <button
           onClick={handleClear}
-          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+          className="mt-2 text-[12px] font-medium text-[var(--accent-employee-text)] underline underline-offset-2"
         >
           Delete another
         </button>
@@ -593,15 +596,14 @@ export function DeleteTeamForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <Trash2 className="h-4 w-4 text-red-500" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Delete Team
         </span>
       </div>
 
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select Team *
         </label>
         <div className="relative">
@@ -611,7 +613,7 @@ export function DeleteTeamForm() {
               setSelectedTeamId(e.target.value);
               setError(null);
             }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a team...</option>
             {teams.map((t) => (
@@ -626,7 +628,7 @@ export function DeleteTeamForm() {
           const team = teams.find((t) => t._id === selectedTeamId);
           if (!team) return null;
           return (
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
               Lead: {team.leadName} &middot; {team.memberCount} member{team.memberCount !== 1 ? "s" : ""}
             </p>
           );
@@ -634,16 +636,17 @@ export function DeleteTeamForm() {
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">
           {error}
         </p>
       )}
 
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !selectedTeamId}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          variant="destructive"
+          className="flex-1"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -651,11 +654,12 @@ export function DeleteTeamForm() {
             <Trash2 className="h-3.5 w-3.5" />
           )}
           {isSubmitting ? "Deleting..." : "Delete Team"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -713,16 +717,16 @@ export function AssignTeamLeadForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             {result.userName} assigned as lead of &quot;{result.teamName}&quot;
           </span>
         </div>
         <button
           onClick={handleClear}
-          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+          className="mt-2 text-[12px] font-medium text-[var(--accent-employee-text)] underline underline-offset-2"
         >
           Assign another
         </button>
@@ -735,22 +739,21 @@ export function AssignTeamLeadForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <Users className="h-4 w-4 text-[var(--accent-admin-text)]" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Assign Team Lead
         </span>
       </div>
 
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select Team *
         </label>
         <div className="relative">
           <select
             value={selectedTeamId}
             onChange={(e) => { setSelectedTeamId(e.target.value); setError(null); }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a team...</option>
             {teams.map((t) => (
@@ -764,14 +767,14 @@ export function AssignTeamLeadForm() {
       </div>
 
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           New Team Lead *
         </label>
         <div className="relative">
           <select
             value={selectedUserId}
             onChange={(e) => { setSelectedUserId(e.target.value); setError(null); }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a team lead...</option>
             {eligibleLeads.map((u) => (
@@ -785,22 +788,23 @@ export function AssignTeamLeadForm() {
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">{error}</p>
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">{error}</p>
       )}
 
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !selectedTeamId || !selectedUserId}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1"
         >
           {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
           {isSubmitting ? "Assigning..." : "Assign Lead"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -856,16 +860,16 @@ export function AssignTeamForm() {
 
   if (result) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 my-1.5">
+      <div className="rounded-md bg-[var(--accent-employee-dim)] px-3 py-2 my-1.5">
         <div className="flex items-center gap-2">
-          <Check className="h-4 w-4 text-emerald-600" />
-          <span className="text-[12px] font-semibold text-emerald-800">
+          <Check className="h-4 w-4 text-[var(--accent-employee-text)]" />
+          <span className="text-[13px] font-medium text-[var(--accent-employee-text)]">
             {result.userName} assigned to team &quot;{result.teamName}&quot;
           </span>
         </div>
         <button
           onClick={handleClear}
-          className="mt-2 text-[11px] text-emerald-700 underline hover:text-emerald-900"
+          className="mt-2 text-[12px] font-medium text-[var(--accent-employee-text)] underline underline-offset-2"
         >
           Assign another
         </button>
@@ -878,16 +882,15 @@ export function AssignTeamForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-[var(--border)] bg-white p-3 my-1.5 space-y-2.5"
     >
-      <div className="flex items-center gap-2 mb-1">
-        <Users className="h-4 w-4 text-[var(--accent-admin-text)]" />
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-1">
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">
           Assign User to Team
         </span>
       </div>
 
       {/* User selector */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select User *
         </label>
         <div className="relative">
@@ -897,7 +900,7 @@ export function AssignTeamForm() {
               setSelectedUserId(e.target.value);
               setError(null);
             }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a user...</option>
             {allUsers.map((u) => (
@@ -912,7 +915,7 @@ export function AssignTeamForm() {
 
       {/* Team selector */}
       <div>
-        <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wide mb-0.5">
+        <label className="block text-[12px] font-medium text-[var(--text-muted)] mb-1">
           Select Team *
         </label>
         <div className="relative">
@@ -922,7 +925,7 @@ export function AssignTeamForm() {
               setSelectedTeamId(e.target.value);
               setError(null);
             }}
-            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[12px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
+            className="w-full appearance-none px-2.5 py-1.5 pr-8 rounded-md border border-[var(--border)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)] bg-white"
           >
             <option value="">Choose a team...</option>
             {teams.map((t) => (
@@ -936,16 +939,16 @@ export function AssignTeamForm() {
       </div>
 
       {error && (
-        <p className="text-[11px] text-red-600 bg-red-50 px-2 py-1 rounded">
+        <p className="text-[12px] text-[var(--danger)] bg-[var(--danger-dim)] px-2 py-1 rounded-md">
           {error}
         </p>
       )}
 
       <div className="flex items-center gap-2 pt-1">
-        <button
+        <Button
           type="submit"
           disabled={isSubmitting || !selectedUserId || !selectedTeamId}
-          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -953,11 +956,12 @@ export function AssignTeamForm() {
             <Users className="h-3.5 w-3.5" />
           )}
           {isSubmitting ? "Assigning..." : "Assign to Team"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={handleClear}
-          className="px-3 py-1.5 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          aria-label="Clear"
+          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>

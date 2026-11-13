@@ -12,6 +12,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Pencil, ArrowRight, Link as LinkIcon, X } from "lucide-react";
+import { Button, StatusBadge } from "@/components/ui";
+import { taskStatusMeta } from "@/lib/status";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -46,14 +48,9 @@ interface MasterBriefBoardProps {
   onOpenTaskDetail: (taskId: string) => void;
 }
 
-/* ─── Status styling ─────────────────────────────── */
-
-const STATUS: Record<string, { color: string; bg: string; label: string }> = {
-  pending:       { color: "#64748b", bg: "#f1f5f9", label: "Pending" },
-  "in-progress": { color: "#d97706", bg: "#fef3c7", label: "In Progress" },
-  review:        { color: "#7c3aed", bg: "#ede9fe", label: "Review" },
-  done:          { color: "#059669", bg: "#d1fae5", label: "Done" },
-};
+// Icon-only buttons on a task card: shown on hover or keyboard focus.
+const CARD_ICON_BUTTON =
+  "inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0";
 
 /* ─── SVG connection path builder ────────────────── */
 
@@ -257,20 +254,12 @@ export function MasterBriefBoard({
 
       {/* Connect mode banner */}
       {connectingFrom && (
-        <div
-          className="sticky top-0 z-10 flex items-center justify-center gap-2 px-4 py-2 text-[12px] font-medium text-white"
-          style={{
-            background: "linear-gradient(135deg, var(--accent-admin, #c4684d) 0%, #a855f7 100%)",
-          }}
-        >
+        <div className="sticky top-0 z-10 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--text-primary)] text-[13px] font-medium text-white">
           <LinkIcon className="h-3.5 w-3.5" />
           Click another task to connect, or
-          <button
-            onClick={cancelConnect}
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-white/20 hover:bg-white/30 transition-colors"
-          >
-            <X className="h-3 w-3" /> Cancel
-          </button>
+          <Button variant="secondary" onClick={cancelConnect}>
+            <X className="h-3.5 w-3.5" /> Cancel
+          </Button>
         </div>
       )}
 
@@ -285,39 +274,38 @@ export function MasterBriefBoard({
             {/* Team header */}
             <div className="flex items-center gap-2.5 mb-3">
               <div
-                className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-1"
-                style={{
-                  backgroundColor: team.teamColor,
-                  boxShadow: `0 0 0 2px color-mix(in srgb, ${team.teamColor} 30%, transparent)`,
-                }}
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: team.teamColor }}
+                aria-hidden
               />
-              <h3 className="text-[13px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
+              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">
                 {team.teamName}
               </h3>
-              <span className="text-[11px] font-medium text-[var(--text-muted)] tabular-nums">
+              <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
                 {team.tasks.length} task{team.tasks.length !== 1 ? "s" : ""}
               </span>
               {isAdmin && (
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => onCreateTask(team.teamId)}
-                  className="ml-auto text-[11px] font-semibold text-[var(--accent-admin-text)] hover:text-[var(--accent-admin-text)] hover:underline transition-colors"
+                  className="ml-auto"
                 >
                   + Add task
-                </button>
+                </Button>
               )}
             </div>
 
             {/* Task cards grid */}
             {team.tasks.length === 0 ? (
-              <div className="flex items-center justify-center h-16 rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--bg-primary)]">
-                <p className="text-[11px] text-[var(--text-muted)]">
+              <div className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-primary)]">
+                <p className="text-[12px] text-[var(--text-muted)]">
                   No tasks yet
                 </p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
                 {team.tasks.map((task, taskIdx) => {
-                  const st = STATUS[task.status] ?? STATUS.pending;
+                  const st = taskStatusMeta(task.status);
                   const isConnecting = connectingFrom === task._id;
                   const isConnectTarget = !!connectingFrom && connectingFrom !== task._id;
                   // Check if this task has any outgoing connections
@@ -334,13 +322,13 @@ export function MasterBriefBoard({
                       }}
                       onClick={() => handleCardClick(task._id)}
                       className={`
-                        relative group w-[200px] rounded-xl border-2 bg-white cursor-pointer
-                        transition-all duration-200
+                        relative group w-[200px] rounded-lg border bg-white cursor-pointer
+                        transition-colors duration-150
                         ${isConnecting
-                          ? "border-[var(--accent-admin)] ring-2 ring-[var(--accent-admin)]/20 shadow-lg scale-[1.02]"
+                          ? "border-[var(--accent-admin)] ring-2 ring-[var(--accent-admin)]/20"
                           : isConnectTarget
-                            ? "border-[var(--accent-admin)]/40 hover:border-[var(--accent-admin)] hover:shadow-lg hover:scale-[1.02]"
-                            : "border-[var(--border)] hover:border-[color-mix(in_srgb,var(--accent-admin)_40%,var(--border))] hover:shadow-md"
+                            ? "border-[var(--accent-admin)]/40 hover:border-[var(--accent-admin)]"
+                            : "border-[var(--border)] hover:border-[var(--border-strong)]"
                         }
                         animate-[fadeSlideIn_350ms_ease-out_both]
                       `}
@@ -348,16 +336,10 @@ export function MasterBriefBoard({
                         animationDelay: `${teamIdx * 60 + taskIdx * 40 + 80}ms`,
                       }}
                     >
-                      {/* Team color top bar */}
-                      <div
-                        className="h-1 rounded-t-[10px]"
-                        style={{ backgroundColor: team.teamColor }}
-                      />
-
                       {/* Card body */}
                       <div className="px-3 py-2.5">
                         <div className="flex items-start justify-between gap-1.5">
-                          <p className="text-[12px] font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 tracking-[-0.005em]">
+                          <p className="text-[13px] font-medium text-[var(--text-primary)] leading-snug line-clamp-2">
                             {task.title}
                           </p>
                           {isAdmin && !connectingFrom && (
@@ -366,9 +348,10 @@ export function MasterBriefBoard({
                                 e.stopPropagation();
                                 onEditTask(task._id);
                               }}
-                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+                              aria-label="Edit task"
+                              className={`${CARD_ICON_BUTTON} -mt-1.5 -mr-1.5`}
                             >
-                              <Pencil className="h-3 w-3" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
@@ -388,7 +371,7 @@ export function MasterBriefBoard({
                             <span
                               className={`text-[11px] font-medium tabular-nums shrink-0 ${
                                 task.status !== "done" && task.status !== "review" && task.deadline < Date.now()
-                                  ? "text-red-500"
+                                  ? "text-[var(--danger)]"
                                   : "text-[var(--text-muted)]"
                               }`}
                             >
@@ -401,13 +384,8 @@ export function MasterBriefBoard({
                         </div>
 
                         {/* Status + Connect handle row */}
-                        <div className="flex items-center justify-between mt-2">
-                          <span
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold"
-                            style={{ color: st.color, backgroundColor: st.bg }}
-                          >
-                            {st.label}
-                          </span>
+                        <div className="flex items-center justify-between min-h-8 mt-1">
+                          <StatusBadge color={st.dot} label={st.label} />
 
                           {/* Connect handle */}
                           {isAdmin && !connectingFrom && (
@@ -417,9 +395,10 @@ export function MasterBriefBoard({
                                 startConnect(task._id);
                               }}
                               title="Connect to another task"
-                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-all"
+                              aria-label="Connect to another task"
+                              className={`${CARD_ICON_BUTTON} -mr-1.5`}
                             >
-                              <ArrowRight className="h-3 w-3" />
+                              <ArrowRight className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
@@ -439,9 +418,9 @@ export function MasterBriefBoard({
                                 return (
                                   <span
                                     key={c._id}
-                                    className="group/conn inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] max-w-full"
+                                    className="group/conn inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] max-w-full"
                                   >
-                                    <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                                    <ArrowRight className="h-3 w-3 shrink-0" />
                                     <span className="truncate">{targetName || "Task"}</span>
                                     {isAdmin && (
                                       <button
@@ -449,9 +428,10 @@ export function MasterBriefBoard({
                                           e.stopPropagation();
                                           removeConnection({ connectionId: c._id as Id<"taskConnections"> });
                                         }}
-                                        className="ml-0.5 opacity-0 group-hover/conn:opacity-100 hover:text-[var(--danger)] transition-opacity"
+                                        aria-label="Remove connection"
+                                        className="ml-0.5 opacity-0 group-hover/conn:opacity-100 focus-visible:opacity-100 hover:text-[var(--danger)] transition-opacity"
                                       >
-                                        <X className="h-2.5 w-2.5" />
+                                        <X className="h-3 w-3" />
                                       </button>
                                     )}
                                   </span>
@@ -470,10 +450,8 @@ export function MasterBriefBoard({
 
         {teams.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--bg-hover)] flex items-center justify-center mb-3">
-              <LinkIcon className="h-5 w-5 text-[var(--text-disabled)]" />
-            </div>
-            <p className="text-[15px] font-medium text-[var(--text-secondary)]">
+            <LinkIcon className="h-8 w-8 text-[var(--text-muted)] mb-2" aria-hidden />
+            <p className="text-[14px] font-medium text-[var(--text-primary)]">
               No teams assigned
             </p>
             <p className="text-[12px] text-[var(--text-muted)] mt-1">

@@ -1,12 +1,23 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card, ConfirmModal, useToast } from "@/components/ui";
 import {
-  ExternalLink,
+  Button,
+  ConfirmModal,
+  EmptyState,
+  Panel,
+  PanelEmpty,
+  StatStrip,
+  StatTile,
+  StatusBadge,
+  useToast,
+} from "@/components/ui";
+import { taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import {
   Link2,
   Copy,
   Plus,
@@ -16,14 +27,8 @@ import {
   GripVertical,
   Eye,
   EyeOff,
-  Briefcase,
   BarChart3,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
   Activity,
-  CalendarDays,
-  Inbox,
 } from "lucide-react";
 import {
   DndContext,
@@ -40,6 +45,35 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { fieldClass, iconButtonClass } from "@/components/ui/classes";
+
+const ICON_BTN = iconButtonClass;
+// Same frame and title bar as <Panel>, for blocks whose header carries a button.
+const BLOCK = "rounded-lg border border-[var(--border)] bg-white overflow-hidden";
+const BLOCK_HEAD =
+  "flex items-center justify-between gap-3 h-11 px-4 border-b border-[var(--border-subtle)]";
+const FIELD = fieldClass;
+const SUB_LABEL = "text-[12px] font-medium text-[var(--text-muted)] mb-1.5";
+
+function BlockTitle({ title, count }: { title: string; count?: number }) {
+  return (
+    <h3 className="flex items-center gap-2 font-semibold text-[14px] text-[var(--text-primary)]">
+      {title}
+      {count !== undefined && count > 0 && (
+        <span className="font-normal tabular-nums text-[var(--text-muted)]">{count}</span>
+      )}
+    </h3>
+  );
+}
+
+function StatusDot({ status }: { status: string }) {
+  return (
+    <span
+      className="w-2 h-2 rounded-full shrink-0"
+      style={{ backgroundColor: taskStatusMeta(status).dot }}
+    />
+  );
+}
 
 interface ClientJsrTabProps {
   brandId: Id<"brands">;
@@ -107,18 +141,24 @@ function SortableBlock({
 
   return (
     <div ref={setNodeRef} style={style} className="mb-4">
-      <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-          <button {...attributes} {...listeners} className="cursor-grab text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+      <div className={BLOCK}>
+        <div className={`flex items-center gap-1 h-11 pl-2 pr-2 ${block.visible ? "border-b border-[var(--border-subtle)]" : ""}`}>
+          <button
+            {...attributes}
+            {...listeners}
+            aria-label={`Drag to reorder ${block.label}`}
+            className={`${ICON_BTN} cursor-grab`}
+          >
             <GripVertical className="h-4 w-4" />
           </button>
-          <span className="font-medium text-[13px] text-[var(--text-primary)] flex-1">{block.label}</span>
+          <span className="font-semibold text-[14px] text-[var(--text-primary)] flex-1">{block.label}</span>
           <button
             onClick={() => onToggle(block.id)}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            className={ICON_BTN}
             title={block.visible ? "Hide block" : "Show block"}
+            aria-label={block.visible ? "Hide block" : "Show block"}
           >
-            {block.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {block.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </button>
         </div>
         {block.visible && <div className="p-4">{children}</div>}
@@ -248,21 +288,24 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
     switch (block.id) {
       case "briefs":
         return (
-          <div className="space-y-2">
+          <div className="-my-2 divide-y divide-[var(--border-subtle)]">
             {brand.briefs.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-3">No briefs</p>
+              <p className="text-[13px] text-[var(--text-muted)] py-2">No briefs</p>
             ) : (
               brand.briefs.map((brief: any) => (
-                <div key={brief._id} className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                <div key={brief._id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{brief.title}</p>
-                    <p className="text-[11px] text-[var(--text-muted)] capitalize">{brief.status}</p>
+                    <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{brief.title}</p>
+                    <StatusBadge
+                      color={BRIEF_STATUS_COLORS[brief.status] ?? BRIEF_STATUS_COLORS.draft}
+                      label={BRIEF_STATUS_LABELS[brief.status] ?? brief.status}
+                    />
                   </div>
-                  <div className="flex items-center gap-2 ml-2">
-                    <div className="w-16 h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-16 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
                       <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${brief.progress}%` }} />
                     </div>
-                    <span className="text-[11px] text-[var(--text-muted)] tabular-nums whitespace-nowrap">
+                    <span className="text-[12px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
                       {brief.doneCount}/{brief.taskCount}
                     </span>
                   </div>
@@ -273,65 +316,48 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         );
       case "taskStatus":
         return (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-gray-50">
-              <p className="text-[11px] font-medium text-[var(--text-muted)]">Pending</p>
-              <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.pending ?? 0}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-amber-50">
-              <p className="text-[11px] font-medium text-amber-600">In Progress</p>
-              <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.["in-progress"] ?? 0}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-purple-50">
-              <p className="text-[11px] font-medium text-purple-600">Review</p>
-              <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.review ?? 0}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-green-50">
-              <p className="text-[11px] font-medium text-green-600">Done</p>
-              <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.taskStatusCounts?.done ?? 0}</p>
-            </div>
-          </div>
+          <StatStrip>
+            <StatTile label="Pending" value={brand.taskStatusCounts?.pending ?? 0} />
+            <StatTile label="In Progress" value={brand.taskStatusCounts?.["in-progress"] ?? 0} />
+            <StatTile label="Review" value={brand.taskStatusCounts?.review ?? 0} />
+            <StatTile label="Done" value={brand.taskStatusCounts?.done ?? 0} />
+          </StatStrip>
         );
       case "analytics":
         return (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-[12px] text-[var(--text-secondary)]">Completion</span>
-              <span className="text-[12px] font-bold text-[var(--text-primary)]">{completionPct}%</span>
+              <span className="text-[13px] text-[var(--text-secondary)]">Completion</span>
+              <span className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">{completionPct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+            <div className="h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
               <div className="h-full rounded-full bg-[var(--accent-employee)] transition-all" style={{ width: `${completionPct}%` }} />
             </div>
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              <div className="text-center">
-                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.briefs.length}</p>
-                <p className="text-[11px] text-[var(--text-muted)]">Briefs</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{totalTasks}</p>
-                <p className="text-[11px] text-[var(--text-muted)]">Tasks</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[20px] font-bold text-[var(--text-primary)] tabular-nums">{brand.managers.length}</p>
-                <p className="text-[11px] text-[var(--text-muted)]">Managers</p>
-              </div>
-            </div>
+            <StatStrip>
+              <StatTile label="Briefs" value={brand.briefs.length} />
+              <StatTile label="Tasks" value={totalTasks} />
+              <StatTile label="Managers" value={brand.managers.length} />
+            </StatStrip>
           </div>
         );
       case "clientTasks": {
         const tasks = brandClientTasks ?? [];
         return (
-          <div className="space-y-2">
+          <div className="-my-2 divide-y divide-[var(--border-subtle)]">
             {tasks.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-3">No client tasks</p>
+              <p className="text-[13px] text-[var(--text-muted)] py-2">No client tasks</p>
             ) : (
               tasks.slice(0, 10).map((task: any) => (
-                <div key={task._id} className="flex items-center justify-between p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
+                <div key={task._id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
-                    <p className="text-[11px] text-[var(--text-secondary)]">{task.briefTitle}</p>
+                    <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
+                    <p className="text-[12px] text-[var(--text-muted)] truncate">{task.briefTitle}</p>
                   </div>
-                  <span className="text-[11px] text-[var(--text-muted)] capitalize shrink-0 ml-2">{task.status}</span>
+                  <StatusBadge
+                    className="w-[88px] shrink-0"
+                    color={taskStatusMeta(task.status).dot}
+                    label={taskStatusMeta(task.status).label}
+                  />
                 </div>
               ))
             )}
@@ -340,11 +366,9 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
       }
       case "recentActivity":
         return (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
-              <Activity className="h-3.5 w-3.5" />
-              <span>Shows recent task activity to the client (status changes, task updates, etc.)</span>
-            </div>
+          <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+            <Activity className="h-3.5 w-3.5 shrink-0" />
+            <span>Shows recent task activity to the client (status changes, task updates, etc.)</span>
           </div>
         );
       case "messages": {
@@ -353,27 +377,24 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         return (
           <div className="space-y-2">
             {recent.length === 0 ? (
-              <p className="text-[12px] text-[var(--text-muted)] text-center py-3">No messages yet</p>
+              <p className="text-[13px] text-[var(--text-muted)]">No messages yet</p>
             ) : (
               recent.map((msg: any) => (
-                <div key={msg._id} className={`p-2.5 rounded-lg ${msg.senderType === "manager" ? "bg-[var(--accent-admin)]/5 ml-4" : "bg-[var(--bg-hover)] mr-4"}`}>
-                  <p className="text-[11px] font-medium text-[var(--text-muted)] mb-0.5">
+                <div key={msg._id} className={`px-3 py-2 rounded-md ${msg.senderType === "manager" ? "bg-[var(--bg-primary)] border border-[var(--border-subtle)] ml-4" : "bg-[var(--bg-hover)] mr-4"}`}>
+                  <p className="text-[12px] font-medium text-[var(--text-muted)] mb-0.5">
                     {msg.senderName || (msg.senderType === "client" ? "Client" : "Manager")}
                   </p>
-                  <p className="text-[12px] text-[var(--text-primary)] line-clamp-2">{msg.content}</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  <p className="text-[13px] text-[var(--text-primary)] line-clamp-2">{msg.content}</p>
+                  <p className="text-[11px] tabular-nums text-[var(--text-muted)] mt-1">
                     {new Date(msg.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                   </p>
                 </div>
               ))
             )}
             {msgs.length > 5 && (
-              <button
-                onClick={() => setChatSidebarOpen(true)}
-                className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline w-full text-center py-1"
-              >
+              <Button variant="ghost" className="w-full" onClick={() => setChatSidebarOpen(true)}>
                 View all {msgs.length} messages
-              </button>
+              </Button>
             )}
           </div>
         );
@@ -384,166 +405,136 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-4">
       {/* Left: JSR Link Management */}
-      <div className="space-y-6">
+      <div className="space-y-4 min-w-0">
         {/* JSR Links */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <ExternalLink className="h-4 w-4 text-[var(--text-secondary)]" />
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">JSR Links</h3>
-              <span className="text-[11px] text-[var(--text-muted)]">({activeLinks.length})</span>
-            </div>
+        <div className={BLOCK}>
+          <div className={BLOCK_HEAD}>
+            <BlockTitle title="JSR Links" count={activeLinks.length} />
             {canManageLinks && (
               <button
                 onClick={handleGenerateJsr}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className={ICON_BTN}
+                aria-label="Generate JSR link"
               >
                 <Plus className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="p-4">
-            {activeLinks.length === 0 && (
-              <div className="text-center py-6">
-                <ExternalLink className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                <p className="text-[12px] text-[var(--text-muted)]">No active JSR links. Click + to generate one.</p>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              {activeLinks.map((link) => (
-                <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-employee-text)] shrink-0" />
-                    <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
-                      {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => copyJsrLink(link.token)}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                    >
-                      <Copy className="h-3 w-3" /> Copy
-                    </button>
-                    <button
-                      onClick={() => setChatSidebarOpen(true)}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors"
-                    >
-                      <MessageCircle className="h-3 w-3" /> Show Chat
-                    </button>
-                    <button
-                      onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
-                    >
-                      Deactivate
-                    </button>
-                  </div>
+          {activeLinks.length === 0 && (
+            <PanelEmpty>No active JSR links. Click + to generate one.</PanelEmpty>
+          )}
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {activeLinks.map((link) => (
+              <div key={link._id} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Link2 className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                  <span className="text-[12px] text-[var(--text-primary)] font-mono truncate flex-1">
+                    {typeof window !== "undefined" ? `${window.location.origin}/jsr/${link.token}` : `/jsr/${link.token}`}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" onClick={() => copyJsrLink(link.token)}>
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </Button>
+                  <Button variant="secondary" onClick={() => setChatSidebarOpen(true)}>
+                    <MessageCircle className="h-3.5 w-3.5" /> Show Chat
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
+                  >
+                    Deactivate
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Client Intake Links */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-            <div className="flex items-center gap-2">
-              <Inbox className="h-4 w-4 text-[var(--text-secondary)]" />
-              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Intake Links</h3>
-              <span className="text-[11px] text-[var(--text-muted)]">({activeIntakeLinks.length})</span>
-            </div>
+        <div className={BLOCK}>
+          <div className={BLOCK_HEAD}>
+            <BlockTitle title="Client Intake Links" count={activeIntakeLinks.length} />
             {canManageLinks && (
               <button
                 onClick={handleGenerateIntake}
-                className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className={ICON_BTN}
+                aria-label="Generate intake link"
               >
                 <Plus className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="p-4">
-            <p className="text-[11px] text-[var(--text-muted)] mb-3">
-              Share this link with the client so they can submit task requests. Requests land in{" "}
-              <span className="font-medium text-[var(--text-secondary)]">Client Requests</span> for review.
-            </p>
-            {activeIntakeLinks.length === 0 && (
-              <div className="text-center py-6">
-                <Inbox className="h-7 w-7 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
-                <p className="text-[12px] text-[var(--text-muted)]">No active intake links. Click + to generate one.</p>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              {activeIntakeLinks.map((link) => (
-                <div key={link._id} className="p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Link2 className="h-3.5 w-3.5 text-[var(--accent-admin-text)] shrink-0" />
-                    <span className="text-[11px] text-[var(--text-primary)] font-mono truncate flex-1">
-                      {typeof window !== "undefined" ? `${window.location.origin}/intake/${link.token}` : `/intake/${link.token}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => copyIntakeLink(link.token)}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                    >
-                      <Copy className="h-3 w-3" /> Copy
-                    </button>
-                    <button
-                      onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
-                    >
-                      Deactivate
-                    </button>
-                  </div>
+          <p className="px-4 pt-3 text-[12px] text-[var(--text-muted)]">
+            Share this link with the client so they can submit task requests. Requests land in{" "}
+            <span className="font-medium text-[var(--text-secondary)]">Client Requests</span> for review.
+          </p>
+          {activeIntakeLinks.length === 0 && (
+            <PanelEmpty>No active intake links. Click + to generate one.</PanelEmpty>
+          )}
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {activeIntakeLinks.map((link) => (
+              <div key={link._id} className="px-4 py-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Link2 className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                  <span className="text-[12px] text-[var(--text-primary)] font-mono truncate flex-1">
+                    {typeof window !== "undefined" ? `${window.location.origin}/intake/${link.token}` : `/intake/${link.token}`}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" onClick={() => copyIntakeLink(link.token)}>
+                    <Copy className="h-3.5 w-3.5" /> Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="ml-auto"
+                    onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
+                  >
+                    Deactivate
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Client JSR Content Preview */}
-        <div className="rounded-xl border border-[var(--border)] bg-white overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border)]">
-            <Eye className="h-4 w-4 text-[var(--text-secondary)]" />
-            <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">What Clients See</h3>
-          </div>
+        <Panel title="What Clients See">
           <div className="p-4 space-y-3">
-            <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Brand Info</p>
+            <div className="p-3 rounded-md bg-[var(--bg-primary)]">
+              <p className={SUB_LABEL}>Brand Info</p>
               <p className="text-[13px] font-medium text-[var(--text-primary)]">{brand.name}</p>
-              {brand.description && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">{brand.description}</p>}
+              {brand.description && <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">{brand.description}</p>}
             </div>
-            <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Task Overview</p>
-              <div className="flex items-center gap-4 text-[12px]">
-                <span className="flex items-center gap-1 text-[var(--text-secondary)]">
-                  <Clock className="h-3 w-3" /> {brand.taskStatusCounts?.pending ?? 0} pending
+            <div className="p-3 rounded-md bg-[var(--bg-primary)]">
+              <p className={SUB_LABEL}>Task Overview</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] tabular-nums text-[var(--text-secondary)]">
+                <span className="flex items-center gap-1.5">
+                  <StatusDot status="pending" /> {brand.taskStatusCounts?.pending ?? 0} pending
                 </span>
-                <span className="flex items-center gap-1 text-amber-600">
-                  <AlertCircle className="h-3 w-3" /> {brand.taskStatusCounts?.["in-progress"] ?? 0} in progress
+                <span className="flex items-center gap-1.5">
+                  <StatusDot status="in-progress" /> {brand.taskStatusCounts?.["in-progress"] ?? 0} in progress
                 </span>
-                <span className="flex items-center gap-1 text-green-600">
-                  <CheckCircle2 className="h-3 w-3" /> {doneCount} done
+                <span className="flex items-center gap-1.5">
+                  <StatusDot status="done" /> {doneCount} done
                 </span>
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-              <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">Deliverables Visibility</p>
-              <p className="text-[11px] text-[var(--text-secondary)]">
+            <div className="p-3 rounded-md bg-[var(--bg-primary)]">
+              <p className={SUB_LABEL}>Deliverables Visibility</p>
+              <p className="text-[12px] text-[var(--text-secondary)]">
                 Clients can view and approve deliverables marked as client-facing. They can also submit task requests and communicate via the chat.
               </p>
             </div>
             {/* Content Calendar month control */}
             {brand.briefs?.some((b: any) => b.briefType === "content_calendar") && (
-              <div className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2 mb-2">
-                  <CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Content Calendar Month</p>
-                </div>
-                <p className="text-[11px] text-[var(--text-secondary)] mb-2">
-                  Choose which month the client sees on the JSR. Leave on "All Months" to show everything.
+              <div className="p-3 rounded-md bg-[var(--bg-primary)]">
+                <p className={SUB_LABEL}>Content Calendar Month</p>
+                <p className="text-[12px] text-[var(--text-secondary)] mb-2">
+                  Choose which month the client sees on the JSR. Leave on &quot;All Months&quot; to show everything.
                 </p>
                 <select
                   value={(() => {
@@ -553,7 +544,8 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   onChange={(e) => {
                     updateJsrCalendarMonth({ brandId, calendarMonth: e.target.value }).catch(() => {});
                   }}
-                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-1.5 text-[12px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                  aria-label="Content Calendar Month"
+                  className={`${FIELD} w-full`}
                 >
                   <option value="">All Months</option>
                   {(() => {
@@ -573,28 +565,25 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
               </div>
             )}
           </div>
-        </div>
+        </Panel>
       </div>
 
       {/* Right: Configurable Sidebar Blocks */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
+      <div className="min-w-0">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Dashboard Blocks</h3>
           <div className="relative">
-            <button
-              onClick={() => setShowAddBlock(!showAddBlock)}
-              className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors border border-[var(--accent-admin)]/20"
-            >
-              <Plus className="h-3 w-3" />
+            <Button variant="secondary" onClick={() => setShowAddBlock(!showAddBlock)}>
+              <Plus className="h-3.5 w-3.5" />
               {hiddenBlocks.length > 0 ? `Add Block (${hiddenBlocks.length})` : "All Shown"}
-            </button>
+            </Button>
             {showAddBlock && hiddenBlocks.length > 0 && (
-              <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-[var(--border)] rounded-lg shadow-lg z-10 py-1">
+              <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-[var(--border)] rounded-lg shadow-lg z-20 py-1">
                 {hiddenBlocks.map((b) => (
                   <button
                     key={b.id}
                     onClick={() => addBlock(b.id)}
-                    className="w-full text-left px-3 py-2 text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="w-full text-left px-3 py-2 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     {b.label}
                   </button>
@@ -615,10 +604,10 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         </DndContext>
 
         {blocks.every((b) => !b.visible) && (
-          <div className="text-center py-12 text-[var(--text-muted)]">
-            <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" />
-            <p className="text-[13px]">No blocks visible. Click "Add Block" to show some.</p>
-          </div>
+          <EmptyState
+            icon={BarChart3}
+            title={'No blocks visible. Click "Add Block" to show some.'}
+          />
         )}
       </div>
 
@@ -627,27 +616,24 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setChatSidebarOpen(false)} />
           <div className="fixed top-0 right-0 h-full w-[500px] max-w-[90vw] bg-white border-l border-[var(--border)] shadow-2xl z-50 flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-[var(--accent-admin-text)]" />
-                <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
-              </div>
-              <button onClick={() => setChatSidebarOpen(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+            <div className="flex items-center justify-between h-12 px-4 border-b border-[var(--border)]">
+              <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Client Chat</h3>
+              <button onClick={() => setChatSidebarOpen(false)} className={ICON_BTN} aria-label="Close chat">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-1" style={{ overscrollBehavior: "contain" }}>
               {(jsrMessages ?? []).length === 0 && (
-                <p className="text-[12px] text-[var(--text-muted)] text-center py-8">No messages yet.</p>
+                <p className="text-[13px] text-[var(--text-muted)] text-center py-8">No messages yet.</p>
               )}
               {(jsrMessages ?? []).map((msg: any) => (
                 <div key={msg._id} className={`flex ${msg.senderType === "manager" ? "justify-end" : "justify-start"} mb-1.5`}>
-                  <div className={`max-w-[75%] rounded-xl px-3.5 py-2.5 ${msg.senderType === "manager" ? "bg-[var(--accent-admin-strong)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
-                    <p className={`text-[11px] font-semibold mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
+                  <div className={`max-w-[75%] rounded-lg px-3 py-2 ${msg.senderType === "manager" ? "bg-[var(--text-primary)] text-white rounded-br-sm" : "bg-[var(--bg-hover)] text-[var(--text-primary)] rounded-bl-sm"}`}>
+                    <p className={`text-[11px] font-medium mb-0.5 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                       {msg.senderName || (msg.senderType === "client" ? "Client" : "You")}
                     </p>
-                    <p className="text-[12px] leading-relaxed">{msg.content}</p>
-                    <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/50" : "text-[var(--text-muted)]"}`}>
+                    <p className="text-[13px] leading-relaxed">{msg.content}</p>
+                    <p className={`text-[11px] mt-1 ${msg.senderType === "manager" ? "text-white/70" : "text-[var(--text-muted)]"}`}>
                       {new Date(msg.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                     </p>
                   </div>
@@ -669,9 +655,11 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   }
                 }}
                 placeholder="Type a message..."
-                className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className={`${FIELD} flex-1 min-w-0`}
               />
-              <button
+              <Button
+                variant="primary"
+                aria-label="Send message"
                 onClick={() => {
                   if (!jsrMsgContent.trim()) return;
                   setSendingJsrMsg(true);
@@ -681,10 +669,10 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                     .finally(() => setSendingJsrMsg(false));
                 }}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
-                className="shrink-0 p-2.5 rounded-lg bg-[var(--accent-admin-strong)] text-white disabled:opacity-50 transition-colors"
+                className="shrink-0"
               >
                 <Send className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
         </>

@@ -9,6 +9,8 @@ import {
   PageHeader,
   SkeletonPageHeader,
   SkeletonList,
+  StatStrip,
+  StatTile,
 } from "@/components/ui";
 import {
   UserSearch,
@@ -48,7 +50,7 @@ export default function RecruitmentPage() {
 
       {/* Reference counts, kept quiet — the positions below are the work. */}
       {stats && (
-        <div className="mb-6 flex flex-wrap items-stretch divide-x divide-[var(--border-subtle)] rounded-lg border border-[var(--border)] bg-white">
+        <StatStrip className="mb-4">
           {/* The funnel, not a pile of totals — this answers "where is everyone". */}
           {[
             { label: "Applied", value: stats.byStage?.applied ?? 0 },
@@ -58,26 +60,21 @@ export default function RecruitmentPage() {
             { label: "Hired", value: stats.byStage?.hired ?? 0 },
             { label: "Rejected", value: stats.byStage?.rejected ?? 0 },
           ].map(({ label, value }) => (
-            <div key={label} className="flex-1 min-w-[110px] px-4 py-3">
-              <p className="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums leading-none">
-                {value.toLocaleString()}
-              </p>
-              <p className="mt-1 text-[11px] text-[var(--text-muted)]">{label}</p>
-            </div>
+            <StatTile key={label} label={label} value={value.toLocaleString()} />
           ))}
-        </div>
+        </StatStrip>
       )}
 
       {stats && (stats.byStage?.screened ?? 0) + (stats.byStage?.interview ?? 0) +
         (stats.byStage?.offer ?? 0) + (stats.byStage?.hired ?? 0) === 0 && (
-        <p className="-mt-3 mb-6 text-[12px] text-[var(--text-muted)]">
+        <p className="-mt-2 mb-4 text-[12px] text-[var(--text-muted)]">
           Everyone imported starts at Applied. Open a position, tick the people
           worth a look and move them along — the funnel fills as you triage.
         </p>
       )}
 
       {/* Global candidate search */}
-      <div className="relative mb-6 max-w-[460px]">
+      <div className="relative mb-4 max-w-[460px]">
         <Search
           size={14}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
@@ -86,7 +83,7 @@ export default function RecruitmentPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search every candidate by name, email or role…"
-          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg pl-9 pr-8 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md pl-9 pr-8 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
         />
         {q && (
           <button
@@ -113,17 +110,17 @@ export default function RecruitmentPage() {
                   onClick={() =>
                     router.push(`/recruitment/${r.jobSourceId}?highlight=${r._id}`)
                   }
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)]"
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
                       {r.name}
                     </p>
-                    <p className="text-[11px] text-[var(--text-muted)] truncate">
+                    <p className="text-[12px] text-[var(--text-muted)] truncate">
                       {r.email}
                     </p>
                   </div>
-                  <span className="shrink-0 text-[11px] text-[var(--text-secondary)]">
+                  <span className="shrink-0 text-[12px] text-[var(--text-muted)]">
                     {r.position || r.jobName}
                   </span>
                 </button>
@@ -144,9 +141,9 @@ export default function RecruitmentPage() {
             >
               <Link
                 href={`/recruitment/${job.sourceId}`}
-                className="group flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors"
+                className="group flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-primary)] transition-colors"
               >
-                <span className="font-medium text-[13px] text-[var(--text-primary)] truncate">
+                <span className="font-medium text-[14px] text-[var(--text-primary)] truncate">
                   {job.name}
                 </span>
                 <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
@@ -154,20 +151,20 @@ export default function RecruitmentPage() {
                 </span>
                 <div className="ml-auto flex items-center gap-3 shrink-0">
                   {job.moving > 0 && (
-                    <span className="text-[11px] font-medium text-[var(--accent-admin-text)] tabular-nums">
+                    <span className="text-[12px] font-medium text-[var(--text-primary)] tabular-nums">
                       {job.moving} moving
                     </span>
                   )}
                   {job.inPlay > 0 ? (
-                    <span className="text-[11px] text-[var(--text-secondary)] tabular-nums">
+                    <span className="text-[12px] text-[var(--text-secondary)] tabular-nums">
                       {job.inPlay} in play
                     </span>
                   ) : (
-                    <span className="text-[11px] text-[var(--text-muted)]">all closed out</span>
+                    <span className="text-[12px] text-[var(--text-muted)]">all closed out</span>
                   )}
                   <ChevronRight
                     size={15}
-                    className="text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] group-hover:translate-x-0.5 transition-all"
+                    className="text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]"
                   />
                 </div>
               </Link>
@@ -183,12 +180,12 @@ export default function RecruitmentPage() {
                       <span className="text-[12px] text-[var(--text-secondary)] truncate">
                         {s.name}
                       </span>
-                      <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
+                      <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
                         {s.total}
                       </span>
                       <ChevronRight
                         size={13}
-                        className="ml-auto text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] transition-colors"
+                        className="ml-auto text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] transition-colors"
                       />
                     </Link>
                   ))}
@@ -200,7 +197,7 @@ export default function RecruitmentPage() {
       </div>
 
       {stats && stats.undated > 0 && (
-        <p className="mt-6 text-[11px] text-[var(--text-muted)]">
+        <p className="mt-4 text-[12px] text-[var(--text-muted)]">
           {stats.undated.toLocaleString()} candidates were imported from the older
           application form and carry no submission date, so date filters only
           cover the {(stats.totalCandidates - stats.undated).toLocaleString()} newer records.

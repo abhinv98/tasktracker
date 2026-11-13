@@ -5,9 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
+  Badge,
+  Button,
   Card,
   ConfirmModal,
+  EmptyState,
   PageHeader,
+  Panel,
+  PanelEmpty,
+  SegmentedTabs,
+  StatStrip,
+  StatTile,
   Table,
   TableBody,
   TableCell,
@@ -19,7 +27,6 @@ import {
 import {
   Banknote,
   FileText,
-  IndianRupee,
   Loader2,
   Plus,
   Printer,
@@ -62,41 +69,34 @@ const todayInput = () => toDateInput(Date.now());
 
 type LineItem = { description: string; qty: number; rate: number; amount: number };
 
-const QUOTE_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: "Draft", color: "#57534e", bg: "#f5f5f4" },
-  sent: { label: "Sent", color: "#1d4ed8", bg: "#eff6ff" },
-  approved: { label: "Approved", color: "#047857", bg: "#ecfdf5" },
-  rejected: { label: "Rejected", color: "#b91c1c", bg: "#fef2f2" },
-  invoiced: { label: "Invoiced", color: "#7c3aed", bg: "#f5f3ff" },
+// One Badge per status: green only for money in or a yes, red only for
+// overdue or a no, everything in between neutral.
+type StatusMeta = { label: string; variant: "neutral" | "success" | "danger" };
+
+const QUOTE_STATUS: Record<string, StatusMeta> = {
+  draft: { label: "Draft", variant: "neutral" },
+  sent: { label: "Sent", variant: "neutral" },
+  approved: { label: "Approved", variant: "success" },
+  rejected: { label: "Rejected", variant: "danger" },
+  invoiced: { label: "Invoiced", variant: "neutral" },
 };
 
-const INVOICE_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  draft: { label: "Draft", color: "#57534e", bg: "#f5f5f4" },
-  unpaid: { label: "Unpaid", color: "#b45309", bg: "#fffbeb" },
-  partially_paid: { label: "Partially Paid", color: "#1d4ed8", bg: "#eff6ff" },
-  paid: { label: "Paid", color: "#047857", bg: "#ecfdf5" },
-  overdue: { label: "Overdue", color: "#b91c1c", bg: "#fef2f2" },
+const INVOICE_STATUS: Record<string, StatusMeta> = {
+  draft: { label: "Draft", variant: "neutral" },
+  unpaid: { label: "Unpaid", variant: "neutral" },
+  partially_paid: { label: "Partially Paid", variant: "neutral" },
+  paid: { label: "Paid", variant: "success" },
+  overdue: { label: "Overdue", variant: "danger" },
 };
 
-function StatusChip({
-  meta,
-}: {
-  meta: { label: string; color: string; bg: string };
-}) {
-  return (
-    <span
-      className="inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
-      style={{ color: meta.color, backgroundColor: meta.bg }}
-    >
-      {meta.label}
-    </span>
-  );
+function StatusChip({ meta }: { meta: StatusMeta }) {
+  return <Badge variant={meta.variant}>{meta.label}</Badge>;
 }
 
 const inputCls =
   "w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]";
 const labelCls =
-  "block font-medium text-[11px] uppercase tracking-wide text-[var(--text-secondary)] mb-1.5";
+  "block font-medium text-[12px] text-[var(--text-muted)] mb-1.5";
 
 /* ─── Line item editor (shared by quotation + generated invoice) ─── */
 
@@ -121,7 +121,7 @@ function LineItemEditor({
 
   return (
     <div>
-      <div className="grid grid-cols-[1fr_64px_110px_100px_28px] gap-2 mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+      <div className="grid grid-cols-[1fr_64px_110px_100px_28px] gap-2 mb-1.5 text-[12px] font-medium text-[var(--text-muted)]">
         <span>Description</span>
         <span>Qty</span>
         <span>Rate (₹)</span>
@@ -158,7 +158,8 @@ function LineItemEditor({
               type="button"
               onClick={() => onChange(items.filter((_, idx) => idx !== i))}
               disabled={items.length === 1}
-              className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)] disabled:opacity-30"
+              aria-label="Remove line"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--text-muted)]"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -255,32 +256,32 @@ export default function InvoicesPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="flex items-start justify-between gap-3">
-        <PageHeader
-          title="Invoices & Quotations"
-          subtitle="Quote projects, raise or track invoices, and record payments, end to end."
-        />
-        <button
-          onClick={() => setShowSettings(true)}
-          // Wait for the profile: the modal snapshots its counters on open, and
-          // saving default counters of 1 would rewind invoice numbering.
-          disabled={profile === undefined}
-          className="shrink-0 disabled:opacity-40 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-        >
-          <Settings className="h-3.5 w-3.5" /> Agency profile
-        </button>
-      </div>
+      <PageHeader
+        title="Invoices & Quotations"
+        subtitle="Quote projects, raise or track invoices, and record payments, end to end."
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => setShowSettings(true)}
+            // Wait for the profile: the modal snapshots its counters on open, and
+            // saving default counters of 1 would rewind invoice numbering.
+            disabled={profile === undefined}
+          >
+            <Settings className="h-3.5 w-3.5" /> Agency profile
+          </Button>
+        }
+      />
 
       {needsProfile && (
-        <div className="mb-4 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 flex items-center gap-2.5">
-          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-          <p className="text-[12px] text-amber-800">
+        <div className="mb-4 px-3 py-2 rounded-md bg-[var(--warning-dim)] flex items-center gap-2.5">
+          <AlertCircle className="h-4 w-4 text-[var(--warning)] shrink-0" />
+          <p className="text-[12px] text-[var(--warning)]">
             Set up your <strong>agency profile</strong> (name, GSTIN, bank details,
             numbering) before creating quotations or invoices.
           </p>
           <button
             onClick={() => setShowSettings(true)}
-            className="ml-auto text-[12px] font-semibold text-amber-800 underline"
+            className="ml-auto shrink-0 text-[12px] font-medium text-[var(--warning)] underline underline-offset-2"
           >
             Set up now
           </button>
@@ -288,31 +289,23 @@ export default function InvoicesPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1.5 mb-5">
-        {(
-          [
-            { key: "overview", label: "Overview" },
-            { key: "quotations", label: "Quotations" },
-            { key: "invoices", label: "Invoices" },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              tab === t.key
-                ? "bg-[var(--text-primary)] text-white"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <SegmentedTabs
+          value={tab}
+          options={
+            [
+              { value: "overview", label: "Overview" },
+              { value: "quotations", label: "Quotations" },
+              { value: "invoices", label: "Invoices" },
+            ] as const
+          }
+          onChange={setTab}
+        />
         {(tab === "quotations" || tab === "invoices") && (
           <select
             value={brandFilter}
             onChange={(e) => setBrandFilter(e.target.value)}
-            className="ml-auto bg-[var(--bg-input)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--text-primary)] px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[160px]"
+            className="ml-auto bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[160px]"
           >
             <option value="">All brands</option>
             {(brands ?? []).map((b: any) => (
@@ -323,38 +316,30 @@ export default function InvoicesPage() {
           </select>
         )}
         {tab === "quotations" && (
-          <button
-            onClick={() => setQuoteModal({})}
-            disabled={needsProfile}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
-          >
+          <Button onClick={() => setQuoteModal({})} disabled={needsProfile}>
             <Plus className="h-4 w-4" /> New Quotation
-          </button>
+          </Button>
         )}
         {tab === "invoices" && (
           <div className="relative">
-            <button
-              onClick={() => setShowNewInvoiceMenu((v) => !v)}
-              disabled={needsProfile}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
-            >
+            <Button onClick={() => setShowNewInvoiceMenu((v) => !v)} disabled={needsProfile}>
               <Plus className="h-4 w-4" /> New Invoice
-            </button>
+            </Button>
             {showNewInvoiceMenu && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowNewInvoiceMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 z-40 w-[240px] rounded-lg border border-[var(--border)] bg-white shadow-lg py-1 text-[12px]">
+                <div className="absolute right-0 top-full mt-1 z-40 w-[240px] rounded-lg border border-[var(--border)] bg-white shadow-lg py-1 text-[13px]">
                   <button
                     onClick={() => {
                       setInvoiceModal({ source: "generated" });
                       setShowNewInvoiceMenu(false);
                     }}
-                    className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left"
+                    className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left transition-colors"
                   >
-                    <FileText className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0 mt-0.5" />
+                    <FileText className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
                     <span>
-                      <span className="block font-semibold text-[var(--text-primary)]">Generate invoice</span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">Line items + GST, printable</span>
+                      <span className="block font-medium text-[var(--text-primary)]">Generate invoice</span>
+                      <span className="block text-[12px] text-[var(--text-muted)]">Line items + GST, printable</span>
                     </span>
                   </button>
                   <button
@@ -362,12 +347,12 @@ export default function InvoicesPage() {
                       setInvoiceModal({ source: "external" });
                       setShowNewInvoiceMenu(false);
                     }}
-                    className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left"
+                    className="flex items-start gap-2 px-3 py-2 w-full hover:bg-[var(--bg-hover)] text-left transition-colors"
                   >
-                    <Upload className="h-4 w-4 text-[var(--accent-admin-text)] shrink-0 mt-0.5" />
+                    <Upload className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" />
                     <span>
-                      <span className="block font-semibold text-[var(--text-primary)]">Track external invoice</span>
-                      <span className="block text-[11px] text-[var(--text-muted)]">Made elsewhere. Attach the PDF</span>
+                      <span className="block font-medium text-[var(--text-primary)]">Track external invoice</span>
+                      <span className="block text-[12px] text-[var(--text-muted)]">Made elsewhere. Attach the PDF</span>
                     </span>
                   </button>
                 </div>
@@ -435,71 +420,37 @@ function OverviewTab({ overview }: { overview: any }) {
   if (overview === undefined)
     return <p className="text-[13px] text-[var(--text-muted)] py-8">Loading…</p>;
 
-  const tiles = [
-    {
-      label: "Outstanding",
-      value: fmtINR(overview.outstanding),
-      hint: "Invoiced, not yet collected",
-      icon: IndianRupee,
-      accent: "admin" as const,
-    },
-    {
-      label: "Overdue",
-      value: fmtINR(overview.overdueTotal),
-      hint: `${overview.overdueCount} invoice${overview.overdueCount === 1 ? "" : "s"} past due`,
-      icon: AlertCircle,
-      accent: "none" as const,
-      danger: overview.overdueCount > 0,
-    },
-    {
-      label: "Collected this month",
-      value: fmtINR(overview.collectedThisMonth),
-      hint: "Payments received",
-      icon: Banknote,
-      accent: "employee" as const,
-    },
-    {
-      label: "Quotes awaiting reply",
-      value: String(overview.quotesAwaiting),
-      hint: `${overview.draftCount} draft invoice${overview.draftCount === 1 ? "" : "s"}`,
-      icon: FileText,
-      accent: "manager" as const,
-    },
-  ];
-
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {tiles.map((t) => (
-          <Card key={t.label} accent={t.accent}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                {t.label}
-              </span>
-              <t.icon
-                className={`h-4 w-4 ${t.danger ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}
-              />
-            </div>
-            <p
-              className={`text-[20px] font-semibold tabular-nums leading-none ${
-                t.danger ? "text-[var(--danger)]" : "text-[var(--text-primary)]"
-              }`}
-            >
-              {t.value}
-            </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1.5">{t.hint}</p>
-          </Card>
-        ))}
-      </div>
+    <div className="space-y-4">
+      <StatStrip>
+        <StatTile
+          label="Outstanding"
+          value={fmtINR(overview.outstanding)}
+          hint="Invoiced, not yet collected"
+        />
+        <StatTile
+          label="Overdue"
+          value={fmtINR(overview.overdueTotal)}
+          hint={`${overview.overdueCount} invoice${overview.overdueCount === 1 ? "" : "s"} past due`}
+          bad={overview.overdueCount > 0}
+        />
+        <StatTile
+          label="Collected this month"
+          value={fmtINR(overview.collectedThisMonth)}
+          hint="Payments received"
+        />
+        <StatTile
+          label="Quotes awaiting reply"
+          value={String(overview.quotesAwaiting)}
+          hint={`${overview.draftCount} draft invoice${overview.draftCount === 1 ? "" : "s"}`}
+        />
+      </StatStrip>
 
-      <section>
-        <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
-          Recent payments
-        </h2>
+      <Panel title="Recent payments">
         {overview.recentPayments.length === 0 ? (
-          <p className="text-[13px] text-[var(--text-muted)]">
+          <PanelEmpty>
             No payments recorded yet. Record one from an invoice&apos;s detail view.
-          </p>
+          </PanelEmpty>
         ) : (
           <Table>
             <TableHeader>
@@ -512,7 +463,7 @@ function OverviewTab({ overview }: { overview: any }) {
             <TableBody>
               {overview.recentPayments.map((p: any) => (
                 <TableRow key={p._id}>
-                  <TableCell>{fmtDate(p.paidOn)}</TableCell>
+                  <TableCell className="tabular-nums">{fmtDate(p.paidOn)}</TableCell>
                   <TableCell>{p.invoiceNumber}</TableCell>
                   <TableCell>{p.brandName}</TableCell>
                   <TableCell>{p.method ?? "-"}</TableCell>
@@ -524,7 +475,7 @@ function OverviewTab({ overview }: { overview: any }) {
             </TableBody>
           </Table>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
@@ -563,17 +514,16 @@ function QuotationsTab({
     return <p className="text-[13px] text-[var(--text-muted)] py-8">Loading…</p>;
   if (quotations.length === 0)
     return (
-      <div className="text-center py-16">
-        <FileText className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-        <p className="text-[15px] font-medium text-[var(--text-secondary)]">No quotations yet</p>
-        <p className="text-[12px] text-[var(--text-muted)] mt-1">
-          Create one per project you pitch. Approve it, then convert it to an invoice.
-        </p>
-      </div>
+      <EmptyState
+        icon={FileText}
+        title="No quotations yet"
+        description="Create one per project you pitch. Approve it, then convert it to an invoice."
+      />
     );
 
   return (
     <>
+      <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
       <Table>
         <TableHeader>
           <TableHead>Number</TableHead>
@@ -599,7 +549,7 @@ function QuotationsTab({
                 <TableCell>{q.projectName}</TableCell>
                 <TableCell className="text-right tabular-nums font-medium">{fmtINR(q.total)}</TableCell>
                 <TableCell><StatusChip meta={meta} /></TableCell>
-                <TableCell className="text-[var(--text-muted)]">{fmtDate(q.createdAt)}</TableCell>
+                <TableCell className="tabular-nums text-[var(--text-muted)]">{fmtDate(q.createdAt)}</TableCell>
                 <TableCell className="text-right">
                   <div className="inline-flex items-center gap-1 flex-wrap justify-end">
                     {q.status === "draft" && (
@@ -643,16 +593,18 @@ function QuotationsTab({
                       href={`/print/quotation/${q._id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                       title="Print / Save as PDF"
+                      aria-label="Print / Save as PDF"
                     >
                       <Printer className="h-3.5 w-3.5" />
                     </a>
                     {!q.invoiceId && (
                       <button
                         onClick={() => setConfirmDelete(q._id)}
-                        className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-red-50"
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         title="Delete"
+                        aria-label="Delete quotation"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -664,6 +616,7 @@ function QuotationsTab({
           })}
         </TableBody>
       </Table>
+      </div>
 
       <ConfirmModal
         open={confirmDelete !== null}
@@ -681,7 +634,7 @@ function QuotationsTab({
 
       {convertId && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-sm">
+          <Card className="w-full max-w-sm shadow-lg">
             <h3 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3">
               Convert to invoice
             </h3>
@@ -693,13 +646,10 @@ function QuotationsTab({
               className={inputCls}
             />
             <div className="flex items-center gap-2 mt-4">
-              <button
-                onClick={() => setConvertId(null)}
-                className="flex-1 py-2 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)]"
-              >
+              <Button variant="ghost" onClick={() => setConvertId(null)} className="flex-1">
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={async () => {
                   await act(
                     () =>
@@ -712,10 +662,10 @@ function QuotationsTab({
                   );
                   setConvertId(null);
                 }}
-                className="flex-1 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold"
+                className="flex-1"
               >
                 Create invoice
-              </button>
+              </Button>
             </div>
           </Card>
         </div>
@@ -734,16 +684,9 @@ function RowBtn({
   primary?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-        primary
-          ? "bg-[var(--accent-admin-strong)] text-white"
-          : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-      }`}
-    >
+    <Button variant={primary ? "primary" : "secondary"} onClick={onClick}>
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -760,16 +703,15 @@ function InvoicesTab({
     return <p className="text-[13px] text-[var(--text-muted)] py-8">Loading…</p>;
   if (invoices.length === 0)
     return (
-      <div className="text-center py-16">
-        <Receipt className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-        <p className="text-[15px] font-medium text-[var(--text-secondary)]">No invoices yet</p>
-        <p className="text-[12px] text-[var(--text-muted)] mt-1">
-          Generate one in-app, track an external one, or convert an approved quotation.
-        </p>
-      </div>
+      <EmptyState
+        icon={Receipt}
+        title="No invoices yet"
+        description="Generate one in-app, track an external one, or convert an approved quotation."
+      />
     );
 
   return (
+    <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
     <Table>
       <TableHeader>
         <TableHead>Number</TableHead>
@@ -794,7 +736,7 @@ function InvoicesTab({
                 </span>
               </TableCell>
               <TableCell>
-                <span className="text-[11px] text-[var(--text-muted)]">
+                <span className="text-[12px] text-[var(--text-muted)]">
                   {inv.source === "generated" ? "Generated" : "External"}
                 </span>
               </TableCell>
@@ -802,18 +744,19 @@ function InvoicesTab({
               <TableCell className="text-right tabular-nums">{fmtINR(inv.amountPaid)}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {inv.balance < 0 ? (
-                  <span className="text-emerald-700">Overpaid {fmtINR(Math.abs(inv.balance))}</span>
+                  <span className="text-[var(--accent-employee-text)]">Overpaid {fmtINR(Math.abs(inv.balance))}</span>
                 ) : (
                   fmtINR(inv.balance)
                 )}
               </TableCell>
-              <TableCell className="text-[var(--text-muted)]">{fmtDate(inv.dueDate)}</TableCell>
+              <TableCell className="tabular-nums text-[var(--text-muted)]">{fmtDate(inv.dueDate)}</TableCell>
               <TableCell><StatusChip meta={meta} /></TableCell>
             </TableRow>
           );
         })}
       </TableBody>
     </Table>
+    </div>
   );
 }
 
@@ -907,7 +850,7 @@ function QuotationModal({
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {editId ? "Edit quotation (draft)" : "New quotation"}
           </h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -957,20 +900,12 @@ function QuotationModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-5">
-          <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          </Button>
+          <Button onClick={handleSave} disabled={!valid || saving} loading={saving}>
             {editId ? "Save changes" : "Create draft"}
-          </button>
+          </Button>
         </div>
       </Card>
     </div>
@@ -1070,7 +1005,7 @@ function NewInvoiceModal({
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {source === "generated" ? "Generate invoice" : "Track external invoice"}
           </h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1126,7 +1061,7 @@ function NewInvoiceModal({
               <label className={labelCls}>Invoice PDF (optional)</label>
               <label className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-dashed border-[var(--border-strong)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors">
                 <Upload className="h-4 w-4 text-[var(--text-muted)]" />
-                <span className="text-[12px] text-[var(--text-secondary)] truncate">
+                <span className="text-[13px] text-[var(--text-secondary)] truncate">
                   {pdfFile ? pdfFile.name : "Attach the invoice PDF"}
                 </span>
                 <input
@@ -1151,20 +1086,12 @@ function NewInvoiceModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-5">
-          <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          </Button>
+          <Button onClick={handleSave} disabled={!valid || saving} loading={saving}>
             {source === "generated" ? "Create draft" : "Track invoice"}
-          </button>
+          </Button>
         </div>
       </Card>
     </div>
@@ -1230,11 +1157,11 @@ function InvoiceDetailModal({
               {invoice.invoiceNumber}
             </h3>
             <StatusChip meta={meta} />
-            <span className="text-[11px] text-[var(--text-muted)]">
+            <span className="text-[12px] text-[var(--text-muted)]">
               {invoice.source === "generated" ? "Generated" : "External"}
             </span>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1260,8 +1187,8 @@ function InvoiceDetailModal({
               danger: invoice.balance > 0 && invoice.effectiveStatus === "overdue",
             },
           ].map((t) => (
-            <div key={t.label} className="rounded-lg border border-[var(--border-subtle)] px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t.label}</p>
+            <div key={t.label} className="rounded-lg border border-[var(--border)] px-3 py-2.5">
+              <p className="text-[12px] text-[var(--text-muted)]">{t.label}</p>
               <p className={`text-[15px] font-semibold tabular-nums ${t.danger ? "text-[var(--danger)]" : "text-[var(--text-primary)]"}`}>
                 {t.value}
               </p>
@@ -1271,10 +1198,10 @@ function InvoiceDetailModal({
 
         {/* Line items (generated) */}
         {invoice.source === "generated" && invoice.lineItems && (
-          <div className="mb-4 rounded-lg border border-[var(--border-subtle)] overflow-hidden">
-            <table className="w-full text-[12px]">
+          <div className="mb-4 rounded-lg border border-[var(--border)] overflow-hidden">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="bg-[var(--bg-hover)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
+                <tr className="text-left">
                   <th className="px-3 py-1.5">Item</th>
                   <th className="px-3 py-1.5 text-right">Qty</th>
                   <th className="px-3 py-1.5 text-right">Rate</th>
@@ -1302,20 +1229,19 @@ function InvoiceDetailModal({
         {/* Actions row */}
         <div className="flex items-center gap-2 mb-5">
           {invoice.status === "draft" && (
-            <button
+            <Button
               onClick={() => act(() => finalize({ invoiceId: invoice._id }), "Invoice finalized. Now unpaid")}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
             >
               Finalize invoice
-            </button>
+            </Button>
           )}
           {invoice.source === "generated" && (
             <a
               href={`/print/invoice/${invoice._id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <Printer className="h-3.5 w-3.5" /> Print / PDF
             </a>
@@ -1325,22 +1251,23 @@ function InvoiceDetailModal({
               href={invoice.pdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" /> View PDF
             </a>
           )}
-          <button
+          <Button
+            variant="ghost"
             onClick={() => setConfirmDelete(true)}
             disabled={busy}
-            className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+            className="ml-auto !text-[var(--text-muted)] hover:!text-[var(--danger)] hover:!bg-[var(--danger-dim)]"
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
-          </button>
+          </Button>
         </div>
 
         {/* Payments */}
-        <h4 className="font-medium text-[12px] uppercase tracking-wide text-[var(--text-secondary)] mb-2">
+        <h4 className="font-semibold text-[14px] text-[var(--text-primary)] mb-2">
           Payments ({invoice.payments.length})
         </h4>
         {invoice.payments.length > 0 && (
@@ -1348,19 +1275,20 @@ function InvoiceDetailModal({
             {invoice.payments.map((p: any) => (
               <div
                 key={p._id}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-hover)] text-[12px]"
+                className="flex items-center gap-3 pl-3 pr-1 py-1 rounded-md bg-[var(--bg-primary)] text-[12px]"
               >
-                <Banknote className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                <span className="font-semibold tabular-nums">{fmtINR(p.amount)}</span>
-                <span className="text-[var(--text-muted)]">{fmtDate(p.paidOn)}</span>
+                <Banknote className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                <span className="font-semibold tabular-nums text-[var(--text-primary)]">{fmtINR(p.amount)}</span>
+                <span className="tabular-nums text-[var(--text-muted)]">{fmtDate(p.paidOn)}</span>
                 {p.method && <span className="text-[var(--text-muted)]">{p.method}</span>}
                 {p.reference && <span className="text-[var(--text-muted)] truncate">Ref: {p.reference}</span>}
                 <button
                   onClick={() => act(() => deletePayment({ paymentId: p._id }), "Payment removed")}
                   disabled={busy}
-                  className="ml-auto p-1 rounded text-[var(--text-muted)] hover:text-[var(--danger)]"
+                  aria-label="Remove payment"
+                  className="ml-auto inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}
@@ -1388,7 +1316,7 @@ function InvoiceDetailModal({
               <label className={labelCls}>Reference (optional)</label>
               <input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="UTR / cheque no." className={inputCls} />
             </div>
-            <button
+            <Button
               onClick={async () => {
                 const amt = Number(payAmount);
                 if (!amt || amt <= 0) {
@@ -1413,10 +1341,9 @@ function InvoiceDetailModal({
                 }
               }}
               disabled={busy}
-              className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40 whitespace-nowrap"
             >
               Record
-            </button>
+            </Button>
           </div>
         ) : (
           <p className="text-[12px] text-[var(--text-muted)]">
@@ -1525,7 +1452,7 @@ function AgencyProfileModal({
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Agency profile</h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1567,7 +1494,7 @@ function AgencyProfileModal({
           </div>
 
           <div className="col-span-2 border-t border-[var(--border-subtle)] pt-3 mt-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-2">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">
               Bank details (shown on generated documents)
             </p>
           </div>
@@ -1593,7 +1520,7 @@ function AgencyProfileModal({
           </div>
 
           <div className="col-span-2 border-t border-[var(--border-subtle)] pt-3 mt-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-2">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">
               Document numbering
             </p>
           </div>
@@ -1624,7 +1551,7 @@ function AgencyProfileModal({
             />
           </div>
           {profile && (
-            <p className="col-span-2 text-[11px] text-amber-700">
+            <p className="col-span-2 text-[12px] text-[var(--warning)]">
               Changing counters can create duplicate document numbers. Only lower them if you know why.
             </p>
           )}
@@ -1642,20 +1569,12 @@ function AgencyProfileModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-5">
-          <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          </Button>
+          <Button onClick={handleSave} disabled={saving} loading={saving}>
             Save profile
-          </button>
+          </Button>
         </div>
       </Card>
     </div>

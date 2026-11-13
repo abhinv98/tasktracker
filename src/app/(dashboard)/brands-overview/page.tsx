@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Tag, BarChart3, TrendingUp } from "lucide-react";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, SegmentedTabs } from "@/components/ui";
 import BrandsTab from "@/components/brandsOverview/BrandsTab";
 import WorkDataTab from "@/components/brandsOverview/WorkDataTab";
 import AnalyticsTab from "@/components/brandsOverview/AnalyticsTab";
@@ -33,27 +33,16 @@ export default function BrandsOverviewPage() {
         subtitle="Brands, work data, and workspace analytics."
       />
 
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] w-fit mb-6">
-        {(
-          [
-            { key: "brands", label: "Brands", icon: Tag },
-            { key: "work-data", label: "Work Data", icon: BarChart3 },
-            { key: "analytics", label: "Analytics", icon: TrendingUp },
-          ] as const
-        ).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => goTab(key)}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
-              tab === key
-                ? "bg-white shadow-sm text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <SegmentedTabs
+          value={tab}
+          onChange={goTab}
+          options={[
+            { value: "brands", label: "Brands", icon: Tag },
+            { value: "work-data", label: "Work Data", icon: BarChart3 },
+            { value: "analytics", label: "Analytics", icon: TrendingUp },
+          ]}
+        />
       </div>
 
       {tab === "brands" && <BrandsTab />}

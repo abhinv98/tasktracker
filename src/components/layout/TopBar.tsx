@@ -108,13 +108,14 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 px-4 sm:px-6 bg-white/70 backdrop-blur-xl border-b border-[var(--border)]">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 px-4 sm:px-6 bg-white border-b border-[var(--border)]">
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <button
           onClick={onMenuToggle}
-          className="md:hidden text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          aria-label="Open menu"
+          className="md:hidden -ml-1.5 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-4 w-4" />
         </button>
         <span className="font-semibold text-[15px] text-[var(--text-primary)] truncate">
           {pageTitle}
@@ -126,7 +127,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search...</span>
-            <kbd className="ml-2 px-1.5 py-0.5 rounded-[5px] bg-white border border-[var(--border)] border-b-[2px] text-[10px] font-mono tracking-[0.04em] text-[var(--text-secondary)]">
+            <kbd className="ml-2 px-1.5 py-0.5 rounded-[5px] bg-white border border-[var(--border)] border-b-[2px] text-[11px] font-mono text-[var(--text-secondary)]">
               ⌘K
             </kbd>
           </button>
@@ -139,15 +140,17 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         <div className="relative" ref={panelRef}>
           <button
             onClick={() => setShowNotifs(!showNotifs)}
+            aria-label="Notifications"
+            aria-expanded={showNotifs}
             className={`relative flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium transition-colors duration-150 ${
               showNotifs
-                ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
+                : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
             }`}
           >
             <Bell className="h-4 w-4" />
             {(unreadCount ?? 0) > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-[11px] font-semibold text-white">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-admin-strong)] text-[11px] font-semibold tabular-nums text-white">
                 {(unreadCount ?? 0) > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -157,23 +160,24 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
           {showNotifs && (
             // Phones: pin to the viewport (the bell isn't at the right edge, so
             // anchoring to it pushed the panel off-screen).
-            <div className="fixed left-4 right-4 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-full mt-2 sm:w-[24rem] bg-white rounded-xl border border-[var(--border)] shadow-lg overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
-                <span className="font-semibold text-[13px] text-[var(--text-primary)]">
+            <div className="fixed left-4 right-4 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-full z-30 mt-2 sm:w-[24rem] bg-white rounded-lg border border-[var(--border)] shadow-lg overflow-hidden">
+              <div className="flex items-center justify-between pl-4 pr-2 h-11 border-b border-[var(--border-subtle)]">
+                <span className="font-semibold text-[14px] text-[var(--text-primary)]">
                   Notifications
                 </span>
                 <div className="flex items-center gap-2">
                   {(unreadCount ?? 0) > 0 && (
                     <button
                       onClick={() => markAllAsRead({})}
-                      className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:underline"
+                      className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
                     >
                       Mark all read
                     </button>
                   )}
                   <button
                     onClick={() => setShowNotifs(false)}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    aria-label="Close notifications"
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -192,7 +196,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
                       className={`px-4 py-3 border-b border-[var(--border-subtle)] transition-colors duration-150 ${
                         notif.read
                           ? "bg-white"
-                          : "bg-[var(--accent-admin-dim)] hover:bg-[var(--bg-hover)]"
+                          : "bg-[var(--bg-primary)] hover:bg-[var(--bg-hover)]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -203,7 +207,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
                           <p className="text-[12px] text-[var(--text-secondary)] mt-0.5 line-clamp-2">
                             {notif.message}
                           </p>
-                          <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                          <p className="text-[12px] text-[var(--text-muted)] mt-1">
                             {formatTimeAgo(notif.createdAt)}
                           </p>
                         </div>
@@ -212,6 +216,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
                             onClick={() => markAsRead({ notificationId: notif._id })}
                             className="shrink-0 mt-1 w-2 h-2 rounded-full bg-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/80"
                             title="Mark as read"
+                            aria-label="Mark as read"
                           />
                         )}
                       </div>
@@ -235,7 +240,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
 
         <button
           onClick={() => signOut()}
-          className="whitespace-nowrap h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
+          className="whitespace-nowrap h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
         >
           Sign out
         </button>
