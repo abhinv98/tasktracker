@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { CheckCircle2, MessageSquareText, Presentation, RotateCcw } from "lucide-react";
 import { PortalCard, PortalCardHeader, EmptyState, timeAgo } from "@/components/portal/shared";
 import { PortalButton, PortalPageHeader, PortalSkeleton } from "@/components/portal/ui";
+import { useToast } from "@/components/ui/Toast";
 
 const KIND_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }> = {
   feedback: { label: "Feedback", icon: MessageSquareText },
@@ -21,6 +22,7 @@ export default function PortalFeedbackPage() {
 
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
   const [justSubmitted, setJustSubmitted] = useState(false);
 
   if (!session || log === undefined) {
@@ -41,7 +43,9 @@ export default function PortalFeedbackPage() {
       setContent("");
       setJustSubmitted(true);
       setTimeout(() => setJustSubmitted(false), 4000);
-    } catch {}
+    } catch {
+      toast("error", "That did not go through. Please try again.");
+    }
     setSubmitting(false);
   }
 

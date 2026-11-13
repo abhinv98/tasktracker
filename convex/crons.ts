@@ -33,4 +33,11 @@ crons.daily(
   internal.managerWorklog.rollWorklogDeadlines
 );
 
+// Remind HR about requests left open for more than 3 days (04:00 UTC, 9:30 am IST).
+crons.daily(
+  "hr stale requests",
+  { hourUTC: 4, minuteUTC: 0 },
+  internal.hr.remindStaleRequests
+);
+
 export default crons;

@@ -26,6 +26,7 @@ import {
   PortalStatusChip,
 } from "@/components/portal/ui";
 import { RemarkComposer, RemarkThread } from "@/components/portal/DeliverableCard";
+import { useToast } from "@/components/ui/Toast";
 
 const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   deck: Presentation,
@@ -44,6 +45,7 @@ export default function PortalDeckPage() {
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const { toast } = useToast();
   const [commentFor, setCommentFor] = useState<string | null>(null);
 
   // Client "add document" form
@@ -71,7 +73,9 @@ export default function PortalDeckPage() {
     setBusy(id + ":approve");
     try {
       await approve({ deckItemId: id as Id<"clientDeckItems"> });
-    } catch {}
+    } catch {
+      toast("error", "That did not go through. Please try again.");
+    }
     setBusy(null);
   }
 
@@ -82,7 +86,9 @@ export default function PortalDeckPage() {
       await requestChanges({ deckItemId: id as Id<"clientDeckItems">, note: note.trim() });
       setNoteFor(null);
       setNote("");
-    } catch {}
+    } catch {
+      toast("error", "That did not go through. Please try again.");
+    }
     setBusy(null);
   }
 
@@ -95,6 +101,7 @@ export default function PortalDeckPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream" }),
       });
+      if (!presignRes.ok) throw new Error("The upload could not be started");
       const { uploadUrl, fileKey } = await presignRes.json();
       await fetch(uploadUrl, {
         method: "PUT",

@@ -1,6 +1,7 @@
 "use client";
 
 import { Printer } from "lucide-react";
+import { formatINR } from "@/lib/money";
 
 type LineItem = { description: string; qty: number; rate: number; amount: number };
 
@@ -36,9 +37,7 @@ export type AgencyInfo = {
   termsNote?: string | null;
 };
 
-function inr(n: number): string {
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
+const inr = formatINR;
 
 function fmtDate(ts?: number | null): string {
   if (!ts) return "-";

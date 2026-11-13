@@ -10,6 +10,7 @@ import { Button, EmptyState, StatStrip, StatusBadge } from "@/components/ui";
 import { PaginationFooter } from "@/components/ui/PaginationFooter";
 import { taskStatusMeta } from "@/lib/status";
 import { fieldClass } from "@/components/ui/classes";
+import { useToast } from "@/components/ui/Toast";
 
 const FIELD = fieldClass;
 
@@ -44,13 +45,17 @@ export default function InternalJsrTab({ brandId }: InternalJsrTabProps) {
   const [filterTag, setFilterTag] = useState("");
   const [editingTagFor, setEditingTagFor] = useState<Id<"tasks"> | null>(null);
   const [tagDraft, setTagDraft] = useState("");
+  const { toast } = useToast();
 
   async function saveTag(taskId: Id<"tasks">) {
     try {
       await setTaskTag({ taskId, tag: tagDraft.trim() || undefined });
-    } catch {}
-    setEditingTagFor(null);
-    setTagDraft("");
+      setEditingTagFor(null);
+      setTagDraft("");
+    } catch (err) {
+      // The editor stays open with the text in it, so nothing has to be retyped.
+      toast("error", err instanceof Error ? err.message : "The tag was not saved");
+    }
   }
 
   const goToBrief = useCallback(

@@ -4,11 +4,15 @@ import { useMutation, useQuery } from "convex/react";
 import { useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { PageHeader, Badge, Button, EmptyState, SegmentedTabs, SectionHeader, StatusBadge, useToast, SkeletonPageHeader, SkeletonCards } from "@/components/ui";
+import { PageHeader, Badge, Button, EmptyState, SegmentedTabs, StatusBadge, useToast, SkeletonPageHeader, SkeletonCards } from "@/components/ui";
 import {
   HR_CATEGORIES,
+  HR_STALE_AFTER_DAYS,
   HR_STATUSES,
   categoryLabel,
+  hrDaysOpen,
+  isHrRequestOpen,
+  isHrRequestStale,
   statusMeta,
   type HrCategory,
   type HrStatus,
@@ -56,10 +60,13 @@ function RequestCard({
   req,
   selected,
   onToggleSelect,
+  now,
 }: {
   req: HrRequest;
   selected: boolean;
   onToggleSelect: () => void;
+  /** When the board was opened, for "open N days". */
+  now: number;
 }) {
   const setStatus = useMutation(api.hr.setStatus);
   const addDocument = useMutation(api.hr.addDocument);
@@ -91,6 +98,7 @@ function RequestCard({
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) throw new Error("The upload was refused");
       const { storageId } = await res.json();
       await addDocument({
         requestId: req._id,
@@ -150,6 +158,9 @@ function RequestCard({
           <span className="text-[12px] text-[var(--text-muted)]">
             {formatDate(req.createdAt)}
           </span>
+          {isHrRequestStale(req, now) && (
+            <Badge variant="warning">Open {hrDaysOpen(req, now)} days</Badge>
+          )}
         </div>
       </div>
 
@@ -277,6 +288,9 @@ export default function HrRequestsPage() {
   const setStatusBulk = useMutation(api.hr.setStatusBulk);
   const { toast } = useToast();
   const [openOnly, setOpenOnly] = useState(false);
+  const [staleOnly, setStaleOnly] = useState(false);
+  // Fixed when the board opens: "open N days" should not tick mid-session.
+  const [now] = useState(() => Date.now());
   const [tab, setTab] = useState<Tab>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -311,9 +325,14 @@ export default function HrRequestsPage() {
     );
   }
 
-  const scoped = openOnly
-    ? requests.filter((r) => r.status !== "completed" && r.status !== "declined")
-    : requests;
+  // Newest first comes from the server (hr.listAll sorts by createdAt).
+  const staleCount = requests.filter((r) => isHrRequestStale(r, now)).length;
+  const showStaleOnly = staleOnly && staleCount > 0;
+  const scoped = showStaleOnly
+    ? requests.filter((r) => isHrRequestStale(r, now))
+    : openOnly
+      ? requests.filter((r) => isHrRequestOpen(r.status))
+      : requests;
   const visible =
     tab === "all" ? scoped : scoped.filter((r) => r.category === tab);
   const pendingCount = requests.filter((r) => r.status === "pending").length;
@@ -344,12 +363,32 @@ export default function HrRequestsPage() {
           <Button
             variant={openOnly ? "primary" : "secondary"}
             aria-pressed={openOnly}
-            onClick={() => setOpenOnly((v) => !v)}
+            onClick={() => {
+              // The two filters are alternatives: choosing this one leaves "over 3 days".
+              setStaleOnly(false);
+              setOpenOnly((v) => !v);
+            }}
           >
             Open only
           </Button>
         }
       />
+
+      {/* The reminder: anything left open past the limit, with one click to see just those. */}
+      {staleCount > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[var(--warning-dim)] px-4 py-2.5">
+          <p className="text-[13px] font-medium text-[var(--warning)]">
+            {staleCount} request{staleCount !== 1 ? "s have" : " has"} been open for more than {HR_STALE_AFTER_DAYS} days.
+            Close {staleCount !== 1 ? "them" : "it"} out, or update {staleCount !== 1 ? "their" : "its"} status.
+          </p>
+          <Button variant="secondary" aria-pressed={showStaleOnly} onClick={() => {
+              setOpenOnly(false);
+              setStaleOnly((v) => !v);
+            }}>
+            {showStaleOnly ? "Show all requests" : `Show ${staleCount !== 1 ? "these" : "it"}`}
+          </Button>
+        </div>
+      )}
 
       {/* Category tabs */}
       <SegmentedTabs
@@ -412,30 +451,9 @@ export default function HrRequestsPage() {
 
       {visible.length === 0 ? (
         <EmptyState icon={Inbox} title="No requests here" />
-      ) : tab === "all" ? (
-        // Grouped by category so "All" still reads as segregated.
-        <div className="flex flex-col gap-6">
-          {HR_CATEGORIES.map(({ value, label }) => {
-            const group = visible.filter((r) => r.category === value);
-            if (group.length === 0) return null;
-            return (
-              <section key={value}>
-                <SectionHeader title={label} count={group.length} />
-                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-                  {group.map((r) => (
-                    <RequestCard
-                      key={r._id}
-                      req={r}
-                      selected={selected.has(r._id)}
-                      onToggleSelect={() => toggle(r._id)}
-                    />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
       ) : (
+        // One list, newest request first, in every tab. Each card names its
+        // own category, so "All" needs no grouping to stay readable.
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {visible.map((r) => (
             <RequestCard
@@ -443,6 +461,7 @@ export default function HrRequestsPage() {
               req={r}
               selected={selected.has(r._id)}
               onToggleSelect={() => toggle(r._id)}
+              now={now}
             />
           ))}
         </div>

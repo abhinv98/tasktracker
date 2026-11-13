@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -184,6 +184,23 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
   const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
   const [jsrMsgContent, setJsrMsgContent] = useState("");
   const [sendingJsrMsg, setSendingJsrMsg] = useState(false);
+  // Enter and the Send button share this. The ref, not the state, is the
+  // guard: a second Enter can arrive before the state has re-rendered, and
+  // the client would get the message twice.
+  const sendingJsrRef = useRef(false);
+  function sendJsrMessage() {
+    const content = jsrMsgContent.trim();
+    if (!content || sendingJsrRef.current) return;
+    sendingJsrRef.current = true;
+    setSendingJsrMsg(true);
+    sendManagerMessage({ brandId, content })
+      .then(() => setJsrMsgContent(""))
+      .catch(() => toast("error", "Failed to send"))
+      .finally(() => {
+        sendingJsrRef.current = false;
+        setSendingJsrMsg(false);
+      });
+  }
   const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
 
   const [blocks, setBlocks] = useState<BlockConfig[]>(() => loadBlocks(brandId));
@@ -645,13 +662,9 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                 value={jsrMsgContent}
                 onChange={(e) => setJsrMsgContent(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && jsrMsgContent.trim()) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    setSendingJsrMsg(true);
-                    sendManagerMessage({ brandId, content: jsrMsgContent.trim() })
-                      .then(() => setJsrMsgContent(""))
-                      .catch(() => toast("error", "Failed to send"))
-                      .finally(() => setSendingJsrMsg(false));
+                    sendJsrMessage();
                   }
                 }}
                 placeholder="Type a message..."
@@ -660,14 +673,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
               <Button
                 variant="primary"
                 aria-label="Send message"
-                onClick={() => {
-                  if (!jsrMsgContent.trim()) return;
-                  setSendingJsrMsg(true);
-                  sendManagerMessage({ brandId, content: jsrMsgContent.trim() })
-                    .then(() => setJsrMsgContent(""))
-                    .catch(() => toast("error", "Failed to send"))
-                    .finally(() => setSendingJsrMsg(false));
-                }}
+                onClick={sendJsrMessage}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
                 className="shrink-0"
               >

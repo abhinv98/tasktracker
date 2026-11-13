@@ -209,8 +209,11 @@ export default function MessagesPage() {
     );
   }, [contactsWithSelf, selectedContactId, user]);
 
+  // Guards a second Enter that lands before the first send has cleared the box.
+  const sendingRef = useRef(false);
   async function handleSend() {
-    if (!messageText.trim() || !selectedContactId) return;
+    if (!messageText.trim() || !selectedContactId || sendingRef.current) return;
+    sendingRef.current = true;
     try {
       await sendMessage({ recipientId: selectedContactId, content: messageText });
       setMessageText("");
@@ -218,6 +221,8 @@ export default function MessagesPage() {
       inputRef.current?.focus();
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to send");
+    } finally {
+      sendingRef.current = false;
     }
   }
 

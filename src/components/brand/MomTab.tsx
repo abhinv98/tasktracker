@@ -92,6 +92,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
           headers: { "Content-Type": transcriptFile.type },
           body: transcriptFile,
         });
+        if (!result.ok) throw new Error("The upload was refused");
         const { storageId } = await result.json();
         transcriptFileId = storageId;
         transcriptFileName = transcriptFile.name;

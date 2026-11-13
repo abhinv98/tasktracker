@@ -6,7 +6,7 @@ import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, SegmentedTabs, useToast } from "@/components/ui";
+import { Badge, Button, SegmentedTabs, useToast, useConfirm } from "@/components/ui";
 import { taskStatusMeta } from "@/lib/status";
 import {
   ChevronLeft,
@@ -158,6 +158,7 @@ function layoutBlocks(blocks: Array<{ startTime: number; endTime: number; _id: s
 export default function PlannerPage() {
   const user = useQuery(api.users.getCurrentUser);
   const { toast } = useToast();
+  const askConfirm = useConfirm();
 
   const [selectedDate, setSelectedDate] = useState(todayStr());
   const [viewMode, setViewMode] = useState<"day" | "week">("day");
@@ -480,14 +481,16 @@ export default function PlannerPage() {
     setConflictModal(null);
   }
 
-  async function handleDeleteBlock(blockId: string) {
-    try {
-      await deleteBlockMut({ blockId: blockId as Id<"scheduleBlocks"> });
-      setShowBlockDetail(null);
-      toast("success", "Block removed");
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed");
-    }
+  function handleDeleteBlock(blockId: string) {
+    askConfirm({
+      title: "Delete this block?",
+      message: "It is removed from the schedule. This cannot be undone.",
+      onConfirm: async () => {
+        await deleteBlockMut({ blockId: blockId as Id<"scheduleBlocks"> });
+        setShowBlockDetail(null);
+        toast("success", "Block removed");
+      },
+    });
   }
 
   async function handleCompleteBlock(block: NonNullable<typeof schedule>[number]) {

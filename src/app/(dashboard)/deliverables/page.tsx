@@ -368,6 +368,7 @@ export default function DeliverablesPage() {
         for (const file of submitFiles) {
           const url = await generateUploadUrl();
           const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+          if (!res.ok) throw new Error("The upload was refused");
           const { storageId } = await res.json();
           newFileIds.push(storageId);
           newFileNames.push(file.name);
@@ -1005,8 +1006,8 @@ export default function DeliverablesPage() {
                                         delete n[d._id];
                                         return n;
                                       });
-                                    } catch {
-                                      /* toast optional */
+                                    } catch (err) {
+                                      toast("error", err instanceof Error ? err.message : "Could not hand this off");
                                     }
                                   }}
                                 >
@@ -1223,18 +1224,14 @@ export default function DeliverablesPage() {
                             Final Approve (Brand Manager)
                           </Button>
                         ) : (
-                          (del.brandManagers ?? []).map((mgr: any) => (
-                            <Button
-                              key={mgr._id}
-                              variant="primary"
-                              onClick={async () => {
-                                try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
-                              }}
-                            >
+                          // Passing notifies every manager of the brand, so it is
+                          // one action, named for all of them, not a button each.
+                          (del.brandManagers ?? []).length > 0 && (
+                            <Button variant="primary" onClick={() => handlePassToManager(del._id)}>
                               <ArrowRight className="h-3.5 w-3.5" />
-                              Pass to {mgr.name}
+                              Pass to {(del.brandManagers as any[]).map((mgr) => mgr.name).join(", ")}
                             </Button>
-                          ))
+                          )
                         )}
                       </div>
                     )}
@@ -1377,7 +1374,10 @@ export default function DeliverablesPage() {
                             newAssigneeId: target as Id<"users">,
                           });
                           setReassignTarget((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
-                        } catch {}
+                          toast("success", "Sent back to the team member");
+                        } catch (err) {
+                          toast("error", err instanceof Error ? err.message : "Could not send it back");
+                        }
                       }}
                       className="w-fit"
                     >
@@ -1392,7 +1392,12 @@ export default function DeliverablesPage() {
                         key={del._id}
                         variant="primary"
                         onClick={async () => {
-                          try { await sendToClientMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
+                          try {
+                            await sendToClientMut({ deliverableId: del._id as Id<"deliverables"> });
+                            toast("success", "Sent to the client");
+                          } catch (err) {
+                            toast("error", err instanceof Error ? err.message : "Could not send it to the client");
+                          }
                         }}
                       >
                         <Send className="h-3.5 w-3.5" />
@@ -1412,7 +1417,11 @@ export default function DeliverablesPage() {
                           type="button"
                           variant="primary"
                           onClick={async () => {
-                            try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
+                            try {
+                              await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> });
+                            } catch (err) {
+                              toast("error", err instanceof Error ? err.message : "Could not receive it for review");
+                            }
                           }}
                         >
                           <ArrowRight className="h-3.5 w-3.5" />
@@ -1694,8 +1703,8 @@ export default function DeliverablesPage() {
                                         delete n[tk];
                                         return n;
                                       });
-                                    } catch {
-                                      /* */
+                                    } catch (err) {
+                                      toast("error", err instanceof Error ? err.message : "Could not hand this off");
                                     }
                                   }}
                                 >

@@ -1494,7 +1494,8 @@ export default function BriefPage() {
                           ...(sh === "right" || sh === "bottom" ? { sourceHandle: sh } : {}),
                         });
                       } catch {
-                        // Connection failed silently — task was still created
+                        // The task itself was created; only the link to it failed.
+                        toast("error", "The task was added, but it could not be connected. Draw the connection again.");
                       }
                     }
 

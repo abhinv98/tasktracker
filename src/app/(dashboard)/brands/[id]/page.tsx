@@ -171,6 +171,23 @@ export default function BrandDetailPage() {
   const [deleteJsrTasks, setDeleteJsrTasks] = useState(false);
   const [jsrMsgContent, setJsrMsgContent] = useState("");
   const [sendingJsrMsg, setSendingJsrMsg] = useState(false);
+  // Enter and the Send button share this. The ref, not the state, is the
+  // guard: a second Enter can arrive before the state has re-rendered, and
+  // the client would get the message twice.
+  const sendingJsrRef = useRef(false);
+  function sendJsrMessage() {
+    const content = jsrMsgContent.trim();
+    if (!content || sendingJsrRef.current) return;
+    sendingJsrRef.current = true;
+    setSendingJsrMsg(true);
+    sendManagerMessage({ brandId, content })
+      .then(() => setJsrMsgContent(""))
+      .catch(() => toast("error", "Failed to send"))
+      .finally(() => {
+        sendingJsrRef.current = false;
+        setSendingJsrMsg(false);
+      });
+  }
 
   // Chat sidebar
   const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
@@ -208,6 +225,7 @@ export default function BrandDetailPage() {
           headers: { "Content-Type": file.type },
           body: file,
         });
+        if (!result.ok) throw new Error("The upload was refused");
         const { storageId } = await result.json();
         await uploadDoc({
           brandId,
@@ -216,7 +234,9 @@ export default function BrandDetailPage() {
           fileType: file.type,
           visibility: "all" as const,
         });
-      } catch {}
+      } catch (err) {
+        toast("error", `${file.name} could not be uploaded${err instanceof Error && err.message ? `: ${err.message}` : ""}`);
+      }
       setUploadingDoc(false);
     }
   }, [generateDocUploadUrl, uploadDoc, brandId]);
@@ -301,6 +321,7 @@ export default function BrandDetailPage() {
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!result.ok) throw new Error("The upload was refused");
       const { storageId } = await result.json();
       await updateBrandLogo({ brandId, logoId: storageId });
       toast("success", "Brand logo updated");
@@ -351,6 +372,7 @@ export default function BrandDetailPage() {
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!result.ok) throw new Error("The upload was refused");
       const { storageId } = await result.json();
       await uploadDoc({
         brandId,
@@ -1299,13 +1321,9 @@ export default function BrandDetailPage() {
                 value={jsrMsgContent}
                 onChange={(e) => setJsrMsgContent(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && jsrMsgContent.trim()) {
+                  if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    setSendingJsrMsg(true);
-                    sendManagerMessage({ brandId, content: jsrMsgContent.trim() })
-                      .then(() => { setJsrMsgContent(""); })
-                      .catch(() => toast("error", "Failed to send"))
-                      .finally(() => setSendingJsrMsg(false));
+                    sendJsrMessage();
                   }
                 }}
                 placeholder="Type a message..."
@@ -1314,14 +1332,7 @@ export default function BrandDetailPage() {
               <Button
                 variant="primary"
                 aria-label="Send message"
-                onClick={() => {
-                  if (!jsrMsgContent.trim()) return;
-                  setSendingJsrMsg(true);
-                  sendManagerMessage({ brandId, content: jsrMsgContent.trim() })
-                    .then(() => { setJsrMsgContent(""); })
-                    .catch(() => toast("error", "Failed to send"))
-                    .finally(() => setSendingJsrMsg(false));
-                }}
+                onClick={sendJsrMessage}
                 disabled={sendingJsrMsg || !jsrMsgContent.trim()}
                 className="shrink-0"
               >

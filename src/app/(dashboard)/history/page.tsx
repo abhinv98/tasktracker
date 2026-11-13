@@ -13,6 +13,7 @@ import {
   FileText,
   Download,
 } from "lucide-react";
+import { flushSync } from "react-dom";
 
 // Labels for the text export only; on screen, statuses come from the lib.
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -109,7 +110,27 @@ export default function HistoryPage() {
 
   function handleExportPDF() {
     setShowExportMenu(false);
-    setTimeout(() => window.print(), 100);
+    if (!history) return; // still loading: there is nothing to print yet
+    // The PDF is the page as printed, so every brand, brief and task is opened
+    // first (a collapsed section would be missing from it). flushSync puts
+    // that on the page before print() runs; the view is put back afterwards.
+    const before = { brands: expandedBrands, briefs: expandedBriefs, tasks: expandedTasks };
+    flushSync(() => {
+      setExpandedBrands(new Set(history.map((g) => g.brand._id as string)));
+      setExpandedBriefs(new Set(history.flatMap((g) => g.briefs.map((b) => b._id as string))));
+      setExpandedTasks(new Set(history.flatMap((g) => g.briefs.flatMap((b) => b.tasks.map((t) => t._id as string)))));
+    });
+    window.addEventListener(
+      "afterprint",
+      () => {
+        setExpandedBrands(before.brands);
+        setExpandedBriefs(before.briefs);
+        setExpandedTasks(before.tasks);
+      },
+      { once: true }
+    );
+    // One frame so the browser has painted the opened sections.
+    requestAnimationFrame(() => window.print());
   }
 
   if (!user) {
@@ -202,7 +223,7 @@ export default function HistoryPage() {
               <button
                 onClick={() => toggleBrand(brandGroup.brand._id)}
                 aria-expanded={isBrandOpen}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left print:!flex"
               >
                 {isBrandOpen ? (
                   <ChevronDown className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
@@ -235,7 +256,7 @@ export default function HistoryPage() {
                         <button
                           onClick={() => toggleBrief(brief._id)}
                           aria-expanded={isBriefOpen}
-                          className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
+                          className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left print:!flex"
                         >
                           {isBriefOpen ? (
                             <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
@@ -279,7 +300,7 @@ export default function HistoryPage() {
                                   {/* Task Row */}
                                   <button
                                     onClick={() => hasDeliverables && toggleTask(task._id)}
-                                    className={`w-full flex items-center gap-3 px-8 py-2 text-left transition-colors ${
+                                    className={`w-full flex items-center gap-3 px-8 py-2 text-left transition-colors print:!flex ${
                                       hasDeliverables ? "hover:bg-[var(--bg-hover)] cursor-pointer" : "cursor-default"
                                     }`}
                                   >

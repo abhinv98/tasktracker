@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Send, Trash2, AtSign, User, CheckSquare, Pin, SmilePlus, ChevronDown, Paperclip, FileText, X } from "lucide-react";
 import { SectionHeader } from "@/components/ui/StatTile";
+import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useToast } from "@/components/ui/Toast";
 
 const EMOJI_PRESETS = [
   { emoji: "👍", label: "thumbsup" },
@@ -118,6 +120,8 @@ export function CommentThread({
 
   const addComment = useMutation(api.comments.addComment);
   const deleteComment = useMutation(api.comments.deleteComment);
+  const askConfirm = useConfirm();
+  const { toast } = useToast();
   const pinComment = useMutation(api.comments.pinComment);
   const unpinComment = useMutation(api.comments.unpinComment);
   const toggleReaction = useMutation(api.comments.toggleReaction);
@@ -284,6 +288,7 @@ export function CommentThread({
           headers: { "Content-Type": pendingFile.file.type },
           body: pendingFile.file,
         });
+        if (!resp.ok) throw new Error("The upload was refused");
         const { storageId } = await resp.json();
         attachmentId = storageId;
         attachmentName = pendingFile.name;
@@ -302,8 +307,10 @@ export function CommentThread({
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
-    } catch {
+    } catch (err) {
       setUploading(false);
+      // The text stays in the box, so nothing typed is lost.
+      toast("error", err instanceof Error && err.message ? err.message : "Your message was not posted. Try again.");
     } finally {
       submittingRef.current = false;
     }
@@ -555,7 +562,13 @@ export function CommentThread({
                     {/* Delete button */}
                     {(c.userId === user?._id || user?.role === "admin") && (
                       <button
-                        onClick={() => deleteComment({ commentId: c._id })}
+                        onClick={() =>
+                          askConfirm({
+                            title: "Delete this message?",
+                            message: "It is removed from the discussion for everyone. This cannot be undone.",
+                            onConfirm: () => deleteComment({ commentId: c._id }),
+                          })
+                        }
                         aria-label="Delete message"
                         className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
                       >

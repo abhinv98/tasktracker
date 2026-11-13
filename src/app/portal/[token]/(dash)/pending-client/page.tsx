@@ -19,6 +19,7 @@ import {
   PortalPageHeader,
   PortalSkeleton,
 } from "@/components/portal/ui";
+import { useToast } from "@/components/ui/Toast";
 
 export default function PortalPendingClientPage() {
   const params = useParams();
@@ -33,6 +34,7 @@ export default function PortalPendingClientPage() {
   const [reviewNote, setReviewNote] = useState("");
   const [needsNote, setNeedsNote] = useState<"changes" | "deny" | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     document.body.style.overflow = reviewItem ? "hidden" : "";
@@ -75,7 +77,9 @@ export default function PortalPendingClientPage() {
       setReviewItem(null);
       setReviewNote("");
       setNeedsNote(null);
-    } catch {}
+    } catch {
+      toast("error", "That did not go through. Please try again.");
+    }
     setSubmitting(false);
   }
 

@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { MessageCircle, Send } from "lucide-react";
 import { PortalCard } from "@/components/portal/shared";
 import { PortalSkeleton } from "@/components/portal/ui";
+import { useToast } from "@/components/ui/Toast";
 
 type Message = {
   _id: string;
@@ -66,6 +67,8 @@ export default function PortalMessagesPage() {
 
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const { toast } = useToast();
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -86,13 +89,18 @@ export default function PortalMessagesPage() {
   const days = groupMessages(messages as Message[]);
 
   async function handleSend() {
-    if (!content.trim() || sending) return;
+    // The ref, not the state, stops a second Enter sending the message twice.
+    if (!content.trim() || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     try {
       await sendMessage({ content: content.trim() });
       setContent("");
       if (textareaRef.current) textareaRef.current.style.height = "auto";
-    } catch {}
+    } catch {
+      toast("error", "Your message was not sent. Please try again.");
+    }
+    sendingRef.current = false;
     setSending(false);
   }
 

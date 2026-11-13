@@ -726,7 +726,9 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                   await addManagerDeckRemark({ deckItemId: item._id, content: deckReply.trim() });
                                   setDeckReply("");
                                   setDeckReplyFor(null);
-                                } catch {}
+                                } catch (err) {
+                                  toast("error", err instanceof Error ? err.message : "Your comment was not sent");
+                                }
                                 setSendingReply(false);
                               }
                             }}

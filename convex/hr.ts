@@ -1,5 +1,6 @@
 import { getAuthUserId } from "./lib/internalAuth";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { HR_STALE_AFTER_DAYS, isHrRequestStale } from "../src/lib/hrRequests";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -216,5 +217,49 @@ export const deleteRequest = mutation({
       await ctx.storage.delete(doc.fileId);
     }
     await ctx.db.delete(requestId);
+  },
+});
+
+/**
+ * Daily nudge (convex/crons.ts): if any request has been open for more than
+ * HR_STALE_AFTER_DAYS days, everyone in HR gets one notification with the
+ * count. One a day while any are still open, none when the board is clear.
+ */
+const STALE_TITLE_END = `open for more than ${HR_STALE_AFTER_DAYS} days`;
+
+export const remindStaleRequests = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const stale = (await ctx.db.query("hrRequests").collect()).filter((r) => isHrRequestStale(r, now));
+    if (stale.length === 0) return { stale: 0, notified: 0 };
+    const hr = (await ctx.db.query("users").collect()).filter((u) => u.isHR === true);
+    const n = stale.length;
+    const title = `${n} request${n !== 1 ? "s" : ""} open for more than ${HR_STALE_AFTER_DAYS} days`;
+    const message = `Please close ${n !== 1 ? "them" : "it"} out, or update ${n !== 1 ? "their" : "its"} status, on the Requests page.`;
+    for (const person of hr) {
+      // One reminder at a time: yesterday's unread one is brought up to date
+      // instead of a new one being stacked on top of it every morning.
+      const unread = await ctx.db
+        .query("notifications")
+        .withIndex("by_recipient_read", (q) => q.eq("recipientId", person._id).eq("read", false))
+        .collect();
+      const earlier = unread.find((x) => x.type === "deadline_reminder" && x.title.endsWith(STALE_TITLE_END));
+      if (earlier) {
+        await ctx.db.patch(earlier._id, { title, message, createdAt: now });
+        continue;
+      }
+      await ctx.db.insert("notifications", {
+        recipientId: person._id,
+        type: "deadline_reminder",
+        title,
+        message,
+        // A system reminder has no sender; the schema wants one, so it is the person themselves.
+        triggeredBy: person._id,
+        read: false,
+        createdAt: now,
+      });
+    }
+    return { stale: n, notified: hr.length };
   },
 });

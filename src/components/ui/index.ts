@@ -2,7 +2,7 @@ export { Badge, StatusBadge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { PageHeader } from "./PageHeader";
-export { ConfirmModal } from "./ConfirmModal";
+export { ConfirmModal, ConfirmProvider, useConfirm } from "./ConfirmModal";
 export { DatePicker } from "./DatePicker";
 export { Input } from "./Input";
 export {

@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { Paperclip, Download, Trash2 } from "lucide-react";
 import { Button } from "./Button";
 import { SectionHeader } from "./StatTile";
+import { useConfirm } from "./ConfirmModal";
+import { useToast } from "./Toast";
 
 interface AttachmentListProps {
   parentType: "brief" | "task";
@@ -19,6 +21,8 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
   const user = useQuery(api.users.getCurrentUser);
   const [isUploading, setIsUploading] = useState(false);
+  const askConfirm = useConfirm();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -32,6 +36,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) throw new Error("The upload was refused");
       const { storageId } = await res.json();
       await addAttachment({
         parentType,
@@ -41,7 +46,7 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
         fileType: file.type,
       });
     } catch (err) {
-      console.error("Upload failed:", err);
+      toast("error", `${file.name} could not be uploaded${err instanceof Error && err.message ? `: ${err.message}` : ""}`);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -92,7 +97,13 @@ export function AttachmentList({ parentType, parentId }: AttachmentListProps) {
               )}
               {(att.uploadedBy === user?._id || user?.role === "admin") && (
                 <button
-                  onClick={() => deleteAttachment({ attachmentId: att._id })}
+                  onClick={() =>
+                    askConfirm({
+                      title: `Delete ${att.fileName}?`,
+                      message: "The file is removed for everyone. This cannot be undone.",
+                      onConfirm: () => deleteAttachment({ attachmentId: att._id }),
+                    })
+                  }
                   aria-label={`Delete ${att.fileName}`}
                   className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                 >

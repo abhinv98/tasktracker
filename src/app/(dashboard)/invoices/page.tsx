@@ -4,26 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import {
-  Badge,
-  Button,
-  Card,
-  ConfirmModal,
-  EmptyState,
-  PageHeader,
-  Panel,
-  PanelEmpty,
-  SegmentedTabs,
-  StatStrip,
-  StatTile,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  useToast,
-} from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, EmptyState, PageHeader, Panel, PanelEmpty, SegmentedTabs, StatStrip, StatTile, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, useToast, useConfirm } from "@/components/ui";
 import {
   Banknote,
   FileText,
@@ -38,12 +19,11 @@ import {
   ExternalLink,
   AlertCircle,
 } from "lucide-react";
+import { formatINR } from "@/lib/money";
 
 /* ─── helpers ─── */
 
-function fmtINR(n: number): string {
-  return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-}
+const fmtINR = formatINR;
 
 function fmtDate(ts?: number | null): string {
   if (!ts) return "-";
@@ -1123,6 +1103,7 @@ function InvoiceDetailModal({
   const [payRef, setPayRef] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const askConfirm = useConfirm();
 
   async function act(fn: () => Promise<unknown>, ok: string) {
     setBusy(true);
@@ -1283,7 +1264,14 @@ function InvoiceDetailModal({
                 {p.method && <span className="text-[var(--text-muted)]">{p.method}</span>}
                 {p.reference && <span className="text-[var(--text-muted)] truncate">Ref: {p.reference}</span>}
                 <button
-                  onClick={() => act(() => deletePayment({ paymentId: p._id }), "Payment removed")}
+                  onClick={() =>
+                    askConfirm({
+                      title: `Remove this payment of ${fmtINR(p.amount)}?`,
+                      message: "The invoice goes back to owing this amount. This cannot be undone.",
+                      confirmLabel: "Remove",
+                      onConfirm: () => act(() => deletePayment({ paymentId: p._id }), "Payment removed"),
+                    })
+                  }
                   disabled={busy}
                   aria-label="Remove payment"
                   className="ml-auto inline-flex items-center justify-center h-7 w-7 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"

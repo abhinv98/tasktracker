@@ -139,6 +139,7 @@ export default function ProfilePage() {
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) throw new Error("The upload was refused");
       const { storageId } = await res.json();
       await updateProfileImage({ storageId });
       toast("success", "Profile photo updated");

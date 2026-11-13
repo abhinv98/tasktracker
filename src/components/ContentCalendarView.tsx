@@ -6,7 +6,7 @@ import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, Card, ConfirmModal, StatusBadge, useToast } from "@/components/ui";
+import { Badge, Button, Card, ConfirmModal, StatusBadge, useToast, useConfirm } from "@/components/ui";
 import { TASK_STATUS_META, taskStatusMeta } from "@/lib/status";
 import {
   Plus,
@@ -228,6 +228,7 @@ export function ContentCalendarView({
   const toggleBreakDay = useMutation(api.contentCalendar.toggleBreakDay);
 
   const { toast } = useToast();
+  const askConfirm = useConfirm();
   // Editing is open to anyone involved in the calendar; deleting is not.
   const canDelete = user?.role === "admin";
 
@@ -769,20 +770,15 @@ export function ContentCalendarView({
                       >
                         <button
                           onClick={() =>
-                            deleteTask({ taskId: task._id })
-                              .then(() => {
-                                if (selectedTaskId === task._id)
-                                  setSelectedTaskId(null);
+                            askConfirm({
+                              title: `Delete "${task.title}"?`,
+                              message: "The entry and its team tasks are removed from the calendar. This cannot be undone.",
+                              onConfirm: async () => {
+                                await deleteTask({ taskId: task._id });
+                                if (selectedTaskId === task._id) setSelectedTaskId(null);
                                 toast("success", "Entry deleted");
-                              })
-                              .catch((err) =>
-                                toast(
-                                  "error",
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Failed"
-                                )
-                              )
+                              },
+                            })
                           }
                           aria-label="Delete entry"
                           title="Delete entry"
@@ -1334,8 +1330,9 @@ export function ContentCalendarEntrySidebar({
     setShowLinkInput(false);
     try {
       await updateReferenceLinks({ taskId: task._id, referenceLinks: updated });
-    } catch {
+    } catch (err) {
       setRefLinks(refLinks);
+      toast("error", err instanceof Error ? err.message : "The link change was not saved");
     }
   }
 
@@ -1344,8 +1341,9 @@ export function ContentCalendarEntrySidebar({
     setRefLinks(updated);
     try {
       await updateReferenceLinks({ taskId: task._id, referenceLinks: updated });
-    } catch {
+    } catch (err) {
       setRefLinks(refLinks);
+      toast("error", err instanceof Error ? err.message : "The link change was not saved");
     }
   }
 
@@ -1355,6 +1353,7 @@ export function ContentCalendarEntrySidebar({
   });
   const addAttachment = useMutation(api.attachments.addAttachment);
   const deleteAttachment = useMutation(api.attachments.deleteAttachment);
+  const askConfirm = useConfirm();
   const generateUploadUrl = useMutation(api.attachments.generateUploadUrl);
   const user = useQuery(api.users.getCurrentUser);
   const [isUploading, setIsUploading] = useState(false);
@@ -1564,6 +1563,7 @@ export function ContentCalendarEntrySidebar({
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) throw new Error("The upload was refused");
       const { storageId } = await res.json();
       await addAttachment({
         parentType: "task",
@@ -2584,28 +2584,22 @@ export function ContentCalendarEntrySidebar({
                         disabled={deletingLinkedId === lt._id}
                         title="Remove linked task"
                         aria-label="Remove linked task"
-                        onClick={async () => {
-                          if (
-                            !confirm(
-                              `Remove linked task "${lt.title}"? This cannot be undone.`
-                            )
-                          )
-                            return;
-                          setDeletingLinkedId(lt._id);
-                          try {
-                            await removeLinkedTask({ taskId: lt._id });
-                            toast("success", "Linked task removed");
-                          } catch (err) {
-                            toast(
-                              "error",
-                              err instanceof Error
-                                ? err.message
-                                : "Failed to remove task"
-                            );
-                          } finally {
-                            setDeletingLinkedId(null);
-                          }
-                        }}
+                        onClick={() =>
+                          askConfirm({
+                            title: `Remove linked task "${lt.title}"?`,
+                            message: "This cannot be undone.",
+                            confirmLabel: "Remove",
+                            onConfirm: async () => {
+                              setDeletingLinkedId(lt._id);
+                              try {
+                                await removeLinkedTask({ taskId: lt._id });
+                                toast("success", "Linked task removed");
+                              } finally {
+                                setDeletingLinkedId(null);
+                              }
+                            },
+                          })
+                        }
                         className={`${ICON_BTN_SM} shrink-0 hover:text-[var(--danger)] disabled:opacity-40`}
                       >
                         {deletingLinkedId === lt._id ? (
@@ -2903,7 +2897,11 @@ export function ContentCalendarEntrySidebar({
                     user?.role === "admin") && (
                     <button
                       onClick={() =>
-                        deleteAttachment({ attachmentId: att._id })
+                        askConfirm({
+                          title: `Delete ${att.fileName}?`,
+                          message: "The file is removed for everyone. This cannot be undone.",
+                          onConfirm: () => deleteAttachment({ attachmentId: att._id }),
+                        })
                       }
                       aria-label="Delete file"
                       className={`${ICON_BTN_SM} hover:text-[var(--danger)]`}

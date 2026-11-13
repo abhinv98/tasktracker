@@ -23,12 +23,27 @@ export function useToast() {
 
 let nextId = 0;
 
+/**
+ * Pages pass `err.message` straight into a toast. From Convex that arrives as
+ * "[CONVEX M(tasks:x)] [Request ID: ...] Server Error\nUncaught Error: <what
+ * the server said>\n    at handler (...)". Only the sentence the server wrote
+ * is for the person; with none, say so plainly. Done here so every toast in
+ * the app is covered, not each call site. Check: node scripts/toastMessage.check.ts
+ */
+export function plainMessage(message: string): string {
+  const thrown = message.match(/Uncaught (?:\w*Error): ([^\n]*)/);
+  const text = (thrown ? thrown[1] : message.replace(/^\[CONVEX [^\]]*\]\s*(?:\[Request ID: [^\]]*\]\s*)?/, ""))
+    .replace(/\s+at \w+ \([\s\S]*$/, "")
+    .trim();
+  return text === "" || text === "Server Error" ? "Something went wrong. Please try again." : text;
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const toast = useCallback((type: ToastType, message: string) => {
     const id = nextId++;
-    setToasts((prev) => [...prev, { id, type, message }]);
+    setToasts((prev) => [...prev, { id, type, message: plainMessage(message) }]);
   }, []);
 
   const dismiss = useCallback((id: number) => {
@@ -58,7 +73,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           content from AT is its own bug. It sits outside any live region, so
           it stays silent on insert and the regions above do the announcing. */}
       {/* Top-right, under the top bar: bottom-right sat on top of side panels' sticky Save buttons. */}
-      <div className="fixed top-16 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed top-16 right-4 z-[80] flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
           <ToastMessage key={t.id} item={t} onDismiss={() => dismiss(t.id)} />
         ))}

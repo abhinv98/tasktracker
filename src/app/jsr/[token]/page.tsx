@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { useParams } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Ban,
 } from "lucide-react";
+import { useToast } from "@/components/ui/Toast";
 
 const TASK_STATUS: Record<string, { label: string; color: string; icon: "pending" | "progress" | "review" | "done" }> = {
   pending: { label: "Pending", color: "#a3a3a3", icon: "pending" },
@@ -99,6 +100,22 @@ export default function JsrPublicPage() {
   const [msgContent, setMsgContent] = useState("");
   const [msgName, setMsgName] = useState("");
   const [sendingMsg, setSendingMsg] = useState(false);
+  const { toast } = useToast();
+  // Enter and Send share this; the ref stops a second Enter sending the same message twice.
+  const sendingMsgRef = useRef(false);
+  function sendChatMessage() {
+    const content = msgContent.trim();
+    if (!content || sendingMsgRef.current) return;
+    sendingMsgRef.current = true;
+    setSendingMsg(true);
+    sendClientMessage({ token, content, senderName: msgName || undefined })
+      .then(() => setMsgContent(""))
+      .catch(() => toast("error", "Your message was not sent. Please try again."))
+      .finally(() => {
+        sendingMsgRef.current = false;
+        setSendingMsg(false);
+      });
+  }
 
   // Client approval sidebar state
   const [reviewSidebarItem, setReviewSidebarItem] = useState<any>(null);
@@ -618,12 +635,9 @@ export default function JsrPublicPage() {
                     value={msgContent}
                     onChange={(e) => setMsgContent(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && msgContent.trim()) {
+                      if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        setSendingMsg(true);
-                        sendClientMessage({ token, content: msgContent.trim(), senderName: msgName || undefined })
-                          .then(() => setMsgContent(""))
-                          .finally(() => setSendingMsg(false));
+                        sendChatMessage();
                       }
                     }}
                     placeholder="Type a message..."
@@ -631,13 +645,7 @@ export default function JsrPublicPage() {
                     style={{ "--tw-ring-color": bc + "30" } as any}
                   />
                   <button
-                    onClick={() => {
-                      if (!msgContent.trim()) return;
-                      setSendingMsg(true);
-                      sendClientMessage({ token, content: msgContent.trim(), senderName: msgName || undefined })
-                        .then(() => setMsgContent(""))
-                        .finally(() => setSendingMsg(false));
-                    }}
+                    onClick={sendChatMessage}
                     disabled={sendingMsg || !msgContent.trim()}
                     className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-50"
                     style={{ backgroundColor: bc }}
@@ -753,7 +761,9 @@ export default function JsrPublicPage() {
                   try {
                     await clientApproveMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote || undefined, senderName: msgName || undefined });
                     setReviewSidebarItem(null);
-                  } catch {}
+                  } catch {
+                    toast("error", "That did not go through. Please try again.");
+                  }
                   setReviewSubmitting(false);
                 }}
                 disabled={reviewSubmitting}
@@ -768,7 +778,9 @@ export default function JsrPublicPage() {
                   try {
                     await clientRequestChangesMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote.trim(), senderName: msgName || undefined });
                     setReviewSidebarItem(null);
-                  } catch {}
+                  } catch {
+                    toast("error", "That did not go through. Please try again.");
+                  }
                   setReviewSubmitting(false);
                 }}
                 disabled={reviewSubmitting}
@@ -783,7 +795,9 @@ export default function JsrPublicPage() {
                   try {
                     await clientDenyMut({ token, deliverableId: reviewSidebarItem.deliverableId as Id<"deliverables">, note: reviewNote.trim(), senderName: msgName || undefined });
                     setReviewSidebarItem(null);
-                  } catch {}
+                  } catch {
+                    toast("error", "That did not go through. Please try again.");
+                  }
                   setReviewSubmitting(false);
                 }}
                 disabled={reviewSubmitting}
@@ -881,13 +895,17 @@ function BriefGroup({ title, tasks, done, total, pct, brandColor, token, addJsrR
 function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
   deliverable: any; brandColor: string; token: string; addJsrRemark: any;
 }) {
+  const { toast } = useToast();
   const [remarkContent, setRemarkContent] = useState("");
   const [remarkName, setRemarkName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showRemarkForm, setShowRemarkForm] = useState(false);
 
+  // The ref, not the state, stops a double click posting the remark twice.
+  const submittingRef = useRef(false);
   async function handleSubmitRemark() {
-    if (!remarkContent.trim()) return;
+    if (!remarkContent.trim() || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await addJsrRemark({
@@ -898,7 +916,10 @@ function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
       });
       setRemarkContent("");
       setShowRemarkForm(false);
-    } catch {}
+    } catch {
+      toast("error", "Your remark was not sent. Please try again.");
+    }
+    submittingRef.current = false;
     setSubmitting(false);
   }
 

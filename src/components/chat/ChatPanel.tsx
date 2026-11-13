@@ -592,6 +592,7 @@ function ChatView({
         headers: { "Content-Type": file.type },
         body: file,
       });
+      if (!res.ok) throw new Error("The upload was refused");
       const { storageId } = await res.json();
       setPendingFile({ storageId, name: file.name });
     } catch (error) {

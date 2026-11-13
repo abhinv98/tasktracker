@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { FileDown } from "lucide-react";
 import { timeAgo } from "./shared";
 import { PortalButton, PortalStatusChip } from "./ui";
+import { useToast } from "@/components/ui/Toast";
 
 type Remark = {
   _id: string;
@@ -56,6 +57,7 @@ export function RemarkComposer({
 }) {
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
 
   async function submit() {
     if (!content.trim() || submitting) return;
@@ -63,7 +65,9 @@ export function RemarkComposer({
     try {
       await onSubmit(content.trim());
       setContent("");
-    } catch {}
+    } catch {
+      toast("error", "That did not go through. Please try again.");
+    }
     setSubmitting(false);
   }
 

@@ -17,7 +17,7 @@ import {
   TableCell,
 } from "@/components/ui/Table";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
-import { taskStatusMeta } from "@/lib/status";
+import { taskStatusMeta, isTaskOverdue } from "@/lib/status";
 
 function formatDate(ts?: number) {
   if (!ts) return "-";
@@ -181,10 +181,8 @@ export default function FreelancersPage() {
                         <TableBody>
                           {b.tasks.map((t) => {
                             const meta = taskStatusMeta(t.status);
-                            const overdue =
-                              t.deadline !== undefined &&
-                              t.deadline < now &&
-                              t.status !== "done";
+                            // Same rule as everywhere else: work waiting in review is not overdue.
+                            const overdue = isTaskOverdue(t, now);
                             return (
                               <TableRow key={t._id}>
                                 <TableCell>{t.title}</TableCell>

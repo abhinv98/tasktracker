@@ -46,6 +46,7 @@ import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
 import { BRIEF_STATUS_COLORS } from "@/lib/statusColors";
 import { taskUsesCreativeSlots, taskCreativesTarget } from "@/lib/briefCreatives";
 import { fieldBaseClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
+import { useConfirm } from "./ConfirmModal";
 
 function parseDuration(str: string): number {
   const m = str.match(/^(\d+)(m|h|d)$/i);
@@ -166,6 +167,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const addDailySummary = useMutation(api.taskDailySummaries.addSummary);
   const updateDailySummary = useMutation(api.taskDailySummaries.updateSummary);
   const deleteDailySummary = useMutation(api.taskDailySummaries.deleteSummary);
+  const askConfirm = useConfirm();
   const [showSummaryForm, setShowSummaryForm] = useState(false);
   const [summaryDate, setSummaryDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [summaryText, setSummaryText] = useState("");
@@ -286,9 +288,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
     try {
       await deleteTaskMutation({ taskId: taskId as Id<"tasks"> });
       onClose();
-    } catch {
+    } catch (err) {
       setIsDeleting(false);
       setConfirmDelete(false);
+      toast("error", err instanceof Error ? err.message : "The task could not be deleted");
     }
   }
 
@@ -974,7 +977,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={async () => { await deleteDailySummary({ summaryId: s._id }); }}
+                            onClick={() =>
+                              askConfirm({
+                                title: "Delete this daily summary?",
+                                message: "The summary is removed for everyone on this task. This cannot be undone.",
+                                onConfirm: () => deleteDailySummary({ summaryId: s._id }),
+                              })
+                            }
                             className={ICON_BTN_DANGER}
                             aria-label="Delete summary"
                           >
