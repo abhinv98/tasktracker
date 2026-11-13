@@ -1,4 +1,4 @@
-type BadgeVariant = "admin" | "manager" | "employee" | "neutral" | "status" | "success";
+type BadgeVariant = "admin" | "manager" | "employee" | "neutral" | "status" | "success" | "danger";
 
 interface BadgeProps {
   variant?: BadgeVariant;
@@ -13,6 +13,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   neutral: "bg-[var(--bg-hover)] text-[var(--text-secondary)]",
   status: "bg-[var(--bg-hover)] text-[var(--text-primary)]",
   success: "bg-emerald-50 text-emerald-700",
+  danger: "bg-[var(--danger-dim)] text-[var(--danger)]",
 };
 
 export function Badge({ variant = "neutral", children, className = "" }: BadgeProps) {

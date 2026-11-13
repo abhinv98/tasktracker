@@ -906,6 +906,107 @@ export const createEntryForBrand = mutation({
 });
 
 /**
+ * A month's entries and break days from an uploaded CSV (the page reads the
+ * file with src/lib/calendarCsv.ts and shows the rows before this is called).
+ * Entries land unassigned-to-anyone-else, like "+" on a date: owned by the
+ * person uploading until they assign them. Uploading the same file again adds
+ * nothing: an entry with the same title and platform on the same date, or a
+ * date already marked as a break, is skipped. Entries on the staging shelf do
+ * not count as already there, since the month grid does not show them.
+ */
+export const importMonthRows = mutation({
+  args: {
+    brandId: v.id("brands"),
+    month: v.string(), // "YYYY-MM"
+    rows: v.array(
+      v.object({
+        date: v.string(), // "YYYY-MM-DD"
+        title: v.string(),
+        platform: v.string(),
+        isBreak: v.boolean(),
+      })
+    ),
+  },
+  handler: async (ctx, { brandId, month, rows }) => {
+    const userId = await requireCalendarEditorForBrand(ctx, brandId);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Bad month");
+    if (rows.length === 0) throw new Error("The file has no rows to add");
+    if (rows.length > 200) throw new Error("Too many rows: a file can add up to 200 at a time");
+    for (const r of rows) {
+      const day = Number(r.date.slice(8));
+      const lastDay = new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date) || !r.date.startsWith(month) || day < 1 || day > lastDay) {
+        throw new Error(`${r.date} is not a date in ${month}`);
+      }
+      if (!r.isBreak && (r.title.trim() === "" || r.title.length > 200 || r.platform.length > 40)) {
+        throw new Error(`Row for ${r.date}: the title or platform is empty or too long`);
+      }
+    }
+
+    const briefId = await getOrCreateCalendarBrief(ctx, brandId, userId);
+    await ensureSheetForMonth(ctx, briefId, month, userId);
+    const existingTasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+      .collect();
+    const entryKey = (date: string, title: string, platform: string) =>
+      `${date}|${title.trim().toLowerCase()}|${platform.toLowerCase()}`;
+    const have = new Set(
+      existingTasks
+        .filter((t) => !t.parentTaskId && !t.stagedAt)
+        .map((t) => entryKey(t.postDate ?? "", t.title, t.platform ?? ""))
+    );
+    const breakDays = new Set(
+      (
+        await ctx.db
+          .query("contentCalendarBreakDays")
+          .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+          .collect()
+      ).map((b) => b.date)
+    );
+    let sortOrder = existingTasks.length ? Math.max(...existingTasks.map((t) => t.sortOrder)) : 0;
+
+    let created = 0, breaks = 0, skipped = 0;
+    for (const r of rows) {
+      if (r.isBreak) {
+        if (breakDays.has(r.date)) skipped++;
+        else {
+          await ctx.db.insert("contentCalendarBreakDays", { briefId, date: r.date, createdBy: userId, createdAt: Date.now() });
+          breakDays.add(r.date);
+          breaks++;
+        }
+        continue;
+      }
+      const title = r.title.trim();
+      const key = entryKey(r.date, title, r.platform);
+      if (have.has(key)) {
+        skipped++;
+        continue;
+      }
+      have.add(key);
+      sortOrder += 1000;
+      const taskId = await ctx.db.insert("tasks", {
+        briefId,
+        title,
+        assigneeId: userId,
+        assignedBy: userId,
+        status: "pending",
+        sortOrder,
+        duration: "1d",
+        durationMinutes: 480,
+        platform: r.platform,
+        contentType: "Post",
+        postDate: r.date,
+      });
+      await tagForOversight(ctx, { taskId, briefId, assigneeId: userId, assignedBy: userId, source: "content_calendar" });
+      created++;
+    }
+    if (created > 0) await reopenBriefForNewTask(ctx, briefId);
+    return { created, breaks, skipped };
+  },
+});
+
+/**
  * Creates a content calendar entry (design assignee as main owner)
  * plus an optional linked copy task — all in one mutation.
  * Used by the "Single Task → For Calendar" form.

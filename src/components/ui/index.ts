@@ -29,4 +29,4 @@ export { TaskDetailModal } from "./TaskDetailModal";
 export { Textarea } from "./Textarea";
 export { ToastProvider, useToast } from "./Toast";
 export { EmptyState } from "./EmptyState";
-export { StatTile, SectionHeader } from "./StatTile";
+export { Panel, PanelEmpty, StatStrip, StatTile, SectionHeader } from "./StatTile";

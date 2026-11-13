@@ -6,7 +6,8 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card, useToast } from "@/components/ui";
+import { Button, Card, Modal, useToast } from "@/components/ui";
+import { readCalendarCsv, type CalendarCsvRow } from "@/lib/calendarCsv";
 import { ContentCalendarEntrySidebar, DeadlineInput } from "@/components/ContentCalendarView";
 import { deadlineInputToMs } from "@/lib/deadlineInput";
 import {
@@ -176,6 +177,11 @@ export default function ContentCalendarPage() {
   const allTeams = useQuery(api.teams.listTeams, {});
   const createBrand = useMutation(api.brands.createBrand);
   const createEntry = useMutation(api.contentCalendar.createEntryForBrand);
+  const importMonthRows = useMutation(api.contentCalendar.importMonthRows);
+  // CSV upload for the open month: the rows read from the file, shown for a
+  // look before anything is added. null = no file picked.
+  const [csvRows, setCsvRows] = useState<CalendarCsvRow[] | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const updateTask = useMutation(api.tasks.updateTask);
   const updateTaskStatus = useUpdateTaskStatus();
   const deleteTask = useMutation(api.tasks.deleteTask);
@@ -651,6 +657,33 @@ export default function ContentCalendarPage() {
             >
               {showBreakDayPicker ? "Done" : "Break days"}
             </button>
+          )}
+          {isEditable && selectedBrandId && (
+            <>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = ""; // picking the same file again must fire
+                  if (!file) return;
+                  if (file.size > 1_000_000) return toast("error", "That file is too large for a month of posts");
+                  const rows = readCalendarCsv(await file.text(), monthStr, PLATFORMS);
+                  if (rows.length === 0) return toast("error", "That file has no rows");
+                  setCsvRows(rows);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                title={`Fill ${MONTHS[month]} from a CSV file`}
+                className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                Upload CSV
+              </button>
+            </>
           )}
           {isEditable && selectedBrandId && (
             <button
@@ -1286,6 +1319,106 @@ export default function ContentCalendarPage() {
       )}
 
       {/* Create Brand Modal */}
+      {csvRows && (() => {
+        const good = csvRows.filter((r) => !r.error && r.date);
+        const posts = good.filter((r) => !r.isBreak).length;
+        const breaks = good.length - posts;
+        const bad = csvRows.length - good.length;
+        return (
+          <Modal
+            open
+            onClose={() => setCsvRows(null)}
+            title={`Add to ${selectedBrand?.name ?? "this brand"}, ${MONTHS[month]} ${year}`}
+            size="lg"
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setCsvRows(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={good.length === 0}
+                  onClick={async () => {
+                    try {
+                      const res = await importMonthRows({
+                        brandId: selectedBrandId as Id<"brands">,
+                        month: monthStr,
+                        rows: good.map((r) => ({ date: r.date!, title: r.title, platform: r.platform, isBreak: r.isBreak })),
+                      });
+                      setCsvRows(null);
+                      toast(
+                        "success",
+                        `Added ${res.created} post${res.created !== 1 ? "s" : ""} and ${res.breaks} break day${res.breaks !== 1 ? "s" : ""}` +
+                          (res.skipped ? `. ${res.skipped} already there, left as they were.` : "")
+                      );
+                    } catch (err) {
+                      toast("error", err instanceof Error ? err.message : "Couldn't add the rows");
+                    }
+                  }}
+                >
+                  Add {posts} post{posts !== 1 ? "s" : ""}
+                  {breaks > 0 ? ` and ${breaks} break day${breaks !== 1 ? "s" : ""}` : ""}
+                </Button>
+              </>
+            }
+          >
+            <p className="text-[13px] text-[var(--text-secondary)] mb-3">
+              {bad > 0
+                ? `${bad} row${bad !== 1 ? "s" : ""} can't be read and will be left out. Fix the file and upload again to add them.`
+                : "This is what the file will add. Posts come in as Pending and assigned to you until you assign them."}
+            </p>
+            <div className="max-h-[50vh] overflow-y-auto rounded-md border border-[var(--border)]">
+              <table className="w-full text-[13px]">
+                <thead className="sticky top-0">
+                  <tr>
+                    <th className="h-8 px-3 text-left">Date</th>
+                    <th className="h-8 px-3 text-left">Post title</th>
+                    <th className="h-8 px-3 text-left">Platform</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {csvRows.map((r) => (
+                    <tr key={r.line} className={r.error ? "text-[var(--text-muted)]" : ""}>
+                      <td className="h-9 px-3 whitespace-nowrap tabular-nums">
+                        {r.date
+                          ? new Date(r.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+                          : `Line ${r.line}`}
+                      </td>
+                      {r.error ? (
+                        <td colSpan={2} className="px-3 text-[var(--danger)]">
+                          Left out: {r.error}
+                        </td>
+                      ) : r.isBreak ? (
+                        <td colSpan={2} className="px-3 text-[var(--text-secondary)]">
+                          Break day
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-3 max-w-[340px] truncate">{r.title}</td>
+                          <td className="px-3 text-[var(--text-secondary)]">{r.platform}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-[12px] text-[var(--text-muted)]">
+              Columns: Date, Post title, Platform. All three are optional. A row without a date takes the day after the
+              row above. For a break day write the date and the word break.{" "}
+              <a
+                className="font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
+                download="content-calendar-sample.csv"
+                href={`data:text/csv;charset=utf-8,${encodeURIComponent(
+                  `Date,Post title,Platform\n01/${String(month + 1).padStart(2, "0")}/${year},Festive greeting,Instagram\n02/${String(month + 1).padStart(2, "0")}/${year},Product reel,Facebook\n03/${String(month + 1).padStart(2, "0")}/${year},break\n`
+                )}`}
+              >
+                Download a sample
+              </a>
+            </p>
+          </Modal>
+        );
+      })()}
+
       {showCreateBrand && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-sm">

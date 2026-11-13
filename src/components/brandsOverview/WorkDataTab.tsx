@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Badge, Card } from "@/components/ui";
-import { Tag, Users, Briefcase, CheckCircle2, Clock, AlertCircle, Eye } from "lucide-react";
+import { Users, Briefcase, CheckCircle2, Clock, AlertCircle, Eye } from "lucide-react";
 
 const RETURN_TO = "/brands-overview?tab=work-data";
 
@@ -76,7 +76,9 @@ export default function WorkDataTab() {
                   className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                   style={{ backgroundColor: brand.color + "20" }}
                 >
-                  <Tag className="h-5 w-5" style={{ color: brand.color }} />
+                  <span className="text-[15px] font-semibold" style={{ color: brand.color }} aria-hidden>
+                    {brand.name.trim().charAt(0).toUpperCase()}
+                  </span>
                 </div>
               )}
               <div className="flex-1 min-w-0">

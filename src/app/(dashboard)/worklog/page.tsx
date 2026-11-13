@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge, Card, PageHeader, StatStrip, StatTile } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Users, Briefcase, X, Filter, Search, FileText, AlertTriangle, Eye, Building2, UsersRound } from "lucide-react";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
@@ -222,34 +222,19 @@ function WorkLogPageInner() {
 
           {/* Summary Stats */}
           {worklog?.summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <Card>
-                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Active Employees</p>
-                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                  {worklog.summary.employeesActive}
-                </p>
-              </Card>
-              <Card>
-                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Total Tasks</p>
-                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                  {worklog.summary.totalTasks}
-                </p>
-              </Card>
-              <Card>
-                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completed</p>
-                <p className="font-bold text-[24px] mt-1 tabular-nums" style={{ color: "#10b981" }}>
-                  {worklog.summary.completedTasks}
-                </p>
-              </Card>
-              <Card>
-                <p className="text-[12px] font-medium text-[var(--text-secondary)]">Completion Rate</p>
-                <p className="font-bold text-[24px] text-[var(--text-primary)] mt-1 tabular-nums">
-                  {worklog.summary.totalTasks > 0
+            <StatStrip className="mb-6">
+              <StatTile label="Active employees" value={worklog.summary.employeesActive} />
+              <StatTile label="Total tasks" value={worklog.summary.totalTasks} />
+              <StatTile label="Completed" value={worklog.summary.completedTasks} />
+              <StatTile
+                label="Completion rate"
+                value={`${
+                  worklog.summary.totalTasks > 0
                     ? Math.round((worklog.summary.completedTasks / worklog.summary.totalTasks) * 100)
-                    : 0}%
-                </p>
-              </Card>
-            </div>
+                    : 0
+                }%`}
+              />
+            </StatStrip>
           )}
 
           {/* Filters */}

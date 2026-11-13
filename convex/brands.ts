@@ -29,6 +29,22 @@ export const getMyManagedBrandIds = query({
 });
 
 // List all brands (admin sees all, employees see none)
+/** Name and colour of every active brand, for labelling rows (the dashboard's
+ *  Brands panel). One table read; listBrands also reads managers, users and
+ *  logo links, which a label does not need. */
+export const listBrandNames = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const user = await ctx.db.get(userId);
+    if (!user || user.role !== "admin") return [];
+    return (await ctx.db.query("brands").collect())
+      .filter((b) => !b.onHold)
+      .map((b) => ({ _id: b._id, name: b.name, color: b.color }));
+  },
+});
+
 export const listBrands = query({
   /** withCounts: brief counts per brand. Only Brands Overview shows them, and
    *  computing them reads every brief, so the other pages skip it. */

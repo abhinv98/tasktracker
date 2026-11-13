@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Badge, Button, Card, Input, SegmentedTabs, Textarea, useToast } from "@/components/ui";
-import { Plus, X, Tag, Briefcase } from "lucide-react";
+import { Plus, X, Briefcase } from "lucide-react";
 
 const BRAND_COLORS = [
   "#d97757", "#6a9bcc", "#788c5d", "#b07cc6", "#cc8f5e",
@@ -126,7 +126,9 @@ export default function BrandsTab() {
                   className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                   style={{ backgroundColor: brand.color + "20" }}
                 >
-                  <Tag className="h-5 w-5" style={{ color: brand.color }} />
+                  <span className="text-[15px] font-semibold" style={{ color: brand.color }} aria-hidden>
+                    {brand.name.trim().charAt(0).toUpperCase()}
+                  </span>
                 </div>
               )}
               <div className="min-w-0 flex-1">

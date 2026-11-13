@@ -4,15 +4,17 @@ import { useQuery, useMutation } from "convex/react";
 import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { NewSelfTaskModal } from "@/components/NewSelfTaskModal";
 import { EchoActionItems } from "@/components/EchoActionItems";
-import { isTaskOverdue } from "@/lib/status";
+import { isTaskOverdue, TASK_STATUS_META, taskStatusMeta } from "@/lib/status";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { formatDeadline } from "@/lib/deadlineInput";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Button, Card, EmptyState, PageHeader, SectionHeader, SegmentedTabs, StatTile, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Panel, PanelEmpty, SectionHeader, SegmentedTabs, StatStrip, StatTile, StatusBadge, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
 import { TodayList } from "@/components/dashboard/TodayList";
-import { X, BarChart3, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, Briefcase, AlertTriangle, Phone, Clock, Play, CalendarClock, Info, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, ListChecks, Layers, Users, Inbox, CheckCircle2, Plus, type LucideIcon } from "lucide-react";
+import { X, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, AlertTriangle, Phone, Clock, Play, CalendarClock, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, Inbox, Plus, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -20,39 +22,6 @@ function getGreeting() {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
-
-function ActivityFeed() {
-  const data = useQuery(api.analytics.getDashboardAnalytics);
-  if (!data) return <p className="text-[12px] text-[var(--text-muted)]">Loading...</p>;
-  const activity = data.recentActivity.slice(0, 8);
-  if (activity.length === 0) return <p className="text-[12px] text-[var(--text-muted)]">No recent activity.</p>;
-  return (
-    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-      {activity.map((log) => (
-        <div key={log._id} className="flex items-start gap-2 py-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-admin)] mt-1.5 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] text-[var(--text-primary)]">
-              <span className="font-medium">{log.userName}</span>{" "}
-              <span className="text-[var(--text-secondary)]">{log.action.replace(/_/g, " ")}</span>{" "}
-              on <span className="font-medium">{log.briefTitle}</span>
-            </p>
-            <p className="text-[11px] text-[var(--text-muted)]">
-              {new Date(log.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const STATUS_CONFIG: Record<string, { color: string; label: string; order: number }> = {
-  "in-progress": { color: "#f59e0b", label: "In Progress", order: 1 },
-  pending: { color: "#6b7280", label: "Pending", order: 2 },
-  review: { color: "#8b5cf6", label: "Review", order: 3 },
-  done: { color: "#10b981", label: "Done", order: 4 },
-};
 
 // ═══════════════════════════════════════════
 // EMPLOYEE TASK VIEWS (Kanban + Tabbed List)
@@ -66,12 +35,12 @@ type EmployeeTask = {
   deadline?: number;
 };
 
-const EMPLOYEE_STATUSES: Array<{ key: string; label: string; color: string; bg: string; dot: string }> = [
-  { key: "pending", label: "Pending", color: "var(--text-muted)", bg: "var(--bg-hover)", dot: "#9CA3AF" },
-  { key: "in-progress", label: "In Progress", color: "#3B82F6", bg: "#EFF6FF", dot: "#3B82F6" },
-  { key: "review", label: "Review", color: "#F59E0B", bg: "#FFFBEB", dot: "#F59E0B" },
-  { key: "done", label: "Done", color: "var(--accent-employee)", bg: "var(--accent-employee-dim)", dot: "#10B981" },
-];
+// Same labels and dot colours as My Tasks, the calendar and every other page.
+const EMPLOYEE_STATUSES = (["pending", "in-progress", "review", "done"] as const).map((key) => ({
+  key,
+  label: TASK_STATUS_META[key].label,
+  dot: TASK_STATUS_META[key].dot,
+}));
 
 const VIEW_STORAGE_KEY = "employeeQueueView";
 const TAB_STORAGE_KEY = "employeeQueueTab";
@@ -81,17 +50,16 @@ function EmployeeTaskCard({
   onSelect,
   onStart,
   isStarting,
-  statusColors,
   compact = false,
 }: {
   task: EmployeeTask;
   onSelect: (id: string) => void;
   onStart: (id: string) => void;
   isStarting: boolean;
-  statusColors: Record<string, { color: string; bg: string }>;
+  /** Inside a status column: tighter, and the status is not repeated. */
   compact?: boolean;
 }) {
-  const sc = statusColors[task.status] ?? statusColors.pending;
+  const meta = taskStatusMeta(task.status);
   const t = task as EmployeeTask & {
     parentTaskId?: string;
     isHelper?: boolean;
@@ -104,51 +72,17 @@ function EmployeeTaskCard({
   };
   // A task inside an on-hold brief is frozen — the server rejects starting it.
   const isOnHold = t.briefStatus === "on_hold";
+  const overdue = isTaskOverdue(task);
+  const creatives: number = (task as { creativesRequired?: number }).creativesRequired ?? 0;
 
   return (
-    <Card
-      className={task.status === "done" ? "opacity-60" : ""}
-      accent={task.status === "done" ? "employee" : undefined}
-      onClick={() => onSelect(task._id)}
-    >
-      <div className={compact ? "flex flex-col gap-2" : "flex justify-between items-start gap-2"}>
+    <Card className={task.status === "done" ? "opacity-60" : ""} onClick={() => onSelect(task._id)}>
+      <div className={compact ? "flex flex-col gap-2" : "flex justify-between items-start gap-3"}>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {!!t.isHelper && (
-              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 shrink-0">
-                HELPER
-              </span>
-            )}
-            {isTaskOverdue(task) && (
-              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-[var(--danger)] shrink-0">
-                OVERDUE
-              </span>
-            )}
-            {t.deadlineExtended && (
-              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700 shrink-0">
-                EXTENDED
-              </span>
-            )}
-            {t.briefStatus === "on_hold" && (
-              <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                ⏸ ON HOLD
-              </span>
-            )}
-            {(task as any).creativesRequired > 0 && (
-              <span
-                className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0"
-                title={`${(task as any).creativesRequired} creative deliverables required`}
-              >
-                {(task as any).creativesRequired} CREATIVES REQUIRED
-              </span>
-            )}
-            <h3 className="font-semibold text-[13px] sm:text-[15px] text-[var(--text-primary)]">
-              {task.title}
-            </h3>
-          </div>
+          <h3 className="font-medium text-[14px] leading-snug text-[var(--text-primary)]">{task.title}</h3>
           {/* Sub-tasks are meaningless without their master task — name it. */}
           {t.parentTaskTitle && (
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">
+            <p className="text-[12px] text-[var(--text-muted)] mt-0.5 truncate">
               ↳ {t.parentTaskTitle}
             </p>
           )}
@@ -157,7 +91,7 @@ function EmployeeTaskCard({
               <span className="inline-flex items-center gap-1 font-medium text-[var(--text-primary)]">
                 <span
                   className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: t.brandColor ?? "#9CA3AF" }}
+                  style={{ backgroundColor: t.brandColor ?? "var(--text-disabled)" }}
                 />
                 {t.brandName}
               </span>
@@ -170,31 +104,42 @@ function EmployeeTaskCard({
                 : ""}
             </span>
           </p>
+          {(overdue || t.isHelper || t.deadlineExtended || isOnHold || creatives > 0) && (
+            <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+              {overdue && <Badge variant="danger">Overdue</Badge>}
+              {isOnHold && <Badge>On hold</Badge>}
+              {!!t.isHelper && <Badge>Helper</Badge>}
+              {t.deadlineExtended && <Badge>Extended</Badge>}
+              {creatives > 0 && (
+                <span title={`${creatives} creative deliverables required`}>
+                  <Badge>
+                    {creatives} creative{creatives !== 1 ? "s" : ""} required
+                  </Badge>
+                </span>
+              )}
+            </div>
+          )}
           {(task.description || t.briefDescription) && (
-            <p className="text-[11px] text-[var(--text-muted)] mt-1 line-clamp-2">
+            <p className="text-[12px] text-[var(--text-muted)] mt-1.5 line-clamp-2">
               {task.description || t.briefDescription}
             </p>
           )}
         </div>
         {task.status === "pending" && !isOnHold ? (
-          <button
+          <Button
+            variant="secondary"
             onClick={(e) => {
               e.stopPropagation();
               onStart(task._id);
             }}
             disabled={isStarting}
-            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60`}
+            className={compact ? "self-start" : "shrink-0"}
           >
-            {isStarting ? <Clock className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            <Play className="h-3 w-3" />
             Start
-          </button>
+          </Button>
         ) : (
-          <span
-            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium`}
-            style={{ color: sc.color, backgroundColor: sc.bg }}
-          >
-            {task.status}
-          </span>
+          !compact && <StatusBadge color={meta.dot} label={meta.label} className="shrink-0" />
         )}
       </div>
     </Card>
@@ -206,13 +151,11 @@ function EmployeeTaskViews({
   onSelectTask,
   onStartTask,
   startingTaskId,
-  statusColors,
 }: {
   tasks: EmployeeTask[];
   onSelectTask: (id: string) => void;
   onStartTask: (id: string) => void;
   startingTaskId: string | null;
-  statusColors: Record<string, { color: string; bg: string }>;
 }) {
   type ViewState = {
     viewMode: "kanban" | "list";
@@ -327,31 +270,23 @@ function EmployeeTaskViews({
 
   const onHoldSection =
     onHoldTasks.length === 0 ? null : (
-      <div className="rounded-xl border border-amber-200 bg-amber-50/40 overflow-hidden">
+      <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
         <button
           onClick={() => setShowOnHold((v) => !v)}
           aria-expanded={showOnHold}
-          className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-amber-50 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors"
         >
-          <span className="flex items-center gap-2">
-            {showOnHold ? (
-              <ChevronDown className="h-3.5 w-3.5 text-amber-700" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-amber-700" />
-            )}
-            <span className="font-semibold text-[12px] text-amber-800 uppercase tracking-wide">
-              ⏸ On Hold
-            </span>
-            <span className="text-[11px] text-amber-700">
-              Brief paused — no action needed
-            </span>
-          </span>
-          <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-white border border-amber-200 text-[11px] font-semibold text-amber-800 tabular-nums">
-            {onHoldTasks.length}
-          </span>
+          {showOnHold ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+          )}
+          <span className="font-medium text-[13px] text-[var(--text-primary)]">On hold</span>
+          <span className="text-[13px] tabular-nums text-[var(--text-muted)]">{onHoldTasks.length}</span>
+          <span className="ml-auto text-[12px] text-[var(--text-muted)]">Brief paused, no action needed</span>
         </button>
         {showOnHold && (
-          <div className="flex flex-col gap-2 p-2 border-t border-amber-200">
+          <div className="flex flex-col gap-2 p-2 border-t border-[var(--border-subtle)] bg-[var(--bg-hover)]">
             {onHoldTasks.map((task) => (
               <EmployeeTaskCard
                 key={task._id}
@@ -359,7 +294,6 @@ function EmployeeTaskViews({
                 onSelect={onSelectTask}
                 onStart={onStartTask}
                 isStarting={startingTaskId === task._id}
-                statusColors={statusColors}
               />
             ))}
           </div>
@@ -391,27 +325,16 @@ function EmployeeTaskViews({
             return (
               <div
                 key={col.key}
-                className="flex flex-col min-w-[280px] sm:min-w-0 snap-start rounded-xl bg-[var(--bg-hover)] border border-[var(--border-subtle)]"
+                className="flex flex-col min-w-[280px] sm:min-w-0 snap-start rounded-lg bg-[var(--bg-hover)]"
               >
-                <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-hover)] rounded-t-xl">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: col.dot }}
-                    />
-                    <span className="font-semibold text-[12px] text-[var(--text-primary)] uppercase tracking-wide">
-                      {col.label}
-                    </span>
-                  </div>
-                  <span className="inline-flex items-center justify-center min-w-[22px] h-[20px] px-1.5 rounded-full bg-white border border-[var(--border)] text-[11px] font-semibold text-[var(--text-secondary)] tabular-nums">
-                    {colTasks.length}
-                  </span>
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.dot }} aria-hidden />
+                  <span className="font-medium text-[13px] text-[var(--text-primary)]">{col.label}</span>
+                  <span className="text-[13px] tabular-nums text-[var(--text-muted)]">{colTasks.length}</span>
                 </div>
                 <div className="flex flex-col gap-2 p-2 min-h-[80px] max-h-[70vh] overflow-y-auto">
                   {colTasks.length === 0 ? (
-                    <p className="text-[11px] text-[var(--text-muted)] text-center py-6 italic">
-                      No tasks
-                    </p>
+                    <p className="text-[12px] text-[var(--text-muted)] px-1 py-4">Nothing here.</p>
                   ) : (
                     colTasks.map((task) => (
                       <EmployeeTaskCard
@@ -420,7 +343,6 @@ function EmployeeTaskViews({
                         onSelect={onSelectTask}
                         onStart={onStartTask}
                         isStarting={startingTaskId === task._id}
-                        statusColors={statusColors}
                         compact
                       />
                     ))
@@ -443,7 +365,7 @@ function EmployeeTaskViews({
                   onClick={() => setActiveTab(tab.key)}
                   className={`inline-flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
                     isActive
-                      ? "border-[var(--accent-employee)] text-[var(--text-primary)]"
+                      ? "border-[var(--text-primary)] text-[var(--text-primary)]"
                       : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   }`}
                 >
@@ -452,15 +374,7 @@ function EmployeeTaskViews({
                     style={{ backgroundColor: tab.dot }}
                   />
                   {tab.label}
-                  <span
-                    className={`inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full text-[11px] font-semibold tabular-nums ${
-                      isActive
-                        ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
-                        : "bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                    }`}
-                  >
-                    {count}
-                  </span>
+                  <span className="text-[12px] font-normal tabular-nums text-[var(--text-muted)]">{count}</span>
                 </button>
               );
             })}
@@ -482,7 +396,6 @@ function EmployeeTaskViews({
                   onSelect={onSelectTask}
                   onStart={onStartTask}
                   isStarting={startingTaskId === task._id}
-                  statusColors={statusColors}
                 />
               ))
             )}
@@ -532,6 +445,7 @@ function AdminDashboard() {
   const teamLeadOverview = useQuery(api.teams.getTeamLeadBriefOverview);
   const pendingApprovalCount = useQuery(api.approvals.getTeamLeadPendingCount);
   const myBrandIds = useQuery(api.brands.getMyManagedBrandIds);
+  const brands = useQuery(api.brands.listBrandNames);
   const clientApprovalCounts = useQuery(api.jsr.getClientApprovalCounts);
   const employeeCount = (allUsers ?? []).filter(
     (u) => u.role === "employee"
@@ -583,10 +497,10 @@ function AdminDashboard() {
 
   // ── Hero digest + attention strip (derived from queries above only) ──
   const firstName = displayName.split(" ")[0];
-  const todayLine = new Date().toLocaleDateString("en-US", {
+  const todayLine = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
-    month: "long",
     day: "numeric",
+    month: "long",
   });
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
@@ -639,12 +553,13 @@ function AdminDashboard() {
       return {
         key: `mine-${ot._id}`,
         icon: AlertTriangle,
-        iconClass: "text-red-500",
+        iconClass: "text-[var(--danger)]",
         title: ot.title,
         context: `Your task · ${ot.briefTitle} · was due ${new Date(ot.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}${contacted ? " · waiting on " + ot.managerName : ""}`,
         href: `/brief/${ot.briefId}`,
         action: contacted ? undefined : (
-          <button
+          <Button
+            variant="secondary"
             onClick={async () => {
               try {
                 await adminContactManager({ taskId: ot._id as Id<"tasks"> });
@@ -654,10 +569,10 @@ function AdminDashboard() {
                 adminToast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
               }
             }}
-            className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+            className="shrink-0"
           >
             <Phone className="h-3 w-3" /> Contact {ot.managerName.split(" ")[0]}
-          </button>
+          </Button>
         ),
       };
     }),
@@ -665,7 +580,7 @@ function AdminDashboard() {
       ? [{
           key: "review-queue",
           icon: ClipboardCheck,
-          iconClass: "text-[var(--accent-manager-text)]",
+          iconClass: "text-[var(--text-muted)]",
           title: `${needsReview} deliverable${needsReview !== 1 ? "s" : ""} waiting on your review`,
           context: "Approve or send back so work keeps moving",
           href: "/deliverables",
@@ -675,7 +590,7 @@ function AdminDashboard() {
     ...(overdueTasksForManager ?? []).map((ot: any): AttentionRow => ({
       key: `overdue-${ot._id}`,
       icon: AlertTriangle,
-      iconClass: "text-red-500",
+      iconClass: "text-[var(--danger)]",
       title: ot.title,
       context:
         ot.alertType === "unassigned"
@@ -689,7 +604,7 @@ function AdminDashboard() {
     ...(actionNeededTasks ?? []).map((t: any): AttentionRow => ({
       key: `action-${t._id}`,
       icon: t.category === "no_deadline" ? CalendarOff : UserX,
-      iconClass: "text-amber-500",
+      iconClass: "text-[var(--text-muted)]",
       title: t.title,
       context: `${t.briefTitle} · ${t.brandName}`,
       href:
@@ -700,7 +615,7 @@ function AdminDashboard() {
     ...pendingRequests.map((r): AttentionRow => ({
       key: `request-${r._id}`,
       icon: Inbox,
-      iconClass: "text-[var(--accent-admin-text)]",
+      iconClass: "text-[var(--text-muted)]",
       title: r.title,
       context: `${r.brandName} · Client request`,
       href: "/client-requests",
@@ -708,6 +623,44 @@ function AdminDashboard() {
   ];
   const attentionTotal = attentionRows.length;
   const attentionVisible = attentionRows.slice(0, 6);
+
+  // Open briefs rolled up per brand and per status. scopedBriefs is already
+  // limited to what this person may see, and listBriefs only returns open ones.
+  const brandRows = (brands ?? [])
+    .map((brand) => {
+      const own = scopedBriefs.filter((b) => b.brandId === brand._id);
+      // Upcoming only: a brief past its date is usually sitting in review, which
+      // this app does not count as overdue (see isTaskOverdue).
+      const deadlines = own.map((b) => b.deadline).filter((d): d is number => !!d && d >= dayStart.getTime());
+      return {
+        _id: brand._id,
+        name: brand.name,
+        color: brand.color,
+        briefs: own.length,
+        tasks: own.reduce((n, b) => n + b.taskCount, 0),
+        done: own.reduce((n, b) => n + b.doneCount, 0),
+        inReview: own.filter((b) => b.status === "review").length,
+        nextDeadline: deadlines.length ? Math.min(...deadlines) : undefined,
+      };
+    })
+    .filter((r) => r.briefs > 0)
+    .sort((a, b) => b.tasks - b.done - (a.tasks - a.done));
+  const brandRowsVisible = brandRows.slice(0, 8);
+  const statusRows = ["active", "in-progress", "review", "sent_to_client", "on_hold", "draft", "rejected"]
+    .map((status) => ({ status, count: scopedBriefs.filter((b) => b.status === status).length }))
+    .filter((r) => r.count > 0);
+  const statusMax = Math.max(1, ...statusRows.map((r) => r.count));
+
+  const mineOpen = myWork?.counts.assignedToMeOpen ?? 0;
+  const supervisingOpen = myWork?.counts.supervisingOpen ?? 0;
+  const showMyTasks = mineOpen > 0 || supervisingOpen > 0;
+  const showTeams = (teamLeadOverview ?? []).length > 0 || (pendingApprovalCount ?? 0) > 0;
+  const clientApprovalTotal = clientApprovalCounts
+    ? clientApprovalCounts.pendingClient +
+      clientApprovalCounts.approved +
+      clientApprovalCounts.changesRequested +
+      clientApprovalCounts.denied
+    : 0;
 
   function toggleTeam(teamId: string) {
     setExpandedTeams((prev) => {
@@ -719,20 +672,19 @@ function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 relative">
-      {/* Header: one tight row — greeting + today's digest, brand shortcut */}
+      {/* Header: greeting, then the date and what today holds on one line */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-            {todayLine}
-          </p>
-          <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-tight leading-tight">
+          <h1 className="font-semibold text-[26px] text-[var(--text-primary)] leading-tight">
             {greeting}, {firstName}
           </h1>
           <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+            {todayLine}
+            <span className="mx-1.5 text-[var(--text-muted)]">·</span>
             {!heroLoaded ? (
               <span className="text-[var(--text-muted)]">Pulling up your day…</span>
             ) : digestSegments.length === 0 ? (
-              <span>All caught up. Nothing urgent on your plate.</span>
+              <span>Nothing urgent today</span>
             ) : (
               digestSegments.map((seg, i) => (
                 <span key={seg.href}>
@@ -749,240 +701,186 @@ function AdminDashboard() {
           </p>
         </div>
         {(myBrandIds ?? []).length > 0 && (
-          <button
+          <Button
+            variant="secondary"
             onClick={() => router.push("/brands-overview?filter=mine")}
-            className="shrink-0 self-start sm:self-auto flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors"
+            className="shrink-0 self-start sm:self-auto"
           >
-            <Briefcase className="h-4 w-4" />
             My Brands
             <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         )}
       </div>
 
       <EchoActionItems />
 
-      {/* Numbers that go somewhere */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      {/* Numbers that go somewhere: one strip, each cell opens its list */}
+      <StatStrip className="mb-4">
         <StatTile
           label="Active briefs"
           value={scopedActiveBriefs}
-          hint={newBriefsThisWeek > 0 ? `+${newBriefsThisWeek} new this week` : "None new this week"}
-          hintTone={newBriefsThisWeek > 0 ? "good" : "muted"}
+          hint={newBriefsThisWeek > 0 ? `${newBriefsThisWeek} new this week` : "None new this week"}
           href="/briefs"
-          icon={Briefcase}
         />
         <StatTile
           label="Open tasks"
           value={scopedOpenTasks}
-          hint={overdueCount > 0 ? `${overdueCount} overdue` : "Nothing overdue"}
-          hintTone={overdueCount > 0 ? "bad" : "good"}
+          hint={overdueCount > 0 ? `${overdueCount} overdue` : "None overdue"}
+          bad={overdueCount > 0}
           href="/worklog"
-          icon={ListChecks}
         />
         <StatTile
           label="Client requests"
           value={pendingRequests.length}
           hint={pendingRequests.length > 0 ? "Waiting for review" : "Queue is clear"}
-          hintTone={pendingRequests.length > 0 ? "bad" : "good"}
+          bad={pendingRequests.length > 0}
           href="/client-requests"
-          icon={Inbox}
         />
         <StatTile
           label={isSuperAdmin ? "Teams" : "My brands"}
           value={isSuperAdmin ? (teams?.length ?? 0) : myBrandIdSet.size}
           hint={`${employeeCount} people`}
           href={isSuperAdmin ? "/users?tab=teams" : "/brands-overview?filter=mine"}
-          icon={isSuperAdmin ? Layers : Users}
         />
-      </div>
+      </StatStrip>
 
-      {/* Needs attention — the page's lead. Everything below it is reference;
-          this is the only block that asks the reader to DO something, so it
-          carries the largest heading, the tinted surface and the room. */}
-      <div className="mb-8 sm:mb-10">
-        <SectionHeader title="Needs attention" count={attentionLoaded ? attentionTotal : undefined} tone="danger" />
+      {/* One grid, one gutter: the work in the wide column, reference blocks
+          in the rail. Every block is a Panel, so title bars and edges line up.
+          Below xl the rail stacks under the work. */}
+      <div className="grid gap-4 xl:grid-cols-3 items-start">
+      <div className="min-w-0 flex flex-col gap-4 xl:col-span-2">
+      {/* Needs attention — the page's lead: the only block that asks the
+          reader to DO something. */}
+      <Panel title="Needs attention" count={attentionLoaded ? attentionTotal : undefined} tone="danger">
         {!attentionLoaded ? (
-          <div className="rounded-lg border border-[var(--border)] bg-white p-5 flex flex-col gap-3">
+          <div className="p-4 flex flex-col gap-3">
             <Skeleton className="h-[13px] w-[60%]" />
             <Skeleton className="h-[13px] w-[45%]" />
             <Skeleton className="h-[13px] w-[52%]" />
           </div>
         ) : attentionTotal === 0 ? (
-          <div className="rounded-lg border border-[var(--accent-employee)]/25 bg-[var(--accent-employee-dim)] px-5 py-6">
-            <p className="text-[15px] font-medium text-[var(--text-primary)] flex items-center gap-2.5">
-              <CheckCircle2 className="h-5 w-5 text-[var(--accent-employee-text)] shrink-0" />
-              All clear. Nothing needs your attention.
-            </p>
-            <p className="mt-1 ml-[30px] text-[13px] text-[var(--text-secondary)]">
-              Everything overdue, waiting on review, or sitting in the client
-              queue has been dealt with.
-            </p>
-          </div>
+          <PanelEmpty>Nothing overdue, nothing waiting on your review, and the client queue is empty.</PanelEmpty>
         ) : (
-          <div className="rounded-lg border border-[var(--danger)]/25 bg-white overflow-hidden shadow-sm">
-            <div className="divide-y divide-[var(--border-subtle)]">
-              {attentionVisible.map((row) => {
-                const RowIcon = row.icon;
-                return (
-                  <div key={row.key} className="flex items-center gap-2 pr-4 hover:bg-[var(--bg-hover)] transition-colors">
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {attentionVisible.map((row) => {
+              const RowIcon = row.icon;
+              return (
+                <li key={row.key} className="flex items-center gap-2 pr-4 hover:bg-[var(--bg-hover)] transition-colors">
                   <Link
                     href={row.href}
                     // The whole row is the target, not a 40px "View" link at
                     // the end of it — this is the thing you're here to click.
-                    className="group flex-1 min-w-0 flex items-center gap-3.5 pl-5 pr-1 py-3.5"
+                    className="group flex-1 min-w-0 flex items-center gap-3 pl-4 pr-1 py-3 focus-visible:outline-offset-[-2px]"
                   >
                     <RowIcon className={`h-4 w-4 shrink-0 ${row.iconClass}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[15px] font-medium text-[var(--text-primary)] truncate">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-medium text-[var(--text-primary)] truncate">
                         {row.title}
-                      </p>
-                      <p className="text-[12px] text-[var(--text-secondary)] truncate">
+                      </span>
+                      <span className="block text-[12px] text-[var(--text-muted)] truncate">
                         {row.context}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--accent-admin-text)] group-hover:translate-x-0.5 transition-all" />
+                      </span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]" />
                   </Link>
                   {row.action}
-                  </div>
-                );
-              })}
-              {attentionTotal > attentionVisible.length && (
-                <p className="px-5 py-2.5 text-[12px] text-[var(--text-muted)]">
-                  +{attentionTotal - attentionVisible.length} more in the sections below
-                </p>
-              )}
-            </div>
-          </div>
+                </li>
+              );
+            })}
+            {attentionTotal > attentionVisible.length && (
+              <li className="px-4 py-2.5 text-[12px] text-[var(--text-muted)]">
+                {attentionTotal - attentionVisible.length} more in the sections below
+              </li>
+            )}
+          </ul>
         )}
-      </div>
+      </Panel>
 
       <TodayList tasks={tasks as any} onOpen={(id) => setAdminSelectedTaskId(id)} />
 
-      {/* Client Approval Status */}
-      {clientApprovalCounts && (clientApprovalCounts.approved > 0 || clientApprovalCounts.pendingClient > 0 || clientApprovalCounts.changesRequested > 0 || clientApprovalCounts.denied > 0) && (
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
-              Client Approvals{" "}
-              <span className="font-normal text-[var(--text-muted)] tabular-nums">
-                ({clientApprovalCounts.pendingClient + clientApprovalCounts.approved + clientApprovalCounts.changesRequested + clientApprovalCounts.denied})
-              </span>
-            </h2>
-            <Link
+      {/* Client approval status */}
+      {clientApprovalCounts && clientApprovalTotal > 0 && (
+        <Panel
+          title="Client approvals"
+          count={clientApprovalTotal}
+          action={{ label: "View all", href: "/deliverables" }}
+        >
+          <StatStrip bare>
+            <StatTile label="Pending client" value={clientApprovalCounts.pendingClient} href="/deliverables" />
+            <StatTile label="Client approved" value={clientApprovalCounts.approved} href="/deliverables" />
+            <StatTile
+              label="Changes requested"
+              value={clientApprovalCounts.changesRequested}
               href="/deliverables"
-              className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {clientApprovalCounts.pendingClient > 0 && (
-              <Card>
-                <p className="text-[11px] font-medium text-[var(--text-secondary)]">Pending Client</p>
-                <p className="font-bold text-[24px] text-purple-600 mt-1 tabular-nums">{clientApprovalCounts.pendingClient}</p>
-              </Card>
-            )}
-            {clientApprovalCounts.approved > 0 && (
-              <Card accent="employee">
-                <p className="text-[11px] font-medium text-[var(--text-secondary)]">Client Approved</p>
-                <p className="font-bold text-[24px] text-emerald-600 mt-1 tabular-nums">{clientApprovalCounts.approved}</p>
-              </Card>
-            )}
-            {clientApprovalCounts.changesRequested > 0 && (
-              <Card accent="manager">
-                <p className="text-[11px] font-medium text-[var(--text-secondary)]">Changes Requested</p>
-                <p className="font-bold text-[24px] text-amber-600 mt-1 tabular-nums">{clientApprovalCounts.changesRequested}</p>
-              </Card>
-            )}
-            {clientApprovalCounts.denied > 0 && (
-              <Card>
-                <p className="text-[11px] font-medium text-[var(--text-secondary)]">Client Denied</p>
-                <p className="font-bold text-[24px] text-red-600 mt-1 tabular-nums">{clientApprovalCounts.denied}</p>
-              </Card>
-            )}
-          </div>
-        </div>
+            />
+            <StatTile label="Client denied" value={clientApprovalCounts.denied} href="/deliverables" />
+          </StatStrip>
+        </Panel>
       )}
 
       {/* Overdue Tasks Section */}
       {(overdueTasksForManager ?? []).length > 0 && (
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)] flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              Overdue Alerts{" "}
-              <span className="font-normal text-[var(--text-muted)] tabular-nums">
-                ({overdueTasksForManager!.length})
-              </span>
-            </h2>
-            <Link
-              href="/worklog"
-              className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
-            >
-              View all →
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Panel
+          title="Overdue alerts"
+          count={overdueTasksForManager!.length}
+          action={{ label: "View all", href: "/worklog" }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[var(--border-subtle)] sm:[&>*:last-child:nth-child(odd)]:col-span-2">
             {overdueTasksForManager!.map((ot: any) => (
-              <Card key={ot._id} className={`p-4 border-l-4 ${ot.alertType === "unassigned" ? "border-l-amber-500" : "border-l-red-500"}`}>
+              <div key={ot._id} className="bg-white p-4">
                 <div className="mb-2">
                   <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">{ot.title}</p>
                   {ot.alertType === "unassigned" ? (
-                    <p className="text-[11px] text-amber-700 mt-0.5 font-medium">
-                      No tasks assigned. Please assign someone quickly.
+                    <p className="text-[12px] text-[var(--warning)] mt-0.5 font-medium">
+                      No one is assigned yet.
                     </p>
                   ) : (
-                    <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 truncate">
-                      {ot.briefTitle} &middot; <span className="font-semibold">{ot.assigneeName}</span>
+                    <p className="text-[12px] text-[var(--text-secondary)] mt-0.5 truncate">
+                      {ot.briefTitle} &middot; <span className="font-medium text-[var(--text-primary)]">{ot.assigneeName}</span>
                     </p>
                   )}
-                  <p className="text-[11px] text-red-600 mt-0.5">
-                    <Clock className="inline h-3 w-3 mr-0.5" />
+                  <p className="text-[12px] text-[var(--danger)] mt-0.5 tabular-nums">
+                    <Clock className="inline h-3 w-3 mr-1 -mt-px" />
                     {new Date(ot.deadline).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}
                     {" "}({Math.round((Date.now() - ot.deadline) / (1000 * 60 * 60))}h overdue)
                   </p>
-                  {ot.deadlineExtended && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-yellow-50 text-yellow-700 mt-1">
-                      EXTENDED
-                    </span>
-                  )}
+                  {ot.deadlineExtended && <Badge className="mt-1">Extended</Badge>}
                 </div>
                 {ot.alertType !== "unassigned" && ot.overdueContacted && (
-                  <div className="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
-                    <p className="text-[11px] font-medium text-blue-800 mb-1.5">
-                      <Phone className="inline h-3 w-3 mr-0.5" />
+                  <div className="mt-2 p-2.5 rounded-md bg-[var(--bg-primary)]">
+                    <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">
+                      <Phone className="inline h-3 w-3 mr-1 -mt-px" />
                       {ot.assigneeName} has contacted you. Have you had the meeting?
                     </p>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         onClick={async () => {
                           await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: true });
                         }}
-                        className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                       >
                         Yes
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
                         onClick={async () => {
                           await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: false });
                         }}
-                        className="h-8 px-3 rounded-md text-[13px] font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-colors"
                       >
                         No
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
                 {ot.briefType === "content_calendar" && (
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
-                    <Calendar className="h-2.5 w-2.5" /> Content Calendar
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" /> Content calendar
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
                   {ot.alertType === "unassigned" ? (
                     <>
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={() => {
                           if (ot.briefType === "content_calendar" && ot.brandId) {
                             router.push(`/content-calendar?brand=${ot.brandId}`);
@@ -990,15 +888,16 @@ function AdminDashboard() {
                             router.push(`/brief/${ot.briefId}`);
                           }
                         }}
-                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
                       >
-                        <ArrowRight className="h-3 w-3" />
                         {ot.briefType === "content_calendar" ? "Open Calendar" : "Assign Tasks"}
-                      </button>
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
                       {resolvingTaskId !== ot._id && (
                         <button
                           onClick={() => setResolvingTaskId(ot._id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                          aria-label={`Remove ${ot.title}`}
+                          title="Remove"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1006,15 +905,15 @@ function AdminDashboard() {
                     </>
                   ) : (
                     <>
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={async () => {
                           await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
                         }}
-                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                       >
                         <Play className="h-3 w-3" />
                         Resume
-                      </button>
+                      </Button>
                       {extendingTaskId === ot._id ? (
                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
                           <div className="flex-1 min-w-[100px]">
@@ -1024,9 +923,10 @@ function AdminDashboard() {
                             type="time"
                             value={extendDeadlineTime}
                             onChange={(e) => setExtendDeadlineTime(e.target.value)}
-                            className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-white text-[12px] focus:outline-none focus:ring-1 focus:ring-[var(--accent-admin)]"
+                            aria-label="New deadline time"
+                            className="w-24 px-2 rounded-md border border-[var(--border)] bg-white"
                           />
-                          <button
+                          <Button
                             onClick={async () => {
                               if (!extendDeadline) return;
                               let finalDeadline = extendDeadline;
@@ -1041,30 +941,29 @@ function AdminDashboard() {
                               setExtendDeadline(undefined);
                               setExtendDeadlineTime("");
                             }}
-                            className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                           >
                             Save
-                          </button>
+                          </Button>
                           <button
                             onClick={() => { setExtendingTaskId(null); setExtendDeadline(undefined); setExtendDeadlineTime(""); }}
-                            className="px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                            aria-label="Cancel"
+                            className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setExtendingTaskId(ot._id)}
-                          className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
-                        >
+                        <Button variant="secondary" onClick={() => setExtendingTaskId(ot._id)}>
                           <CalendarClock className="h-3 w-3" />
                           Extend Deadline
-                        </button>
+                        </Button>
                       )}
                       {resolvingTaskId !== ot._id && (
                         <button
                           onClick={() => setResolvingTaskId(ot._id)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors ml-auto"
+                          aria-label={`Remove ${ot.title}`}
+                          title="Remove"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1073,12 +972,13 @@ function AdminDashboard() {
                   )}
                 </div>
                 {resolvingTaskId === ot._id && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-gray-50 border border-[var(--border-subtle)]">
+                  <div className="mt-2 p-2.5 rounded-md bg-[var(--bg-primary)]">
                     <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">
                       {ot.alertType === "unassigned" ? "Delete this brief and all its data?" : "Is this task already done?"}
                     </p>
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="destructive"
                         onClick={async () => {
                           if (ot.alertType === "unassigned") {
                             await deleteBrief({ briefId: ot.briefId as Id<"briefs"> });
@@ -1087,11 +987,11 @@ function AdminDashboard() {
                           }
                           setResolvingTaskId(null);
                         }}
-                        className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
                       >
                         Yes, Delete
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
                         onClick={() => {
                           if (ot.briefType === "content_calendar" && ot.brandId) {
                             router.push(`/content-calendar?brand=${ot.brandId}`);
@@ -1100,81 +1000,57 @@ function AdminDashboard() {
                           }
                           setResolvingTaskId(null);
                         }}
-                        className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                       >
                         No, Continue
-                      </button>
-                      <button
-                        onClick={() => setResolvingTaskId(null)}
-                        className="px-2 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                      >
+                      </Button>
+                      <Button variant="ghost" onClick={() => setResolvingTaskId(null)}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
-              </Card>
+              </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
 
       {/* Action Needed Grid */}
       {(actionNeededTasks ?? []).length > 0 && (
-        <div className="mb-6 sm:mb-8">
-          <h2 className="font-semibold text-[15px] text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <Info className="h-4 w-4 text-blue-500" />
-            Action Needed{" "}
-            <span className="font-normal text-[var(--text-muted)] tabular-nums">
-              ({actionNeededTasks!.length})
-            </span>
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Panel title="Action needed" count={actionNeededTasks!.length}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-[var(--border-subtle)] sm:[&>*:last-child:nth-child(odd)]:col-span-2">
             {actionNeededTasks!.map((t: any) => {
-              const borderColor =
-                t.category === "neither"
-                  ? "border-l-red-500"
-                  : t.category === "no_assignee"
-                    ? "border-l-amber-500"
-                    : "border-l-blue-500";
               const label =
                 t.category === "neither"
-                  ? "No Assignee & No Deadline"
+                  ? "No assignee, no deadline"
                   : t.category === "no_assignee"
-                    ? "No Assignee"
-                    : "No Deadline";
-              const labelColor =
-                t.category === "neither"
-                  ? "text-red-600 bg-red-50"
-                  : t.category === "no_assignee"
-                    ? "text-amber-600 bg-amber-50"
-                    : "text-blue-600 bg-blue-50";
+                    ? "No assignee"
+                    : "No deadline";
               const IconComp = t.category === "no_deadline" ? CalendarOff : UserX;
 
               return (
-                <Card key={t._id} className={`p-4 border-l-4 ${borderColor}`}>
+                <div key={t._id} className="bg-white p-4">
                   <div className="flex items-start gap-2 mb-2">
                     <IconComp className="h-4 w-4 mt-0.5 shrink-0 text-[var(--text-muted)]" />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate">
                         {t.title}
                       </p>
-                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                      <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
                         {t.briefTitle} &middot; {t.brandName}
                       </p>
                     </div>
                   </div>
                   {t.briefType === "content_calendar" && (
-                    <p className="text-[11px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
-                      <Calendar className="h-2.5 w-2.5" /> Content Calendar
+                    <p className="text-[12px] text-[var(--text-muted)] mb-1 flex items-center gap-1">
+                      <Calendar className="h-3 w-3" /> Content calendar
                     </p>
                   )}
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-subtle)]">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${labelColor}`}>
-                      {label}
-                    </span>
+                    <Badge>{label}</Badge>
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <Button
+                        variant="secondary"
                         onClick={() => {
                           if (t.briefType === "content_calendar" && t.brandId) {
                             router.push(`/content-calendar?brand=${t.brandId}`);
@@ -1182,15 +1058,16 @@ function AdminDashboard() {
                             router.push(`/brief/${t.briefId}`);
                           }
                         }}
-                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                       >
                         {t.briefType === "content_calendar" ? "Open Calendar" : "Take Action"}
                         <ArrowRight className="h-3 w-3" />
-                      </button>
+                      </Button>
                       {resolvingTaskId !== t._id && (
                         <button
                           onClick={() => setResolvingTaskId(t._id)}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          aria-label={`Remove ${t.title}`}
+                          title="Remove"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1198,19 +1075,20 @@ function AdminDashboard() {
                     </div>
                   </div>
                   {resolvingTaskId === t._id && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-gray-50 border border-[var(--border-subtle)]">
+                    <div className="mt-2 p-2.5 rounded-md bg-[var(--bg-primary)]">
                       <p className="text-[12px] font-medium text-[var(--text-primary)] mb-2">Is this task already done?</p>
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
+                          variant="destructive"
                           onClick={async () => {
                             await deleteTask({ taskId: t._id as Id<"tasks"> });
                             setResolvingTaskId(null);
                           }}
-                          className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
                         >
                           Yes, Delete
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="secondary"
                           onClick={() => {
                             if (t.briefType === "content_calendar" && t.brandId) {
                               router.push(`/content-calendar?brand=${t.brandId}`);
@@ -1219,103 +1097,153 @@ function AdminDashboard() {
                             }
                             setResolvingTaskId(null);
                           }}
-                          className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                         >
                           No, Continue
-                        </button>
-                        <button
-                          onClick={() => setResolvingTaskId(null)}
-                          className="px-2 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
+                        </Button>
+                        <Button variant="ghost" onClick={() => setResolvingTaskId(null)}>
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}
-                </Card>
+                </div>
               );
             })}
           </div>
-        </div>
+        </Panel>
       )}
 
-      {/* My Tasks moved to its own page (/my-tasks) */}
-      {(() => {
-        const mine = myWork?.counts.assignedToMeOpen ?? 0;
-        const supervising = myWork?.counts.supervisingOpen ?? 0;
-        if (mine === 0 && supervising === 0) return null;
-        return (
-          <Card
-            hover
-            onClick={() => router.push("/my-tasks")}
-            className="mb-6 sm:mb-8 p-4"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
-                  My Tasks
-                </h2>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="text-[12px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)] tabular-nums">
-                      {mine}
-                    </span>{" "}
-                    your task{mine !== 1 ? "s" : ""}
-                  </span>
-                  <span className="h-3 w-px bg-[var(--border)]" aria-hidden />
-                  <span className="text-[12px] text-[var(--text-secondary)]">
-                    <span className="font-semibold text-[var(--text-primary)] tabular-nums">
-                      {supervising}
-                    </span>{" "}
-                    supervising
-                  </span>
-                  {(myWork?.counts.needsReview ?? 0) > 0 && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-700">
-                      {myWork!.counts.needsReview} awaiting your review
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)]">
-                Open My Tasks
-              </span>
-            </div>
-          </Card>
-        );
-      })()}
-
-      {/* Team Lead Overview */}
-      {((teamLeadOverview ?? []).length > 0 || (pendingApprovalCount ?? 0) > 0) && (
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between mb-4 gap-2">
-            <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
-              My Teams{" "}
-              <span className="font-normal text-[var(--text-muted)] tabular-nums">
-                ({(teamLeadOverview ?? []).length})
-              </span>
-            </h2>
-            <div className="flex items-center gap-3">
-              {(pendingApprovalCount ?? 0) > 0 && (
-                <button
-                  onClick={() => router.push("/deliverables")}
-                  className="flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
-                >
-                  <ClipboardCheck className="h-3.5 w-3.5 text-amber-600" />
-                  <span className="text-[12px] font-semibold text-amber-700">
-                    {pendingApprovalCount} Approval{pendingApprovalCount !== 1 ? "s" : ""} Pending
-                  </span>
-                  <ArrowRight className="h-3 w-3 text-amber-500" />
-                </button>
-              )}
-              <Link
-                href="/teams"
-                className="text-[12px] font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
-              >
-                View all →
-              </Link>
-            </div>
+      {/* Where the open work sits, brand by brand */}
+      {brandRows.length > 0 && (
+        <Panel
+          title="Brands"
+          count={brandRows.length}
+          action={{ label: "All brands", href: "/brands-overview" }}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className="h-9 px-4 text-left">Brand</th>
+                  <th className="h-9 px-3 text-right">Open briefs</th>
+                  <th className="h-9 px-3 text-left">Tasks done</th>
+                  <th className="h-9 px-3 text-right">Briefs in review</th>
+                  <th className="h-9 px-4 text-right">Next deadline</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {brandRowsVisible.map((r) => (
+                    <tr key={r._id}>
+                      <td className="h-11 px-4 max-w-[220px]">
+                        <Link
+                          href={`/brands/${r._id}`}
+                          className="flex items-center gap-2 font-medium text-[var(--text-primary)] hover:underline underline-offset-2"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-sm shrink-0"
+                            style={{ backgroundColor: r.color ?? "var(--text-disabled)" }}
+                            aria-hidden
+                          />
+                          <span className="truncate">{r.name}</span>
+                        </Link>
+                      </td>
+                      <td className="px-3 text-right tabular-nums">{r.briefs}</td>
+                      <td className="px-3">
+                        <span className="flex items-center gap-2">
+                          <span className="w-20 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden shrink-0">
+                            <span
+                              className="block h-full rounded-full bg-[var(--accent-employee)]"
+                              style={{ width: `${r.tasks > 0 ? (r.done / r.tasks) * 100 : 0}%` }}
+                            />
+                          </span>
+                          <span className="tabular-nums text-[var(--text-secondary)]">
+                            {r.done}/{r.tasks}
+                          </span>
+                        </span>
+                      </td>
+                      <td className={`px-3 text-right tabular-nums ${r.inReview ? "" : "text-[var(--text-disabled)]"}`}>
+                        {r.inReview || "–"}
+                      </td>
+                      <td
+                        className={`px-4 text-right tabular-nums whitespace-nowrap ${
+                          r.nextDeadline ? "text-[var(--text-secondary)]" : "text-[var(--text-disabled)]"
+                        }`}
+                      >
+                        {r.nextDeadline ? formatDeadline(r.nextDeadline) : "–"}
+                      </td>
+                    </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 snap-x">
+          {brandRows.length > brandRowsVisible.length && (
+            <p className="px-4 py-2.5 border-t border-[var(--border-subtle)] text-[12px] text-[var(--text-muted)]">
+              {brandRows.length - brandRowsVisible.length} more with open briefs
+            </p>
+          )}
+        </Panel>
+      )}
+      </div>
+
+      <aside className="min-w-0 flex flex-col gap-4">
+      {/* My Tasks lives on its own page (/my-tasks); this is the way in */}
+      {showMyTasks && (
+        <Panel title="My tasks" action={{ label: "Open", href: "/my-tasks" }}>
+          <div className="grid grid-cols-3 gap-px bg-[var(--border-subtle)]">
+            <StatTile label="Yours" value={mineOpen} href="/my-tasks" />
+            <StatTile label="Supervising" value={supervisingOpen} href="/my-tasks" />
+            <StatTile label="To review" value={needsReview} href="/deliverables" />
+          </div>
+        </Panel>
+      )}
+
+      {/* Open briefs by stage */}
+      {statusRows.length > 0 && (
+        <Panel title="Briefs by status" count={scopedActiveBriefs} action={{ label: "All briefs", href: "/briefs" }}>
+          <ul className="px-4 py-2">
+            {statusRows.map((r) => (
+              <li key={r.status} className="flex items-center gap-3 h-9 text-[13px]">
+                <span className="flex items-center gap-2 w-[112px] shrink-0 text-[var(--text-primary)]">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: BRIEF_STATUS_COLORS[r.status] }}
+                    aria-hidden
+                  />
+                  {BRIEF_STATUS_LABELS[r.status]}
+                </span>
+                <span className="flex-1 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                  <span
+                    className="block h-full rounded-full bg-[var(--text-secondary)]"
+                    style={{ width: `${(r.count / statusMax) * 100}%` }}
+                  />
+                </span>
+                <span className="w-7 text-right tabular-nums text-[var(--text-primary)]">{r.count}</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      {/* Team lead overview: one list, each team opens in place */}
+      {showTeams && (
+        <Panel
+          title="My teams"
+          count={(teamLeadOverview ?? []).length}
+          action={{ label: "View all", href: "/teams" }}
+        >
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {(pendingApprovalCount ?? 0) > 0 && (
+              <Link
+                href="/deliverables"
+                className="group flex items-center gap-2.5 px-4 py-2.5 text-[13px] hover:bg-[var(--bg-hover)] transition-colors focus-visible:outline-offset-[-2px]"
+              >
+                <ClipboardCheck className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                <span className="flex-1 font-medium text-[var(--text-primary)]">
+                  {pendingApprovalCount} approval{pendingApprovalCount !== 1 ? "s" : ""} pending
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 shrink-0 text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] transition-colors" />
+              </Link>
+            )}
             {(teamLeadOverview ?? []).map((teamData: any) => {
               const isExpanded = expandedTeams.has(teamData.team._id);
               const totalTasks = teamData.members.reduce(
@@ -1327,108 +1255,106 @@ function AdminDashboard() {
               const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
               return (
-                <Card key={teamData.team._id} className="p-0 overflow-hidden min-w-[350px] snap-start shrink-0">
-                  <div
-                    className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
-                    style={{ borderLeft: `4px solid ${teamData.team.color}` }}
+                <div key={teamData.team._id}>
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
                     onClick={() => toggleTeam(teamData.team._id)}
+                    className="w-full px-4 py-3 flex items-center gap-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors focus-visible:outline-offset-[-2px]"
                   >
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                     ) : (
                       <ChevronRight className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                     )}
-                    <div
-                      className="w-3 h-3 rounded-sm shrink-0"
+                    <span
+                      className="w-2.5 h-2.5 rounded-sm shrink-0"
                       style={{ backgroundColor: teamData.team.color }}
+                      aria-hidden
                     />
-                    <h3 className="font-semibold text-[15px] text-[var(--text-primary)] flex-1">
-                      {teamData.team.name}
-                    </h3>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-16 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-[var(--accent-employee)]"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                          {doneTasks}/{totalTasks}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-[var(--text-muted)]">
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-[14px] text-[var(--text-primary)] truncate">
+                        {teamData.team.name}
+                      </span>
+                      <span className="block text-[12px] text-[var(--text-muted)]">
                         {teamData.members.length} member{teamData.members.length !== 1 ? "s" : ""}
                       </span>
-                    </div>
-                  </div>
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="w-14 h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
+                        <span
+                          className="block h-full rounded-full bg-[var(--accent-employee)]"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </span>
+                      <span className="text-[12px] text-[var(--text-secondary)] tabular-nums">
+                        {doneTasks}/{totalTasks}
+                      </span>
+                    </span>
+                  </button>
 
                   {isExpanded && (
-                    <div className="border-t border-[var(--border)]">
+                    <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)]">
                       {teamData.members.map((memberData: any, midx: number) => {
                         const memberDone = memberData.briefs.reduce((a: number, b: any) => a + (b.doneCount ?? 0), 0);
                         const memberTotal = memberData.briefs.reduce((a: number, b: any) => a + (b.taskCount ?? 0), 0);
-                        const memberPct = memberTotal > 0 ? Math.round((memberDone / memberTotal) * 100) : 0;
 
                         return (
                           <div
                             key={memberData.user._id}
                             className={`px-4 py-3 ${midx !== teamData.members.length - 1 ? "border-b border-[var(--border-subtle)]" : ""}`}
                           >
-                            <div className="flex items-center gap-2.5 mb-2">
+                            <div className="flex items-center gap-2.5">
                               {memberData.user.avatarUrl ? (
-                                <img src={memberData.user.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
+                                <img src={memberData.user.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-7 h-7 rounded-full bg-[var(--accent-employee-dim)] flex items-center justify-center text-[11px] font-bold text-[var(--accent-employee-text)]">
+                                <div className="w-7 h-7 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[12px] font-medium text-[var(--text-secondary)] shrink-0">
                                   {(memberData.user.name ?? memberData.user.email ?? "?").charAt(0).toUpperCase()}
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-[13px] text-[var(--text-primary)]">
-                                    {memberData.user.name ?? memberData.user.email}
-                                  </span>
-                                  {memberData.user.designation && (
-                                    <span className="text-[11px] text-[var(--text-muted)]">{memberData.user.designation}</span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <div className="w-20 h-1 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-                                    <div className="h-full rounded-full bg-[var(--accent-employee)]" style={{ width: `${memberPct}%` }} />
-                                  </div>
-                                  <span className="text-[11px] text-[var(--text-muted)] tabular-nums">
-                                    {memberDone}/{memberTotal} tasks
-                                  </span>
-                                </div>
+                                <p className="font-medium text-[13px] text-[var(--text-primary)] truncate">
+                                  {memberData.user.name ?? memberData.user.email}
+                                </p>
+                                {memberData.user.designation && (
+                                  <p className="text-[12px] text-[var(--text-muted)] truncate">{memberData.user.designation}</p>
+                                )}
                               </div>
+                              <span className="shrink-0 text-[12px] text-[var(--text-secondary)] tabular-nums">
+                                {memberDone}/{memberTotal}
+                              </span>
                             </div>
-                            <div className="flex flex-wrap gap-1.5 ml-9">
-                              {memberData.briefs.map((briefInfo: any) => (
-                                <button
-                                  key={briefInfo._id}
-                                  onClick={() => router.push(`/brief/${briefInfo._id}`)}
-                                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] bg-[var(--bg-hover)] hover:bg-[var(--border)] transition-colors text-left"
-                                >
-                                  <span className="font-medium text-[var(--text-primary)] truncate max-w-[160px]">
-                                    {briefInfo.title}
-                                  </span>
-                                  <span className="text-[var(--text-muted)] tabular-nums shrink-0">
-                                    {briefInfo.doneCount}/{briefInfo.taskCount}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
+                            {memberData.briefs.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2 ml-[37px]">
+                                {memberData.briefs.map((briefInfo: any) => (
+                                  <button
+                                    key={briefInfo._id}
+                                    onClick={() => router.push(`/brief/${briefInfo._id}`)}
+                                    className="inline-flex items-center gap-1.5 max-w-full px-2 py-1 rounded-md text-[12px] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors text-left"
+                                  >
+                                    <span className="text-[var(--text-primary)] truncate max-w-[160px]">
+                                      {briefInfo.title}
+                                    </span>
+                                    <span className="text-[var(--text-muted)] tabular-nums shrink-0">
+                                      {briefInfo.doneCount}/{briefInfo.taskCount}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
                   )}
-                </Card>
+                </div>
               );
             })}
           </div>
-        </div>
+        </Panel>
       )}
+      </aside>
+      </div>
 
       {/* Admin Task Detail Modal */}
       {adminSelectedTaskId && (
@@ -1456,13 +1382,6 @@ function EmployeeDashboard() {
   const startingTaskId: string | null = null;
   const [showNewTask, setShowNewTask] = useState(false);
 
-  const STATUS_COLORS: Record<string, { color: string; bg: string }> = {
-    "pending": { color: "var(--text-muted)", bg: "var(--bg-hover)" },
-    "in-progress": { color: "#3B82F6", bg: "#EFF6FF" },
-    "review": { color: "#F59E0B", bg: "#FFFBEB" },
-    "done": { color: "var(--accent-employee)", bg: "var(--accent-employee-dim)" },
-  };
-
   const isHalted = overdueStatus && overdueStatus.length > 0;
   const nowMs = Date.now();
   const myOpen = (tasks ?? []).filter((t) => t.status !== "done" && t.briefStatus !== "archived");
@@ -1474,19 +1393,18 @@ function EmployeeDashboard() {
     <div className="p-4 sm:p-6 lg:p-8 relative">
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
-          {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        </p>
-        <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-tight leading-tight">
+      <div className="min-w-0">
+        <h1 className="font-semibold text-[26px] text-[var(--text-primary)] leading-tight">
           {greeting}, {displayName.split(" ")[0]}
         </h1>
         <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+          {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
+          <span className="mx-1.5 text-[var(--text-muted)]">·</span>
           {myOverdue > 0
             ? `${myOverdue} overdue · ${dueThisWeek} due this week`
             : dueThisWeek > 0
-              ? `${dueThisWeek} due this week. Click a task for details.`
-              : "Nothing due this week."}
+              ? `${dueThisWeek} due this week`
+              : "Nothing due this week"}
         </p>
       </div>
         <Button onClick={() => setShowNewTask(true)} className="shrink-0">
@@ -1497,36 +1415,34 @@ function EmployeeDashboard() {
       <NewSelfTaskModal open={showNewTask} onClose={() => setShowNewTask(false)} />
       <EchoActionItems />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <StatTile label="Open tasks" value={myOpen.length} href="/my-tasks" icon={ListChecks}
-          hint={myOverdue > 0 ? `${myOverdue} overdue` : "Nothing overdue"} hintTone={myOverdue > 0 ? "bad" : "good"} />
-        <StatTile label="In progress" value={myOpen.filter((t) => t.status === "in-progress").length} href="/my-tasks" icon={Play} />
-        <StatTile label="In review" value={myOpen.filter((t) => t.status === "review").length} href="/my-tasks" icon={ClipboardCheck}
+      <StatStrip className="mb-4">
+        <StatTile label="Open tasks" value={myOpen.length} href="/my-tasks"
+          hint={myOverdue > 0 ? `${myOverdue} overdue` : "None overdue"} bad={myOverdue > 0} />
+        <StatTile label="In progress" value={myOpen.filter((t) => t.status === "in-progress").length} href="/my-tasks" />
+        <StatTile label="In review" value={myOpen.filter((t) => t.status === "review").length} href="/my-tasks"
           hint="Waiting on a reviewer" />
-        <StatTile label="Done this week" value={doneThisWeek} href="/worklog" icon={CheckCircle2}
-          hintTone="good" hint={doneThisWeek > 0 ? "Nice work" : undefined} />
-      </div>
+        <StatTile label="Done this week" value={doneThisWeek} href="/worklog" />
+      </StatStrip>
 
       {/* Needs attention: your overdue tasks, each with its next step */}
       {isHalted && (
-        <section className="mb-8">
-          <SectionHeader title="Needs attention" count={overdueStatus.length} tone="danger" />
-          <ul className="rounded-xl border border-[var(--danger)]/25 bg-white divide-y divide-[var(--border-subtle)] overflow-hidden shadow-sm">
+        <Panel title="Needs attention" count={overdueStatus.length} tone="danger" className="mb-4">
+          <ul className="divide-y divide-[var(--border-subtle)]">
             {overdueStatus.map((ot) => {
               const isContacted = ot.overdueContacted || justContactedTasks.has(ot._id);
               return (
-                <li key={ot._id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                <li key={ot._id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--danger)]" />
                   <button type="button" onClick={() => setSelectedTaskId(ot._id)} className="min-w-0 flex-1 text-left">
-                    <span className="block text-[15px] font-medium text-[var(--text-primary)] truncate">{ot.title}</span>
-                    <span className="block text-[12px] text-[var(--text-secondary)] truncate">
+                    <span className="block text-[14px] font-medium text-[var(--text-primary)] truncate">{ot.title}</span>
+                    <span className="block text-[12px] text-[var(--text-muted)] truncate">
                       {ot.briefTitle} · was due {new Date(ot.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · Manager {ot.managerName}
                     </span>
                     {isContacted && (
-                      <span className="block text-[11px] text-amber-700 mt-0.5">Waiting for {ot.managerName} to confirm.</span>
+                      <span className="block text-[12px] text-[var(--text-secondary)] mt-0.5">Waiting for {ot.managerName} to confirm.</span>
                     )}
                     {!isContacted && ot.overdueContactDenied && (
-                      <span className="block text-[11px] text-red-700 mt-0.5">You haven&apos;t met the brand manager about this yet. Please contact them.</span>
+                      <span className="block text-[12px] text-[var(--danger)] mt-0.5">You haven&apos;t met the brand manager about this yet. Please contact them.</span>
                     )}
                   </button>
                   <button
@@ -1548,12 +1464,12 @@ function EmployeeDashboard() {
               );
             })}
           </ul>
-        </section>
+        </Panel>
       )}
 
       <TodayList tasks={tasks as any} onOpen={setSelectedTaskId} />
 
-      <SectionHeader title="All my tasks" />
+      <SectionHeader title="All my tasks" className="mt-8 mb-3" />
       <EmployeeTaskViews
         tasks={tasks ?? []}
         onSelectTask={setSelectedTaskId}
@@ -1564,7 +1480,6 @@ function EmployeeDashboard() {
           );
         }}
         startingTaskId={startingTaskId}
-        statusColors={STATUS_COLORS}
       />
 
       {/* Task Detail Modal */}

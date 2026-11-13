@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-react";
 interface PageHeaderProps {
   title: string;
   subtitle?: string;
+  /** No longer drawn: the sidebar already carries the page's icon, and a
+   *  title reads cleaner as a plain noun. Kept so call sites compile. */
   icon?: LucideIcon;
   /** Right-aligned slot for buttons / filters */
   actions?: React.ReactNode;
@@ -17,7 +19,6 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   subtitle,
-  icon: Icon,
   actions,
   className = "",
 }: PageHeaderProps) {
@@ -26,9 +27,6 @@ export function PageHeader({
       className={`flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 ${className}`}
     >
       <div className="flex items-start gap-2.5">
-        {Icon && (
-          <Icon className="h-5 w-5 mt-[5px] text-[var(--accent-admin-text)] shrink-0" />
-        )}
         <div>
           <h1 className="font-semibold text-[26px] text-[var(--text-primary)] tracking-[-0.02em] leading-tight">
             {title}

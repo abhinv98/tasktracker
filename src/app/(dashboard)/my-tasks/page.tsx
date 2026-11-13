@@ -5,7 +5,7 @@ import { isTaskOverdue } from "@/lib/status";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Card, PageHeader, SegmentedTabs, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { PageHeader, SegmentedTabs, StatStrip, StatTile, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import { TASK_STATUS_CONFIG } from "@/lib/statusColors";
 import {
@@ -144,26 +144,15 @@ export default function MyTasksPage() {
         subtitle="Work assigned to you, plus the tasks you delegated and need to track & sign off."
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: "Assigned to me (open)", value: counts.assignedToMeOpen },
-          { label: "Assigned to me (all)", value: counts.assignedToMe },
-          { label: "Supervising (open)", value: counts.supervisingOpen },
-          { label: "Awaiting my review", value: counts.needsReview },
-        ].map((c) => (
-          <Card key={c.label} className="p-4">
-            <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-              {c.label}
-            </p>
-            <p className="text-[20px] font-bold text-[var(--text-primary)] mt-1">
-              {c.value}
-            </p>
-          </Card>
-        ))}
-      </div>
+      <StatStrip className="mb-4">
+        <StatTile label="Assigned to me, open" value={counts.assignedToMeOpen} />
+        <StatTile label="Assigned to me, all" value={counts.assignedToMe} />
+        <StatTile label="Supervising, open" value={counts.supervisingOpen} />
+        <StatTile label="Awaiting my review" value={counts.needsReview} />
+      </StatStrip>
 
       {/* Filter bar */}
-      <div className="rounded-xl border border-[var(--border)] bg-white p-3 mb-6 flex flex-wrap items-center gap-3">
+      <div className="rounded-lg border border-[var(--border)] bg-white p-3 mb-6 flex flex-wrap items-center gap-3">
         <SegmentedTabs
           value={scope}
           onChange={setScope}

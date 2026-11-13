@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { Play, Square, CalendarCheck } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { SectionHeader, useToast } from "@/components/ui";
+import { Panel, PanelEmpty, useToast } from "@/components/ui";
 import { taskStatusMeta, isTaskOverdue } from "@/lib/status";
 
 type TodayTask = {
@@ -65,19 +65,15 @@ export function TodayList({
   }
 
   return (
-    <section className="mb-8">
-      <SectionHeader
-        title="Your week"
-        count={due.length}
-        action={due.length > visible.length ? { label: "All my tasks", href: "/my-tasks" } : undefined}
-      />
+    <Panel
+      title="Your week"
+      count={due.length}
+      action={due.length > visible.length ? { label: "All my tasks", href: "/my-tasks" } : undefined}
+    >
       {tasks === undefined ? null : visible.length === 0 ? (
-        <p className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--border)] bg-white px-4 py-3 text-[13px] text-[var(--text-secondary)]">
-          <CalendarCheck className="h-4 w-4 text-[var(--accent-employee-text)]" />
-          Nothing of yours is due in the next 7 days.
-        </p>
+        <PanelEmpty>Nothing of yours is due in the next 7 days.</PanelEmpty>
       ) : (
-        <ul className="rounded-xl border border-[var(--border)] bg-white divide-y divide-[var(--border-subtle)] overflow-hidden">
+        <ul className="divide-y divide-[var(--border-subtle)]">
           {visible.map((t) => {
             const meta = taskStatusMeta(t.status);
             const overdue = isTaskOverdue(t, now);
@@ -125,6 +121,6 @@ export function TodayList({
           })}
         </ul>
       )}
-    </section>
+    </Panel>
   );
 }
