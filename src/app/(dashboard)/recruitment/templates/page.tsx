@@ -225,7 +225,7 @@ export default function RecruitmentTemplatesPage() {
                     onClick={() =>
                       setEditing({ ...editing, body: editing.body + `{{${p}}}` })
                     }
-                    className="px-1.5 py-0.5 rounded border border-[var(--border)] bg-[var(--bg-primary)] text-[11px] font-mono text-[var(--text-secondary)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin-text)] transition-colors"
+                    className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] font-mono text-[var(--text-secondary)] hover:border-[var(--accent-admin)] hover:text-[var(--accent-admin-text)] transition-colors"
                   >
                     {`{{${p}}}`}
                   </button>

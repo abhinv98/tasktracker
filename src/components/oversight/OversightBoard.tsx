@@ -344,7 +344,7 @@ export default function OversightBoard() {
               setStartDate(t);
               setEndDate(t);
             }}
-            className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             Today
           </button>
@@ -358,7 +358,7 @@ export default function OversightBoard() {
               setStartDate(fmtIso(start));
               setEndDate(fmtIso(end));
             }}
-            className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             Last 7 days
           </button>

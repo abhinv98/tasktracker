@@ -122,7 +122,7 @@ export function CandidatePanel({
                   <button
                     key={s.value}
                     onClick={() => move(s.value)}
-                    className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                    className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                       active
                         ? "text-white"
                         : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"

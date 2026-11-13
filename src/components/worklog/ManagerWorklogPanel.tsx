@@ -76,7 +76,7 @@ export default function ManagerWorklogPanel() {
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                   mode === m
                     ? "bg-white shadow-sm text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -122,7 +122,7 @@ export default function ManagerWorklogPanel() {
             </button>
             <button
               onClick={() => setDate(getTodayStr())}
-              className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             >
               Today
             </button>

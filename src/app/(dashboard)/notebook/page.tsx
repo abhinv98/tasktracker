@@ -115,7 +115,7 @@ export default function NotebookPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               tab === key
                 ? "bg-white shadow-sm text-[var(--text-primary)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -242,7 +242,7 @@ function NotesTab() {
             <button
               key={s}
               onClick={() => setScope(s)}
-              className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+              className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                 scope === s
                   ? "bg-white shadow-sm text-[var(--text-primary)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -275,7 +275,7 @@ function NotesTab() {
             </button>
             <button
               onClick={() => setDate(getTodayStr())}
-              className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+              className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
             >
               Today
             </button>
@@ -615,7 +615,7 @@ function IconBtn({
     <button
       onClick={onClick}
       title={label}
-      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+      className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
         danger
           ? "text-[var(--danger)] hover:bg-[var(--danger)]/10"
           : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -938,7 +938,7 @@ function ConvertModal({
               <button
                 key={k}
                 onClick={() => setKind(k)}
-                className={`flex-1 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                   kind === k
                     ? "bg-white shadow-sm text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -1288,7 +1288,7 @@ function WorklogTab() {
         </button>
         <button
           onClick={() => setDate(getTodayStr())}
-          className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
         >
           Today
         </button>
@@ -1420,7 +1420,7 @@ function WorklogTab() {
                         setConvDeadline("");
                         setConvDuration("");
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                     >
                       Convert to self task
                     </button>

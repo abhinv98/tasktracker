@@ -679,7 +679,7 @@ export default function PlannerPage() {
                   </div>
                   <button
                     onClick={() => quickScheduleTask(task._id)}
-                    className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 px-2 py-1 rounded-md bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:bg-[#a04525] transition-all"
+                    className="shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525] transition-all"
                     title="Quick schedule on current day"
                   >
                     <Plus className="h-3 w-3 inline mr-0.5" />Add
@@ -699,7 +699,7 @@ export default function PlannerPage() {
             <button onClick={() => setSelectedDate((d) => addDays(d, -1))} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <button onClick={() => setSelectedDate(todayStr())} className="px-2.5 py-1 rounded-md text-[11px] font-medium hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]">Today</button>
+            <button onClick={() => setSelectedDate(todayStr())} className="h-8 px-3 rounded-md text-[13px] font-medium hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]">Today</button>
             <button onClick={() => setSelectedDate((d) => addDays(d, 1))} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]">
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -715,8 +715,8 @@ export default function PlannerPage() {
               <StickyNote className="h-3.5 w-3.5" />
             </button>
             <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-1">
-              <button onClick={() => setViewMode("day")} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${viewMode === "day" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Day</button>
-              <button onClick={() => setViewMode("week")} className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${viewMode === "week" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Week</button>
+              <button onClick={() => setViewMode("day")} className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${viewMode === "day" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Day</button>
+              <button onClick={() => setViewMode("week")} className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${viewMode === "week" ? "bg-white shadow-sm text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>Week</button>
             </div>
             <button onClick={() => setShowShortcuts(!showShortcuts)} className="p-1.5 rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-muted)] relative" title="Keyboard shortcuts">
               <HelpCircle className="h-3.5 w-3.5" />
@@ -867,16 +867,16 @@ export default function PlannerPage() {
                         <p className="text-[11px] text-[var(--text-secondary)] mb-2">{formatMin(block.startTime)} - {formatMin(block.endTime)}</p>
                         {block.description && <p className="text-[11px] text-[var(--text-muted)] mb-2">{block.description}</p>}
                         <div className="flex items-center gap-1.5">
-                          <button onClick={() => handleCompleteBlock(block)} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${block.completed ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]" : "bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--accent-employee-dim)]"}`}>
+                          <button onClick={() => handleCompleteBlock(block)} className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${block.completed ? "bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]" : "bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--accent-employee-dim)]"}`}>
                             <Check className="h-3 w-3" />{block.completed ? "Completed" : "Complete"}
                           </button>
                           {(isViewingSelf || isAdmin) && (
-                            <button onClick={() => handleDeleteBlock(block._id)} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--danger-dim)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors">
+                            <button onClick={() => handleDeleteBlock(block._id)} className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--danger-dim)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-white transition-colors">
                               <Trash2 className="h-3 w-3" />Delete
                             </button>
                           )}
                           {isAdminOrManager && !isViewingSelf && block.type === "brief_task" && block.taskId && (
-                            <button onClick={() => { setShowPriority(block.taskId!); setShowBlockDetail(null); }} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-colors">
+                            <button onClick={() => { setShowPriority(block.taskId!); setShowBlockDetail(null); }} className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-colors">
                               Priority
                             </button>
                           )}
@@ -1140,7 +1140,7 @@ export default function PlannerPage() {
                   <button
                     key={creator.id}
                     onClick={() => handleConflictDm(creator.id, creator.name)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-admin-text)]" />
                     Message {creator.name}
@@ -1152,7 +1152,7 @@ export default function PlannerPage() {
               {!isViewingSelf && conflictModal.conflicts[0]?.employeeId && (
                 <button
                   onClick={() => handleConflictDm(conflictModal.conflicts[0].employeeId, conflictModal.conflicts[0].employeeName)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-manager-text)]" />
                   Message Employee
@@ -1161,14 +1161,14 @@ export default function PlannerPage() {
 
               <button
                 onClick={handleForceCreate}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:bg-[#a04525] transition-colors"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:bg-[#a04525] transition-colors"
               >
                 Add Anyway
               </button>
 
               <button
                 onClick={() => setConflictModal(null)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] text-[11px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 Cancel
               </button>

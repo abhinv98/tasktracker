@@ -2169,7 +2169,7 @@ export function ContentCalendarEntrySidebar({
               />
               <button
                 onClick={handleAddLink}
-                className="px-2 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[11px] font-medium hover:opacity-90"
+                className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90"
               >
                 Add
               </button>
@@ -2925,7 +2925,7 @@ function RequestChangesControl({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
         title="Reopen this task and send it back for changes"
       >
         <RotateCcw className="h-3 w-3" />
@@ -3014,7 +3014,7 @@ function RequestChangesControl({
               setSubmitting(false);
             }
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors disabled:opacity-50"
         >
           {submitting ? (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -3030,7 +3030,7 @@ function RequestChangesControl({
             setNote("");
             setNewDeadline("");
           }}
-          className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           Cancel
         </button>

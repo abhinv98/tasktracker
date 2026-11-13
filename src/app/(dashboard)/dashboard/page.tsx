@@ -183,7 +183,7 @@ function EmployeeTaskCard({
               onStart(task._id);
             }}
             disabled={isStarting}
-            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60`}
+            className={`${compact ? "self-start" : "shrink-0"} inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-60`}
           >
             {isStarting ? <Clock className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
             Start
@@ -654,7 +654,7 @@ function AdminDashboard() {
                 adminToast("error", err instanceof Error ? err.message : "Couldn't contact the manager");
               }
             }}
-            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+            className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
           >
             <Phone className="h-3 w-3" /> Contact {ot.managerName.split(" ")[0]}
           </button>
@@ -751,7 +751,7 @@ function AdminDashboard() {
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => router.push("/brands-overview?filter=mine")}
-            className="shrink-0 self-start sm:self-auto flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[var(--text-primary)] text-white text-[13px] font-medium hover:bg-[#2a2a2a] transition-colors"
+            className="shrink-0 self-start sm:self-auto flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors"
           >
             <Briefcase className="h-4 w-4" />
             My Brands
@@ -959,7 +959,7 @@ function AdminDashboard() {
                         onClick={async () => {
                           await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: true });
                         }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                        className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                       >
                         Yes
                       </button>
@@ -967,7 +967,7 @@ function AdminDashboard() {
                         onClick={async () => {
                           await confirmOverdueContact({ taskId: ot._id as Id<"tasks">, confirmed: false });
                         }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-colors"
+                        className="h-8 px-3 rounded-md text-[13px] font-medium text-red-600 border border-red-300 hover:bg-red-50 transition-colors"
                       >
                         No
                       </button>
@@ -990,7 +990,7 @@ function AdminDashboard() {
                             router.push(`/brief/${ot.briefId}`);
                           }
                         }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-amber-600 hover:bg-amber-700 transition-colors"
                       >
                         <ArrowRight className="h-3 w-3" />
                         {ot.briefType === "content_calendar" ? "Open Calendar" : "Assign Tasks"}
@@ -1010,7 +1010,7 @@ function AdminDashboard() {
                         onClick={async () => {
                           await resumeOverdueTask({ taskId: ot._id as Id<"tasks"> });
                         }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
                       >
                         <Play className="h-3 w-3" />
                         Resume
@@ -1041,7 +1041,7 @@ function AdminDashboard() {
                               setExtendDeadline(undefined);
                               setExtendDeadlineTime("");
                             }}
-                            className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
+                            className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                           >
                             Save
                           </button>
@@ -1055,7 +1055,7 @@ function AdminDashboard() {
                       ) : (
                         <button
                           onClick={() => setExtendingTaskId(ot._id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                          className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                         >
                           <CalendarClock className="h-3 w-3" />
                           Extend Deadline
@@ -1087,7 +1087,7 @@ function AdminDashboard() {
                           }
                           setResolvingTaskId(null);
                         }}
-                        className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                        className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
                       >
                         Yes, Delete
                       </button>
@@ -1100,7 +1100,7 @@ function AdminDashboard() {
                           }
                           setResolvingTaskId(null);
                         }}
-                        className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                        className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                       >
                         No, Continue
                       </button>
@@ -1182,7 +1182,7 @@ function AdminDashboard() {
                             router.push(`/brief/${t.briefId}`);
                           }
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                       >
                         {t.briefType === "content_calendar" ? "Open Calendar" : "Take Action"}
                         <ArrowRight className="h-3 w-3" />
@@ -1206,7 +1206,7 @@ function AdminDashboard() {
                             await deleteTask({ taskId: t._id as Id<"tasks"> });
                             setResolvingTaskId(null);
                           }}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                          className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
                         >
                           Yes, Delete
                         </button>
@@ -1219,7 +1219,7 @@ function AdminDashboard() {
                             }
                             setResolvingTaskId(null);
                           }}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
+                          className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] border border-[var(--accent-admin)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                         >
                           No, Continue
                         </button>
@@ -1298,7 +1298,7 @@ function AdminDashboard() {
               {(pendingApprovalCount ?? 0) > 0 && (
                 <button
                   onClick={() => router.push("/deliverables")}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
+                  className="flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
                 >
                   <ClipboardCheck className="h-3.5 w-3.5 text-amber-600" />
                   <span className="text-[12px] font-semibold text-amber-700">
@@ -1539,7 +1539,7 @@ function EmployeeDashboard() {
                       }
                     }}
                     disabled={isContacted}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+                    className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
                   >
                     <Phone className="h-3 w-3" />
                     {isContacted ? "Contacted" : "Contact manager"}

@@ -250,7 +250,7 @@ export default function RecruitmentJobPage() {
             <button
               key={t.value || "all"}
               onClick={() => setStage(t.value as Stage | "" | "open")}
-              className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${
+              className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                 stage === t.value
                   ? "bg-white shadow-sm text-[var(--text-primary)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"

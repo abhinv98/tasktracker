@@ -460,7 +460,7 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <button
             type="button"
             onClick={() => setView("mine")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               view === "mine"
                 ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -472,7 +472,7 @@ function SuggestionBox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
           <button
             type="button"
             onClick={() => setView("all")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               view === "all"
                 ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

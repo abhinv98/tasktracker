@@ -437,7 +437,7 @@ export default function DeliverablesPage() {
               key={idx}
               type="button"
               onClick={() => setPreviewFile(file)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-hover)] text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
             >
               {isImage ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
               <span className="max-w-[150px] truncate">{file.name}</span>
@@ -471,7 +471,7 @@ export default function DeliverablesPage() {
         <button
           onClick={() => onReject(id)}
           disabled={noteIsEmpty}
-          className="px-3 py-1.5 rounded-lg bg-[var(--danger)] text-white text-[12px] font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--danger)] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
           title={noteIsEmpty ? "Add a reason first" : "Send"}
         >
           Send
@@ -506,7 +506,7 @@ export default function DeliverablesPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-medium transition-all ${
+              className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
                 activeTab === tab.id
                   ? "bg-white text-[var(--text-primary)] shadow-sm"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -619,7 +619,7 @@ export default function DeliverablesPage() {
                       type="button"
                       disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                       onClick={() => handleSubmit(null, "bm")}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
                     >
                       Brand Manager
                     </button>
@@ -628,7 +628,7 @@ export default function DeliverablesPage() {
                         type="button"
                         disabled={isSubmitting || !submitMessage.trim() || !submitTaskId}
                         onClick={() => handleSubmit(null, "as")}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
                         Assignor
                       </button>
@@ -779,7 +779,7 @@ export default function DeliverablesPage() {
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                       <button
                         onClick={() => openEdit(d)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--accent-admin)] text-[var(--accent-admin-text)] text-[12px] font-medium hover:bg-[var(--accent-admin-dim)] transition-colors"
+                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--accent-admin)] text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-dim)] transition-colors"
                       >
                         Edit
                       </button>
@@ -795,7 +795,7 @@ export default function DeliverablesPage() {
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                     <button
                       onClick={() => handleApprove(d._id, d.taskTitle)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
                     >
                       <Check className="h-3.5 w-3.5" />
                       Approve
@@ -805,7 +805,7 @@ export default function DeliverablesPage() {
                     ) : (
                       <button
                         onClick={() => setShowRejectForm(d._id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
                         Request Changes
@@ -830,7 +830,7 @@ export default function DeliverablesPage() {
                     )}
                     <button
                       onClick={() => setHandoffDeliverableId(handoffDeliverableId === d._id ? null : d._id)}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                      className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                         handoffDeliverableId === d._id
                           ? "bg-indigo-600 text-white"
                           : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
@@ -1030,14 +1030,14 @@ export default function DeliverablesPage() {
                                       /* toast optional */
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-indigo-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                                 >
                                   <GitBranch className="h-3.5 w-3.5" />
                                   Hand Off
                                 </button>
                                 <button
                                   onClick={() => setHandoffDeliverableId(null)}
-                                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
+                                  className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -1118,7 +1118,7 @@ export default function DeliverablesPage() {
                   <>
                     <button
                       onClick={() => handleMainAssigneeApprove(d._id)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
                     >
                       <Check className="h-3.5 w-3.5" />
                       Approve
@@ -1128,7 +1128,7 @@ export default function DeliverablesPage() {
                     ) : (
                       <button
                         onClick={() => setShowRejectForm(d._id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
                         Request Changes
@@ -1145,7 +1145,7 @@ export default function DeliverablesPage() {
                     </span>
                     <button
                       onClick={() => handlePassSubTaskToTeamLead(d._id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                      className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                     >
                       <ArrowRight className="h-3.5 w-3.5" />
                       Pass to Team Lead
@@ -1243,7 +1243,7 @@ export default function DeliverablesPage() {
                       <>
                         <button
                           onClick={() => handleTeamLeadApprove(del._id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
                         >
                           <Check className="h-3.5 w-3.5" />
                           Approve{isMultiCreative ? ` #${idx + 1}` : " as Team Lead"}
@@ -1251,7 +1251,7 @@ export default function DeliverablesPage() {
                         {del.isAlsoBrandManager && (
                           <button
                             onClick={() => handleTeamLeadAndManagerApprove(del._id)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Approve as TL & Manager
@@ -1262,7 +1262,7 @@ export default function DeliverablesPage() {
                         ) : (
                           <button
                             onClick={() => setShowRejectForm(del._id)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <X className="h-3.5 w-3.5" />
                             Request Changes
@@ -1277,7 +1277,7 @@ export default function DeliverablesPage() {
                         {del.isAlsoBrandManager ? (
                           <button
                             onClick={() => handleManagerApproveFromTeamLead(del._id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                           >
                             <ShieldCheck className="h-3.5 w-3.5" />
                             Final Approve (Brand Manager)
@@ -1289,7 +1289,7 @@ export default function DeliverablesPage() {
                               onClick={async () => {
                                 try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                               }}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                              className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                             >
                               <ArrowRight className="h-3.5 w-3.5" />
                               Pass to {mgr.name}
@@ -1450,7 +1450,7 @@ export default function DeliverablesPage() {
                           setReassignTarget((prev) => { const n = { ...prev }; delete n[group.taskId]; return n; });
                         } catch {}
                       }}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
+                      className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 w-fit"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Send Back to Team Member
@@ -1464,7 +1464,7 @@ export default function DeliverablesPage() {
                         onClick={async () => {
                           try { await sendToClientMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                         }}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                       >
                         <Send className="h-3.5 w-3.5" />
                         Send to Client
@@ -1484,7 +1484,7 @@ export default function DeliverablesPage() {
                           onClick={async () => {
                             try { await passToManagerMut({ deliverableId: del._id as Id<"deliverables"> }); } catch {}
                           }}
-                          className="flex items-center gap-1.5 w-fit px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                          className="flex items-center gap-1.5 w-fit h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity"
                         >
                           <ArrowRight className="h-3.5 w-3.5" />
                           Receive{isMultiCreative ? ` #${deliverables.indexOf(del) + 1}` : ""} for review
@@ -1504,7 +1504,7 @@ export default function DeliverablesPage() {
                                 <button
                                   key={del._id}
                                   onClick={() => handleApprove(del._id, del.taskTitle ?? d?.taskTitle)}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent-employee)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity"
+                                  className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-employee)] text-white hover:opacity-90 transition-opacity"
                                 >
                                   <Check className="h-3.5 w-3.5" />
                                   Approve{isMultiCreative ? ` #${deliverables.indexOf(del) + 1}` : ""}
@@ -1534,7 +1534,7 @@ export default function DeliverablesPage() {
                         ) : (
                           <button
                             onClick={() => setShowRejectForm(rejectTargetId)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[var(--danger)] text-[var(--danger)] text-[12px] font-medium hover:bg-[var(--danger-dim)] transition-colors"
+                            className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <X className="h-3.5 w-3.5" />
                             Request Changes
@@ -1552,7 +1552,7 @@ export default function DeliverablesPage() {
                         return (
                           <button
                             onClick={() => { setHandoffTaskId(handoffTaskId === group.taskId ? null : group.taskId); }}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
+                            className={`flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                               handoffTaskId === group.taskId
                                 ? "bg-indigo-600 text-white"
                                 : "border border-indigo-500 text-indigo-600 hover:bg-indigo-50"
@@ -1774,14 +1774,14 @@ export default function DeliverablesPage() {
                                       /* */
                                     }
                                   }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-indigo-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                                 >
                                   <GitBranch className="h-3.5 w-3.5" />
                                   Hand Off{isMultiCreative ? " All" : ""}
                                 </button>
                                 <button
                                   onClick={() => setHandoffTaskId(null)}
-                                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-hover)] transition-colors"
+                                  className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                                 >
                                   Cancel
                                 </button>

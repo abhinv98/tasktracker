@@ -423,19 +423,19 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => copyJsrLink(link.token)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <Copy className="h-3 w-3" /> Copy
                     </button>
                     <button
                       onClick={() => setChatSidebarOpen(true)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors"
                     >
                       <MessageCircle className="h-3 w-3" /> Show Chat
                     </button>
                     <button
                       onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                     >
                       Deactivate
                     </button>
@@ -486,13 +486,13 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => copyIntakeLink(link.token)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <Copy className="h-3 w-3" /> Copy
                     </button>
                     <button
                       onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                      className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                     >
                       Deactivate
                     </button>
@@ -583,7 +583,7 @@ export default function ClientJsrTab({ brandId, brand, canManageLinks }: ClientJ
           <div className="relative">
             <button
               onClick={() => setShowAddBlock(!showAddBlock)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors border border-[var(--accent-admin)]/20"
+              className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin)]/10 transition-colors border border-[var(--accent-admin)]/20"
             >
               <Plus className="h-3 w-3" />
               {hiddenBlocks.length > 0 ? `Add Block (${hiddenBlocks.length})` : "All Shown"}

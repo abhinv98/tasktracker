@@ -102,7 +102,7 @@ export default function AllCandidatesPage() {
         <button
           onClick={() => setShowFilters((v) => !v)}
           aria-expanded={showFilters}
-          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[12px] font-medium transition-colors ${
+          className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
             activeFilters > 0
               ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
               : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
@@ -122,7 +122,7 @@ export default function AllCandidatesPage() {
             <button
               key={t.value || "all"}
               onClick={() => setStage(t.value as Stage | "" | "open")}
-              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
+              className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                 stage === t.value
                   ? "bg-white text-[var(--text-primary)] shadow-sm"
                   : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"

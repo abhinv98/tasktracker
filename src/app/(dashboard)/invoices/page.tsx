@@ -265,7 +265,7 @@ export default function InvoicesPage() {
           // Wait for the profile: the modal snapshots its counters on open, and
           // saving default counters of 1 would rewind invoice numbering.
           disabled={profile === undefined}
-          className="shrink-0 disabled:opacity-40 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 disabled:opacity-40 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <Settings className="h-3.5 w-3.5" /> Agency profile
         </button>
@@ -299,7 +299,7 @@ export default function InvoicesPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+            className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               tab === t.key
                 ? "bg-[var(--text-primary)] text-white"
                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -326,7 +326,7 @@ export default function InvoicesPage() {
           <button
             onClick={() => setQuoteModal({})}
             disabled={needsProfile}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
           >
             <Plus className="h-4 w-4" /> New Quotation
           </button>
@@ -336,7 +336,7 @@ export default function InvoicesPage() {
             <button
               onClick={() => setShowNewInvoiceMenu((v) => !v)}
               disabled={needsProfile}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
             >
               <Plus className="h-4 w-4" /> New Invoice
             </button>
@@ -736,7 +736,7 @@ function RowBtn({
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+      className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
         primary
           ? "bg-[var(--accent-admin-strong)] text-white"
           : "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -959,14 +959,14 @@ function QuotationModal({
         <div className="flex items-center justify-end gap-2 mt-5">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)]"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {editId ? "Save changes" : "Create draft"}
@@ -1153,14 +1153,14 @@ function NewInvoiceModal({
         <div className="flex items-center justify-end gap-2 mt-5">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)]"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={!valid || saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {source === "generated" ? "Create draft" : "Track invoice"}
@@ -1305,7 +1305,7 @@ function InvoiceDetailModal({
             <button
               onClick={() => act(() => finalize({ invoiceId: invoice._id }), "Invoice finalized. Now unpaid")}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
             >
               Finalize invoice
             </button>
@@ -1333,7 +1333,7 @@ function InvoiceDetailModal({
           <button
             onClick={() => setConfirmDelete(true)}
             disabled={busy}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-red-50 text-red-600 text-[12px] font-semibold hover:bg-red-100 disabled:opacity-40"
+            className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>
@@ -1413,7 +1413,7 @@ function InvoiceDetailModal({
                 }
               }}
               disabled={busy}
-              className="px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40 whitespace-nowrap"
+              className="h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40 whitespace-nowrap"
             >
               Record
             </button>
@@ -1644,14 +1644,14 @@ function AgencyProfileModal({
         <div className="flex items-center justify-end gap-2 mt-5">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)]"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)]"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Save profile

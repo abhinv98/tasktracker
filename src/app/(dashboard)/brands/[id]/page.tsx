@@ -1127,19 +1127,19 @@ export default function BrandDetailPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => copyJsrLink(link.token)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <Copy className="h-3 w-3" /> Copy
                         </button>
                         <button
                           onClick={() => setChatSidebarOpen(true)}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
+                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
                         >
                           <MessageCircle className="h-3 w-3" /> Show Chat
                         </button>
                         <button
                           onClick={() => { setDeactivatingJsrId(link._id); setDeleteJsrTasks(false); }}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
+                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors ml-auto"
                         >
                           Deactivate
                         </button>
@@ -1197,7 +1197,7 @@ export default function BrandDetailPage() {
                         {!task.needsClientInput && task.clientFacing && (
                           <button
                             onClick={() => { setClientInputTaskId(task._id); setClientInputMsg(""); }}
-                            className="text-[11px] font-medium text-orange-600 hover:bg-orange-50 px-2 py-1 rounded transition-colors"
+                            className="h-8 px-3 rounded-md text-[13px] font-medium text-orange-600 hover:bg-orange-50 transition-colors"
                           >
                             Request Client Input
                           </button>
@@ -1210,7 +1210,7 @@ export default function BrandDetailPage() {
                                 toast("success", "Client input flag cleared");
                               } catch { toast("error", "Failed to clear flag"); }
                             }}
-                            className="text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] px-2 py-1 rounded transition-colors"
+                            className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             Clear Input Request
                           </button>
@@ -1223,7 +1223,7 @@ export default function BrandDetailPage() {
                                 toast("success", "Sent to client for review");
                               } catch (err) { toast("error", err instanceof Error ? err.message : "Failed"); }
                             }}
-                            className="text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 px-2 py-1 rounded transition-colors"
+                            className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--accent-admin-strong)]/10 transition-colors"
                           >
                             Send to Client
                           </button>
@@ -1248,13 +1248,13 @@ export default function BrandDetailPage() {
                                 setClientInputMsg("");
                               } catch { toast("error", "Failed"); }
                             }}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-orange-500 text-white text-[11px] font-medium"
+                            className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium bg-orange-500 text-white"
                           >
                             Send
                           </button>
                           <button
                             onClick={() => { setClientInputTaskId(null); setClientInputMsg(""); }}
-                            className="shrink-0 px-2 py-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)] text-[11px]"
+                            className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
                           >
                             Cancel
                           </button>
@@ -1311,7 +1311,7 @@ export default function BrandDetailPage() {
                         const el = document.getElementById(`chat-date-${d}`);
                         el?.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/5 transition-colors"
+                      className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] hover:border-[var(--accent-admin)] hover:bg-[var(--accent-admin)]/5 transition-colors"
                     >
                       <span className="text-[11px] font-semibold text-[var(--text-primary)]">{dateLabel(d)}</span>
                       <span className="text-[11px] font-medium text-[var(--text-muted)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded-full">{dateCounts[d]}</span>

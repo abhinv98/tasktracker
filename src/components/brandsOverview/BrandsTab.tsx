@@ -85,7 +85,7 @@ export default function BrandsTab() {
         {(myBrandIds ?? []).length > 0 && (
           <button
             onClick={() => setFilterMine((p) => !p)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold transition-colors border ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors border ${
               filterMine
                 ? "bg-[var(--accent-admin-strong)] text-white border-[var(--accent-admin)]"
                 : "bg-white text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-hover)]"

@@ -633,7 +633,7 @@ export function CommentThread({
             <button
               type="button"
               onClick={() => setShowTargetPicker(!showTargetPicker)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:bg-[var(--border)] transition-colors"
             >
               Posting to: <span className="text-[var(--text-primary)]">{postTarget.label}</span>
               <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

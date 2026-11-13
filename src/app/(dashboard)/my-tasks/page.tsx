@@ -211,7 +211,7 @@ export default function MyTasksPage() {
         {filtersActive && (
           <button
             onClick={clearFilters}
-            className="ml-auto inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            className="ml-auto inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
           >
             <X className="h-3 w-3" />
             Clear
@@ -361,7 +361,7 @@ export default function MyTasksPage() {
                             e.stopPropagation();
                             router.push("/deliverables");
                           }}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
+                          className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)]"
                         >
                           <Eye className="h-3.5 w-3.5" />
                           Review

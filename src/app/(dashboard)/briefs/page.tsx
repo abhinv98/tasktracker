@@ -734,7 +734,7 @@ export default function BriefsPage() {
           <button
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
               activeFilterCount > 0
                 ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                 : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
@@ -841,7 +841,7 @@ export default function BriefsPage() {
         <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-hover)] ml-auto">
           <button
             onClick={() => setViewMode("folders")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
               viewMode === "folders" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -850,7 +850,7 @@ export default function BriefsPage() {
           </button>
           <button
             onClick={() => setViewMode("all")}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
               viewMode === "all" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
@@ -931,7 +931,7 @@ export default function BriefsPage() {
                         // Hidden until the row is hovered or focused: it's on
                         // every row, and 15 identical buttons compete with the
                         // brand names people are actually scanning for.
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--accent-admin-dim)] transition-all"
+                        className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--accent-admin-dim)] transition-all"
                       >
                         <Plus className="h-3 w-3" />
                         New Brief
@@ -1326,7 +1326,7 @@ export default function BriefsPage() {
                   <button
                     type="button"
                     onClick={() => setBriefMode("master")}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                    className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
                       briefMode === "master" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
                     }`}
                   >
@@ -1335,7 +1335,7 @@ export default function BriefsPage() {
                   <button
                     type="button"
                     onClick={() => setBriefMode("individual")}
-                    className={`flex-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                    className={`flex-1 h-8 px-3 rounded-md text-[13px] font-medium transition-all ${
                       briefMode === "individual" ? "bg-white text-[var(--text-primary)] shadow-sm" : "text-[var(--text-secondary)]"
                     }`}
                   >
@@ -1820,7 +1820,7 @@ function IndividualTaskFields({
         <button
           type="button"
           onClick={addTeamBlock}
-          className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all"
+          className="self-start inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all"
         >
           <Plus className="h-3 w-3" />
           Add another team

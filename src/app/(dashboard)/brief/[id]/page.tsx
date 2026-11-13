@@ -181,7 +181,7 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
               return (
                 <button
                   onClick={() => onUpdateStatus(task._id, next.status)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors"
+                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors"
                 >
                   Move to {next.label} &rarr;
                 </button>
@@ -319,14 +319,14 @@ function SingleTaskBriefView({ brief, tasks, tasksData, isAdmin, user, onOpenTas
                 <button
                   type="button"
                   onClick={() => setShowAddHelper(false)}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
+                  className="h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreatingSubTask}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:bg-[#a04525] transition-colors disabled:opacity-50"
                 >
                   {isCreatingSubTask ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
                   {isCreatingSubTask ? "Adding..." : "Add Helper"}
@@ -723,7 +723,7 @@ export default function BriefPage() {
           <button
             type="button"
             onClick={goBack}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all shrink-0"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)] hover:bg-[var(--accent-admin-strong)] hover:text-white transition-all shrink-0"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> {backLabel}
           </button>
@@ -1032,7 +1032,7 @@ export default function BriefPage() {
                 type="button"
                 onClick={handleAutoLayout}
                 title="Re-arrange nodes into columns following the task flow"
-                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Wand2 className="h-3 w-3" /> Auto-layout
               </button>
@@ -1048,7 +1048,7 @@ export default function BriefPage() {
                     setShowTeamPicker(false);
                     setShowAddTaskTeamPicker(false);
                   }}
-                  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+                  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                     viewTeamFilter
                       ? "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
                       : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -1212,7 +1212,7 @@ export default function BriefPage() {
                     <button
                       type="button"
                       onClick={() => setShowTeamPicker(true)}
-                      className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold"
+                      className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white"
                     >
                       <Plus className="h-4 w-4" /> Add a team
                     </button>
@@ -1417,7 +1417,7 @@ export default function BriefPage() {
                           const first = (teamsForBrief ?? []).filter(Boolean)[0];
                           if (first) openCreateTaskPanel(first._id);
                         }}
-                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[13px] font-semibold"
+                        className="mt-4 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white"
                       >
                         <Plus className="h-4 w-4" /> Add the first task
                       </button>

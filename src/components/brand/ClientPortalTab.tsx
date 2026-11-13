@@ -418,7 +418,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                             visibleMonths === undefined ? (calendarMonths ?? []) : null,
                         }).catch(() => {})
                       }
-                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                      className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                         visibleMonths === undefined
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-[var(--bg-hover)] text-[var(--text-secondary)]"
@@ -455,7 +455,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                       : [...visibleMonths, m],
                                   }).catch(() => {})
                                 }
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
+                                className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                                   on
                                     ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                                     : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)]"

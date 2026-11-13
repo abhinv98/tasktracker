@@ -640,7 +640,7 @@ export default function ContentCalendarPage() {
             <button
               type="button"
               onClick={() => setShowBreakDayPicker((v) => !v)}
-              className={`text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+              className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                 showBreakDayPicker
                   ? "border-red-300 bg-red-50 text-red-800"
                   : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -657,7 +657,7 @@ export default function ContentCalendarPage() {
                 setSelectedIds(new Set());
                 setBulkAction(null);
               }}
-              className={`inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+              className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                 selectMode
                   ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                   : "border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -677,7 +677,7 @@ export default function ContentCalendarPage() {
               setYear(n.getFullYear());
               setMonth(n.getMonth());
             }}
-            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             Today
           </button>
@@ -915,7 +915,7 @@ export default function ContentCalendarPage() {
                             e.stopPropagation();
                             setPopoverDate(popoverDate === dateStr ? null : dateStr);
                           }}
-                          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--accent-admin-text)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <div className="flex items-center gap-0.5">
                             {dayTasks.slice(2).map((t: any) => {
@@ -1005,14 +1005,14 @@ export default function ContentCalendarPage() {
           <button
             type="button"
             onClick={handleBulkToShelf}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg hover:bg-white/15 transition-colors"
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium hover:bg-white/15 transition-colors"
           >
             <Inbox className="h-3.5 w-3.5" /> To shelf
           </button>
           <button
             type="button"
             onClick={() => setBulkAction(bulkAction === "shift" ? null : "shift")}
-            className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               bulkAction === "shift" ? "bg-white/20" : "hover:bg-white/15"
             }`}
           >
@@ -1021,7 +1021,7 @@ export default function ContentCalendarPage() {
           <button
             type="button"
             onClick={() => setBulkAction(bulkAction === "month" ? null : "month")}
-            className={`inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               bulkAction === "month" ? "bg-white/20" : "hover:bg-white/15"
             }`}
           >

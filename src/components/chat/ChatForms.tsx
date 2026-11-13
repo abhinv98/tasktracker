@@ -36,7 +36,7 @@ export function CopyableLink({ url }: { url: string }) {
       />
       <button
         onClick={handleCopy}
-        className="shrink-0 px-3 py-2 border-l border-blue-200 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1.5 text-[11px] font-medium"
+        className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium border-l border-blue-200 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1.5"
       >
         {copied ? (
           <>
@@ -199,7 +199,7 @@ export function CreateUserForm() {
         <button
           type="submit"
           disabled={isSubmitting || !name.trim() || !email.trim()}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -374,7 +374,7 @@ export function DeleteBriefForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedBriefId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -511,7 +511,7 @@ export function DeleteUserForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedUserId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -643,7 +643,7 @@ export function DeleteTeamForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedTeamId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -792,7 +792,7 @@ export function AssignTeamLeadForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedTeamId || !selectedUserId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
           {isSubmitting ? "Assigning..." : "Assign Lead"}
@@ -945,7 +945,7 @@ export function AssignTeamForm() {
         <button
           type="submit"
           disabled={isSubmitting || !selectedUserId || !selectedTeamId}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

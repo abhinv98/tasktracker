@@ -122,7 +122,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         {onSearchClick && (
           <button
             onClick={onSearchClick}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-[12px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+            className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search...</span>
@@ -139,7 +139,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         <div className="relative" ref={panelRef}>
           <button
             onClick={() => setShowNotifs(!showNotifs)}
-            className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors duration-150 ${
+            className={`relative flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium transition-colors duration-150 ${
               showNotifs
                 ? "bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
                 : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -235,7 +235,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
 
         <button
           onClick={() => signOut()}
-          className="whitespace-nowrap rounded-lg px-2 sm:px-3 py-2 text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
+          className="whitespace-nowrap h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
         >
           Sign out
         </button>
@@ -260,7 +260,7 @@ function RunningTimerPill() {
     <button
       onClick={() => void stopTimer({ entryId: active._id })}
       title={`Stop timer on "${active.taskTitle ?? "task"}"`}
-      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:opacity-90"
+      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:opacity-90"
     >
       <Square className="h-3 w-3" />
       <span className="tabular-nums">{formatMinutes(mins)}</span>

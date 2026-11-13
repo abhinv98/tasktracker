@@ -413,7 +413,7 @@ export default function ClientRequestsPage() {
             <div className="flex items-center gap-1.5 mb-4">
               <button
                 onClick={() => setTab("pending")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                   tab === "pending"
                     ? "bg-[var(--text-primary)] text-white"
                     : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -430,7 +430,7 @@ export default function ClientRequestsPage() {
               </button>
               <button
                 onClick={() => setTab("held")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                   tab === "held"
                     ? "bg-[var(--text-primary)] text-white"
                     : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
@@ -583,7 +583,7 @@ export default function ClientRequestsPage() {
                             );
                           }
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
+                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
                       >
                         Reflect to portal
                       </button>
@@ -664,7 +664,7 @@ export default function ClientRequestsPage() {
                     <button
                       onClick={handleSaveCounterDate}
                       disabled={busy || counterDate === undefined}
-                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[var(--border)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
+                      className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-40 transition-colors"
                     >
                       {busyAction === "date" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                       Save
@@ -748,7 +748,7 @@ export default function ClientRequestsPage() {
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => setCampaignChoice("new")}
-                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
+                            className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                               campaignChoice === "new"
                                 ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
                                 : "border-[var(--border)] text-[var(--text-secondary)]"
@@ -758,7 +758,7 @@ export default function ClientRequestsPage() {
                           </button>
                           <button
                             onClick={() => setCampaignChoice("existing")}
-                            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
+                            className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
                               campaignChoice === "existing"
                                 ? "border-[var(--accent-admin)] text-[var(--accent-admin-text)] bg-[var(--accent-admin-dim)]"
                                 : "border-[var(--border)] text-[var(--text-secondary)]"
@@ -894,7 +894,7 @@ export default function ClientRequestsPage() {
                     <button
                       onClick={handleAssign}
                       disabled={busy || !assigneeId}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-[var(--accent-admin-strong)] text-white text-[12px] font-semibold disabled:opacity-40 transition-colors"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white disabled:opacity-40 transition-colors"
                     >
                       {busyAction === "assign" ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -919,7 +919,7 @@ export default function ClientRequestsPage() {
                         setDestKind(null);
                       }}
                       disabled={busy}
-                      className="flex items-center justify-center px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                      className="flex items-center justify-center h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
                     >
                       Back
                     </button>
@@ -956,7 +956,7 @@ export default function ClientRequestsPage() {
                       <button
                         onClick={handleHold}
                         disabled={busy}
-                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
                       >
                         {busyAction === "hold" ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -969,7 +969,7 @@ export default function ClientRequestsPage() {
                       <button
                         onClick={handleResume}
                         disabled={busy}
-                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md border border-[var(--border)] text-[13px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-50 transition-colors"
                       >
                         {busyAction === "resume" ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -982,7 +982,7 @@ export default function ClientRequestsPage() {
                     <button
                       onClick={handleDecline}
                       disabled={busy}
-                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
                     >
                       {busyAction === "decline" ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -997,7 +997,7 @@ export default function ClientRequestsPage() {
                 <button
                   onClick={() => setConfirmDelete(true)}
                   disabled={busy}
-                  className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-red-50 text-red-600 text-[13px] font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
+                  className="flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
                 >
                   {busyAction === "delete" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

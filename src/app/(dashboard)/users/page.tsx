@@ -835,7 +835,7 @@ export default function UsersPage() {
           <button
             key={key}
             onClick={() => router.replace(key === "users" ? "/users" : `/users?tab=${key}`)}
-            className={`px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            className={`h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
               tab === key
                 ? "bg-white shadow-sm text-[var(--text-primary)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"

@@ -257,7 +257,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Upload className="h-3.5 w-3.5" />
                 {transcriptFile ? "Change file" : "Upload transcript"}
@@ -435,13 +435,13 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                         <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
                           <button
                             onClick={() => startEdit(mom)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <Edit3 className="h-3 w-3" /> Edit
                           </button>
                           <button
                             onClick={() => setDeletingId(mom._id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/5 transition-colors"
+                            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/5 transition-colors"
                           >
                             <Trash2 className="h-3 w-3" /> Delete
                           </button>

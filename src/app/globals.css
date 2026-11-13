@@ -143,6 +143,28 @@ input, textarea {
   caret-color: var(--accent-admin-strong, #b3542e);
 }
 
+/* One size for every boxed text field and dropdown, wherever it was written:
+   the Input component's 32px-row height (h-8) and 13px text. Unlayered on
+   purpose, so it wins over the utility classes on the ~300 hand-written fields
+   without touching them. Left alone: tick boxes, file pickers and the like, and
+   inline editors with a transparent background (page titles, the command
+   palette), which are text on the page rather than boxes, and the client
+   portal (.portal-root), which has its own look. */
+:where(input, select):not(
+    [type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"],
+    [type="hidden"], [type="submit"], [type="button"], [type="image"],
+    [class*="bg-transparent"], .sr-only, .hidden, .portal-root *
+  ) {
+  height: 1.8rem;
+  padding-block: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 0.3125rem;
+}
+textarea:not([class*="bg-transparent"], .portal-root *) {
+  font-size: 13px;
+}
+
 /* Nothing in this app is motion-critical: every animation is a fade, a slide
    or a pulse, so honouring the OS preference costs no meaning. */
 @media (prefers-reduced-motion: reduce) {

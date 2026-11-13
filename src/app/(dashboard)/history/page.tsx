@@ -143,7 +143,7 @@ export default function HistoryPage() {
           <div className="relative">
           <button
             onClick={() => setShowExportMenu(!showExportMenu)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-admin-strong)] text-white rounded-lg text-[12px] font-semibold hover:opacity-90 transition-opacity print:hidden"
+            className="flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-strong)] text-white hover:opacity-90 transition-opacity print:hidden"
           >
             <Download className="w-3.5 h-3.5" />
             Export

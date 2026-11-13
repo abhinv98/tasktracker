@@ -255,7 +255,7 @@ export default function MyRequestsPage() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+                className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
                   tab === key
                     ? "bg-white shadow-sm text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"

@@ -11,7 +11,7 @@ type ButtonVariant = "primary" | "secondary" | "destructive" | "ghost";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
-  /** sm = 28px, for toolbars and dense rows; md = 32px default. */
+  /** Kept so existing call sites compile; every button is the one 32px size now. */
   size?: "sm" | "md";
   /** Force the spinner on. Omit and an async onClick drives it automatically. */
   loading?: boolean;
@@ -41,6 +41,7 @@ const RESUBMIT_WINDOW_MS = 2500;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", className = "", children, disabled, loading, onClick, ...props }, ref) => {
+    void size; // accepted for old call sites; it no longer changes anything
     const lastSubmit = useRef(0);
     // An async onClick drives the spinner on its own, so every action button
     // gets one without touching its call site. `loading` overrides for forms,
@@ -80,7 +81,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         className={`
           relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap
-          ${size === "sm" ? "h-7 px-2.5 text-[12px]" : "h-8 px-3 text-[13px]"}
+          h-8 px-3 text-[13px]
           font-medium tracking-[-0.003em]
           rounded-md shadow-[0_1px_0_rgba(0,0,0,0.03)]
           transition-all duration-150

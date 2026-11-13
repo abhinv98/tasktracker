@@ -267,7 +267,7 @@ export function MasterBriefBoard({
           Click another task to connect, or
           <button
             onClick={cancelConnect}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 hover:bg-white/30 transition-colors text-[11px] font-semibold"
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-white/20 hover:bg-white/30 transition-colors"
           >
             <X className="h-3 w-3" /> Cancel
           </button>
