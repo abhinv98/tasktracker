@@ -1,10 +1,10 @@
 "use client";
 
-import { useQuery } from "convex/react";
-import { useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { Button, Card, EmptyState, PageHeader, Select, useToast } from "@/components/ui";
 import { ArrowLeft, AudioLines } from "lucide-react";
 
 const when = (ms: number) =>
@@ -56,6 +56,9 @@ export default function MeetingsPage() {
                 <p className="text-[13px] text-[var(--text-secondary)] mt-1">{m.summary[0]}</p>
               )}
               <p className="text-[12px] text-[var(--text-muted)] mt-2">
+                {m.brandName && (
+                  <span className="text-[var(--text-secondary)] font-medium">{m.brandName} · </span>
+                )}
                 {m.actionItems.length} action item{m.actionItems.length === 1 ? "" : "s"}
                 {m.attendees.length > 0 && ` · ${m.attendees.map((a) => a.name).join(", ")}`}
               </p>
@@ -84,7 +87,31 @@ function MeetingDetail({
   onBack: () => void;
 }) {
   const m = useQuery(api.echo.get, { meetingId });
+  const brands = useQuery(api.echo.brandOptions, {});
+  const setBrand = useMutation(api.echo.setBrand);
+  const recordingUrl = useAction(api.echo.recordingUrl);
+  const { toast } = useToast();
+  const audio = useRef<HTMLAudioElement>(null);
+  const [recording, setRecording] = useState<string | null>(null);
   const people = m ? [...m.attendees.map((a) => a.name), ...m.seenNames] : [];
+
+  /** Loads the recording (the link is made on demand and expires) and plays it from `seconds`. */
+  const play = async (seconds = 0) => {
+    const el = audio.current;
+    if (!el) return;
+    if (!recording) {
+      const src = await recordingUrl({ meetingId }).catch(() => null);
+      if (!src) return toast("error", "The recording is not available");
+      el.src = src;
+      setRecording(src);
+    }
+    const start = () => {
+      el.currentTime = seconds;
+      void el.play();
+    };
+    if (el.readyState >= 1) start();
+    else el.addEventListener("loadedmetadata", start, { once: true });
+  };
 
   return (
     <div className="p-4 sm:p-8 max-w-3xl">
@@ -107,6 +134,51 @@ function MeetingDetail({
               people.length ? ` · ${[...new Set(people)].join(", ")}` : ""
             }`}
           />
+          <Card>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="sm:w-72">
+                <Select
+                  label="Brand folder"
+                  value={m.brandId ?? ""}
+                  onChange={(e) =>
+                    setBrand({
+                      meetingId,
+                      brandId: (e.target.value || null) as Id<"brands"> | null,
+                    }).catch((err) =>
+                      toast("error", err instanceof Error ? err.message : "Could not file it")
+                    )
+                  }
+                  options={[
+                    { value: "", label: "Not filed under a brand" },
+                    ...(brands ?? []).map((b) => ({ value: b._id, label: b.name })),
+                  ]}
+                />
+              </div>
+              {m.hasRecording && !recording && (
+                <Button variant="secondary" onClick={() => play()}>
+                  Listen to the recording
+                </Button>
+              )}
+            </div>
+            <p className="text-[12px] text-[var(--text-muted)] mt-2">
+              {m.brandId
+                ? `${
+                    m.brandSource === "auto" ? "Filed by Echo from who was in the meeting. " : ""
+                  }The notes are also in this brand's Meeting Minutes, and Echo files the next meeting with these people here by itself.`
+                : "Pick the brand once. Echo remembers the people in this meeting and files their next one by itself."}
+            </p>
+            <audio
+              ref={audio}
+              controls
+              className={recording ? "mt-3 w-full" : "hidden"}
+              // The link expires after a few hours: drop it, so Listen comes back and fetches a new one.
+              onError={() => {
+                if (!recording) return;
+                setRecording(null);
+                toast("error", "The recording stopped loading. Press Listen again.");
+              }}
+            />
+          </Card>
           <Section title="Summary">
             <ul className="list-disc pl-5 text-[13px] text-[var(--text-primary)] flex flex-col gap-1">
               {m.summary.map((s, i) => (
@@ -162,9 +234,24 @@ function MeetingDetail({
               <summary className="text-[13px] text-[var(--text-secondary)] cursor-pointer">
                 Show the full transcript
               </summary>
-              <pre className="mt-3 whitespace-pre-wrap text-[12px] leading-5 text-[var(--text-primary)] font-sans">
-                {m.transcript}
-              </pre>
+              <div className="mt-3 flex flex-col text-[12px] leading-5 text-[var(--text-primary)]">
+                {m.transcript.split("\n").map((line, i) => {
+                  const at = line.match(/^\[(\d+):(\d\d)\]/);
+                  // With a recording, a line plays the meeting from that moment.
+                  return at && m.hasRecording ? (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => play(Number(at[1]) * 60 + Number(at[2]))}
+                      className="text-left rounded px-1 -mx-1 hover:bg-[var(--bg-hover)]"
+                    >
+                      {line}
+                    </button>
+                  ) : (
+                    <p key={i}>{line}</p>
+                  );
+                })}
+              </div>
             </details>
           </Section>
         </>

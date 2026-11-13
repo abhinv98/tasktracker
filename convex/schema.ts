@@ -1272,9 +1272,57 @@ export default defineSchema({
     openQuestions: v.array(v.string()),
     nextMeeting: v.optional(v.string()),
     transcript: v.string(),
+    /** Echo has an MP3 of the call (played through a signed link, see echo.recordingUrl). */
+    hasRecording: v.optional(v.boolean()),
+    /** The brand this meeting is filed under: worked out from who was in it, or picked by its owner. */
+    brandId: v.optional(v.id("brands")),
+    brandSource: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
+    /** The copy of the notes in that brand's Meeting Minutes. */
+    momId: v.optional(v.id("meetingMinutes")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner_time", ["ownerId", "startedAt"])
     .index("by_session", ["sessionId"]),
+
+  // People from outside the company seen in meetings, and the brand they belong
+  // to. Once someone is known here, a meeting they are in files itself.
+  echoPeople: defineTable({
+    name: v.string(),
+    /** Lower-cased name: Meet shows names, not emails, so this is the usual match. */
+    nameKey: v.string(),
+    email: v.optional(v.string()),
+    domain: v.optional(v.string()),
+    brandId: v.optional(v.id("brands")),
+    updatedAt: v.number(),
+  })
+    .index("by_name", ["nameKey"])
+    .index("by_email", ["email"])
+    .index("by_domain", ["domain"]),
+
+  // An action item from a meeting, offered to the staff member it was given to.
+  // Accepting turns it into a real task; nothing becomes a task on its own.
+  echoActionItems: defineTable({
+    meetingId: v.id("echoMeetings"),
+    assigneeId: v.id("users"),
+    task: v.string(),
+    dueDate: v.optional(v.string()),
+    status: v.union(
+      v.literal("suggested"),
+      v.literal("accepted"),
+      v.literal("dismissed")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_assignee_status", ["assigneeId", "status"])
+    .index("by_meeting", ["meetingId"]),
+
+  // A person's connected Google Calendar (read-only), used to fill in who was
+  // invited to a meeting. The refresh token is stored encrypted.
+  echoCalendars: defineTable({
+    userId: v.id("users"),
+    googleEmail: v.string(),
+    refreshTokenEnc: v.string(),
+    connectedAt: v.number(),
+  }).index("by_user", ["userId"]),
 });

@@ -39,7 +39,9 @@ import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverable
 import type * as lib_cascadeDeleteTask from "../lib/cascadeDeleteTask.js";
 import type * as lib_cascadeTaskStatus from "../lib/cascadeTaskStatus.js";
 import type * as lib_clientReview from "../lib/clientReview.js";
+import type * as lib_echoFiling from "../lib/echoFiling.js";
 import type * as lib_echoKey from "../lib/echoKey.js";
+import type * as lib_google from "../lib/google.js";
 import type * as lib_guards from "../lib/guards.js";
 import type * as lib_internalAuth from "../lib/internalAuth.js";
 import type * as lib_openBriefs from "../lib/openBriefs.js";
@@ -137,7 +139,9 @@ declare const fullApi: ApiFromModules<{
   "lib/cascadeDeleteTask": typeof lib_cascadeDeleteTask;
   "lib/cascadeTaskStatus": typeof lib_cascadeTaskStatus;
   "lib/clientReview": typeof lib_clientReview;
+  "lib/echoFiling": typeof lib_echoFiling;
   "lib/echoKey": typeof lib_echoKey;
+  "lib/google": typeof lib_google;
   "lib/guards": typeof lib_guards;
   "lib/internalAuth": typeof lib_internalAuth;
   "lib/openBriefs": typeof lib_openBriefs;

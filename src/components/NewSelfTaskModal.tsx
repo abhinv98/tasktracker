@@ -11,19 +11,32 @@ import { Button, DatePicker, Input, Modal, Select, Textarea, useToast } from "@/
  * the brand manager who will review and close it. They can take it as far as
  * Review by submitting a deliverable; closing is the manager's.
  */
-export function NewSelfTaskModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NewSelfTaskModal({
+  open,
+  onClose,
+  initial,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Starting values, e.g. an action item from a meeting. Give the modal a `key` so each one starts fresh. */
+  initial?: { title?: string; brandId?: string; deadline?: number };
+  onCreated?: () => void;
+}) {
   const brands = useQuery(api.briefs.listBrandsForSelfTask, open ? {} : "skip");
   const createSelfTask = useMutation(api.briefs.createSelfTask);
   const { toast } = useToast();
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState("");
-  const [brandId, setBrandId] = useState("");
+  const [chosenBrandId, setBrandId] = useState(initial?.brandId ?? "");
   const [managerId, setManagerId] = useState("");
-  const [deadline, setDeadline] = useState<number | undefined>(undefined);
+  const [deadline, setDeadline] = useState<number | undefined>(initial?.deadline);
   const [submitting, setSubmitting] = useState(false);
 
-  const brand = brands?.find((b) => b._id === brandId);
+  const brand = brands?.find((b) => b._id === chosenBrandId);
+  // A suggested brand that cannot take self-made tasks (on hold, or no manager) is not a choice.
+  const brandId = brand ? chosenBrandId : "";
   // A brand with one manager needs no second choice.
   const chosenManager = brand?.managers.length === 1 ? brand.managers[0]._id : managerId;
 
@@ -49,6 +62,7 @@ export function NewSelfTaskModal({ open, onClose }: { open: boolean; onClose: ()
       });
       toast("success", "Task created. Submit a deliverable when it's ready for review.");
       reset();
+      onCreated?.();
       onClose();
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Couldn't create the task");

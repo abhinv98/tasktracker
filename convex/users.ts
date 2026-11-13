@@ -14,6 +14,13 @@ export async function removeUserAndCleanup(
   const targetUser = await ctx.db.get(targetUserId);
   if (!targetUser) return;
 
+  // Their connected Google Calendar (a stored token) must not outlive the account.
+  const calendars = await ctx.db
+    .query("echoCalendars")
+    .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+    .collect();
+  for (const c of calendars) await ctx.db.delete(c._id);
+
   const userTeams = await ctx.db
     .query("userTeams")
     .withIndex("by_user", (q) => q.eq("userId", targetUserId))

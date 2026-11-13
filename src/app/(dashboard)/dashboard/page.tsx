@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { NewSelfTaskModal } from "@/components/NewSelfTaskModal";
+import { EchoActionItems } from "@/components/EchoActionItems";
 import { isTaskOverdue } from "@/lib/status";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -759,6 +760,8 @@ function AdminDashboard() {
         )}
       </div>
 
+      <EchoActionItems />
+
       {/* Numbers that go somewhere */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <StatTile
@@ -1492,6 +1495,7 @@ function EmployeeDashboard() {
         </Button>
       </div>
       <NewSelfTaskModal open={showNewTask} onClose={() => setShowNewTask(false)} />
+      <EchoActionItems />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <StatTile label="Open tasks" value={myOpen.length} href="/my-tasks" icon={ListChecks}

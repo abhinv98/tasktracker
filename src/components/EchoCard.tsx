@@ -1,9 +1,13 @@
 "use client";
 
-import { useAction } from "convex/react";
-import { useEffect, useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Button, Card, useToast } from "@/components/ui";
+
+// Echo's Chrome Web Store page. Empty until the listing is published; until then
+// the card hands out the zip to load by hand.
+const STORE_URL = "";
 
 /** What the Echo extension's content script (link.js) reports on this page. */
 type EchoHello = { version: string; linkedEmail: string | null };
@@ -18,6 +22,28 @@ export function EchoCard({ email }: { email?: string }) {
   const { toast } = useToast();
   const [echo, setEcho] = useState<EchoHello | null>(null);
   const [showSteps, setShowSteps] = useState(false);
+  const calendar = useQuery(api.echo.calendarStatus, {});
+  const googleAuthUrl = useAction(api.echo.googleAuthUrl);
+  const disconnectCalendar = useMutation(api.echo.disconnectCalendar);
+
+  const finishGoogleConnect = useAction(api.echo.finishGoogleConnect);
+
+  // Back from Google: finish the connection as the signed-in person, then tidy the address.
+  // The code works once, so this must not run twice (React re-runs effects in development).
+  const finishing = useRef(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("gcal_code");
+    const state = params.get("gcal_state");
+    if (finishing.current || (!params.get("calendar") && !(code && state))) return;
+    finishing.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (!(code && state)) return toast("error", "Google Calendar was not connected. Try again.");
+    finishGoogleConnect({ code, state }).then(
+      (account) => toast("success", `Google Calendar connected as ${account}`),
+      (e) => toast("error", e instanceof Error ? e.message : "Google Calendar was not connected")
+    );
+  }, [toast, finishGoogleConnect]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -66,8 +92,8 @@ export function EchoCard({ email }: { email?: string }) {
           </Button>
         ) : (
           <a
-            href="/echo/echo-extension.zip"
-            download
+            href={STORE_URL || "/echo/echo-extension.zip"}
+            {...(STORE_URL ? { target: "_blank", rel: "noreferrer" } : { download: true })}
             onClick={() => setShowSteps(true)}
             className="inline-flex shrink-0 items-center rounded-md h-8 px-3 text-[13px] font-medium bg-[var(--text-primary)] text-white"
           >
@@ -82,7 +108,13 @@ export function EchoCard({ email }: { email?: string }) {
         </p>
       )}
 
-      {!echo && (
+      {!echo && STORE_URL && showSteps && (
+        <p className="text-[13px] text-[var(--text-secondary)] mt-3">
+          Press Add to Chrome on the page that opened, then come back here and reload.
+        </p>
+      )}
+
+      {!echo && !STORE_URL && (
         <div className="mt-3">
           {!showSteps ? (
             <button
@@ -102,6 +134,37 @@ export function EchoCard({ email }: { email?: string }) {
               <li>Press Load unpacked and pick the unzipped folder.</li>
               <li>Reload this page and press Link this browser.</li>
             </ol>
+          )}
+        </div>
+      )}
+
+      {calendar?.available && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-medium text-[13px] text-[var(--text-primary)]">Google Calendar</h3>
+            <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
+              {calendar.email
+                ? `Connected as ${calendar.email}. Echo only reads your invites, to fill in who was in each meeting.`
+                : "Connect it so Echo knows who was invited to each meeting, with their emails. Read-only."}
+            </p>
+          </div>
+          {calendar.email ? (
+            <Button variant="secondary" onClick={() => disconnectCalendar({})}>
+              Disconnect
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  window.location.href = await googleAuthUrl({});
+                } catch (e) {
+                  toast("error", e instanceof Error ? e.message : "Could not start the connection");
+                }
+              }}
+            >
+              Connect Google Calendar
+            </Button>
           )}
         </div>
       )}
