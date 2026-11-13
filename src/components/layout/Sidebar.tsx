@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
+  AudioLines,
   LayoutGrid,
   Briefcase,
   Users,
@@ -87,6 +88,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/recruitment/activity": MessageSquare,
   "/my-requests": Send,
   "/petty-cash": Wallet,
+  "/meetings": AudioLines,
 };
 
 interface NavCategory {
@@ -114,6 +116,7 @@ const ADMIN_NAV: NavCategory[] = [
     items: [
       { href: "/discussions", label: "Discussions" },
       { href: "/messages", label: "Messages" },
+      { href: "/meetings", label: "Meetings" },
     ],
   },
   {
@@ -179,7 +182,10 @@ const HR_NAV: NavCategory[] = [
   },
   {
     category: "Personal",
-    items: [{ href: "/notebook", label: "My Notebook" }],
+    items: [
+      { href: "/notebook", label: "My Notebook" },
+      { href: "/meetings", label: "Meetings" },
+    ],
   },
   {
     category: "Account",
@@ -200,6 +206,7 @@ const EMPLOYEE_NAV: NavCategory[] = [
     items: [
       { href: "/discussions", label: "Discussions" },
       { href: "/messages", label: "Messages" },
+      { href: "/meetings", label: "Meetings" },
     ],
   },
   {

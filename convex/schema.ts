@@ -1234,4 +1234,47 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"]),
+
+  // ─── ECHO MEETINGS ────────────────────
+  // Notes pushed in by Echo, the meeting note-taker (convex/echo.ts): one row
+  // per recorded meeting, owned by whoever recorded it.
+  echoMeetings: defineTable({
+    ownerId: v.id("users"),
+    /** Echo's id for the recording; a re-run of the notes updates the same row. */
+    sessionId: v.string(),
+    title: v.string(),
+    startedAt: v.number(),
+    durationMs: v.number(),
+    meetingUrl: v.optional(v.string()),
+    attendees: v.array(
+      v.object({ name: v.string(), email: v.optional(v.string()) })
+    ),
+    /** Names read off the meeting window, for people who were not on the invite. */
+    seenNames: v.array(v.string()),
+    summary: v.array(v.string()),
+    actionItems: v.array(
+      v.object({
+        task: v.string(),
+        ownerName: v.optional(v.string()),
+        ownerEmail: v.optional(v.string()),
+        dueDate: v.optional(v.string()),
+        dueText: v.optional(v.string()),
+        timestamp: v.optional(v.string()),
+      })
+    ),
+    decisions: v.array(
+      v.object({
+        text: v.string(),
+        by: v.optional(v.string()),
+        timestamp: v.optional(v.string()),
+      })
+    ),
+    openQuestions: v.array(v.string()),
+    nextMeeting: v.optional(v.string()),
+    transcript: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_time", ["ownerId", "startedAt"])
+    .index("by_session", ["sessionId"]),
 });

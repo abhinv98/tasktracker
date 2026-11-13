@@ -13,6 +13,7 @@ import {
   Textarea,
   useToast,
 } from "@/components/ui";
+import { EchoCard } from "@/components/EchoCard";
 import {
   Camera,
   Loader2,
@@ -421,6 +422,8 @@ export default function ProfilePage() {
               </form>
             )}
           </Card>
+
+          <EchoCard email={user.email} />
         </div>
       )}
 

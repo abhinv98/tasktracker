@@ -29,6 +29,7 @@ import type * as crons from "../crons.js";
 import type * as debug from "../debug.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dm from "../dm.js";
+import type * as echo from "../echo.js";
 import type * as freelancers from "../freelancers.js";
 import type * as hr from "../hr.js";
 import type * as http from "../http.js";
@@ -38,6 +39,7 @@ import type * as lib_autoApproveDeliverables from "../lib/autoApproveDeliverable
 import type * as lib_cascadeDeleteTask from "../lib/cascadeDeleteTask.js";
 import type * as lib_cascadeTaskStatus from "../lib/cascadeTaskStatus.js";
 import type * as lib_clientReview from "../lib/clientReview.js";
+import type * as lib_echoKey from "../lib/echoKey.js";
 import type * as lib_guards from "../lib/guards.js";
 import type * as lib_internalAuth from "../lib/internalAuth.js";
 import type * as lib_openBriefs from "../lib/openBriefs.js";
@@ -125,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   debug: typeof debug;
   deliverables: typeof deliverables;
   dm: typeof dm;
+  echo: typeof echo;
   freelancers: typeof freelancers;
   hr: typeof hr;
   http: typeof http;
@@ -134,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cascadeDeleteTask": typeof lib_cascadeDeleteTask;
   "lib/cascadeTaskStatus": typeof lib_cascadeTaskStatus;
   "lib/clientReview": typeof lib_clientReview;
+  "lib/echoKey": typeof lib_echoKey;
   "lib/guards": typeof lib_guards;
   "lib/internalAuth": typeof lib_internalAuth;
   "lib/openBriefs": typeof lib_openBriefs;

@@ -26,6 +26,7 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/teams": "Users & Teams",
   "/archive": "Archive",
   "/profile": "Profile",
+  "/meetings": "Meetings",
   "/deliverables": "Deliverables",
   "/brands-overview": "Brands Overview",
   "/brands": "Brands",
