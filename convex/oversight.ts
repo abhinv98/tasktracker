@@ -168,7 +168,13 @@ export const getOversightBoard = query({
     }
 
     const now = Date.now();
-    let rows = allTasks.map((t) => {
+    // A held brand's work is paused (its briefs are archived), so its tasks
+    // leave every count and column until the brand resumes.
+    const liveTasks = allTasks.filter((t) => {
+      const brandId = briefMap.get(t.briefId)?.brandId;
+      return !(brandId && brandMap.get(brandId)?.onHold);
+    });
+    let rows = liveTasks.map((t) => {
       const brief = briefMap.get(t.briefId);
       const brand = brief?.brandId ? brandMap.get(brief.brandId) : null;
       const assignee = userMap.get(t.assigneeId);
@@ -288,6 +294,7 @@ export const getOversightBoard = query({
     if (scope.kind === "admin") {
       filterOptions = {
         brands: allBrands
+          .filter((b) => !b.onHold)
           .map((b) => ({ _id: b._id, name: b.name }))
           .sort((a, b) => a.name.localeCompare(b.name)),
         managers: allUsers
