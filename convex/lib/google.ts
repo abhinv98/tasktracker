@@ -16,3 +16,31 @@ export async function googleToken(params: Record<string, string>) {
     error?: string;
   };
 }
+
+/**
+ * Events on a person's primary calendar between two moments, using their
+ * stored (already unsealed) refresh token. Three outcomes, because callers
+ * must tell them apart: the events; `reconnect` when Google no longer accepts
+ * the token (access withdrawn there); `failed` for anything passing.
+ */
+export async function calendarEvents<E>(
+  refreshToken: string,
+  range: { timeMin: number; timeMax: number },
+  extra: Record<string, string> = {}
+): Promise<{ status: "ok"; items: E[] } | { status: "reconnect" } | { status: "failed" }> {
+  const token = await googleToken({ refresh_token: refreshToken, grant_type: "refresh_token" }).catch(() => null);
+  if (!token) return { status: "failed" };
+  if (!token.access_token) return { status: token.error === "invalid_grant" ? "reconnect" : "failed" };
+  const params = new URLSearchParams({
+    timeMin: new Date(range.timeMin).toISOString(),
+    timeMax: new Date(range.timeMax).toISOString(),
+    singleEvents: "true",
+    ...extra,
+  });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${token.access_token}` },
+  }).catch(() => null);
+  if (!res?.ok) return { status: "failed" };
+  const { items = [] } = (await res.json()) as { items?: E[] };
+  return { status: "ok", items };
+}

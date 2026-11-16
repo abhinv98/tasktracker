@@ -1282,6 +1282,8 @@ export default defineSchema({
     brandSource: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
     /** The copy of the notes in that brand's Meeting Minutes. */
     momId: v.optional(v.id("meetingMinutes")),
+    /** Set when this recording carries on from another (its recorder left before the call ended). */
+    continuesSessionId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -1302,6 +1304,15 @@ export default defineSchema({
     .index("by_name", ["nameKey"])
     .index("by_email", ["email"])
     .index("by_domain", ["domain"]),
+
+  // Teammates who were in a meeting someone else's Echo recorded: one recording
+  // per call, and everyone whose Echo was in it sees the same notes.
+  echoMeetingViewers: defineTable({
+    meetingId: v.id("echoMeetings"),
+    userId: v.id("users"),
+  })
+    .index("by_user", ["userId"])
+    .index("by_meeting_user", ["meetingId", "userId"]),
 
   // An action item from a meeting, offered to the staff member it was given to.
   // Accepting turns it into a real task; nothing becomes a task on its own.

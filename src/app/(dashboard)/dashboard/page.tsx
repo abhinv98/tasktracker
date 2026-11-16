@@ -14,6 +14,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Badge, Button, Card, EmptyState, Panel, PanelEmpty, SectionHeader, SegmentedTabs, StatStrip, StatTile, StatusBadge, TaskDetailModal, DatePicker, Skeleton, useCelebrate, useToast } from "@/components/ui";
 import { TodayList } from "@/components/dashboard/TodayList";
+import { TodayMeetings } from "@/components/dashboard/TodayMeetings";
+import { EchoNudge } from "@/components/dashboard/EchoNudge";
 import { X, ArrowRight, ChevronDown, ChevronRight, ClipboardCheck, AlertTriangle, Phone, Clock, Play, CalendarClock, UserX, CalendarOff, Trash2, Calendar, LayoutGrid, List as ListIcon, Inbox, Plus, type LucideIcon } from "lucide-react";
 
 function getGreeting() {
@@ -712,6 +714,7 @@ function AdminDashboard() {
         )}
       </div>
 
+      <EchoNudge email={user?.email} />
       <EchoActionItems />
 
       {/* Numbers that go somewhere: one strip, each cell opens its list */}
@@ -1186,6 +1189,7 @@ function AdminDashboard() {
       </div>
 
       <aside className="min-w-0 flex flex-col gap-4">
+      <TodayMeetings />
       {/* My Tasks lives on its own page (/my-tasks); this is the way in */}
       {showMyTasks && (
         <Panel title="My tasks" action={{ label: "Open", href: "/my-tasks" }}>
@@ -1372,7 +1376,7 @@ function AdminDashboard() {
 // EMPLOYEE DASHBOARD
 // ═══════════════════════════════════════════
 function EmployeeDashboard() {
-  const { tasks, displayName, greeting } = useDashboardBase();
+  const { user, tasks, displayName, greeting } = useDashboardBase();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const overdueStatus = useQuery(api.tasks.getOverdueHaltStatus);
   const contactManager = useMutation(api.tasks.contactManagerForOverdue);
@@ -1413,6 +1417,7 @@ function EmployeeDashboard() {
         </Button>
       </div>
       <NewSelfTaskModal open={showNewTask} onClose={() => setShowNewTask(false)} />
+      <EchoNudge email={user?.email} />
       <EchoActionItems />
 
       <StatStrip className="mb-4">
@@ -1467,6 +1472,9 @@ function EmployeeDashboard() {
         </Panel>
       )}
 
+      <div className="mb-4 empty:hidden">
+        <TodayMeetings />
+      </div>
       <TodayList tasks={tasks as any} onOpen={setSelectedTaskId} />
 
       <SectionHeader title="All my tasks" className="mt-8 mb-3" />

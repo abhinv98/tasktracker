@@ -1,10 +1,11 @@
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { fileMeeting } from "./lib/echoFiling";
-import { hmac, sameText, seal, signEchoKey } from "./lib/echoKey";
-import { googleToken } from "./lib/google";
+import { joinLinkOf, type CalendarEvent } from "../src/lib/echo";
+import { hmac, sameText, seal, signEchoKey, unseal } from "./lib/echoKey";
+import { calendarEvents, googleToken } from "./lib/google";
 import { requireInternalUser } from "./lib/guards";
 
 // Echo is the meeting note-taker (a Chrome extension plus its own server). The
@@ -68,11 +69,23 @@ export const ingest = internalMutation({
     nextMeeting: v.optional(v.string()),
     transcript: v.string(),
     hasRecording: v.optional(v.boolean()),
+    /** Teammates whose Echo was in the call without recording it (one recording per meeting). */
+    sharedWith: v.optional(v.array(v.string())),
+    continuesSessionId: v.optional(v.string()),
   },
-  handler: async (ctx, { ownerId: rawOwner, ...meeting }) => {
-    const ownerId = ctx.db.normalizeId("users", rawOwner);
-    const owner = ownerId ? await ctx.db.get(ownerId) : null;
-    if (!ownerId || !owner || owner.role === "client") throw new Error("Unknown owner");
+  handler: async (ctx, { ownerId: rawOwner, sharedWith, ...meeting }) => {
+    // Staff accounts only. Echo's keys are good for 180 days, so the recorder's
+    // account may have been removed or made a client since. The meeting then goes
+    // to the first teammate who was attached to it instead of being refused,
+    // because their Echo stayed quiet on the strength of that recording.
+    const staff = async (raw: string) => {
+      const id = ctx.db.normalizeId("users", raw);
+      const user = id ? await ctx.db.get(id) : null;
+      return id && user && user.role !== "client" ? id : null;
+    };
+    let ownerId = await staff(rawOwner);
+    for (const raw of sharedWith ?? []) ownerId ??= await staff(raw);
+    if (!ownerId) throw new Error("Unknown owner");
     const now = Date.now();
     const existing = await ctx.db
       .query("echoMeetings")
@@ -87,6 +100,7 @@ export const ingest = internalMutation({
         // Named so a re-run that no longer has them clears the old values.
         meetingUrl: meeting.meetingUrl,
         nextMeeting: meeting.nextMeeting,
+        continuesSessionId: meeting.continuesSessionId,
         updatedAt: now,
       });
       meetingId = existing._id;
@@ -98,41 +112,118 @@ export const ingest = internalMutation({
         updatedAt: now,
       });
     }
+    // Everyone else who was in the call sees the same notes. Only ever added to:
+    // a re-run of the notes must not take a meeting away from someone.
+    const already = new Set(
+      (
+        await ctx.db
+          .query("echoMeetingViewers")
+          .withIndex("by_meeting_user", (q) => q.eq("meetingId", meetingId))
+          .collect()
+      ).map((row) => row.userId as string)
+    );
+    for (const raw of new Set(sharedWith ?? [])) {
+      const userId = ctx.db.normalizeId("users", raw);
+      if (!userId || userId === ownerId || already.has(userId)) continue;
+      const user = await ctx.db.get(userId);
+      if (!user || user.role === "client") continue;
+      await ctx.db.insert("echoMeetingViewers", { meetingId, userId });
+    }
     await fileMeeting(ctx, meetingId);
     return meetingId;
   },
 });
 
-/** My meetings, newest first, without the transcripts. */
+/** Whether `userId` may read a meeting: they recorded it, or their Echo was in the call. */
+async function canSeeMeeting(ctx: QueryCtx, meeting: Doc<"echoMeetings">, userId: Id<"users">) {
+  if (meeting.ownerId === userId) return true;
+  const row = await ctx.db
+    .query("echoMeetingViewers")
+    .withIndex("by_meeting_user", (q) => q.eq("meetingId", meeting._id).eq("userId", userId))
+    .first();
+  return row !== null;
+}
+
+/** My meetings, newest first, without the transcripts: the ones I recorded and
+ *  the ones a teammate's Echo recorded while mine was in the same call. */
 export const listMine = query({
   args: {},
   handler: async (ctx) => {
     const me = await requireInternalUser(ctx);
-    const rows = await ctx.db
+    const mine = await ctx.db
       .query("echoMeetings")
       .withIndex("by_owner_time", (q) => q.eq("ownerId", me._id))
       .order("desc")
       // ponytail: reads whole rows (transcripts included) to list 50; split the
       // transcript into its own table if people pile up long meetings.
       .take(50);
+    const sharedIds = (
+      await ctx.db
+        .query("echoMeetingViewers")
+        .withIndex("by_user", (q) => q.eq("userId", me._id))
+        .order("desc")
+        .take(50)
+    ).map((row) => row.meetingId);
+    const shared = (await Promise.all(sharedIds.map((id) => ctx.db.get(id)))).filter(
+      (m): m is Doc<"echoMeetings"> => !!m
+    );
+    const rows = [...mine, ...shared].sort((a, b) => b.startedAt - a.startedAt).slice(0, 50);
     return await Promise.all(
       rows.map(async (m) => {
         const { transcript, ...rest } = m;
         void transcript; // the list stays light; `get` returns the full row
-        return { ...rest, brandName: m.brandId ? (await ctx.db.get(m.brandId))?.name : undefined };
+        return {
+          ...rest,
+          brandName: m.brandId ? (await ctx.db.get(m.brandId))?.name : undefined,
+          // Whose Echo recorded it, when it was not mine.
+          recordedBy: m.ownerId === me._id ? null : ((await ctx.db.get(m.ownerId))?.name ?? "A teammate"),
+        };
       })
     );
   },
 });
 
-/** One of my meetings in full. */
+/** One of my meetings in full. Only its recorder files it under a brand (`mine`). */
 export const get = query({
   args: { meetingId: v.id("echoMeetings") },
   handler: async (ctx, { meetingId }) => {
     const me = await requireInternalUser(ctx);
     const meeting = await ctx.db.get(meetingId);
-    if (!meeting || meeting.ownerId !== me._id) return null;
-    return meeting;
+    if (!meeting || !(await canSeeMeeting(ctx, meeting, me._id))) return null;
+    const mine = meeting.ownerId === me._id;
+    // Everyone with access sees who else has it: sharing is never silent.
+    const viewerRows = await ctx.db
+      .query("echoMeetingViewers")
+      .withIndex("by_meeting_user", (q) => q.eq("meetingId", meetingId))
+      .collect();
+    const sharedWith = await Promise.all(
+      viewerRows.map(async (row) => ({
+        userId: row.userId,
+        name: (await ctx.db.get(row.userId))?.name ?? "A teammate",
+      }))
+    );
+    return {
+      ...meeting,
+      mine,
+      sharedWith,
+      recordedBy: mine ? null : ((await ctx.db.get(meeting.ownerId))?.name ?? "A teammate"),
+      brandName: meeting.brandId ? ((await ctx.db.get(meeting.brandId))?.name ?? null) : null,
+    };
+  },
+});
+
+/** The recorder takes a teammate off a meeting that was shared with them. */
+export const removeViewer = mutation({
+  args: { meetingId: v.id("echoMeetings"), userId: v.id("users") },
+  handler: async (ctx, { meetingId, userId }) => {
+    const me = await requireInternalUser(ctx);
+    const meeting = await ctx.db.get(meetingId);
+    if (!meeting || meeting.ownerId !== me._id) throw new Error("Only the person who recorded it can do that");
+    const rows = await ctx.db
+      .query("echoMeetingViewers")
+      .withIndex("by_meeting_user", (q) => q.eq("meetingId", meetingId).eq("userId", userId))
+      .collect();
+    for (const row of rows) await ctx.db.delete(row._id);
   },
 });
 
@@ -215,6 +306,61 @@ export const recordingUrl = action({
 });
 
 /* ---------- Google Calendar (read-only), connected from the profile page ---------- */
+
+/**
+ * The signed-in person's timed meetings between two moments (the dashboard
+ * passes the bounds of their own day), from the Google Calendar they connected.
+ * Declined and cancelled events are left out. Read-only, nothing is stored.
+ */
+export const meetingsBetween = action({
+  args: { from: v.number(), to: v.number() },
+  handler: async (
+    ctx,
+    { from, to }
+  ): Promise<{
+    connected: boolean;
+    /** Google no longer accepts the stored access: disconnect and connect again on the profile. */
+    reconnect?: boolean;
+    events: { id: string; title: string; start: number; end: number; joinUrl: string | null; people: number }[];
+  }> => {
+    const secret = process.env.ECHO_LINK_SECRET;
+    const me = await ctx.runQuery(api.users.getCurrentUser, {});
+    if (!me || me.role === "client") throw new Error("Not authorized");
+    if (!(to > from) || to - from > 3 * 86_400_000) throw new Error("Bad range");
+    const sealed = await ctx.runQuery(internal.echo.calendarToken, { ownerId: me._id });
+    if (!secret || !sealed) return { connected: false, events: [] };
+    const got = await calendarEvents<CalendarEvent>(
+      await unseal(sealed, secret),
+      { timeMin: from, timeMax: to },
+      // eventTypes=default: real events only, not focus time, out of office or working location.
+      { orderBy: "startTime", maxResults: "50", eventTypes: "default" }
+    );
+    // Google no longer accepts the stored access: the profile page can connect again.
+    if (got.status === "reconnect") return { connected: false, reconnect: true, events: [] };
+    // Anything passing is an error, so the panel says "try again" instead of "connect".
+    if (got.status === "failed") throw new Error("Google Calendar did not answer. Try again in a moment.");
+    const { items } = got;
+    return {
+      connected: true,
+      events: items
+        .filter(
+          (e) =>
+            e.status !== "cancelled" &&
+            !!e.start?.dateTime && // all-day entries are not meetings to join
+            !!e.end?.dateTime &&
+            e.attendees?.find((a) => a.self)?.responseStatus !== "declined"
+        )
+        .map((e, i) => ({
+          id: e.id ?? String(i),
+          title: e.summary?.trim() || "Untitled meeting",
+          start: Date.parse(e.start!.dateTime!),
+          end: Date.parse(e.end!.dateTime!),
+          joinUrl: joinLinkOf(e),
+          people: e.attendees?.length ?? 0,
+        })),
+    };
+  },
+});
 
 // SITE_URL is where Google's answer is sent on to (the profile page); without it the row stays hidden.
 const googleReady = () =>

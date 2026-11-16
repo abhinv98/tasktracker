@@ -3,7 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import { sameText, unseal } from "./lib/echoKey";
-import { googleToken } from "./lib/google";
+import { calendarEvents } from "./lib/google";
 
 const http = httpRouter();
 
@@ -77,24 +77,15 @@ http.route({
     }
     const sealed = await ctx.runQuery(internal.echo.calendarToken, { ownerId });
     if (!sealed) return none;
-    const { access_token } = await googleToken({
-      refresh_token: await unseal(sealed, process.env.ECHO_LINK_SECRET!),
-      grant_type: "refresh_token",
-    });
-    if (!access_token) return none; // access was withdrawn at Google; the person can connect again
     const day = 86_400_000;
-    const params = new URLSearchParams({
-      timeMin: new Date(Date.now() - day).toISOString(),
-      timeMax: new Date(Date.now() + day).toISOString(),
-      singleEvents: "true",
-      maxResults: "250",
-    });
-    const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
-      { headers: { Authorization: `Bearer ${access_token}` } }
+    const got = await calendarEvents<GoogleEvent>(
+      await unseal(sealed, process.env.ECHO_LINK_SECRET!),
+      { timeMin: Date.now() - day, timeMax: Date.now() + day },
+      { maxResults: "250" }
     );
-    if (!res.ok) return none;
-    const { items = [] } = (await res.json()) as { items?: GoogleEvent[] };
+    // Access withdrawn at Google (the person can connect again) or Google not answering: no invite.
+    if (got.status !== "ok") return none;
+    const { items } = got;
     // The meeting link sits in hangoutLink, conferenceData, location or the description.
     const event = items.find((e) => JSON.stringify(e).includes(code));
     if (!event) return none;

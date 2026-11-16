@@ -16,13 +16,14 @@ type TodayTask = {
   briefStatus?: string;
 };
 
-function dueLabel(deadline: number, now: number) {
+function dueLabel(deadline: number, now: number, overdue: boolean) {
   const d = new Date(deadline);
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const days = Math.floor((d.getTime() - start.getTime()) / 86_400_000);
   const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  if (deadline < now) return `Overdue · ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+  // Past its date but waiting in review is not overdue (lib/status isTaskOverdue): say when it was due.
+  if (deadline < now) return `${overdue ? "Overdue" : "Was due"} · ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
   if (days === 0) return `Today · ${time}`;
   if (days === 1) return `Tomorrow · ${time}`;
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
@@ -98,7 +99,7 @@ export function TodayList({
                       overdue ? "font-semibold text-[var(--danger)]" : "text-[var(--text-secondary)]"
                     }`}
                   >
-                    {dueLabel(t.deadline!, now)}
+                    {dueLabel(t.deadline!, now, overdue)}
                   </span>
                 </button>
                 {t.status !== "review" && (

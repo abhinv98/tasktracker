@@ -239,7 +239,9 @@ export default function ProfilePage() {
 
       {/* ═══ TAB: ACCOUNT ═══ */}
       {activeTab === "account" && (
-        <div className="max-w-xl">
+        // Two columns from lg up: who you are on the left, password and Echo on
+        // the right. One column below that, in the same order as before.
+        <div className="grid gap-4 lg:grid-cols-2 items-start max-w-6xl">
           <Card>
             <form onSubmit={handleSave} className="flex flex-col gap-4">
               {/* Profile Photo */}
@@ -341,7 +343,8 @@ export default function ProfilePage() {
             </form>
           </Card>
 
-          <Card className="mt-4">
+          <div className="flex flex-col gap-4 min-w-0">
+          <Card>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
@@ -416,6 +419,7 @@ export default function ProfilePage() {
           </Card>
 
           <EchoCard email={user.email} />
+          </div>
         </div>
       )}
 

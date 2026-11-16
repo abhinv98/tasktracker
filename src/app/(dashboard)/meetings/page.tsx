@@ -59,6 +59,7 @@ export default function MeetingsPage() {
                 {m.brandName && (
                   <span className="text-[var(--text-secondary)] font-medium">{m.brandName} · </span>
                 )}
+                {m.recordedBy && <span>Recorded by {m.recordedBy} · </span>}
                 {m.actionItems.length} action item{m.actionItems.length === 1 ? "" : "s"}
                 {m.attendees.length > 0 && ` · ${m.attendees.map((a) => a.name).join(", ")}`}
               </p>
@@ -89,6 +90,7 @@ function MeetingDetail({
   const m = useQuery(api.echo.get, { meetingId });
   const brands = useQuery(api.echo.brandOptions, {});
   const setBrand = useMutation(api.echo.setBrand);
+  const removeViewer = useMutation(api.echo.removeViewer);
   const recordingUrl = useAction(api.echo.recordingUrl);
   const { toast } = useToast();
   const audio = useRef<HTMLAudioElement>(null);
@@ -197,31 +199,88 @@ function MeetingDetail({
                   <dd className="text-[var(--text-primary)]">
                     {people.length ? [...new Set(people)].join(", ") : "Not known"}
                   </dd>
+                  {m.recordedBy && (
+                    <>
+                      <dt className="text-[var(--text-muted)]">Recorded</dt>
+                      <dd className="text-[var(--text-primary)]">
+                        by {m.recordedBy}&apos;s Echo. You were in the same call, so the notes are shared with you.
+                      </dd>
+                    </>
+                  )}
+                  {m.sharedWith.length > 0 && (
+                    <>
+                      <dt className="text-[var(--text-muted)]">Shared</dt>
+                      <dd className="text-[var(--text-primary)]">
+                        <p className="text-[var(--text-secondary)]">
+                          Their Echo was in the same call, so they see these notes too.
+                        </p>
+                        <ul className="mt-1 flex flex-col gap-1">
+                          {m.sharedWith.map((p) => (
+                            <li key={p.userId} className="flex items-center justify-between gap-2">
+                              <span>{p.name}</span>
+                              {m.mine && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    removeViewer({ meetingId, userId: p.userId }).catch((err) =>
+                                      toast("error", err instanceof Error ? err.message : "Could not remove them")
+                                    )
+                                  }
+                                  className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </dd>
+                    </>
+                  )}
+                  {m.continuesSessionId && (
+                    <>
+                      <dt className="text-[var(--text-muted)]">Note</dt>
+                      <dd className="text-[var(--text-primary)]">
+                        This carries on from an earlier recording of the same call, made before its recorder left.
+                      </dd>
+                    </>
+                  )}
                 </dl>
                 <div className="px-4 py-3.5 border-t border-[var(--border-subtle)]">
-                  <Select
-                    label="Brand folder"
-                    value={m.brandId ?? ""}
-                    onChange={(e) =>
-                      setBrand({
-                        meetingId,
-                        brandId: (e.target.value || null) as Id<"brands"> | null,
-                      }).catch((err) =>
-                        toast("error", err instanceof Error ? err.message : "Could not file it")
-                      )
-                    }
-                    options={[
-                      { value: "", label: "Not filed under a brand" },
-                      ...(brands ?? []).map((b) => ({ value: b._id, label: b.name })),
-                    ]}
-                  />
-                  <p className="text-[12px] text-[var(--text-muted)] mt-2">
-                    {m.brandId
-                      ? `${
-                          m.brandSource === "auto" ? "Filed by Echo from who was in the meeting. " : ""
-                        }The notes are also in this brand's Meeting Minutes, and Echo files the next meeting with these people here by itself.`
-                      : "Pick the brand once. Echo remembers the people in this meeting and files their next one by itself."}
-                  </p>
+                  {m.mine ? (
+                    <>
+                      <Select
+                        label="Brand folder"
+                        value={m.brandId ?? ""}
+                        onChange={(e) =>
+                          setBrand({
+                            meetingId,
+                            brandId: (e.target.value || null) as Id<"brands"> | null,
+                          }).catch((err) =>
+                            toast("error", err instanceof Error ? err.message : "Could not file it")
+                          )
+                        }
+                        options={[
+                          { value: "", label: "Not filed under a brand" },
+                          ...(brands ?? []).map((b) => ({ value: b._id, label: b.name })),
+                        ]}
+                      />
+                      <p className="text-[12px] text-[var(--text-muted)] mt-2">
+                        {m.brandId
+                          ? `${
+                              m.brandSource === "auto" ? "Filed by Echo from who was in the meeting. " : ""
+                            }The notes are also in this brand's Meeting Minutes, and Echo files the next meeting with these people here by itself.`
+                          : "Pick the brand once. Echo remembers the people in this meeting and files their next one by itself."}
+                      </p>
+                    </>
+                  ) : (
+                    // Filing belongs to whoever recorded it, so two people cannot file one meeting two ways.
+                    <p className="text-[13px] text-[var(--text-secondary)]">
+                      <span className="text-[var(--text-muted)]">Brand folder</span>{" "}
+                      <span className="font-medium text-[var(--text-primary)]">{m.brandName ?? "Not filed under a brand"}</span>
+                      . {m.recordedBy} can change it.
+                    </p>
+                  )}
                 </div>
               </Panel>
 

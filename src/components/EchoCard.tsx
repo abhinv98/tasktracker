@@ -2,15 +2,13 @@
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
+import { useEchoExtension } from "@/lib/useEchoExtension";
 import { api } from "@/convex/_generated/api";
 import { Button, Card, useToast } from "@/components/ui";
 
 // Echo's Chrome Web Store page. Empty until the listing is published; until then
 // the card hands out the zip to load by hand.
 const STORE_URL = "";
-
-/** What the Echo extension's content script (link.js) reports on this page. */
-type EchoHello = { version: string; linkedEmail: string | null };
 
 /**
  * Profile card for Echo, the meeting note-taker: add the extension to this
@@ -20,7 +18,8 @@ type EchoHello = { version: string; linkedEmail: string | null };
 export function EchoCard({ email }: { email?: string }) {
   const createLinkKey = useAction(api.echo.createLinkKey);
   const { toast } = useToast();
-  const [echo, setEcho] = useState<EchoHello | null>(null);
+  const ext = useEchoExtension();
+  const echo = ext.installed ? { version: ext.version ?? "", linkedEmail: ext.linkedEmail } : null;
   const [showSteps, setShowSteps] = useState(false);
   const calendar = useQuery(api.echo.calendarStatus, {});
   const googleAuthUrl = useAction(api.echo.googleAuthUrl);
@@ -45,17 +44,6 @@ export function EchoCard({ email }: { email?: string }) {
     );
   }, [toast, finishGoogleConnect]);
 
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.source !== window || e.origin !== window.location.origin) return;
-      if (e.data?.source !== "echo-extension" || e.data.type !== "hello") return;
-      setEcho({ version: String(e.data.version), linkedEmail: e.data.linkedEmail ?? null });
-    };
-    window.addEventListener("message", onMessage);
-    window.postMessage({ source: "tasktracker", type: "ping" }, window.location.origin);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
   const linked = !!echo?.linkedEmail && echo.linkedEmail === email;
 
   const link = async () => {
@@ -72,7 +60,7 @@ export function EchoCard({ email }: { email?: string }) {
   };
 
   return (
-    <Card className="mt-6">
+    <Card>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-semibold text-[15px] text-[var(--text-primary)]">
@@ -101,6 +89,30 @@ export function EchoCard({ email }: { email?: string }) {
           </a>
         )}
       </div>
+
+      {ext.updateAvailable && (
+        <div className="mt-3 rounded-md bg-[var(--warning-dim)] px-3 py-2.5">
+          <p className="text-[13px] font-medium text-[var(--warning)]">
+            A newer Echo is out (version {ext.latest}). This browser has {ext.version}.
+          </p>
+          <ol className="mt-1.5 list-decimal pl-5 text-[13px] text-[var(--text-secondary)] flex flex-col gap-1">
+            <li>
+              <a
+                href={STORE_URL || "/echo/echo-extension.zip"}
+                {...(STORE_URL ? { target: "_blank", rel: "noreferrer" } : { download: true })}
+                className="font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2"
+              >
+                Download the new version
+              </a>{" "}
+              and unzip it over the folder you loaded Echo from, replacing the old files.
+            </li>
+            <li>
+              Open <span className="font-mono">chrome://extensions</span> and press the reload arrow on Echo.
+            </li>
+            <li>Reload this page. Your link to this account is kept.</li>
+          </ol>
+        </div>
+      )}
 
       {echo && !linked && echo.linkedEmail && (
         <p className="text-[13px] text-[var(--warning)] mt-3">
