@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ConvexHttpClient } from "convex/browser";
 import { r2Client, R2_BUCKET } from "@/lib/r2";
+import { api } from "@/convex/_generated/api";
+
+/** Who may get an upload URL: someone signed in (staff or a portal client; the Convex login
+ *  token in the Authorization header), or whoever holds an active intake link (its token in
+ *  the body). Nobody else can put files in the bucket. */
+async function allowed(req: NextRequest, intakeToken: unknown): Promise<boolean> {
+  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  try {
+    if (typeof intakeToken === "string" && intakeToken) {
+      return (await convex.query(api.jsr.getIntakeByToken, { token: intakeToken })) !== null;
+    }
+    const jwt = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
+    if (!jwt) return false;
+    convex.setAuth(jwt);
+    const me = await convex.query(api.users.getCurrentUser, {});
+    return !!me && me.isReviewer !== true;
+  } catch {
+    return false; // a bad or expired login token
+  }
+}
 
 /**
  * POST /api/r2-upload
@@ -12,7 +33,10 @@ import { r2Client, R2_BUCKET } from "@/lib/r2";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { fileName, contentType } = await req.json();
+    const { fileName, contentType, intakeToken } = await req.json();
+    if (!(await allowed(req, intakeToken))) {
+      return NextResponse.json({ error: "Sign in to upload files" }, { status: 401 });
+    }
     if (!fileName || !contentType) {
       return NextResponse.json({ error: "fileName and contentType required" }, { status: 400 });
     }

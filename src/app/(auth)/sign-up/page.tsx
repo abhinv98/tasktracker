@@ -42,7 +42,8 @@ function SignUpForm() {
     const formData = new FormData(form);
     formData.set("flow", "signUp");
 
-    // When signing up via invite, enforce the invite email
+    // The server checks the invite by its token and its email.
+    if (inviteToken) formData.set("invite", inviteToken);
     if (invite?.email) {
       formData.set("email", invite.email);
     }
@@ -77,6 +78,14 @@ function SignUpForm() {
 
   // Accounts are by invite only (convex/auth.ts refuses the rest), so
   // without a working invite there is no form to fill in.
+  if (inviteToken && invite === undefined) {
+    return (
+      <div className="bg-white rounded-xl border border-[var(--border)] shadow-sm p-8">
+        <Brand />
+        <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
+      </div>
+    );
+  }
   if (!inviteToken || invite === null) {
     return (
       <div className="bg-white rounded-xl border border-[var(--border)] shadow-sm p-8">

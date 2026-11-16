@@ -38,6 +38,9 @@ export default defineSchema({
      *  their own Google Calendar and uses Echo, and sees nothing else. Every
      *  internal function treats it as signed out (lib/internalAuth, lib/guards). */
     isReviewer: v.optional(v.boolean()),
+    /** Only while signing up: the invite link's token, checked and cleared in
+     *  the same transaction (auth.ts). */
+    inviteToken: v.optional(v.string()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useAuthToken } from "@convex-dev/auth/react";
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -52,6 +53,7 @@ function RefIcon({ kind }: { kind: RefKind }) {
 }
 
 export default function PortalNewTaskPage() {
+  const authToken = useAuthToken();
   const params = useParams();
   const token = params.token as string;
   const session = useQuery(api.clientPortal.getPortalSession);
@@ -84,7 +86,7 @@ export default function PortalNewTaskPage() {
       try {
         const presignRes = await fetch("/api/r2-upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
           body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream" }),
         });
         if (!presignRes.ok) throw new Error("The upload could not be started");

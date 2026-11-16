@@ -92,7 +92,7 @@ export default function IntakePublicPage() {
         const presignRes = await fetch("/api/r2-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream" }),
+          body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream", intakeToken: token }),
         });
         if (!presignRes.ok) throw new Error("The upload could not be started");
         const { uploadUrl, fileKey } = await presignRes.json();

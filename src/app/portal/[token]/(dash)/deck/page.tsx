@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useAuthToken } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -35,6 +36,7 @@ const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string; st
 };
 
 export default function PortalDeckPage() {
+  const authToken = useAuthToken();
   const session = useQuery(api.clientPortal.getPortalSession);
   const items = useQuery(api.clientPortal.getDeckItems);
   const approve = useMutation(api.clientPortal.approveDeckItem);
@@ -98,7 +100,7 @@ export default function PortalDeckPage() {
     try {
       const presignRes = await fetch("/api/r2-upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({ fileName: file.name, contentType: file.type || "application/octet-stream" }),
       });
       if (!presignRes.ok) throw new Error("The upload could not be started");

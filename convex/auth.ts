@@ -2,6 +2,7 @@ import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
 import { DataModel } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
@@ -10,10 +11,14 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const name = (params.name as string) ?? params.email ?? "User";
         const email = params.email as string;
         if (!email) throw new Error("Email is required");
+        // The invite link's token, so sign-up proves it holds the invite and not
+        // just its email. Checked and cleared in afterUserCreatedOrUpdated.
+        const inviteToken = typeof params.invite === "string" && params.invite ? params.invite : undefined;
         return {
           name,
           email,
           role: "employee" as const,
+          ...(inviteToken ? { inviteToken } : {}),
         };
       },
     }),
@@ -34,31 +39,34 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         return;
       }
 
-      // A new account needs an unused invite for its email. Throwing here
-      // undoes the whole sign-up: the user and its login are written in this
-      // same transaction.
+      // A new account needs the token of an unused invite made out to its
+      // email. Throwing here undoes the whole sign-up: the user and its login
+      // are written in this same transaction.
       if (!existingUserId) {
-        const email = user.email?.trim().toLowerCase();
-        const allInvites = await ctx.db.query("invites").collect();
-        const invite = email
-          ? allInvites.find(
-              (inv: Record<string, unknown>) =>
-                typeof inv.email === "string" && inv.email.trim().toLowerCase() === email && !inv.used
-            )
-          : undefined;
-        if (!invite) throw new ConvexError("Accounts are by invite only. Ask an admin for an invite link.");
+        const token = user.inviteToken;
+        const invite = token
+          ? await (ctx as unknown as MutationCtx).db
+              .query("invites")
+              .withIndex("by_token", (q) => q.eq("token", token))
+              .first()
+          : null;
+        if (
+          !invite ||
+          invite.used ||
+          invite.email.trim().toLowerCase() !== user.email?.trim().toLowerCase()
+        ) {
+          throw new ConvexError("Accounts are by invite only. Ask an admin for an invite link.");
+        }
 
-        // Apply invite settings
-        const updates: Record<string, unknown> = {};
+        // Apply invite settings; the token has done its job.
+        const updates: Record<string, unknown> = { inviteToken: undefined };
         if (invite.role) updates.role = invite.role;
         if (invite.isFreelancer) updates.isFreelancer = true;
         if (invite.isReviewer) updates.isReviewer = true;
         if (invite.name) updates.name = invite.name;
         if (invite.designation) updates.designation = invite.designation;
 
-        if (Object.keys(updates).length > 0) {
-          await ctx.db.patch(userId, updates);
-        }
+        await ctx.db.patch(userId, updates);
 
         // Add to team if specified
         if (invite.teamId) {

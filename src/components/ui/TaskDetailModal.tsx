@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAuthToken } from "@convex-dev/auth/react";
 import { useQuery, useMutation } from "convex/react";
 import { useUpdateTaskStatus } from "@/lib/useUpdateTaskStatus";
 import { api } from "@/convex/_generated/api";
@@ -79,6 +80,7 @@ const STATUS_FLOW: Record<string, string> = {
 };
 
 export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalProps) {
+  const authToken = useAuthToken();
   const detail = useQuery(api.tasks.getTaskDetail, {
     taskId: taskId as Id<"tasks">,
   });
@@ -311,7 +313,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
           // Get presigned upload URL from our R2 API
           const presignRes = await fetch("/api/r2-upload", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
             body: JSON.stringify({ fileName: file.name, contentType: file.type }),
           });
           if (!presignRes.ok) throw new Error("Could not prepare upload");
