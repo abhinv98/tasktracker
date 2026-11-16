@@ -74,7 +74,7 @@ export function EchoCard({ email }: { email?: string }) {
                 : "Echo records your Google Meet calls by itself and writes the notes and action items."}
           </p>
         </div>
-        {echo ? (
+        {!ext.ready ? null : echo ? (
           <Button variant={linked ? "secondary" : "primary"} onClick={link}>
             {linked ? "Link again" : "Link this browser"}
           </Button>
@@ -120,13 +120,13 @@ export function EchoCard({ email }: { email?: string }) {
         </p>
       )}
 
-      {!echo && STORE_URL && showSteps && (
+      {ext.ready && !echo && STORE_URL && showSteps && (
         <p className="text-[13px] text-[var(--text-secondary)] mt-3">
           Press Add to Chrome on the page that opened, then come back here and reload.
         </p>
       )}
 
-      {!echo && !STORE_URL && (
+      {ext.ready && !echo && !STORE_URL && (
         <div className="mt-3">
           {!showSteps ? (
             <button

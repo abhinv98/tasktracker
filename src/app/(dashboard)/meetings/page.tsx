@@ -137,11 +137,19 @@ function MeetingDetail({
           <div className="grid gap-4 xl:grid-cols-5 items-start">
             <div className="min-w-0 flex flex-col gap-4 xl:col-span-3">
               <Section title="Summary">
-                <ul className="list-disc pl-5 text-[13px] leading-relaxed text-[var(--text-primary)] flex flex-col gap-1.5">
-                  {m.summary.map((s, i) => (
-                    <li key={i}>{s}</li>
-                  ))}
-                </ul>
+                {m.summary.length === 0 ? (
+                  <p className="text-[13px] text-[var(--text-muted)]">
+                    {m.transcript.trim()
+                      ? "There was nothing in this meeting to summarise."
+                      : "No speech was picked up in this recording, so there are no notes. If people were talking, they may have been muted in Meet."}
+                  </p>
+                ) : (
+                  <ul className="list-disc pl-5 text-[13px] leading-relaxed text-[var(--text-primary)] flex flex-col gap-1.5">
+                    {m.summary.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                )}
               </Section>
               <Panel title="Action items" count={m.actionItems.length}>
                 {m.actionItems.length === 0 ? (
@@ -308,6 +316,9 @@ function MeetingDetail({
                     </p>
                   </div>
                 )}
+                {!m.transcript.trim() ? (
+                  <PanelEmpty>No speech was picked up.</PanelEmpty>
+                ) : (
                 <div className="px-4 py-3 max-h-[60vh] overflow-y-auto flex flex-col text-[12px] leading-5 text-[var(--text-primary)]">
                   {m.transcript.split("\n").map((line, i) => {
                     const at = line.match(/^\[(\d+):(\d\d)\]/);
@@ -326,6 +337,7 @@ function MeetingDetail({
                     );
                   })}
                 </div>
+                )}
               </Panel>
             </aside>
           </div>
