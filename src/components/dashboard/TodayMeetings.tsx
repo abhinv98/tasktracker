@@ -58,11 +58,11 @@ export function TodayMeetings() {
     <Panel title="Today's meetings" count={connected ? events.length : undefined}>
       {result && result !== "failed" && result.reconnect ? (
         <PanelEmpty>
-          Google Calendar needs connecting again.{" "}
+          Echo does not have access to your calendar.{" "}
           <Link href="/profile" className="font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2">
-            Disconnect and reconnect it on your profile
+            Disconnect and connect Google Calendar again on your profile
           </Link>
-          .
+          , and tick the calendar box on Google&apos;s screen.
         </PanelEmpty>
       ) : !connected ? (
         <PanelEmpty>

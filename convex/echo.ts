@@ -418,6 +418,12 @@ export const finishGoogleConnect = action({
     }
     const tokens = await googleToken({ code, grant_type: "authorization_code", redirect_uri: GOOGLE_REDIRECT() });
     if (!tokens.refresh_token || !tokens.id_token) throw new Error("Google did not grant calendar access");
+    // Signing in is not the same as granting the calendar: Google shows that as its own tick box.
+    if (!(tokens.scope ?? "").split(" ").includes("https://www.googleapis.com/auth/calendar.events.readonly")) {
+      throw new Error(
+        "Google signed you in, but the calendar box was not ticked. Connect again and tick the box that lets Echo see your calendar events."
+      );
+    }
     // The id token came straight from Google over TLS; its payload names the account.
     const claims = JSON.parse(
       atob(tokens.id_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))

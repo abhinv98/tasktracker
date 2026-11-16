@@ -13,6 +13,9 @@ export async function googleToken(params: Record<string, string>) {
     access_token?: string;
     refresh_token?: string;
     id_token?: string;
+    /** The permissions Google actually granted, space separated. On its consent
+     *  screen each one is a separate tick, so this can be less than was asked for. */
+    scope?: string;
     error?: string;
   };
 }
@@ -40,6 +43,9 @@ export async function calendarEvents<E>(
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
     headers: { Authorization: `Bearer ${token.access_token}` },
   }).catch(() => null);
+  // 401/403: the stored access does not cover calendar events (the calendar box was left
+  // unticked on Google's screen, or access was withdrawn). Connecting again is the only fix.
+  if (res?.status === 401 || res?.status === 403) return { status: "reconnect" };
   if (!res?.ok) return { status: "failed" };
   const { items = [] } = (await res.json()) as { items?: E[] };
   return { status: "ok", items };
