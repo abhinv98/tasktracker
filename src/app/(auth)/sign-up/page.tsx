@@ -7,6 +7,18 @@ import { useQuery } from "convex/react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import { Button, Input } from "@/components/ui";
+import { plainMessage } from "@/components/ui/Toast";
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5 mb-6">
+      <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
+        <span className="text-white font-bold text-[13px]">O</span>
+      </div>
+      <span className="font-semibold text-[15px] text-[var(--text-primary)]">The Ecultify</span>
+    </div>
+  );
+}
 
 function SignUpForm() {
   const { signIn } = useAuthActions();
@@ -58,21 +70,34 @@ function SignUpForm() {
           return;
         }
       }
-      setError(msg || "Sign up failed");
+      setError(plainMessage(msg));
       setIsSubmitting(false);
     }
   }
 
+  // Accounts are by invite only (convex/auth.ts refuses the rest), so
+  // without a working invite there is no form to fill in.
+  if (!inviteToken || invite === null) {
+    return (
+      <div className="bg-white rounded-xl border border-[var(--border)] shadow-sm p-8">
+        <Brand />
+        <p className="text-[15px] text-[var(--text-primary)] mb-2">
+          {inviteToken ? "This invite link has been used or is no longer valid." : "Accounts are by invite only."}
+        </p>
+        <p className="text-[13px] text-[var(--text-secondary)] mb-6">Ask an admin to send you an invite link.</p>
+        <a
+          href="/sign-in"
+          className="block text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-center transition-colors"
+        >
+          Already have an account? Sign in
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl border border-[var(--border)] shadow-sm p-8">
-      <div className="flex items-center gap-2.5 mb-6">
-        <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
-          <span className="text-white font-bold text-[13px]">O</span>
-        </div>
-        <span className="font-semibold text-[15px] text-[var(--text-primary)]">
-          The Ecultify
-        </span>
-      </div>
+      <Brand />
 
       {invite && (
         <div className="mb-4 rounded-lg bg-[var(--accent-admin)]/8 border border-[var(--accent-admin)]/20 px-4 py-3">
@@ -176,14 +201,7 @@ export default function SignUpPage() {
   return (
     <Suspense fallback={
       <div className="bg-white rounded-xl border border-[var(--border)] shadow-sm p-8">
-        <div className="flex items-center gap-2.5 mb-6">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent-admin)] flex items-center justify-center">
-            <span className="text-white font-bold text-[13px]">O</span>
-          </div>
-          <span className="font-semibold text-[15px] text-[var(--text-primary)]">
-            The Ecultify
-          </span>
-        </div>
+        <Brand />
         <p className="text-[15px] text-[var(--text-secondary)]">Loading...</p>
       </div>
     }>

@@ -520,6 +520,8 @@ export const sendMessage = action({
     // 1. Get current user
     const user = await ctx.runQuery(api.users.getCurrentUser);
     if (!user) throw new Error("Not authenticated");
+    // The assistant reads and changes work data on the person's behalf.
+    if (user.role === "client" || user.isReviewer === true) throw new Error("Not authorized");
 
     const role = user.role ?? "employee";
 

@@ -34,6 +34,10 @@ export default defineSchema({
     isAccountant: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
     clientBrandId: v.optional(v.id("brands")),
+    /** An outside reviewer's account (Google's app review): signs in, connects
+     *  their own Google Calendar and uses Echo, and sees nothing else. Every
+     *  internal function treats it as signed out (lib/internalAuth, lib/guards). */
+    isReviewer: v.optional(v.boolean()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
@@ -438,6 +442,8 @@ export default defineSchema({
       v.literal("employee")
     ),
     isFreelancer: v.optional(v.boolean()),
+    /** Signing up with this invite makes a reviewer account (users.isReviewer). */
+    isReviewer: v.optional(v.boolean()),
     teamId: v.optional(v.id("teams")),
     token: v.string(),
     createdBy: v.id("users"),

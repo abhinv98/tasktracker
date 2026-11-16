@@ -214,11 +214,10 @@ export default function ProfilePage() {
         {(
           [
             { id: "account" as ProfileTab, label: "Account", icon: UserIcon },
-            {
-              id: "suggestions" as ProfileTab,
-              label: "Suggestion Box",
-              icon: Lightbulb,
-            },
+            // The suggestion box is the team's; a reviewer's account does not get it.
+            ...(user?.isReviewer === true
+              ? []
+              : [{ id: "suggestions" as ProfileTab, label: "Suggestion Box", icon: Lightbulb }]),
           ]
         ).map((tab) => (
           <button

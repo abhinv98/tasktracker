@@ -1,5 +1,5 @@
 import { getAuthUserId as getAnyAuthUserId } from "@convex-dev/auth/server";
-import { getAuthUserId } from "./lib/internalAuth";
+import { getAuthUserId, getSelfUserId } from "./lib/internalAuth";
 import { requireInternalUser } from "./lib/guards";
 import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
@@ -122,7 +122,8 @@ export const listEmployees = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const users = await ctx.db.query("users").collect();
-    return users.filter((u) => u.role === "employee");
+    // An outside reviewer is not someone to assign work to.
+    return users.filter((u) => u.role === "employee" && u.isReviewer !== true);
   },
 });
 
@@ -427,8 +428,10 @@ export const updateProfile = mutation({
     avatarUrl: v.optional(v.string()),
   },
   handler: async (ctx, { name, avatarUrl }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getSelfUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    // A picture link loads in staff browsers; an outside reviewer may not set one.
+    if (avatarUrl !== undefined && (await ctx.db.get(userId))?.isReviewer === true) throw new Error("Not authorized");
     const updates: { name?: string; avatarUrl?: string; image?: string } = { name };
     if (avatarUrl !== undefined) {
       updates.avatarUrl = avatarUrl;
@@ -441,7 +444,7 @@ export const updateProfile = mutation({
 export const updateProfileImage = mutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, { storageId }) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getSelfUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     const url = await ctx.storage.getUrl(storageId);
     if (!url) throw new Error("Failed to get image URL");
@@ -452,7 +455,7 @@ export const updateProfileImage = mutation({
 export const removeProfileImage = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getSelfUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     await ctx.db.patch(userId, { avatarUrl: undefined, image: undefined });
   },
@@ -461,7 +464,7 @@ export const removeProfileImage = mutation({
 export const generateProfileUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getSelfUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
     return await ctx.storage.generateUploadUrl();
   },

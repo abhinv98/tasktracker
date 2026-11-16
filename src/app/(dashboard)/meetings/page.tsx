@@ -254,6 +254,7 @@ function MeetingDetail({
                     </>
                   )}
                 </dl>
+                {m.canFile && (
                 <div className="px-4 py-3.5 border-t border-[var(--border-subtle)]">
                   {m.mine ? (
                     <>
@@ -290,6 +291,7 @@ function MeetingDetail({
                     </p>
                   )}
                 </div>
+                )}
               </Panel>
 
               <Panel title="Transcript">

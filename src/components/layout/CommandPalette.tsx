@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { NAV_COMMANDS } from "@/lib/commands";
+import { isReviewerRoute } from "@/lib/reviewer";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -64,6 +65,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   // is better than one that offers a page and then bounces you off it.
   const commands = useMemo(() => {
     if (!user) return [];
+    if (user.isReviewer === true) return NAV_COMMANDS.filter((c) => isReviewerRoute(c.href));
     return NAV_COMMANDS.filter((c) => c.visible(user));
   }, [user]);
 

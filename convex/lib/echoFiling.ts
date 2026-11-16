@@ -63,7 +63,7 @@ export async function fileMeeting(
   if (!m) return;
   const now = Date.now();
   const users = await ctx.db.query("users").collect();
-  const staff = users.filter((u) => u.role !== "client");
+  const staff = users.filter((u) => u.role !== "client" && u.isReviewer !== true);
   const staffByEmail = new Map(
     staff.filter((u) => u.email).map((u) => [u.email!.toLowerCase(), u] as const)
   );

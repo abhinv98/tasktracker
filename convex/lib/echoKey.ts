@@ -31,7 +31,7 @@ export async function hmac(text: string, secret: string): Promise<string> {
 
 /** Echo's server checks the signature and refuses a key past `exp` (ms since epoch). */
 export async function signEchoKey(
-  who: { id: string; email: string; name: string; exp: number },
+  who: { id: string; email: string; name: string; exp: number; outside?: true },
   secret: string
 ): Promise<string> {
   const payload = base64url(enc.encode(JSON.stringify(who)));

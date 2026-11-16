@@ -9,6 +9,7 @@ import { TopBar } from "@/components/layout/TopBar";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { useNavDepthTracker } from "@/lib/useSmartBack";
 import { canAccessPettyCash } from "@/lib/pettyCash";
+import { isReviewerRoute } from "@/lib/reviewer";
 
 // Note: /oversight is gated server-side by oversight access (super-admins,
 // oversight admins, brand managers, and team leads). Don't list it here or
@@ -64,6 +65,12 @@ export default function DashboardLayout({
     // Portal client accounts never see the internal dashboard
     if (role === "client") {
       router.replace("/portal");
+      return;
+    }
+
+    // An outside reviewer's account sees its dashboard, meetings and profile only.
+    if (user.isReviewer === true) {
+      if (!isReviewerRoute(pathname)) router.replace("/dashboard");
       return;
     }
 

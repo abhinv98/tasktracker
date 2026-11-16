@@ -27,7 +27,7 @@ export const getContacts = query({
 
     for (const u of allUsers) {
       // Portal client accounts aren't DM contacts
-      if (u._id === authId || u.role === "client") continue;
+      if (u._id === authId || u.role === "client" || u.isReviewer === true) continue;
 
       // Unread: messages sent TO me by this user where readAt is undefined
       const unreadMessages = await ctx.db

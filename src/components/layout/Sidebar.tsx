@@ -231,6 +231,13 @@ const EMPLOYEE_NAV: NavCategory[] = [
   },
 ];
 
+// An outside reviewer's account (users.isReviewer): only what works for them.
+const REVIEWER_NAV: NavCategory[] = [
+  { category: "Work", items: [{ href: "/dashboard", label: "Dashboard" }] },
+  { category: "Communication", items: [{ href: "/meetings", label: "Meetings" }] },
+  { category: "Account", items: [{ href: "/profile", label: "Profile" }] },
+];
+
 /**
  * Recruitment is its own workspace: once you're inside /recruitment the sidebar
  * becomes recruitment's navigation rather than the whole app's. It earns that
@@ -280,7 +287,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const baseNav: NavCategory[] =
     inRecruitment && canRecruit
       ? RECRUITMENT_NAV
-      : user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
+      : user.isReviewer === true
+        ? REVIEWER_NAV
+        : user.isHR === true ? HR_NAV : role === "admin" ? ADMIN_NAV : EMPLOYEE_NAV;
   const nav: NavCategory[] = baseNav
     .map((cat) => ({
       ...cat,

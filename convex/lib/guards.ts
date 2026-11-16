@@ -4,8 +4,17 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 
 type Ctx = QueryCtx | MutationCtx;
 
-/** Any logged-in internal user (admin or employee). Blocks portal client accounts. */
+/** Any logged-in internal user (admin or employee). Blocks portal client
+ *  accounts and outside reviewer accounts. */
 export async function requireInternalUser(ctx: Ctx): Promise<Doc<"users">> {
+  const user = await requireEchoUser(ctx);
+  if (user.isReviewer === true) throw new Error("Not authorized");
+  return user;
+}
+
+/** Staff, or an outside reviewer account: for Echo's own functions only
+ *  (their meetings, their calendar). Everything else uses requireInternalUser. */
+export async function requireEchoUser(ctx: Ctx): Promise<Doc<"users">> {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
   const user = await ctx.db.get(userId);

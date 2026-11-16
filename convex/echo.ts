@@ -6,7 +6,7 @@ import { fileMeeting } from "./lib/echoFiling";
 import { joinLinkOf, type CalendarEvent } from "../src/lib/echo";
 import { hmac, sameText, seal, signEchoKey, unseal } from "./lib/echoKey";
 import { calendarEvents, googleToken } from "./lib/google";
-import { requireInternalUser } from "./lib/guards";
+import { requireEchoUser } from "./lib/guards";
 
 // Echo is the meeting note-taker (a Chrome extension plus its own server). The
 // task tracker owns the accounts: it signs a personal key for each person, the
@@ -26,11 +26,14 @@ export const createLinkKey = action({
     if (!me || me.role === "client") throw new Error("Not authorized");
     if (!me.email) throw new Error("Your account has no email address");
     // Good for 180 days, so a key left behind stops working by itself; linking again renews it.
+    // An outside reviewer's key lasts 30 days, since a key cannot be taken back, and is marked
+    // so Echo never joins their recordings with staff ones (~/echo/server/src/sharing.ts).
     const who = {
       id: me._id as string,
       email: me.email,
       name: me.name?.trim() || me.email,
-      exp: Date.now() + 180 * 86_400_000,
+      exp: Date.now() + (me.isReviewer ? 30 : 180) * 86_400_000,
+      ...(me.isReviewer ? { outside: true as const } : {}),
     };
     return { key: await signEchoKey(who, secret), name: who.name, email: who.email };
   },
@@ -83,8 +86,13 @@ export const ingest = internalMutation({
       const user = id ? await ctx.db.get(id) : null;
       return id && user && user.role !== "client" ? id : null;
     };
+    const isReviewer = async (id: Id<"users">) => (await ctx.db.get(id))?.isReviewer === true;
     let ownerId = await staff(rawOwner);
-    for (const raw of sharedWith ?? []) ownerId ??= await staff(raw);
+    for (const raw of sharedWith ?? []) {
+      if (ownerId) break;
+      const candidate = await staff(raw);
+      if (candidate && !(await isReviewer(candidate))) ownerId = candidate;
+    }
     if (!ownerId) throw new Error("Unknown owner");
     const now = Date.now();
     const existing = await ctx.db
@@ -122,14 +130,18 @@ export const ingest = internalMutation({
           .collect()
       ).map((row) => row.userId as string)
     );
-    for (const raw of new Set(sharedWith ?? [])) {
+    // An outside reviewer's recording is theirs alone: nobody is added to it
+    // and it is not filed or turned into tasks. Nor is a reviewer ever added
+    // to a staff recording. (Echo does not share across the two either.)
+    const reviewerOwned = await isReviewer(ownerId);
+    for (const raw of reviewerOwned ? [] : new Set(sharedWith ?? [])) {
       const userId = ctx.db.normalizeId("users", raw);
       if (!userId || userId === ownerId || already.has(userId)) continue;
       const user = await ctx.db.get(userId);
-      if (!user || user.role === "client") continue;
+      if (!user || user.role === "client" || user.isReviewer === true) continue;
       await ctx.db.insert("echoMeetingViewers", { meetingId, userId });
     }
-    await fileMeeting(ctx, meetingId);
+    if (!reviewerOwned) await fileMeeting(ctx, meetingId);
     return meetingId;
   },
 });
@@ -149,7 +161,7 @@ async function canSeeMeeting(ctx: QueryCtx, meeting: Doc<"echoMeetings">, userId
 export const listMine = query({
   args: {},
   handler: async (ctx) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const mine = await ctx.db
       .query("echoMeetings")
       .withIndex("by_owner_time", (q) => q.eq("ownerId", me._id))
@@ -187,7 +199,7 @@ export const listMine = query({
 export const get = query({
   args: { meetingId: v.id("echoMeetings") },
   handler: async (ctx, { meetingId }) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const meeting = await ctx.db.get(meetingId);
     if (!meeting || !(await canSeeMeeting(ctx, meeting, me._id))) return null;
     const mine = meeting.ownerId === me._id;
@@ -205,6 +217,8 @@ export const get = query({
     return {
       ...meeting,
       mine,
+      /** Brand folders are staff-only; an outside reviewer never sees them. */
+      canFile: me.isReviewer !== true,
       sharedWith,
       recordedBy: mine ? null : ((await ctx.db.get(meeting.ownerId))?.name ?? "A teammate"),
       brandName: meeting.brandId ? ((await ctx.db.get(meeting.brandId))?.name ?? null) : null,
@@ -216,7 +230,7 @@ export const get = query({
 export const removeViewer = mutation({
   args: { meetingId: v.id("echoMeetings"), userId: v.id("users") },
   handler: async (ctx, { meetingId, userId }) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const meeting = await ctx.db.get(meetingId);
     if (!meeting || meeting.ownerId !== me._id) throw new Error("Only the person who recorded it can do that");
     const rows = await ctx.db
@@ -231,7 +245,8 @@ export const removeViewer = mutation({
 export const brandOptions = query({
   args: {},
   handler: async (ctx) => {
-    await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
+    if (me.isReviewer === true) return [];
     const brands = await ctx.db.query("brands").collect();
     return brands
       .filter((b) => !b.onHold)
@@ -244,7 +259,8 @@ export const brandOptions = query({
 export const setBrand = mutation({
   args: { meetingId: v.id("echoMeetings"), brandId: v.union(v.id("brands"), v.null()) },
   handler: async (ctx, { meetingId, brandId }) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
+    if (me.isReviewer === true) throw new Error("Not authorized");
     const meeting = await ctx.db.get(meetingId);
     if (!meeting || meeting.ownerId !== me._id) throw new Error("Not authorized");
     const brand = brandId ? await ctx.db.get(brandId) : null;
@@ -257,7 +273,7 @@ export const setBrand = mutation({
 export const myActionItems = query({
   args: {},
   handler: async (ctx) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const rows = await ctx.db
       .query("echoActionItems")
       .withIndex("by_assignee_status", (q) => q.eq("assigneeId", me._id).eq("status", "suggested"))
@@ -285,7 +301,7 @@ export const resolveActionItem = mutation({
     status: v.union(v.literal("accepted"), v.literal("dismissed")),
   },
   handler: async (ctx, { itemId, status }) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const item = await ctx.db.get(itemId);
     if (!item || item.assigneeId !== me._id) throw new Error("Not authorized");
     await ctx.db.patch(itemId, { status });
@@ -370,7 +386,7 @@ const GOOGLE_REDIRECT = () => `${process.env.CONVEX_SITE_URL}/echo/google/callba
 export const calendarStatus = query({
   args: {},
   handler: async (ctx) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const row = await ctx.db
       .query("echoCalendars")
       .withIndex("by_user", (q) => q.eq("userId", me._id))
@@ -470,7 +486,7 @@ export const calendarToken = internalQuery({
 export const disconnectCalendar = mutation({
   args: {},
   handler: async (ctx) => {
-    const me = await requireInternalUser(ctx);
+    const me = await requireEchoUser(ctx);
     const rows = await ctx.db
       .query("echoCalendars")
       .withIndex("by_user", (q) => q.eq("userId", me._id))

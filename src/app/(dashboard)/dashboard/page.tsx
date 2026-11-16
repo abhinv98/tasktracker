@@ -435,7 +435,28 @@ export default function DashboardPage() {
   const user = useQuery(api.users.getCurrentUser);
   // Two components, not an `if` around hooks: a role change then remounts
   // instead of changing the hook count mid-render.
+  if (user?.isReviewer === true) return <ReviewerDashboard firstName={(user.name ?? "").split(" ")[0]} email={user.email} />;
   return user?.role === "admin" ? <AdminDashboard /> : <EmployeeDashboard />;
+}
+
+// An outside reviewer's account (users.isReviewer): their own calendar and
+// Echo, nothing of Ecultify's work. The backend returns nothing else to it.
+function ReviewerDashboard({ firstName, email }: { firstName: string; email?: string }) {
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl">
+      <h1 className="font-semibold text-[26px] text-[var(--text-primary)] leading-tight">
+        {getGreeting()}
+        {firstName ? `, ${firstName}` : ""}
+      </h1>
+      <p className="mt-1 mb-6 text-[13px] text-[var(--text-secondary)]">
+        This is a review account for Echo. Connect your Google Calendar on the Profile page to see today&apos;s
+        meetings here; meetings Echo records for you appear under Meetings.
+      </p>
+      <EchoNudge email={email} />
+      <EchoActionItems />
+      <TodayMeetings />
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════
