@@ -2559,7 +2559,7 @@ export const deleteDeliverable = mutation({
 export const listHandoffContextsForTasks = query({
   args: { taskIds: v.array(v.id("tasks")) },
   handler: async (ctx, { taskIds }) => {
-    if (taskIds.length === 0) return {};
+    if (taskIds.length === 0 || !(await getAuthUserId(ctx))) return {};
 
     const tasks = await Promise.all(taskIds.map((id) => ctx.db.get(id)));
     const briefIds = Array.from(

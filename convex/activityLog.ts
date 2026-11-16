@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId } from "./lib/internalAuth";
 
 export const logActivity = mutation({
   args: {
@@ -10,6 +11,7 @@ export const logActivity = mutation({
     details: v.optional(v.string()),
   },
   handler: async (ctx, { briefId, taskId, userId, action, details }) => {
+    if (!(await getAuthUserId(ctx))) throw new Error("Not authenticated");
     return await ctx.db.insert("activityLog", {
       briefId,
       taskId,
@@ -24,6 +26,7 @@ export const logActivity = mutation({
 export const getBriefTimeline = query({
   args: { briefId: v.id("briefs"), limit: v.optional(v.number()) },
   handler: async (ctx, { briefId, limit = 50 }) => {
+    if (!(await getAuthUserId(ctx))) return [];
     const logs = await ctx.db
       .query("activityLog")
       .withIndex("by_brief_time", (q) => q.eq("briefId", briefId))
