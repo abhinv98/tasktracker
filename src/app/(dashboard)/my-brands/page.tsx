@@ -111,7 +111,7 @@ function BrandDetail({
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title="Back to brands"
           aria-label="Back to brands"
         >

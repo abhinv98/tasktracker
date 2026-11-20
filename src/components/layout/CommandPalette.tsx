@@ -180,7 +180,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
           <button
             onClick={onClose}
             aria-label="Close command palette"
-            className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X className="h-4 w-4" />
           </button>

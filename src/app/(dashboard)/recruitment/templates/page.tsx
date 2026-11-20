@@ -141,14 +141,14 @@ export default function RecruitmentTemplatesPage() {
                       })
                     }
                     aria-label={`Edit ${t.name}`}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => setDeleting(t._id)}
                     aria-label={`Delete ${t.name}`}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>

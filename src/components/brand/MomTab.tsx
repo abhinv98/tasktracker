@@ -277,7 +277,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                     type="button"
                     onClick={() => { setTranscriptFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
                     aria-label="Remove file"
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -431,7 +431,7 @@ export default function MomTab({ brandId, isAdmin, isBrandManager }: MomTabProps
                             href={mom.transcriptUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+                            className="inline-flex items-center gap-2 h-control px-3 rounded-control border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <Download className="h-3.5 w-3.5" />
                             {mom.transcriptFileName ?? "Download Transcript"}

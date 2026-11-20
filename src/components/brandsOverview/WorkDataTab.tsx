@@ -82,7 +82,7 @@ export default function WorkDataTab() {
                   )
                 }
                 aria-label={`Open ${brand.name}`}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Eye className="h-4 w-4" />
               </button>

@@ -242,7 +242,7 @@ function NotesTab() {
             <button
               onClick={() => setDate(shiftDate(date, -1))}
               aria-label="Previous day"
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -255,7 +255,7 @@ function NotesTab() {
             <button
               onClick={() => setDate(shiftDate(date, 1))}
               aria-label="Next day"
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -597,7 +597,7 @@ function IconBtn({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`flex items-center gap-1.5 h-8 px-2 rounded-md text-[12px] font-medium text-[var(--text-muted)] transition-colors ${
+      className={`flex items-center gap-1.5 h-control px-2 rounded-control text-[12px] font-medium text-[var(--text-muted)] transition-colors ${
         danger
           ? "hover:text-[var(--danger)] hover:bg-[var(--danger-dim)]"
           : "hover:text-[var(--text-primary)] hover:bg-black/5"
@@ -1258,7 +1258,7 @@ function WorklogTab() {
         <button
           onClick={() => setDate(shiftDate(date, -1))}
           aria-label="Previous day"
-          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -1271,7 +1271,7 @@ function WorklogTab() {
         <button
           onClick={() => setDate(shiftDate(date, 1))}
           aria-label="Next day"
-          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -1468,14 +1468,14 @@ function WorklogTab() {
                       setEditContent(e.content);
                     }}
                     aria-label="Edit entry"
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => setDeletingId(e._id)}
                     aria-label="Delete entry"
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1661,7 +1661,7 @@ function Modal({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X className="h-4 w-4" />
           </button>

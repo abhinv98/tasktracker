@@ -23,7 +23,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={`
-            w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg
+            w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control
             text-[var(--text-primary)] text-[13px]
             px-2.5 py-2 min-h-[88px]
             placeholder:text-[var(--text-disabled)]

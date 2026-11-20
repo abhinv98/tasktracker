@@ -632,7 +632,7 @@ export default function ContentCalendarPage() {
                 }
               }}
               aria-label="Brand"
-              className="h-8 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
+              className="h-control bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[var(--text-primary)] px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[180px]"
             >
               <option value="">Select brand</option>
               {/* On-hold brands take no new entries, so they are not offered;
@@ -1034,7 +1034,7 @@ export default function ContentCalendarPage() {
           <button
             type="button"
             onClick={handleBulkToShelf}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium hover:bg-white/15 transition-colors"
+            className="inline-flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium hover:bg-white/15 transition-colors"
           >
             <Inbox className="h-3.5 w-3.5" /> To shelf
           </button>
@@ -1042,7 +1042,7 @@ export default function ContentCalendarPage() {
             type="button"
             aria-pressed={bulkAction === "shift"}
             onClick={() => setBulkAction(bulkAction === "shift" ? null : "shift")}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium transition-colors ${
               bulkAction === "shift" ? "bg-white/20" : "hover:bg-white/15"
             }`}
           >
@@ -1052,7 +1052,7 @@ export default function ContentCalendarPage() {
             type="button"
             aria-pressed={bulkAction === "month"}
             onClick={() => setBulkAction(bulkAction === "month" ? null : "month")}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium transition-colors ${
               bulkAction === "month" ? "bg-white/20" : "hover:bg-white/15"
             }`}
           >
@@ -1062,7 +1062,7 @@ export default function ContentCalendarPage() {
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="inline-flex items-center h-8 px-3 rounded-md text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+            className="inline-flex items-center h-control px-3 rounded-control text-[13px] font-medium text-white/70 hover:text-white hover:bg-white/15 transition-colors"
           >
             Clear
           </button>

@@ -1016,7 +1016,7 @@ export default function BriefPage() {
                     setShowAddTaskTeamPicker(false);
                   }}
                   aria-expanded={showViewTeamFilter}
-                  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
+                  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium border transition-colors ${
                     viewTeamFilter
                       ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
                       : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"

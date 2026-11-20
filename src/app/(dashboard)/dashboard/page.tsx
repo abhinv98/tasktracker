@@ -921,7 +921,7 @@ function AdminDashboard() {
                           onClick={() => setResolvingTaskId(ot._id)}
                           aria-label={`Remove ${ot.title}`}
                           title="Remove"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -971,7 +971,7 @@ function AdminDashboard() {
                           <button
                             onClick={() => { setExtendingTaskId(null); setExtendDeadline(undefined); setExtendDeadlineTime(""); }}
                             aria-label="Cancel"
-                            className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                            className="inline-flex items-center justify-center h-control w-control shrink-0 rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -987,7 +987,7 @@ function AdminDashboard() {
                           onClick={() => setResolvingTaskId(ot._id)}
                           aria-label={`Remove ${ot.title}`}
                           title="Remove"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors ml-auto"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1091,7 +1091,7 @@ function AdminDashboard() {
                           onClick={() => setResolvingTaskId(t._id)}
                           aria-label={`Remove ${t.title}`}
                           title="Remove"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -1481,7 +1481,7 @@ function EmployeeDashboard() {
                       }
                     }}
                     disabled={isContacted}
-                    className="shrink-0 inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+                    className="shrink-0 inline-flex items-center gap-1 h-control px-3 rounded-control text-[13px] font-medium bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
                   >
                     <Phone className="h-3 w-3" />
                     {isContacted ? "Contacted" : "Contact manager"}

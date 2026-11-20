@@ -1262,7 +1262,7 @@ export default function BrandDetailPage() {
                         const el = document.getElementById(`chat-date-${d}`);
                         el?.scrollIntoView({ behavior: "smooth", block: "start" });
                       }}
-                      className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-md text-[12px] font-medium border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="shrink-0 flex items-center gap-1.5 h-control px-3 rounded-control text-[12px] font-medium border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       <span className="text-[var(--text-primary)]">{dateLabel(d)}</span>
                       <span className="tabular-nums text-[var(--text-muted)]">{dateCounts[d]}</span>

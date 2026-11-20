@@ -1247,7 +1247,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   />
                 </div>
                 <div>
-                  <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-[var(--border-strong)] bg-white text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                  <label className="inline-flex items-center gap-1.5 h-control px-3 rounded-control border border-dashed border-[var(--border-strong)] bg-white text-[13px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                     <Paperclip className="h-3.5 w-3.5" />
                     Attach files
                     <input

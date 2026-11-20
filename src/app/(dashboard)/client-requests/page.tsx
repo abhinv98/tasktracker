@@ -479,7 +479,7 @@ export default function ClientRequestsPage() {
               <button
                 onClick={() => setSelectedId(null)}
                 aria-label="Close"
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -624,7 +624,7 @@ export default function ClientRequestsPage() {
                     type="date"
                     value={toDateInput(counterDate)}
                     onChange={(e) => setCounterDate(fromDateInput(e.target.value))}
-                    className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
                   {(selected.status === "pending_review" || selected.status === "on_hold") && (
                     <Button
@@ -651,7 +651,7 @@ export default function ClientRequestsPage() {
                     onChange={(e) => setTaskTag(e.target.value)}
                     list="client-request-tags"
                     placeholder="e.g. Social, Blog, Design (optional)"
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                   />
                   <datalist id="client-request-tags">
                     {(brandTagSuggestions ?? []).map((t) => (
@@ -727,7 +727,7 @@ export default function ClientRequestsPage() {
                               value={newBriefTitle}
                               onChange={(e) => setNewBriefTitle(e.target.value)}
                               placeholder="Campaign brief title"
-                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                             />
                             <textarea
                               value={newBriefDesc}
@@ -741,7 +741,7 @@ export default function ClientRequestsPage() {
                           <select
                             value={existingBriefId}
                             onChange={(e) => setExistingBriefId(e.target.value)}
-                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             <option value="">
                               {campaignBriefs === undefined
@@ -766,13 +766,13 @@ export default function ClientRequestsPage() {
                           type="date"
                           value={calDate}
                           onChange={(e) => setCalDate(e.target.value)}
-                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <select
                             value={calPlatform}
                             onChange={(e) => setCalPlatform(e.target.value)}
-                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             {PLATFORMS.map((p) => (
                               <option key={p} value={p}>{p}</option>
@@ -781,7 +781,7 @@ export default function ClientRequestsPage() {
                           <select
                             value={calContentType}
                             onChange={(e) => setCalContentType(e.target.value)}
-                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                           >
                             {CONTENT_TYPES.map((t) => (
                               <option key={t} value={t}>{t}</option>
@@ -804,7 +804,7 @@ export default function ClientRequestsPage() {
                         <select
                           value={acceptAssigneeId}
                           onChange={(e) => setAcceptAssigneeId(e.target.value)}
-                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                         >
                           <option value="">Decide later</option>
                           {assignableUsers.map((u: any) => (
@@ -836,7 +836,7 @@ export default function ClientRequestsPage() {
                     <select
                       value={assigneeId}
                       onChange={(e) => setAssigneeId(e.target.value)}
-                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[13px] text-[var(--text-primary)] h-8 px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
+                      className="flex-1 bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[13px] text-[var(--text-primary)] h-control px-2.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] appearance-none cursor-pointer"
                     >
                       <option value="">{selected.assigned ? "Reassign to…" : "Choose assignee…"}</option>
                       {assignableUsers.map((u: any) => (

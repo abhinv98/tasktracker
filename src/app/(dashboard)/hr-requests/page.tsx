@@ -235,7 +235,7 @@ function RequestCard({
               <select
                 value={req.status}
                 onChange={(e) => update(e.target.value as HrStatus)}
-                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md h-8 px-2.5 text-[13px] text-[var(--text-primary)] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control h-control px-2.5 text-[13px] text-[var(--text-primary)] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               >
                 {HR_STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -264,7 +264,7 @@ function RequestCard({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Status note for the employee…"
-                className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-md h-8 px-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+                className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border)] rounded-control h-control px-2.5 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
               />
               <Button
                 variant="secondary"

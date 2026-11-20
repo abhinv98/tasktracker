@@ -86,7 +86,7 @@ export default function BrandsTab() {
           <button
             onClick={() => setFilterMine((p) => !p)}
             aria-pressed={filterMine}
-            className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium transition-colors border ${
+            className={`flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium transition-colors border ${
               filterMine
                 ? "bg-[var(--bg-hover)] text-[var(--text-primary)] border-[var(--border-strong)]"
                 : "bg-white text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-hover)]"
@@ -183,7 +183,7 @@ export default function BrandsTab() {
               <button
                 onClick={() => setShowModal(false)}
                 aria-label="Close"
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -214,7 +214,7 @@ export default function BrandsTab() {
                       onClick={() => setColor(c)}
                       aria-label={`Color ${c}`}
                       aria-pressed={color === c}
-                      className={`w-8 h-8 rounded-md border-2 transition-all ${
+                      className={`w-control h-control rounded-control border-2 transition-all ${
                         color === c ? "border-[var(--text-primary)] scale-110" : "border-transparent"
                       }`}
                       style={{ backgroundColor: c }}

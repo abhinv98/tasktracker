@@ -214,13 +214,13 @@ export default function CampaignDetailPage() {
                         <div className="flex items-center gap-1">
                           {m.resume && (
                             <a href={m.resume} target="_blank" rel="noreferrer" title="Open résumé" aria-label="Open résumé"
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+                              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                               <FileText size={14} />
                             </a>
                           )}
                           {m.portfolioLink && (
                             <a href={m.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio" aria-label="Open portfolio"
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+                              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                               <ExternalLink size={14} />
                             </a>
                           )}
@@ -231,7 +231,7 @@ export default function CampaignDetailPage() {
                             }}
                             aria-label={`Remove ${m.name} from campaign`}
                             title="Remove from campaign"
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <UserMinus size={14} />
                           </button>

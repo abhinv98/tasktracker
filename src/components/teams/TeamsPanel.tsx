@@ -274,7 +274,7 @@ export default function TeamsPanel() {
               {isAdmin && (
                 <button
                   onClick={() => setConfirmDeleteTeam(true)}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                  className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                   title="Delete team"
                   aria-label="Delete team"
                 >
@@ -284,7 +284,7 @@ export default function TeamsPanel() {
               <button
                 onClick={closePanel}
                 aria-label="Close"
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <X size={16} />
               </button>

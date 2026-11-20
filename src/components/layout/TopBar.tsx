@@ -113,7 +113,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         <button
           onClick={onMenuToggle}
           aria-label="Open menu"
-          className="md:hidden -ml-1.5 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="md:hidden -ml-1.5 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <Menu className="h-4 w-4" />
         </button>
@@ -123,7 +123,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
         {onSearchClick && (
           <button
             onClick={onSearchClick}
-            className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
+            className="hidden sm:flex items-center gap-2 h-control px-3 rounded-control text-[13px] font-medium border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search...</span>
@@ -142,7 +142,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
             onClick={() => setShowNotifs(!showNotifs)}
             aria-label="Notifications"
             aria-expanded={showNotifs}
-            className={`relative flex items-center gap-2 h-8 px-3 rounded-md text-[13px] font-medium transition-colors duration-150 ${
+            className={`relative flex items-center gap-2 h-control px-3 rounded-control text-[13px] font-medium transition-colors duration-150 ${
               showNotifs
                 ? "bg-[var(--bg-hover)] text-[var(--text-primary)]"
                 : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
@@ -177,7 +177,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
                   <button
                     onClick={() => setShowNotifs(false)}
                     aria-label="Close notifications"
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -240,7 +240,7 @@ export function TopBar({ user, onMenuToggle, onSearchClick }: TopBarProps) {
 
         <button
           onClick={() => signOut()}
-          className="whitespace-nowrap h-8 px-3 rounded-md text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
+          className="whitespace-nowrap h-control px-3 rounded-control text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors duration-150"
         >
           Sign out
         </button>
@@ -265,7 +265,7 @@ function RunningTimerPill() {
     <button
       onClick={() => void stopTimer({ entryId: active._id })}
       title={`Stop timer on "${active.taskTitle ?? "task"}"`}
-      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:opacity-90"
+      className="inline-flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)] hover:opacity-90"
     >
       <Square className="h-3 w-3" />
       <span className="tabular-nums">{formatMinutes(mins)}</span>

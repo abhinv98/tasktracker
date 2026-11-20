@@ -81,9 +81,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         onClick={handleClick}
         className={`
           relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap
-          h-8 px-3 text-[13px]
+          h-control px-3 text-[13px]
           font-medium tracking-[-0.003em]
-          rounded-md shadow-[0_1px_0_rgba(0,0,0,0.03)]
+          rounded-control shadow-[0_1px_0_rgba(0,0,0,0.03)]
           transition-all duration-150
           active:translate-y-[1px] active:duration-[50ms]
           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0

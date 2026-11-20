@@ -132,7 +132,7 @@ export function DatePicker({
         id={id}
         disabled={disabled}
         onClick={() => !disabled && setOpen(!open)}
-        className="flex items-center gap-2 w-full min-w-[140px] bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] h-8 px-2.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 w-full min-w-[140px] bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[var(--text-primary)] h-control px-2.5 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] focus:ring-offset-1 hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <CalendarIcon className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
         <span className="truncate">{displayLabel}</span>
@@ -191,7 +191,7 @@ export function DatePicker({
                   type="button"
                   onClick={() => selectDay(d)}
                   className={`
-                    h-8 rounded-md text-[13px] font-medium transition-colors
+                    h-control rounded-control text-[13px] font-medium transition-colors
                     ${!isCurrentMonth ? "text-[var(--text-disabled)]" : "text-[var(--text-primary)]"}
                     ${selected ? "bg-[var(--accent-admin-strong)] text-white hover:bg-[var(--accent-admin-strong)]" : ""}
                     ${!selected && isCurrentMonth ? "hover:bg-[var(--bg-hover)]" : ""}

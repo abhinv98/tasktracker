@@ -83,7 +83,7 @@ export function EchoCard({ email }: { email?: string }) {
             href={STORE_URL || "/echo/echo-extension.zip"}
             {...(STORE_URL ? { target: "_blank", rel: "noreferrer" } : { download: true })}
             onClick={() => setShowSteps(true)}
-            className="inline-flex shrink-0 items-center rounded-md h-8 px-3 text-[13px] font-medium bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity"
+            className="inline-flex shrink-0 items-center rounded-control h-control px-3 text-[13px] font-medium bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity"
           >
             Add Echo to your browser
           </a>

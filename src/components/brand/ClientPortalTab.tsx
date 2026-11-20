@@ -388,7 +388,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                       <span className={`text-[13px] ${hidden ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{tab.label}</span>
                       <button
                         onClick={() => void toggleTab(tab.key)}
-                        className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"} hover:bg-[var(--bg-hover)]`}
+                        className={`inline-flex items-center justify-center h-control w-control rounded-control transition-colors ${hidden ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"} hover:bg-[var(--bg-hover)]`}
                         title={hidden ? "Show tab" : "Hide tab"}
                         aria-label={hidden ? `Show ${tab.label}` : `Hide ${tab.label}`}
                         aria-pressed={!hidden}
@@ -427,7 +427,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                         }).catch(() => {})
                       }
                       aria-pressed={visibleMonths === undefined}
-                      className="h-8 px-3 rounded-md text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="h-control px-3 rounded-control text-[13px] font-medium border border-[var(--border)] bg-white text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
                     >
                       {visibleMonths === undefined ? "All visible" : "Restricted"}
                     </button>
@@ -461,7 +461,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                                   }).catch(() => {})
                                 }
                                 aria-pressed={on}
-                                className={`h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
+                                className={`h-control px-3 rounded-control text-[13px] font-medium border transition-colors ${
                                   on
                                     ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
                                     : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--border-strong)]"
@@ -661,7 +661,7 @@ export default function ClientPortalTab({ brandId, brand, canManageLinks }: Clie
                             </button>
                             <button
                               onClick={() => void updateDeckItem({ deckItemId: item._id, requiresApproval: !item.requiresApproval }).catch(() => {})}
-                              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-colors hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+                              className={`inline-flex items-center justify-center h-control w-control rounded-control transition-colors hover:bg-[var(--bg-hover)] ${item.requiresApproval ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
                               title={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
                               aria-label={item.requiresApproval ? "Remove approval requirement" : "Require client approval"}
                               aria-pressed={!!item.requiresApproval}

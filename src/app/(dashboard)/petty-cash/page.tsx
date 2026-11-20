@@ -795,7 +795,7 @@ export default function PettyCashPage() {
                                     }}
                                     title="Reopen — puts the cash back out"
                                     aria-label="Reopen handout"
-                                    className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                   >
                                     <Undo2 className="h-3.5 w-3.5" />
                                   </button>
@@ -807,7 +807,7 @@ export default function PettyCashPage() {
                                   }}
                                   title="Edit"
                                   aria-label="Edit handout"
-                                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                  className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
@@ -815,7 +815,7 @@ export default function PettyCashPage() {
                                   onClick={() => setDeleting(h)}
                                   title="Delete"
                                   aria-label="Delete handout"
-                                  className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                                  className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
@@ -886,7 +886,7 @@ export default function PettyCashPage() {
                             onClick={() => setDeletingAlloc(a)}
                             title="Delete"
                             aria-label="Delete allocation"
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

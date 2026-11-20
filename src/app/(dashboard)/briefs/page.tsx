@@ -53,7 +53,7 @@ const FIELD_CLASS = `w-full ${fieldClass}`;
 const FIELD_LABEL_CLASS = "block mb-1.5 font-medium text-[13px] text-[var(--text-secondary)]";
 // Icon-only buttons inside table rows; the negative margin keeps the row height.
 const ICON_BUTTON_CLASS =
-  "inline-flex items-center justify-center h-8 w-8 -my-1 rounded-md text-[var(--text-muted)] transition-colors";
+  "inline-flex items-center justify-center h-control w-control -my-1 rounded-control text-[var(--text-muted)] transition-colors";
 
 const STORAGE_BRIEF_DRAFT = "tasktracker_briefDraft";
 const STORAGE_BRIEFS_UI = "tasktracker_briefsUi";
@@ -1891,7 +1891,7 @@ function TeamBlockRow({
           <button
             type="button"
             onClick={onRemove}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
             title="Remove team block"
             aria-label="Remove team block"
           >

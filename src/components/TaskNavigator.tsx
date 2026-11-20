@@ -71,7 +71,7 @@ export function TaskNavigator({
         <div className="flex justify-end mt-4">
           <button
             onClick={onClose}
-            className="h-8 px-3 rounded-md text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
+            className="h-control px-3 rounded-control text-[13px] font-medium text-white bg-[var(--accent-admin-strong)] hover:opacity-90 transition-opacity"
           >
             Got it
           </button>

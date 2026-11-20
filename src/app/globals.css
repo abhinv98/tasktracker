@@ -10,12 +10,17 @@
   /* Compact density: every spacing utility (p-*, gap-*, h-*, …) runs ~10%
      tighter than Tailwind's 0.25rem default, app-wide, in one place. */
   --spacing: 0.225rem;
-  /* Crisper corners across the ~1,000 rounded-* uses. */
-  --radius-sm: 0.1875rem;
-  --radius-md: 0.3125rem;
-  --radius-lg: 0.4375rem;
-  --radius-xl: 0.5625rem;
-  --radius-2xl: 0.75rem;
+  /* Corner scale shared with the HRMS app, so both read as one product. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  /* Controls (buttons, fields, dropdowns, icon buttons) are a true 32px with
+     10px corners, as in the HRMS. Named, not h-8: the compact --spacing above
+     makes h-8 come out at 28.8px. Use h-control / w-control / rounded-control. */
+  --spacing-control: 2rem;
+  --radius-control: 0.625rem;
 }
 
 :root {
@@ -144,7 +149,7 @@ input, textarea {
 }
 
 /* One size for every boxed text field and dropdown, wherever it was written:
-   the Input component's 32px-row height (h-8) and 13px text. Unlayered on
+   the Input component's 32px height (h-control) and 13px text. Unlayered on
    purpose, so it wins over the utility classes on the ~300 hand-written fields
    without touching them. Left alone: tick boxes, file pickers and the like, and
    inline editors with a transparent background (page titles, the command
@@ -155,11 +160,11 @@ input, textarea {
     [type="hidden"], [type="submit"], [type="button"], [type="image"],
     [class*="bg-transparent"], .sr-only, .hidden, .portal-root *
   ) {
-  height: 1.8rem;
+  height: 2rem;
   padding-block: 0;
   font-size: 13px;
   line-height: 1.4;
-  border-radius: 0.3125rem;
+  border-radius: 0.625rem;
 }
 textarea:not([class*="bg-transparent"], .portal-root *) {
   font-size: 13px;

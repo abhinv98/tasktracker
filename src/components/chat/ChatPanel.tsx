@@ -617,7 +617,7 @@ function ChatView({
         <button
           onClick={onBack}
           aria-label="Back to conversations"
-          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -746,7 +746,7 @@ function ChatView({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
             title="Attach file"
             aria-label="Attach file"
           >
@@ -776,7 +776,7 @@ function ChatView({
           <button
             onClick={handleSend}
             disabled={isLoading || (!message.trim() && !pendingFile)}
-            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-8 w-8 rounded-md bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            className="shrink-0 mb-[3px] inline-flex items-center justify-center h-control w-control rounded-control bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             title="Send message"
             aria-label="Send message"
           >
@@ -861,7 +861,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
               <button
                 onClick={handleNewChat}
                 disabled={isCreating}
-                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
                 title="New chat"
                 aria-label="New chat"
               >
@@ -875,7 +875,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             <button
               onClick={onClose}
               aria-label="Close"
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <X className="h-4 w-4" />
             </button>

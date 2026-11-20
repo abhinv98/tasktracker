@@ -450,7 +450,7 @@ export default function DeliverablesPage() {
               key={idx}
               type="button"
               onClick={() => setPreviewFile(file)}
-              className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
+              className="inline-flex items-center gap-1 h-control px-3 rounded-control text-[13px] font-medium bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--accent-admin-text)] transition-colors"
             >
               {isImage ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}
               <span className="max-w-[150px] truncate">{file.name}</span>
@@ -492,7 +492,7 @@ export default function DeliverablesPage() {
         <button
           onClick={() => setShowRejectForm(null)}
           aria-label="Cancel request for changes"
-          className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="inline-flex items-center justify-center h-control w-control shrink-0 rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -575,7 +575,7 @@ export default function DeliverablesPage() {
               </div>
             )}
             <div>
-              <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+              <label className="inline-flex items-center gap-1.5 h-control px-3 rounded-control border border-dashed border-[var(--border)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
                 <Paperclip className="h-3.5 w-3.5" />
                 {editingDeliverableId ? "Replace files (optional)" : "Attach files (images, PDFs, etc.)"}
                 <input
@@ -692,7 +692,7 @@ export default function DeliverablesPage() {
                     {isAdmin && (
                       <button
                         onClick={() => setDeletingDeliverableId(d._id)}
-                        className="inline-flex items-center justify-center h-8 w-8 -my-1.5 -mr-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                        className="inline-flex items-center justify-center h-control w-control -my-1.5 -mr-1.5 rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         title="Delete deliverable"
                         aria-label="Delete deliverable"
                       >

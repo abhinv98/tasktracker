@@ -87,7 +87,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X size={16} />
           </button>
@@ -272,7 +272,7 @@ function ResetPasswordModal({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X size={16} />
           </button>
@@ -444,7 +444,7 @@ function CreateClientModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             <X size={16} />
           </button>
@@ -618,7 +618,7 @@ function ClientsPanel() {
                         <button
                           onClick={() => void handleReset()}
                           disabled={newPassword.length < 8 || resetting}
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-40"
                           title="Save new password"
                           aria-label="Save new password"
                         >
@@ -627,7 +627,7 @@ function ClientsPanel() {
                         <button
                           onClick={() => { setResetId(null); setNewPassword(""); }}
                           aria-label="Cancel password reset"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         >
                           <X size={15} />
                         </button>
@@ -636,7 +636,7 @@ function ClientsPanel() {
                       <div className="flex items-center justify-end gap-0.5">
                         <button
                           onClick={() => { setResetId(c._id); setNewPassword(""); }}
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                           title="Reset password"
                           aria-label="Reset password"
                         >
@@ -644,7 +644,7 @@ function ClientsPanel() {
                         </button>
                         <button
                           onClick={() => setDeleting({ id: c._id, name: c.name ?? c.email ?? "Client" })}
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                          className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                           title="Delete client login"
                           aria-label="Delete client login"
                         >
@@ -916,7 +916,7 @@ export default function UsersPage() {
                             name: user.name ?? user.email ?? "User",
                           })
                         }
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                        className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                         title="Reset password"
                         aria-label="Reset password"
                       >
@@ -927,7 +927,7 @@ export default function UsersPage() {
                       onClick={() =>
                         setDeletingUser({ id: user._id, name: user.name ?? user.email ?? "User" })
                       }
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                      className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                       title="Delete user"
                       aria-label="Delete user"
                     >

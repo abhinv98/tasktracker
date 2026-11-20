@@ -212,7 +212,7 @@ export function CreateUserForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -388,7 +388,7 @@ export function DeleteBriefForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -526,7 +526,7 @@ export function DeleteUserForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -659,7 +659,7 @@ export function DeleteTeamForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -804,7 +804,7 @@ export function AssignTeamLeadForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -961,7 +961,7 @@ export function AssignTeamForm() {
           type="button"
           onClick={handleClear}
           aria-label="Clear"
-          className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>

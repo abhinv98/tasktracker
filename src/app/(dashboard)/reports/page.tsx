@@ -57,7 +57,7 @@ export default function ReportsPage() {
           <select
             value={selectedEmployee}
             onChange={(e) => setSelectedEmployee(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] h-8 px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[var(--text-primary)] h-control px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)] min-w-[200px]"
           >
             <option value="">All Team Members</option>
             {employees.map((emp) => (
@@ -73,7 +73,7 @@ export default function ReportsPage() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] h-8 px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[var(--text-primary)] h-control px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           />
         </div>
         <div>
@@ -82,7 +82,7 @@ export default function ReportsPage() {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-md text-[var(--text-primary)] h-8 px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            className="bg-[var(--bg-input)] border border-[var(--border)] rounded-control text-[var(--text-primary)] h-control px-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
           />
         </div>
       </div>

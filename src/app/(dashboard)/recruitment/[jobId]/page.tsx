@@ -291,7 +291,7 @@ export default function RecruitmentJobPage() {
             <button
               onClick={() => setConfirmDelete(true)}
               aria-label="Delete selected"
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
             >
               <Trash2 size={15} />
             </button>

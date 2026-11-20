@@ -573,7 +573,7 @@ function QuotationsTab({
                       href={`/print/quotation/${q._id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                       title="Print / Save as PDF"
                       aria-label="Print / Save as PDF"
                     >
@@ -582,7 +582,7 @@ function QuotationsTab({
                     {!q.invoiceId && (
                       <button
                         onClick={() => setConfirmDelete(q._id)}
-                        className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+                        className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
                         title="Delete"
                         aria-label="Delete quotation"
                       >
@@ -830,7 +830,7 @@ function QuotationModal({
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {editId ? "Edit quotation (draft)" : "New quotation"}
           </h3>
-          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -985,7 +985,7 @@ function NewInvoiceModal({
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">
             {source === "generated" ? "Generate invoice" : "Track external invoice"}
           </h3>
-          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1142,7 +1142,7 @@ function InvoiceDetailModal({
               {invoice.source === "generated" ? "Generated" : "External"}
             </span>
           </div>
-          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -1222,7 +1222,7 @@ function InvoiceDetailModal({
               href={`/print/invoice/${invoice._id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 h-control px-3 rounded-control border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <Printer className="h-3.5 w-3.5" /> Print / PDF
             </a>
@@ -1232,7 +1232,7 @@ function InvoiceDetailModal({
               href={invoice.pdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center gap-1.5 h-control px-3 rounded-control border border-[var(--border)] bg-white text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" /> View PDF
             </a>
@@ -1440,7 +1440,7 @@ function AgencyProfileModal({
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">Agency profile</h3>
-          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>

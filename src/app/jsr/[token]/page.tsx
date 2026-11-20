@@ -1016,7 +1016,7 @@ function DeliverableCard({ deliverable, brandColor, token, addJsrRemark }: {
               </button>
               <button
                 onClick={() => setShowRemarkForm(false)}
-                className="h-8 px-3 rounded-md text-[13px] font-medium text-[#737373] hover:bg-[#f0f0f0]"
+                className="h-control px-3 rounded-control text-[13px] font-medium text-[#737373] hover:bg-[#f0f0f0]"
               >
                 Cancel
               </button>

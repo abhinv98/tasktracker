@@ -708,7 +708,7 @@ function MySuggestionItem({
                 setEditContent(suggestion.content);
                 setEditing(true);
               }}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Edit"
               aria-label="Edit suggestion"
             >
@@ -717,7 +717,7 @@ function MySuggestionItem({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
               title="Delete"
               aria-label="Delete suggestion"
             >
@@ -996,7 +996,7 @@ function AdminSuggestionItem({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
+              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
               title="Delete suggestion"
               aria-label="Delete suggestion"
             >

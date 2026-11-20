@@ -355,7 +355,7 @@ export default function IntakePublicPage() {
                 <button
                   onClick={addLink}
                   disabled={!linkInput.trim()}
-                  className="shrink-0 h-8 px-3 rounded-md text-[13px] font-medium border border-[#e5e5e5] text-[#525252] hover:border-[#c4c4c4] disabled:opacity-40 transition-colors"
+                  className="shrink-0 h-control px-3 rounded-control text-[13px] font-medium border border-[#e5e5e5] text-[#525252] hover:border-[#c4c4c4] disabled:opacity-40 transition-colors"
                 >
                   Add
                 </button>

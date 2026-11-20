@@ -650,7 +650,7 @@ export function CommentThread({
             <button
               type="button"
               onClick={() => setShowTargetPicker(!showTargetPicker)}
-              className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[13px] font-medium bg-white border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="inline-flex items-center gap-1 h-control px-3 rounded-control text-[13px] font-medium bg-white border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
             >
               Posting to: <span className="text-[var(--text-primary)]">{postTarget.label}</span>
               <ChevronDown className="h-3.5 w-3.5" />
@@ -728,7 +728,7 @@ export function CommentThread({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
             title="Attach a file"
             aria-label="Attach a file"
           >
@@ -769,7 +769,7 @@ export function CommentThread({
                   }, 0);
                 }
               }}
-              className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
               title="Mention a person or task"
               aria-label="Mention a person or task"
             >
@@ -791,7 +791,7 @@ export function CommentThread({
             type="submit"
             disabled={(!text.trim() && !pendingFile) || uploading}
             aria-label="Send message"
-            className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md bg-[var(--text-primary)] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#2a2a2a] transition-colors"
+            className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control bg-[var(--text-primary)] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#2a2a2a] transition-colors"
           >
             {uploading ? (
               <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

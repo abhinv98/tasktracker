@@ -98,7 +98,7 @@ export function TodayMeetings() {
                     href={e.joinUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`shrink-0 inline-flex items-center h-8 px-3 rounded-md text-[13px] font-medium transition-colors ${
+                    className={`shrink-0 inline-flex items-center h-control px-3 rounded-control text-[13px] font-medium transition-colors ${
                       live || soon
                         ? "bg-[var(--text-primary)] text-white hover:bg-[#2a2a2a]"
                         : "bg-white text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"

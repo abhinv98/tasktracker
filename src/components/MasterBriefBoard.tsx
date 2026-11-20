@@ -50,7 +50,7 @@ interface MasterBriefBoardProps {
 
 // Icon-only buttons on a task card: shown on hover or keyboard focus.
 const CARD_ICON_BUTTON =
-  "inline-flex items-center justify-center h-8 w-8 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0";
+  "inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0";
 
 /* ─── SVG connection path builder ────────────────── */
 

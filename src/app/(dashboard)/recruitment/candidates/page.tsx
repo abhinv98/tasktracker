@@ -102,7 +102,7 @@ export default function AllCandidatesPage() {
         <button
           onClick={() => setShowFilters((v) => !v)}
           aria-expanded={showFilters}
-          className={`flex items-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-medium border transition-colors ${
+          className={`flex items-center gap-1.5 h-control px-3 rounded-control text-[13px] font-medium border transition-colors ${
             activeFilters > 0
               ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
               : "border-[var(--border)] bg-white text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"
