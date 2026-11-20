@@ -730,7 +730,7 @@ export default function BriefsPage() {
         />
         <Tray
           title="Due date"
-          width="w-[280px]"
+          width="w-[340px]"
           active={!!filterDateStart || !!filterDateEnd}
           label={
             filterDateStart || filterDateEnd ? (

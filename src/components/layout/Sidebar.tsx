@@ -135,6 +135,7 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/worklog", label: "Work Log" },
       { href: "/petty-cash", label: "Petty Cash", pettyCashOnly: true },
       { href: "/users", label: "Users & Teams" },
+      { href: "/recruitment", label: "Recruitment", superAdminOnly: true },
       { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
     ],
@@ -274,8 +275,8 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
   const inRecruitment = pathname.startsWith("/recruitment");
-  // HR only for now — superadmins keep backend access but don't see the nav.
-  const canRecruit = user.isHR === true;
+  // HR and super admins, the same two the backend lets in.
+  const canRecruit = user.isHR === true || user.isSuperAdmin === true;
   // Positions are fetched only inside the workspace — no point paying for the
   // query on every other page in the app.
   const jobs = useQuery(
