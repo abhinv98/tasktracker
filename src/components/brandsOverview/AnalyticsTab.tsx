@@ -1,9 +1,13 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { useMemo } from "react";
 import { api } from "@/convex/_generated/api";
-import { Badge, Card, Panel, PanelEmpty, StatStrip, StatTile } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import { BarList, ChartCard, Columns, SparkStat, StackedBar, shareLabel } from "@/components/ui/Charts";
+import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
+import { TASK_STATUS_META } from "@/lib/status";
 
 type EmployeeStat = {
   _id: string;
@@ -30,60 +34,45 @@ function actionLabel(action: string): string {
   return "Activity";
 }
 
-/** Heading over a chart: title left, one quiet total right. */
-function ChartHeader({ title, note }: { title: string; note: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 mb-3">
-      <h3 className="font-semibold text-[15px] text-[var(--text-primary)]">{title}</h3>
-      <span className="text-[12px] tabular-nums text-[var(--text-muted)]">{note}</span>
-    </div>
-  );
+/** Segments for a status breakdown: known statuses in workflow order, then
+ *  anything else the data holds, so the shares always add up to the total. */
+function statusSegments(
+  counts: Record<string, number>,
+  order: string[],
+  label: (key: string) => string,
+  color: (key: string) => string,
+) {
+  const keys = [...order, ...Object.keys(counts).filter((k) => !order.includes(k))];
+  return keys.map((k) => ({ label: label(k), value: counts[k] ?? 0, color: color(k) }));
 }
 
-function StatusRow({
-  label,
-  count,
-  pct,
-  color,
-}: {
-  label: string;
-  count: number;
-  pct: number;
-  color: string;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[12px] font-medium text-[var(--text-primary)]">{label}</span>
-        <span className="text-[12px] tabular-nums text-[var(--text-secondary)]">
-          {count}
-          {pct > 0 && (
-            <span className="text-[var(--text-muted)] ml-1">
-              ({Math.round(pct)}%)
-            </span>
-          )}
-        </span>
-      </div>
-      <div className="w-full h-1.5 rounded-full bg-[var(--border-subtle)] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
-      </div>
-    </div>
-  );
-}
+const TASK_ORDER = ["pending", "in-progress", "review", "on-hold", "done"];
+const BRIEF_ORDER = [
+  "draft", "active", "in-progress", "review", "sent_to_client",
+  "on_hold", "rejected", "completed", "archived",
+];
+
+const BANDS = [
+  { key: "behind", title: "Behind" },
+  { key: "inProgress", title: "In progress" },
+  { key: "onTrack", title: "On track" },
+] as const;
+
+type Analytics = NonNullable<FunctionReturnType<typeof api.analytics.getDashboardAnalytics>>;
 
 export default function AnalyticsTab() {
   const data = useQuery(api.analytics.getDashboardAnalytics);
+  if (!data) {
+    return (
+      <p className="text-[13px] text-[var(--text-secondary)]">Loading analytics...</p>
+    );
+  }
+  return <AnalyticsView data={data} />;
+}
 
+/** The page itself, given its numbers. */
+export function AnalyticsView({ data }: { data: Analytics }) {
   const banded = useMemo(() => {
-    if (!data)
-      return {
-        onTrack: [] as EmployeeStat[],
-        inProgress: [] as EmployeeStat[],
-        behind: [] as EmployeeStat[],
-      };
     const out = { onTrack: [] as EmployeeStat[], inProgress: [] as EmployeeStat[], behind: [] as EmployeeStat[] };
     for (const emp of data.employeeStats as EmployeeStat[]) {
       const rate = emp.totalTasks > 0 ? (emp.doneTasks / emp.totalTasks) * 100 : 0;
@@ -94,146 +83,141 @@ export default function AnalyticsTab() {
     return out;
   }, [data]);
 
-  if (!data) {
-    return (
-      <p className="text-[13px] text-[var(--text-secondary)]">Loading analytics...</p>
-    );
-  }
+  const weeks = data.weeklyVelocity;
+  const velocitySum = weeks.reduce((s, w) => s + w.count, 0);
+  const thisWeek = weeks[weeks.length - 1]?.count ?? 0;
+  const lastWeek = weeks[weeks.length - 2]?.count ?? 0;
+  const weekDiff = thisWeek - lastWeek;
 
-  const maxVelocity = Math.max(...data.weeklyVelocity.map((w) => w.count), 1);
-  const velocitySum = data.weeklyVelocity.reduce((s, w) => s + w.count, 0);
+  const doneTasks = data.tasksByStatus["done"] ?? 0;
+  const openBriefs =
+    data.totalBriefs - (data.briefsByStatus["completed"] ?? 0) - (data.briefsByStatus["archived"] ?? 0);
+
+  const taskSegments = statusSegments(
+    data.tasksByStatus,
+    TASK_ORDER,
+    (k) => TASK_STATUS_META[k]?.label ?? k,
+    (k) => TASK_STATUS_META[k]?.dot ?? "var(--text-muted)",
+  );
+  const briefSegments = statusSegments(
+    data.briefsByStatus,
+    BRIEF_ORDER,
+    (k) => BRIEF_STATUS_LABELS[k] ?? k,
+    (k) => BRIEF_STATUS_COLORS[k] ?? "var(--text-muted)",
+  );
+  const people = data.employeeStats as EmployeeStat[];
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
-      <StatStrip>
-        <StatTile label="Briefs" value={data.totalBriefs} />
-        <StatTile label="Tasks" value={data.totalTasks} />
-        <StatTile
+      {/* Headline numbers */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <SparkStat
+          label="Briefs"
+          value={data.totalBriefs}
+          hint={`${openBriefs} open · ${data.totalBrands} brands`}
+        />
+        <SparkStat
+          label="Tasks"
+          value={data.totalTasks}
+          hint={`${shareLabel(doneTasks, data.totalTasks)} done`}
+        />
+        <SparkStat
           label="Overdue"
           value={data.overdueTasks}
-          hint={data.overdueTasks > 0 ? "Past deadline" : undefined}
+          hint={data.overdueTasks > 0 ? "Past deadline" : "Nothing late"}
           bad={data.overdueTasks > 0}
         />
-        <StatTile label="Teams" value={data.totalTeams} />
-        <StatTile label="Brands" value={data.totalBrands} />
-        <StatTile label="Avg Completion" value={`${data.avgCompletionHours}h`} />
-      </StatStrip>
+        <SparkStat
+          label="Done, last 7 days"
+          value={thisWeek}
+          delta={{
+            text: `${weekDiff > 0 ? "+" : ""}${weekDiff}`,
+            good: weekDiff === 0 ? null : weekDiff > 0,
+          }}
+          hint="vs prior week"
+          spark={weeks.map((w) => w.count)}
+        />
+        <SparkStat label="Avg completion" value={`${data.avgCompletionHours}h`} hint="created to done" />
+        <SparkStat label="Teams" value={data.totalTeams} hint={`${people.length} ${people.length === 1 ? "person" : "people"}`} />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Tasks by Status */}
-        <Card>
-          <ChartHeader title="Tasks by Status" note={`${data.totalTasks} total`} />
-          <div className="space-y-2.5">
-            {[
-              { key: "pending", label: "Pending" },
-              { key: "in-progress", label: "In Progress" },
-              { key: "review", label: "Review" },
-              { key: "done", label: "Done" },
-            ].map(({ key, label }) => {
-              const count = data.tasksByStatus[key] ?? 0;
-              const pct = data.totalTasks > 0 ? (count / data.totalTasks) * 100 : 0;
-              return (
-                <StatusRow
-                  key={key}
-                  label={label}
-                  count={count}
-                  pct={pct}
-                  color="var(--accent-manager)"
-                />
-              );
-            })}
-          </div>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="space-y-4">
+        <ChartCard
+          title="Tasks by status"
+          description={`${data.totalTasks} tasks in all`}
+          table={{
+            columns: ["Status", "Tasks", "Share"],
+            rows: taskSegments.map((s) => [s.label, s.value, shareLabel(s.value, data.totalTasks)]),
+          }}
+        >
+          <StackedBar segments={taskSegments} />
+        </ChartCard>
 
-        {/* Briefs by Status */}
-        <Card>
-          <ChartHeader title="Briefs by Status" note={`${data.totalBriefs} total`} />
-          <div className="space-y-2.5">
-            {[
-              { key: "draft", label: "Draft" },
-              { key: "active", label: "Active" },
-              { key: "in-progress", label: "In Progress" },
-              { key: "review", label: "Review" },
-              { key: "completed", label: "Completed" },
-              { key: "archived", label: "Archived" },
-            ].map(({ key, label }) => {
-              const count = data.briefsByStatus[key] ?? 0;
-              const pct = data.totalBriefs > 0 ? (count / data.totalBriefs) * 100 : 0;
-              return (
-                <StatusRow
-                  key={key}
-                  label={label}
-                  count={count}
-                  pct={pct}
-                  color="var(--accent-admin)"
-                />
-              );
-            })}
-          </div>
-        </Card>
+        <ChartCard
+          title="Briefs by status"
+          description={`${data.totalBriefs} briefs in all`}
+          table={{
+            columns: ["Status", "Briefs", "Share"],
+            rows: briefSegments.map((s) => [s.label, s.value, shareLabel(s.value, data.totalBriefs)]),
+          }}
+        >
+          <StackedBar segments={briefSegments} />
+        </ChartCard>
 
-        {/* Weekly Velocity */}
-        <Card>
-          <ChartHeader title="Weekly Velocity" note={`${velocitySum} done in 8 weeks`} />
-          <div className="relative h-[160px] pt-3">
-            <div className="absolute inset-x-0 top-3 bottom-6 flex flex-col justify-between pointer-events-none">
-              {[0, 1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="border-t border-[var(--border-subtle)]"
-                />
-              ))}
-            </div>
-            <div className="relative flex items-end gap-2 h-full">
-              {data.weeklyVelocity.map((w, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5">
-                  <span className="text-[11px] tabular-nums font-medium text-[var(--text-primary)] h-3.5">
-                    {w.count > 0 ? w.count : ""}
-                  </span>
-                  <div
-                    className="w-full rounded-t-sm transition-all duration-300"
-                    style={{
-                      height: `${Math.max((w.count / maxVelocity) * 100, 4)}%`,
-                      backgroundColor: w.count > 0 ? "var(--accent-employee)" : "var(--border-subtle)",
-                      minHeight: "4px",
-                    }}
+        <ChartCard
+          title="Weekly velocity"
+          description={`Tasks completed per week · ${velocitySum} in the last ${weeks.length} weeks`}
+          table={{
+            columns: ["Week ending", "Tasks done"],
+            rows: weeks.map((w) => [w.week, w.count]),
+          }}
+        >
+          <Columns categories={weeks.map((w) => w.week)} values={weeks.map((w) => w.count)} name="Tasks done" />
+        </ChartCard>
+        </div>
+
+        <ChartCard
+          title="Employee utilization"
+          description={`Tasks done out of assigned · ${people.length} ${people.length === 1 ? "person" : "people"}`}
+          table={{
+            columns: ["Person", "Done", "Assigned", "Share", "Tracked"],
+            rows: people.map((e) => [
+              e.name,
+              e.doneTasks,
+              e.totalTasks,
+              shareLabel(e.doneTasks, e.totalTasks),
+              `${e.trackedHours}h`,
+            ]),
+          }}
+        >
+          {people.length === 0 ? (
+            <p className="text-[13px] text-[var(--text-muted)]">No employees yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {BANDS.filter((b) => banded[b.key].length > 0).map((b) => (
+                <div key={b.key}>
+                  <p className="mb-1.5 flex items-center gap-2 text-[12px] font-medium text-[var(--text-muted)]">
+                    {b.title}
+                    <span className="font-normal tabular-nums">{banded[b.key].length}</span>
+                  </p>
+                  <BarList
+                    max={100}
+                    items={banded[b.key].map((e) => ({
+                      label: e.name,
+                      value: e.totalTasks > 0 ? (e.doneTasks / e.totalTasks) * 100 : 0,
+                      text: `${e.doneTasks}/${e.totalTasks}`,
+                    }))}
                   />
-                  <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">
-                    {w.week}
-                  </span>
                 </div>
               ))}
             </div>
-          </div>
-        </Card>
-
-        {/* Employee Utilization (banded) */}
-        <Card>
-          <ChartHeader
-            title="Employee Utilization"
-            note={`${data.employeeStats.length} ${data.employeeStats.length === 1 ? "person" : "people"}`}
-          />
-          <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
-            {data.employeeStats.length === 0 && (
-              <p className="text-[13px] text-[var(--text-muted)]">No employees yet.</p>
-            )}
-            {banded.behind.length > 0 && (
-              <UtilGroup title="Behind" count={banded.behind.length} emps={banded.behind} />
-            )}
-            {banded.inProgress.length > 0 && (
-              <UtilGroup title="In progress" count={banded.inProgress.length} emps={banded.inProgress} />
-            )}
-            {banded.onTrack.length > 0 && (
-              <UtilGroup title="On track" count={banded.onTrack.length} emps={banded.onTrack} />
-            )}
-          </div>
-        </Card>
+          )}
+        </ChartCard>
       </div>
 
-      {/* Recent Activity */}
-      <Panel title="Recent Activity">
-        <div className="max-h-[300px] overflow-y-auto divide-y divide-[var(--border-subtle)]">
+      <ChartCard title="Recent activity" description="Latest changes across briefs, tasks and deliverables">
+        <div className="-mx-4 -mb-4 max-h-[300px] overflow-y-auto divide-y divide-[var(--border-subtle)] border-t border-[var(--border-subtle)]">
           {data.recentActivity.map((log: ActivityLog) => (
             <div key={log._id} className="flex items-start gap-3 px-4 py-2.5">
               <Badge className="min-w-[68px] justify-center mt-0.5 shrink-0">
@@ -259,62 +243,10 @@ export default function AnalyticsTab() {
             </div>
           ))}
           {data.recentActivity.length === 0 && (
-            <PanelEmpty>No recent activity.</PanelEmpty>
+            <p className="px-4 py-3.5 text-[13px] text-[var(--text-muted)]">No recent activity.</p>
           )}
         </div>
-      </Panel>
-    </div>
-  );
-}
-
-function UtilGroup({
-  title,
-  count,
-  emps,
-}: {
-  title: string;
-  count: number;
-  emps: EmployeeStat[];
-}) {
-  return (
-    <div>
-      <p className="flex items-center gap-2 mb-1.5 text-[12px] font-medium text-[var(--text-muted)]">
-        {title}
-        <span className="font-normal tabular-nums">{count}</span>
-      </p>
-      <div className="space-y-1.5">
-        {emps.map((emp) => {
-          const rate = emp.totalTasks > 0
-            ? Math.round((emp.doneTasks / emp.totalTasks) * 100)
-            : 0;
-          return (
-            <div key={emp._id} className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[11px] font-medium text-[var(--text-secondary)] shrink-0">
-                {emp.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">
-                    {emp.name}
-                  </span>
-                  <span className="text-[12px] tabular-nums text-[var(--text-secondary)] shrink-0">
-                    {emp.doneTasks}/{emp.totalTasks}
-                  </span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-[var(--border-subtle)] mt-0.5">
-                  <div
-                    className="h-full rounded-full bg-[var(--accent-employee)] transition-all duration-300"
-                    style={{ width: `${rate}%` }}
-                  />
-                </div>
-              </div>
-              <span className="text-[12px] text-[var(--text-muted)] shrink-0 w-9 text-right tabular-nums">
-                {emp.trackedHours}h
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      </ChartCard>
     </div>
   );
 }
