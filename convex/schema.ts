@@ -1126,7 +1126,9 @@ export default defineSchema({
       v.literal("active"),
       v.literal("non_active"),
       v.literal("rejected"),
-      v.literal("on_hold")
+      v.literal("on_hold"),
+      // Added in cultform after the first import.
+      v.literal("shortlisted")
     ),
     statusUpdatedAt: v.optional(v.union(v.number(), v.null())),
     /** Where the candidate sits in the funnel. Optional only so the backfill

@@ -32,8 +32,20 @@ const statusValidator = v.union(
   v.literal("active"),
   v.literal("non_active"),
   v.literal("rejected"),
-  v.literal("on_hold")
+  v.literal("on_hold"),
+  v.literal("shortlisted")
 );
+
+/** The funnel stage a cultform status stands for. "Screened" is what the UI
+ *  labels Shortlisted. One row was ever non_active with any meaning, so it is
+ *  parked rather than read as a rejection. */
+const STAGE_FROM_STATUS = {
+  active: "applied",
+  shortlisted: "screened",
+  rejected: "rejected",
+  on_hold: "on_hold",
+  non_active: "on_hold",
+} as const;
 
 async function requireRecruiter(ctx: any) {
   const userId = await getAuthUserId(ctx);
@@ -813,6 +825,185 @@ export const sendTemplateEmail = action({
 });
 
 /* ── Migration ─────────────────────────────────────────────── */
+
+/**
+ * Bring the cultform JobData tables across, a batch at a time. Every row is
+ * matched on its MySQL id (`sourceId`), so it is safe to run again: rows that
+ * exist are updated, rows that don't are added, nothing is deleted.
+ *
+ * A candidate's stage follows the cultform status only while nobody has moved
+ * it here: once HR sets a stage in this app, a later run leaves it alone.
+ *
+ *   node scripts/import-cultform.mjs <folder of jd_*.json exports>
+ */
+export const importFromCultform = internalMutation({
+  args: {
+    jobs: v.optional(v.array(v.object({
+      sourceId: v.number(),
+      name: v.string(),
+      description: v.string(),
+      parentSourceId: v.union(v.number(), v.null()),
+      createdAt: v.number(),
+    }))),
+    candidates: v.optional(v.array(v.object({
+      sourceId: v.number(),
+      jobSourceId: v.number(),
+      name: v.string(),
+      number: v.string(),
+      email: v.string(),
+      age: v.union(v.number(), v.null()),
+      experience: v.string(),
+      resume: v.string(),
+      portfolioLink: v.string(),
+      position: v.string(),
+      currentCtc: v.string(),
+      expectedCtc: v.string(),
+      noticePeriod: v.string(),
+      status: statusValidator,
+      statusUpdatedAt: v.union(v.number(), v.null()),
+      createdAt: v.union(v.number(), v.null()),
+    }))),
+    templates: v.optional(v.array(v.object({
+      sourceId: v.number(),
+      jobSourceId: v.number(),
+      name: v.string(),
+      subject: v.string(),
+      body: v.string(),
+      createdAt: v.number(),
+    }))),
+    campaigns: v.optional(v.array(v.object({
+      sourceId: v.number(),
+      jobSourceId: v.number(),
+      name: v.string(),
+      startDate: v.number(),
+      endDate: v.union(v.number(), v.null()),
+      createdAt: v.number(),
+      source: v.union(v.literal("auto"), v.literal("manual")),
+      /** MySQL contact ids of its members. */
+      memberSourceIds: v.array(v.number()),
+    }))),
+    emailLogs: v.optional(v.array(v.object({
+      sourceId: v.number(),
+      jobSourceId: v.number(),
+      jobName: v.string(),
+      contactEmail: v.string(),
+      contactName: v.string(),
+      templateName: v.string(),
+      smtpFrom: v.string(),
+      status: v.union(v.literal("sent"), v.literal("failed")),
+      error: v.string(),
+      sentAt: v.number(),
+      campaignSourceId: v.union(v.number(), v.null()),
+    }))),
+  },
+  handler: async (ctx, args) => {
+    const done = { added: 0, updated: 0, unchanged: 0 };
+    /** True when any field of `row` differs from what is stored, so a re-run
+     *  only writes (and only counts) what really changed. */
+    const differs = (existing: Record<string, unknown>, row: Record<string, unknown>) =>
+      Object.entries(row).some(
+        ([k, val]) => JSON.stringify(existing[k] ?? null) !== JSON.stringify(val ?? null)
+      );
+
+    for (const j of args.jobs ?? []) {
+      const existing = await ctx.db
+        .query("recruitJobs")
+        .withIndex("by_source", (q) => q.eq("sourceId", j.sourceId))
+        .first();
+      if (!existing) {
+        // formUrl is edited here, not in cultform (its column is dead there).
+        await ctx.db.insert("recruitJobs", { ...j, formUrl: "" });
+        done.added++;
+      } else if (differs(existing, j)) {
+        await ctx.db.patch(existing._id, j);
+        done.updated++;
+      } else done.unchanged++;
+    }
+
+    for (const c of args.candidates ?? []) {
+      const existing = await ctx.db
+        .query("recruitCandidates")
+        .withIndex("by_source", (q) => q.eq("sourceId", c.sourceId))
+        .first();
+      const stage = STAGE_FROM_STATUS[c.status];
+      if (!existing) {
+        const stageUpdatedAt = c.statusUpdatedAt ?? c.createdAt;
+        await ctx.db.insert("recruitCandidates", {
+          ...c,
+          stage,
+          ...(stageUpdatedAt != null ? { stageUpdatedAt } : {}),
+        });
+        done.added++;
+        continue;
+      }
+      // Still where the last import left it (or never given a stage) →
+      // nobody moved it here.
+      const untouched =
+        existing.stage === undefined || existing.stage === STAGE_FROM_STATUS[existing.status];
+      const row =
+        untouched && existing.stage !== stage
+          ? { ...c, stage, stageUpdatedAt: c.statusUpdatedAt ?? Date.now() }
+          : c;
+      if (differs(existing, row)) {
+        await ctx.db.patch(existing._id, row);
+        done.updated++;
+      } else done.unchanged++;
+    }
+
+    if (args.templates?.length) {
+      const all = await ctx.db.query("recruitTemplates").collect();
+      for (const t of args.templates) {
+        const existing = all.find((x) => x.sourceId === t.sourceId);
+        if (!existing) {
+          await ctx.db.insert("recruitTemplates", t);
+          done.added++;
+        } else if (differs(existing, t)) {
+          await ctx.db.patch(existing._id, t);
+          done.updated++;
+        } else done.unchanged++;
+      }
+    }
+
+    if (args.campaigns?.length) {
+      const all = await ctx.db.query("recruitCampaigns").collect();
+      for (const { memberSourceIds, ...c } of args.campaigns) {
+        const candidateIds = [];
+        for (const sid of memberSourceIds) {
+          const cand = await ctx.db
+            .query("recruitCandidates")
+            .withIndex("by_source", (q) => q.eq("sourceId", sid))
+            .first();
+          if (cand) candidateIds.push(cand._id);
+        }
+        const existing = all.find((x) => x.sourceId === c.sourceId);
+        // Members added here stay: the cultform list only ever adds to it.
+        const row = { ...c, candidateIds: [...new Set([...(existing?.candidateIds ?? []), ...candidateIds])] };
+        if (!existing) {
+          await ctx.db.insert("recruitCampaigns", row);
+          done.added++;
+        } else if (differs(existing, row)) {
+          await ctx.db.patch(existing._id, row);
+          done.updated++;
+        } else done.unchanged++;
+      }
+    }
+
+    if (args.emailLogs?.length) {
+      // Logs are a record of what was sent: add the missing ones, never rewrite.
+      const have = new Set((await ctx.db.query("recruitEmailLogs").collect()).map((l) => l.sourceId));
+      for (const l of args.emailLogs) {
+        if (have.has(l.sourceId)) {
+          done.unchanged++;
+          continue;
+        }
+        await ctx.db.insert("recruitEmailLogs", l);
+        done.added++;
+      }
+    }
+
+    return done;
+  },
+});
 
 /**
  * One-shot backfill: give every imported candidate a funnel stage derived from

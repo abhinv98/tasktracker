@@ -14,7 +14,8 @@ export type Stage =
  */
 export const STAGES: { value: Stage; label: string; color: string; exit?: boolean }[] = [
   { value: "applied", label: "Applied", color: "#6b7280" },
-  { value: "screened", label: "Screened", color: "#2563eb" },
+  // HR's own word for this step, and the cultform status it was imported from.
+  { value: "screened", label: "Shortlisted", color: "#2563eb" },
   { value: "interview", label: "Interview", color: "#7c3aed" },
   { value: "offer", label: "Offer", color: "#d97706" },
   { value: "hired", label: "Hired", color: "#059669" },
