@@ -54,7 +54,7 @@ export default function RecruitmentPage() {
           {/* The funnel, not a pile of totals — this answers "where is everyone". */}
           {[
             { label: "Applied", value: stats.byStage?.applied ?? 0 },
-            { label: "Screened", value: stats.byStage?.screened ?? 0 },
+            { label: "Shortlisted", value: stats.byStage?.screened ?? 0 },
             { label: "Interview", value: stats.byStage?.interview ?? 0 },
             { label: "Offer", value: stats.byStage?.offer ?? 0 },
             { label: "Hired", value: stats.byStage?.hired ?? 0 },
