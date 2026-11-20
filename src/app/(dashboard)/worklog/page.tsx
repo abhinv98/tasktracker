@@ -407,6 +407,7 @@ function WorkLogPageInner() {
                       <div style={{ width: `${(team.statusCounts.review / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("review").dot }} />
                       <div style={{ width: `${(team.statusCounts["in-progress"] / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("in-progress").dot }} />
                       <div style={{ width: `${(team.statusCounts.pending / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("pending").dot }} />
+                      <div style={{ width: `${(team.statusCounts["on-hold"] / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("on-hold").dot }} />
                     </>
                   )}
                 </div>
@@ -414,6 +415,9 @@ function WorkLogPageInner() {
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="pending" />{team.statusCounts.pending} pending</span>
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="in-progress" />{team.statusCounts["in-progress"]} in progress</span>
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="review" />{team.statusCounts.review} review</span>
+                  {team.statusCounts["on-hold"] > 0 && (
+                    <span className="inline-flex items-center gap-1.5"><StatusDot status="on-hold" />{team.statusCounts["on-hold"]} on hold</span>
+                  )}
                 </div>
               </div>
 

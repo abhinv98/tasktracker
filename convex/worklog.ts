@@ -392,6 +392,7 @@ export const getTeamLoadView = query({
           pending: teamTasks.filter((t) => t.status === "pending").length,
           "in-progress": teamTasks.filter((t) => t.status === "in-progress").length,
           review: teamTasks.filter((t) => t.status === "review").length,
+          "on-hold": teamTasks.filter((t) => t.status === "on-hold").length,
         },
         loadLevel,
       };
