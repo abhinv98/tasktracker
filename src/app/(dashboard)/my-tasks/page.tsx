@@ -1,22 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { isTaskOverdue, taskStatusMeta } from "@/lib/status";
+import { isTaskOverdue, taskStatusMeta, TASK_STATUS_META } from "@/lib/status";
 import { useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
-import { Badge, Button, PageHeader, Panel, PanelEmpty, SegmentedTabs, StatStrip, StatTile, StatusBadge, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { Badge, Button, PageHeader, Panel, PanelEmpty, StatusBadge, TaskDetailModal, SkeletonPageHeader, SkeletonList } from "@/components/ui";
+import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
 import { TaskNavigator } from "@/components/TaskNavigator";
 import {
   ListTodo,
   Eye,
-  Filter,
-  Search,
   X,
 } from "lucide-react";
-import { fieldClass } from "@/components/ui/classes";
-
-const FILTER_FIELD = fieldClass;
 const TH = "px-4 py-2.5 text-left font-medium text-[12px] text-[var(--text-muted)]";
 
 function fmt(ts: number | null): string {
@@ -128,6 +124,19 @@ export default function MyTasksPage() {
     return shown !== total ? `${shown} of ${total}` : `${shown}`;
   };
 
+  // "Awaiting my review" is Supervising narrowed to the Review status.
+  const chip =
+    scope === "supervising" && statusFilter === "review" ? "review" : scope;
+  const pickChip = (next: "all" | "mine" | "supervising" | "review") => {
+    if (next === "review") {
+      setScope("supervising");
+      setStatusFilter("review");
+      return;
+    }
+    if (chip === "review") setStatusFilter("");
+    setScope(next);
+  };
+
   const showMine = scope !== "supervising";
   const showSup = scope !== "mine";
 
@@ -139,60 +148,42 @@ export default function MyTasksPage() {
         subtitle="Work assigned to you, plus the tasks you delegated and need to track & sign off."
       />
 
-      <StatStrip className="mb-4">
-        <StatTile label="Assigned to me, open" value={counts.assignedToMeOpen} />
-        <StatTile label="Assigned to me, all" value={counts.assignedToMe} />
-        <StatTile label="Supervising, open" value={counts.supervisingOpen} />
-        <StatTile label="Awaiting my review" value={counts.needsReview} />
-      </StatStrip>
+      {/* The counts double as the scope filter: click a number to see its rows. */}
+      <StatChips
+        className="mb-4"
+        label="Filter by whose tasks"
+        value={chip}
+        onChange={pickChip}
+        options={[
+          { value: "all", label: "All open", count: counts.assignedToMeOpen + counts.supervisingOpen },
+          { value: "mine", label: "Assigned to me", count: counts.assignedToMeOpen },
+          { value: "supervising", label: "Supervising", count: counts.supervisingOpen },
+          { value: "review", label: "Awaiting my review", count: counts.needsReview, dot: TASK_STATUS_META.review.dot },
+        ]}
+      />
 
-      {/* Filter bar */}
-      <div className="rounded-lg border border-[var(--border)] bg-white p-3 mb-4 flex flex-wrap items-center gap-2">
-        <SegmentedTabs
-          value={scope}
-          onChange={setScope}
-          options={[
-            { value: "all", label: "All" },
-            { value: "mine", label: "Assigned to me" },
-            { value: "supervising", label: "Supervising" },
-          ]}
+      {/* Filter row */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Search task, brief, brand, person…"
+          label="Search my tasks"
         />
-        <div className="flex items-center gap-1.5 pl-1 text-[12px] text-[var(--text-muted)]">
-          <Filter className="h-3.5 w-3.5" aria-hidden />
-        </div>
-        <select
+        <FilterTray
+          label="Status"
+          allLabel="All statuses"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className={`${FILTER_FIELD} px-2.5`}
-        >
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="in-progress">In Progress</option>
-          <option value="review">Review</option>
-          <option value="done">Done</option>
-          <option value="on-hold">On Hold</option>
-        </select>
-        <select
+          onChange={setStatusFilter}
+          options={Object.entries(TASK_STATUS_META).map(([value, m]) => ({ value, label: m.label }))}
+        />
+        <FilterTray
+          label="Brand"
+          allLabel="All brands"
           value={brandFilter}
-          onChange={(e) => setBrandFilter(e.target.value)}
-          className={`${FILTER_FIELD} px-2.5`}
-        >
-          <option value="">All brands</option>
-          {brandOptions.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className={`${FILTER_FIELD} pl-8 pr-2.5 w-[180px] placeholder:text-[var(--text-disabled)]`}
-          />
-        </div>
+          onChange={setBrandFilter}
+          options={brandOptions.map((b) => ({ value: b.id, label: b.name }))}
+        />
         <label className="flex items-center gap-1.5 pl-1 text-[13px] text-[var(--text-secondary)] cursor-pointer select-none">
           <input
             type="checkbox"
@@ -203,7 +194,7 @@ export default function MyTasksPage() {
           Hide done
         </label>
         {filtersActive && (
-          <Button variant="ghost" onClick={clearFilters} className="ml-auto">
+          <Button variant="ghost" onClick={clearFilters}>
             <X className="h-3.5 w-3.5" />
             Clear
           </Button>

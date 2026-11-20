@@ -2,12 +2,12 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { TaskNavigator } from "@/components/TaskNavigator";
-import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Badge, Button, ConfirmModal, DatePicker, EmptyState, Input, Modal, PageHeader, SegmentedTabs, Select, StatusBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
+import { Badge, Button, ConfirmModal, DatePicker, EmptyState, Input, Modal, PageHeader, SegmentedTabs, StatusBadge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, useToast } from "@/components/ui";
 
 // The date filters store YYYY-MM-DD (they always have; the filtering below
 // parses that). DatePicker speaks timestamps. Convert at the boundary rather
@@ -28,10 +28,11 @@ function fmtYmd(ymd: string): string {
     : "";
 }
 
-import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, Filter, List, FolderClosed, CheckCircle2, Briefcase, X, Eye, ExternalLink } from "lucide-react";
+import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, List, FolderClosed, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 import { taskStatusMeta } from "@/lib/status";
 import { fieldClass } from "@/components/ui/classes";
+import { FilterTray, SearchField, StatChips, Tray } from "@/components/ui/Tray";
 
 /** Designing / copywriting only. */
 function showCreativesRequiredField(
@@ -189,6 +190,7 @@ export default function BriefsPage() {
   const [filterDateStart, setFilterDateStart] = useState<string>("");
   const [filterDateEnd, setFilterDateEnd] = useState<string>("");
   const [filterTeamId, setFilterTeamId] = useState<string>("");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     try {
@@ -388,8 +390,17 @@ export default function BriefsPage() {
       const endTs = new Date(filterDateEnd + "T23:59:59").getTime();
       list = list.filter((b) => b.deadline && b.deadline <= endTs);
     }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      const brandName = new Map((brands ?? []).map((b: any) => [b._id, (b.name ?? "").toLowerCase()]));
+      list = list.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          (brandName.get((b as any).brandId) ?? "").includes(q)
+      );
+    }
     return list;
-  }, [briefs, filterBriefType, filterTeamId, filterDateStart, filterDateEnd]);
+  }, [briefs, brands, filterBriefType, filterTeamId, filterDateStart, filterDateEnd, search]);
 
   // Overdue drives the ordering, so the page answers "where do I go now"
   // instead of listing brands alphabetically. Ties fall back to the name so
@@ -406,34 +417,13 @@ export default function BriefsPage() {
     return { open, overdue, done };
   }
 
-  // ── Filter popover ────────────────────────────────────────────
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const filterPopoverRef = useRef<HTMLDivElement>(null);
-
-  // Click-outside to dismiss. The popover is absolutely positioned inside the
-  // filter row, which has no overflow clipping, so no portal is needed here.
-  useEffect(() => {
-    if (!filtersOpen) return;
-    function onDown(e: MouseEvent) {
-      if (!filterPopoverRef.current?.contains(e.target as Node)) setFiltersOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setFiltersOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [filtersOpen]);
-
   function clearAllFilters() {
     setFilterManagerId("");
     setFilterBriefType(""); 
     setFilterTeamId("");
     setFilterDateStart("");
     setFilterDateEnd("");
+    setSearch("");
   }
 
   const TYPE_LABELS: Record<string, string> = {
@@ -446,29 +436,8 @@ export default function BriefsPage() {
     single_task: "Single Task",
   };
 
-  const activeFilterChips = useMemo(() => {
-    const chips: { key: string; label: string; value: string; clear: () => void }[] = [];
-    if (filterManagerId) {
-      const m = (managers ?? []).find((x: any) => x._id === filterManagerId);
-      chips.push({ key: "manager", label: "Manager", value: m?.name ?? m?.email ?? "—", clear: () => setFilterManagerId("") });
-    }
-    if (filterBriefType) {
-      chips.push({ key: "type", label: "Type", value: TYPE_LABELS[filterBriefType] ?? filterBriefType, clear: () => setFilterBriefType("") });
-    }
-    if (filterTeamId) {
-      const t = (allTeams ?? []).find((x: any) => x._id === filterTeamId);
-      chips.push({ key: "team", label: "Team", value: t?.name ?? "—", clear: () => setFilterTeamId("") });
-    }
-    if (filterDateStart) {
-      chips.push({ key: "from", label: "Due from", value: fmtYmd(filterDateStart), clear: () => setFilterDateStart("") });
-    }
-    if (filterDateEnd) {
-      chips.push({ key: "to", label: "Due to", value: fmtYmd(filterDateEnd), clear: () => setFilterDateEnd("") });
-    }
-    return chips;
-  }, [filterManagerId, filterBriefType, filterTeamId, filterDateStart, filterDateEnd, managers, allTeams]);
-
-  const activeFilterCount = activeFilterChips.length;
+  const filtersActive =
+    !!filterManagerId || !!filterBriefType || !!filterTeamId || !!filterDateStart || !!filterDateEnd || !!search.trim();
 
   const activeBriefs = useMemo(() => filteredBriefs.filter((b) => b.status !== "completed" && b.status !== "review"), [filteredBriefs]);
   const completedBriefs = useMemo(() => filteredBriefs.filter((b) => b.status === "completed"), [filteredBriefs]);
@@ -721,121 +690,84 @@ export default function BriefsPage() {
         }
       />
 
-      {/* Tab Bar */}
-      <SegmentedTabs
-        className="mb-4"
+      {/* The counts double as the tab bar: click a number to see its briefs. */}
+      <StatChips
+        className="mb-4 sm:max-w-2xl"
+        label="Filter briefs by stage"
         value={briefsTab}
         onChange={setBriefsTab}
         options={[
-          { value: "active", label: "Active", icon: Briefcase, count: activeBriefs.length },
-          { value: "review", label: "Review", icon: Eye, count: reviewBriefs.length },
-          { value: "completed", label: "Completed", icon: CheckCircle2, count: completedList ? completedBriefs.length : undefined },
+          { value: "active", label: "Active", count: activeBriefs.length, dot: BRIEF_STATUS_COLORS.active },
+          { value: "review", label: "Review", count: reviewBriefs.length, dot: BRIEF_STATUS_COLORS.review },
+          { value: "completed", label: "Completed", count: completedList ? completedBriefs.length : undefined, dot: BRIEF_STATUS_COLORS.completed },
         ]}
       />
 
-      {/* Filter Bar — five always-on controls became one button. They're used
-          occasionally; the rows below are used constantly, so the rows get the
-          vertical space. Anything set shows as a removable chip so an active
-          filter is never hidden behind a closed popover. */}
+      {/* Filter row: search, then one small tray per filter. A filter that is
+          set says so on its own button, so nothing hides behind a closed tray. */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative" ref={filterPopoverRef}>
-          <Button
-            variant="secondary"
-            onClick={() => setFiltersOpen((v) => !v)}
-            aria-expanded={filtersOpen}
-          >
-            <Filter className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-[var(--text-primary)] text-white text-[11px] font-semibold tabular-nums">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-
-          {filtersOpen && (
-            <div className="animate-scaleIn absolute left-0 top-full mt-1.5 z-30 w-[280px] rounded-lg border border-[var(--border)] bg-white p-3 shadow-lg flex flex-col gap-3">
-              <Select
-                label="Manager"
-                value={filterManagerId}
-                onChange={(e) => setFilterManagerId(e.target.value)}
-                options={[
-                  { value: "", label: "All Managers" },
-                  ...(managers ?? []).map((m: any) => ({
-                    value: m._id,
-                    label: m.name ?? m.email,
-                  })),
-                ]}
+        <SearchField value={search} onChange={setSearch} placeholder="Search brief or brand…" label="Search briefs" />
+        <FilterTray
+          label="Manager"
+          allLabel="All managers"
+          value={filterManagerId}
+          onChange={setFilterManagerId}
+          options={(managers ?? []).map((m: any) => ({ value: m._id, label: m.name ?? m.email }))}
+        />
+        <FilterTray
+          label="Type"
+          allLabel="All types"
+          value={filterBriefType}
+          onChange={setFilterBriefType}
+          options={Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+        />
+        <FilterTray
+          label="Team"
+          allLabel="All teams"
+          value={filterTeamId}
+          onChange={setFilterTeamId}
+          options={(allTeams ?? []).map((t: any) => ({ value: t._id, label: t.name }))}
+        />
+        <Tray
+          title="Due date"
+          width="w-[280px]"
+          active={!!filterDateStart || !!filterDateEnd}
+          label={
+            filterDateStart || filterDateEnd ? (
+              <>
+                <span className="font-normal text-[var(--text-muted)]">Due:</span>
+                {filterDateStart ? fmtYmd(filterDateStart) : "any"} – {filterDateEnd ? fmtYmd(filterDateEnd) : "any"}
+              </>
+            ) : (
+              "Due"
+            )
+          }
+        >
+          {/* The app's own DatePicker speaks timestamps; the filters store
+              YYYY-MM-DD, so convert here and leave the filtering untouched. */}
+          <div className="grid grid-cols-2 gap-2 px-2 pb-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[13px] text-[var(--text-secondary)]">From</label>
+              <DatePicker
+                value={ymdToTs(filterDateStart)}
+                onChange={(ts) => setFilterDateStart(tsToYmd(ts))}
+                placeholder="Any"
               />
-              <Select
-                label="Type"
-                value={filterBriefType}
-                onChange={(e) => setFilterBriefType(e.target.value)}
-                options={[
-                  { value: "", label: "All Types" },
-                  { value: "developmental", label: "Developmental" },
-                  { value: "designing", label: "Designing" },
-                  { value: "video_editing", label: "Video Editing" },
-                  { value: "production", label: "Production" },
-                  { value: "copywriting", label: "Copywriting" },
-                  { value: "content_calendar", label: "Content Calendar" },
-                  { value: "single_task", label: "Single Task" },
-                ]}
-              />
-              <Select
-                label="Team"
-                value={filterTeamId}
-                onChange={(e) => setFilterTeamId(e.target.value)}
-                options={[
-                  { value: "", label: "All Teams" },
-                  ...(allTeams ?? []).map((t: any) => ({ value: t._id, label: t.name })),
-                ]}
-              />
-              {/* The app's own DatePicker, not <input type="date"> — this page
-                  was the only place running a second date vocabulary. It speaks
-                  timestamps, the filters store YYYY-MM-DD, so convert here and
-                  leave the filtering logic below untouched. */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)]">
-                    Due from
-                  </label>
-                  <DatePicker
-                    value={ymdToTs(filterDateStart)}
-                    onChange={(ts) => setFilterDateStart(tsToYmd(ts))}
-                    placeholder="Any"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-medium text-[13px] text-[var(--text-secondary)]">
-                    Due to
-                  </label>
-                  <DatePicker
-                    value={ymdToTs(filterDateEnd)}
-                    onChange={(ts) => setFilterDateEnd(tsToYmd(ts))}
-                    placeholder="Any"
-                  />
-                </div>
-              </div>
             </div>
-          )}
-        </div>
-
-        {/* Active filters, always visible even with the popover shut. */}
-        {activeFilterChips.map((chip) => (
-          <button
-            key={chip.key}
-            onClick={chip.clear}
-            className="group flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[var(--border)] bg-white text-[12px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
-          >
-            <span className="text-[var(--text-muted)]">{chip.label}:</span>
-            <span className="font-medium text-[var(--text-primary)]">{chip.value}</span>
-            <X className="h-3 w-3 text-[var(--text-muted)] group-hover:text-[var(--danger)]" />
-          </button>
-        ))}
-        {activeFilterCount > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[13px] text-[var(--text-secondary)]">To</label>
+              <DatePicker
+                value={ymdToTs(filterDateEnd)}
+                onChange={(ts) => setFilterDateEnd(tsToYmd(ts))}
+                placeholder="Any"
+              />
+            </div>
+          </div>
+        </Tray>
+        {filtersActive && (
           <Button variant="ghost" onClick={clearAllFilters}>
-            Clear all
+            <X className="h-3.5 w-3.5" />
+            Clear
           </Button>
         )}
 
