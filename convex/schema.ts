@@ -1103,6 +1103,8 @@ export default defineSchema({
     formUrl: v.string(),
     /** Set when this is a sub-position; candidates file under the parent. */
     parentSourceId: v.optional(v.union(v.number(), v.null())),
+    /** Closed roles drop off the website's application form. Missing = open. */
+    status: v.optional(v.union(v.literal("open"), v.literal("closed"))),
     createdAt: v.number(),
   }).index("by_source", ["sourceId"]),
 

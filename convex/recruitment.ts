@@ -7,7 +7,7 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
 // ── RECRUITMENT ────────────────────────────────────────────────
@@ -821,6 +821,127 @@ export const sendTemplateEmail = action({
       else failed++;
     }
     return { sent, failed };
+  },
+});
+
+/* ── Website application form ──────────────────────────────── */
+// The form on ecultify.com/job-application talks to /api/apply (a Next route),
+// which stores the resume and calls these two. Both are public on purpose: the
+// form is public. So this file is the trust boundary and checks everything.
+
+/** Roles the website form offers: every role that is not closed. */
+export const openPositions = query({
+  args: {},
+  handler: async (ctx) => {
+    const jobs = await ctx.db.query("recruitJobs").collect();
+    const closed = new Set(jobs.filter((j) => j.status === "closed").map((j) => j.sourceId));
+    return jobs
+      // Closing a role closes its sub-positions with it.
+      .filter((j) => !closed.has(j.sourceId) && !(j.parentSourceId && closed.has(j.parentSourceId)))
+      .map((j) => ({ id: j.sourceId, label: j.name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  },
+});
+
+const RESUME_KEY = /^resumes\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,120}\.pdf$/;
+const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+/** Plain text only: these values are later dropped into HTML emails, some
+ *  of them inside an attribute, so quotes go too. */
+const clean = (value: string | undefined, max: number) =>
+  (value ?? "").replace(/[<>"\u0000-\u001f]/g, " ").trim().slice(0, max);
+
+export const apply = mutation({
+  args: {
+    jobSourceId: v.number(),
+    name: v.string(),
+    email: v.string(),
+    number: v.optional(v.string()),
+    age: v.optional(v.union(v.number(), v.null())),
+    experience: v.optional(v.string()),
+    currentCtc: v.optional(v.string()),
+    expectedCtc: v.optional(v.string()),
+    noticePeriod: v.optional(v.string()),
+    portfolioLink: v.optional(v.string()),
+    /** The R2 key /api/apply stored the resume under. */
+    resumeKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const name = clean(args.name, 120);
+    const email = clean(args.email, 200).toLowerCase();
+    if (!name) throw new ConvexError("Please enter your name");
+    if (!EMAIL.test(email)) throw new ConvexError("A valid email is required");
+    if (args.resumeKey !== undefined && !RESUME_KEY.test(args.resumeKey)) {
+      throw new ConvexError("Resume upload failed. Please try again.");
+    }
+    const age =
+      typeof args.age === "number" && Number.isInteger(args.age) && args.age >= 16 && args.age <= 65
+        ? args.age
+        : null;
+
+    const selected = await ctx.db
+      .query("recruitJobs")
+      .withIndex("by_source", (q) => q.eq("sourceId", args.jobSourceId))
+      .first();
+    // A sub-position files under its parent; `position` keeps what was picked.
+    const jobSourceId = selected?.parentSourceId ?? selected?.sourceId;
+    const parent =
+      selected?.parentSourceId != null
+        ? await ctx.db
+            .query("recruitJobs")
+            .withIndex("by_source", (q) => q.eq("sourceId", selected.parentSourceId as number))
+            .first()
+        : selected;
+    if (!selected || jobSourceId === undefined || selected.status === "closed" || parent?.status === "closed") {
+      throw new ConvexError("This role is no longer open. Please pick another one.");
+    }
+
+    const now = Date.now();
+    // ponytail: one global flood breaker, no per-IP limit. Add a captcha on the
+    // form if real spam shows up.
+    // Rows with a sourceId came from a cultform import, not from the form.
+    const recent = (await ctx.db.query("recruitCandidates").order("desc").take(600)).filter(
+      (c) => c.sourceId === undefined && c._creationTime > now - 3_600_000
+    );
+    if (recent.length >= 300) {
+      throw new ConvexError("We are receiving too many applications right now. Please try again in an hour.");
+    }
+    // A double click or a retry must not create a second row.
+    if (
+      recent.some(
+        (c) => c.email === email && c.jobSourceId === jobSourceId && c._creationTime > now - 600_000
+      )
+    ) {
+      return { success: true, saved: false };
+    }
+
+    await ctx.db.insert("recruitCandidates", {
+      jobSourceId,
+      name,
+      email,
+      number: clean(args.number, 30),
+      age,
+      experience: clean(args.experience, 50),
+      resume: args.resumeKey ? `${process.env.SITE_URL}/api/r2-file?key=${args.resumeKey}` : "",
+      portfolioLink: clean(args.portfolioLink, 500),
+      position: selected.name,
+      currentCtc: clean(args.currentCtc, 100),
+      expectedCtc: clean(args.expectedCtc, 100),
+      noticePeriod: clean(args.noticePeriod, 100),
+      status: "active",
+      statusUpdatedAt: null,
+      stage: "applied",
+      createdAt: now,
+    });
+    return { success: true, saved: true };
+  },
+});
+
+/** Open or close a role on the website form. */
+export const setJobOpen = mutation({
+  args: { jobId: v.id("recruitJobs"), open: v.boolean() },
+  handler: async (ctx, { jobId, open }) => {
+    await requireRecruiter(ctx);
+    await ctx.db.patch(jobId, { status: open ? "open" : "closed" });
   },
 });
 
