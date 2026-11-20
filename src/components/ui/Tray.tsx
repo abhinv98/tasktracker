@@ -77,7 +77,7 @@ export function Tray({
       </button>
       {open && (
         <div
-          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-80 flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg ${width} ${
+          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-[24rem] flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg ${width} ${
             align === "end" ? "right-0" : "left-0"
           }`}
         >
