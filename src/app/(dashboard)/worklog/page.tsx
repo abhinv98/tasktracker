@@ -404,7 +404,6 @@ function WorkLogPageInner() {
                 <div className="flex h-1.5 rounded-full overflow-hidden bg-[var(--border-subtle)]">
                   {team.totalTasks > 0 && (
                     <>
-                      <div style={{ width: `${(team.statusCounts.done / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("done").dot }} />
                       <div style={{ width: `${(team.statusCounts.review / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("review").dot }} />
                       <div style={{ width: `${(team.statusCounts["in-progress"] / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("in-progress").dot }} />
                       <div style={{ width: `${(team.statusCounts.pending / team.totalTasks) * 100}%`, backgroundColor: taskStatusMeta("pending").dot }} />
@@ -415,7 +414,6 @@ function WorkLogPageInner() {
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="pending" />{team.statusCounts.pending} pending</span>
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="in-progress" />{team.statusCounts["in-progress"]} in progress</span>
                   <span className="inline-flex items-center gap-1.5"><StatusDot status="review" />{team.statusCounts.review} review</span>
-                  <span className="inline-flex items-center gap-1.5"><StatusDot status="done" />{team.statusCounts.done} done</span>
                 </div>
               </div>
 
@@ -440,12 +438,11 @@ function WorkLogPageInner() {
                         <Badge>{member.supervisingCount} supervising</Badge>
                       )}
                       <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
-                        {member.taskCount} tasks
+                        {member.taskCount} active
                       </span>
                       <div className="flex h-1.5 w-16 rounded-full overflow-hidden bg-[var(--border-subtle)]">
                         {member.taskCount > 0 && (
                           <>
-                            <div style={{ width: `${(member.doneTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("done").dot }} />
                             <div style={{ width: `${(member.reviewTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("review").dot }} />
                             <div style={{ width: `${(member.inProgressTasks / member.taskCount) * 100}%`, backgroundColor: taskStatusMeta("in-progress").dot }} />
                           </>
@@ -458,7 +455,7 @@ function WorkLogPageInner() {
 
               <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
                 <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
-                  {team.members.length} members &middot; {team.totalTasks} total tasks
+                  {team.members.length} members &middot; {team.totalTasks} active tasks
                 </span>
               </div>
             </Card>

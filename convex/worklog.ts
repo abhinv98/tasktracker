@@ -331,7 +331,11 @@ export const getTeamLoadView = query({
     );
     // A Set, not activeBriefs.some() per task: that was tasks × briefs work.
     const activeBriefIds = new Set<string>(activeBriefs.map((b) => b._id));
-    const activeTasks = allTasks.filter((t) => activeBriefIds.has(t.briefId));
+    // Open work only: a finished task is not load, and the member panel
+    // (getTeamMemberTasks) lists the same set, so the row and panel agree.
+    const activeTasks = allTasks.filter(
+      (t) => activeBriefIds.has(t.briefId) && t.status !== "done"
+    );
 
     return teams.map((team) => {
       const memberLinks = userTeams.filter((ut) => ut.teamId === team._id);
@@ -359,7 +363,6 @@ export const getTeamLoadView = query({
             pendingTasks: memberTasks.filter((t) => t.status === "pending").length,
             inProgressTasks: memberTasks.filter((t) => t.status === "in-progress").length,
             reviewTasks: memberTasks.filter((t) => t.status === "review").length,
-            doneTasks: memberTasks.filter((t) => t.status === "done").length,
           };
         })
         .filter(Boolean);
@@ -389,7 +392,6 @@ export const getTeamLoadView = query({
           pending: teamTasks.filter((t) => t.status === "pending").length,
           "in-progress": teamTasks.filter((t) => t.status === "in-progress").length,
           review: teamTasks.filter((t) => t.status === "review").length,
-          done: teamTasks.filter((t) => t.status === "done").length,
         },
         loadLevel,
       };
