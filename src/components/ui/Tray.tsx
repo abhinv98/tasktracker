@@ -22,7 +22,7 @@ export function Tray({
   icon: Icon,
   active = false,
   title,
-  width = "w-max min-w-56 max-w-[24rem]",
+  width = "w-max max-w-[24rem]",
   align = "start",
   children,
 }: {
@@ -78,7 +78,7 @@ export function Tray({
       </button>
       {open && (
         <div
-          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-[24rem] flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg min-w-full ${width} ${
+          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-[24rem] flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg min-w-[max(100%,11rem)] ${width} ${
             align === "end" ? "right-0" : "left-0"
           }`}
         >
