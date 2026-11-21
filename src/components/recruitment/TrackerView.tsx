@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "convex/react";
-import { ExternalLink, Plus, Trash2, X } from "lucide-react";
+import { useAuthToken } from "@convex-dev/auth/react";
+import { ExternalLink, FileText, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable, useConfirm, useToast } from "@/components/ui";
@@ -267,6 +268,31 @@ function RecordPanel({
   const { toast } = useToast();
   const askConfirm = useConfirm();
   const router = useRouter();
+  const authToken = useAuthToken();
+  const [makingLetter, setMakingLetter] = useState(false);
+
+  /** The appointment letter for this offer, as a Word file (see /api/appointment-letter). */
+  async function downloadLetter() {
+    if (!row) return;
+    setMakingLetter(true);
+    try {
+      const res = await fetch("/api/appointment-letter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ offerId: row._id }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Could not make the letter");
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(await res.blob());
+      link.download = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "Appointment Letter.docx";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not make the letter");
+    } finally {
+      setMakingLetter(false);
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -382,6 +408,12 @@ function RecordPanel({
                       </span>
                     </span>
                   ))}
+                {tracker === "offers" && (
+                  <Button type="button" size="sm" variant="secondary" loading={makingLetter} onClick={downloadLetter}>
+                    <FileText size={13} />
+                    Appointment letter
+                  </Button>
+                )}
                 {typeof resume === "string" && (
                   <a
                     href={resume}
@@ -485,11 +517,13 @@ function FieldInput({
   if (field.type === "long") {
     return <textarea {...common} rows={3} maxLength={maxLength(field)} className={`${fieldBaseClass} w-full py-2`} />;
   }
-  if (field.type === "select" || field.type === "user" || field.type === "ref") {
+  if (field.type === "select" || field.type === "user" || field.type === "ref" || field.type === "job") {
     const options =
       field.type === "select"
         ? (field.options ?? []).map((o) => ({ value: o, label: o }))
-        : field.type === "user"
+        : field.type === "job"
+          ? data.jobs.map((j) => ({ value: j.id, label: j.name }))
+          : field.type === "user"
           ? data.people.map((p) => ({ value: p._id, label: p.name }))
           : data.book[field.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }));
     return (
@@ -506,7 +540,7 @@ function FieldInput({
   return (
     <input
       {...common}
-      type={field.type === "text" ? "text" : field.type}
+      type={field.type === "date" || field.type === "time" || field.type === "number" ? field.type : "text"}
       min={field.type === "number" ? 0 : undefined}
       step={field.type === "number" ? "any" : undefined}
       maxLength={field.type === "text" ? maxLength(field) : undefined}

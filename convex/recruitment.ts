@@ -1,4 +1,3 @@
-import { getAuthUserId } from "./lib/internalAuth";
 import {
   mutation,
   query,
@@ -8,16 +7,19 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { ConvexError, v } from "convex/values";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
 
 // ── RECRUITMENT ────────────────────────────────────────────────
 // Imported from the cultform JobData MySQL app. Rows join on `sourceId`
 // (the original MySQL primary key) rather than Convex Ids, so the public
 // application form can dual-write into both systems and stay reconcilable.
 //
-// Access: HR, super-admins, and anyone they have handed recruitment access
-// (users.canRecruit, see hrOps.setRecruitAccess). Everyone else stays out:
-// salaries, phone numbers and CVs are not general reading.
+// Access: HR and super-admins see every position. Anyone they have given
+// positions to (users.recruitJobs, see hrOps.setRecruitAccess) sees those
+// positions only. Everyone else stays out: salaries, phone numbers and CVs
+// are not general reading. Every function below checks the position.
 
 const stageValidator = v.union(
   v.literal("applied"),
@@ -48,30 +50,41 @@ const STAGE_FROM_STATUS = {
   non_active: "on_hold",
 } as const;
 
-async function requireRecruiter(ctx: any) {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("Not authenticated");
-  const user = await ctx.db.get(userId);
-  if (!user || (user.isHR !== true && user.isSuperAdmin !== true && user.canRecruit !== true)) {
-    throw new Error("Recruitment is HR only");
-  }
-  return { userId, user };
+type Ctx = QueryCtx | MutationCtx;
+
+async function requireRecruiter(ctx: Ctx): Promise<RecruitAccess> {
+  const access = await recruitAccess(ctx);
+  if (!access) throw new Error("Recruitment is HR only");
+  return access;
 }
 
-async function canRecruit(ctx: any): Promise<boolean> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return false;
-  const user = await ctx.db.get(userId);
-  return user?.isHR === true || user?.isSuperAdmin === true || user?.canRecruit === true;
+/** Roles, the website switch and anything that spans positions: HR and super admins. */
+async function requireFull(ctx: Ctx): Promise<RecruitAccess> {
+  const access = await requireRecruiter(ctx);
+  if (!access.full) throw new Error("Only HR and super admins can do this");
+  return access;
+}
+
+function requireJob(access: RecruitAccess, jobSourceId: number) {
+  if (!mayRecruitFor(access, jobSourceId)) throw new Error("You do not have access to this position");
+}
+
+/** Every one of these candidates must sit in a position the caller may work on. */
+async function requireCandidates(ctx: Ctx, access: RecruitAccess, ids: Id<"recruitCandidates">[]) {
+  if (access.full) return;
+  for (const id of ids) {
+    const c = await ctx.db.get(id);
+    if (c) requireJob(access, c.jobSourceId);
+  }
 }
 
 /** Jobs with their live candidate counts, parents before their sub-positions. */
 export const listJobs = query({
   args: {},
   handler: async (ctx) => {
-    if (!(await canRecruit(ctx))) return [];
-
-    const jobs = await ctx.db.query("recruitJobs").collect();
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
+    const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
     const candidates = await ctx.db.query("recruitCandidates").collect();
 
     const counts = new Map<number, { total: number; active: number; rejected: number; inPlay: number; moving: number }>();
@@ -118,10 +131,12 @@ export const listJobs = query({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
-    if (!(await canRecruit(ctx))) return null;
-    const candidates = await ctx.db.query("recruitCandidates").collect();
-    const jobs = await ctx.db.query("recruitJobs").collect();
-    const logs = await ctx.db.query("recruitEmailLogs").collect();
+    const access = await recruitAccess(ctx);
+    if (!access) return null;
+    const mine = <T extends { jobSourceId: number }>(rows: T[]) => rows.filter((r) => mayRecruitFor(access, r.jobSourceId));
+    const candidates = mine(await ctx.db.query("recruitCandidates").collect());
+    const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    const logs = mine(await ctx.db.query("recruitEmailLogs").collect());
 
     const byStatus: Record<string, number> = {
       active: 0, non_active: 0, rejected: 0, on_hold: 0,
@@ -166,7 +181,8 @@ export const listCandidates = query({
     maxNoticeDays: v.optional(v.number()),
   },
   handler: async (ctx, { jobSourceId, stage, search, minYears, maxExpected, maxNoticeDays }) => {
-    if (!(await canRecruit(ctx))) return [];
+    const access = await recruitAccess(ctx);
+    if (!access || !mayRecruitFor(access, jobSourceId)) return [];
     let rows = await ctx.db
       .query("recruitCandidates")
       .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
@@ -223,12 +239,14 @@ export const listCandidates = query({
 export const searchCandidates = query({
   args: { search: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { search, limit }) => {
-    if (!(await canRecruit(ctx))) return [];
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
     const s = search.trim().toLowerCase();
     if (s.length < 2) return [];
     const jobs = await ctx.db.query("recruitJobs").collect();
     const rows = await ctx.db.query("recruitCandidates").collect();
     return rows
+      .filter((r) => mayRecruitFor(access, r.jobSourceId))
       .filter(
         (r) =>
           r.name.toLowerCase().includes(s) ||
@@ -246,15 +264,17 @@ export const searchCandidates = query({
 export const listTemplates = query({
   args: { jobSourceId: v.optional(v.number()) },
   handler: async (ctx, { jobSourceId }) => {
-    if (!(await canRecruit(ctx))) return [];
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
     const jobs = await ctx.db.query("recruitJobs").collect();
-    const rows =
+    const rows = (
       jobSourceId != null
         ? await ctx.db
             .query("recruitTemplates")
             .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
             .collect()
-        : await ctx.db.query("recruitTemplates").collect();
+        : await ctx.db.query("recruitTemplates").collect()
+    ).filter((t) => mayRecruitFor(access, t.jobSourceId));
     return rows.map((t) => ({
       ...t,
       jobName: jobs.find((j) => j.sourceId === t.jobSourceId)?.name ?? "Unknown",
@@ -266,14 +286,16 @@ export const listTemplates = query({
 export const listEmailLogs = query({
   args: { jobSourceId: v.optional(v.number()), limit: v.optional(v.number()) },
   handler: async (ctx, { jobSourceId, limit }) => {
-    if (!(await canRecruit(ctx))) return [];
-    const rows =
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
+    const rows = (
       jobSourceId != null
         ? await ctx.db
             .query("recruitEmailLogs")
             .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
             .collect()
-        : await ctx.db.query("recruitEmailLogs").collect();
+        : await ctx.db.query("recruitEmailLogs").collect()
+    ).filter((l) => mayRecruitFor(access, l.jobSourceId));
     rows.sort((a, b) => b.sentAt - a.sentAt);
     return rows.slice(0, limit ?? 50);
   },
@@ -287,7 +309,7 @@ export const setCandidateStatus = mutation({
     status: statusValidator,
   },
   handler: async (ctx, { candidateIds, status }) => {
-    await requireRecruiter(ctx);
+    await requireCandidates(ctx, await requireRecruiter(ctx), candidateIds);
     const now = Date.now();
     for (const id of candidateIds) {
       await ctx.db.patch(id, { status, statusUpdatedAt: now });
@@ -303,7 +325,7 @@ export const createJob = mutation({
     parentSourceId: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, { name, description, parentSourceId }) => {
-    await requireRecruiter(ctx);
+    await requireFull(ctx);
     if (!name.trim()) throw new Error("Name is required");
     // Keep allocating sourceIds above the imported range so a later
     // reconciliation against MySQL can still tell the two apart.
@@ -328,7 +350,7 @@ export const updateJob = mutation({
     formUrl: v.optional(v.string()),
   },
   handler: async (ctx, { jobId, ...patch }) => {
-    await requireRecruiter(ctx);
+    await requireFull(ctx);
     const clean = Object.fromEntries(
       Object.entries(patch).filter(([, v]) => v !== undefined)
     );
@@ -339,7 +361,7 @@ export const updateJob = mutation({
 export const deleteCandidates = mutation({
   args: { candidateIds: v.array(v.id("recruitCandidates")) },
   handler: async (ctx, { candidateIds }) => {
-    await requireRecruiter(ctx);
+    await requireCandidates(ctx, await requireRecruiter(ctx), candidateIds);
     for (const id of candidateIds) await ctx.db.delete(id);
     // Drop them from campaign member lists so memberCount stays right.
     const del = new Set<string>(candidateIds);
@@ -368,7 +390,7 @@ export const addCandidate = mutation({
     age: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
-    await requireRecruiter(ctx);
+    requireJob(await requireRecruiter(ctx), args.jobSourceId);
     if (!args.name.trim()) throw new Error("Name is required");
     if (!args.email.trim()) throw new Error("Email is required");
     return await ctx.db.insert("recruitCandidates", {
@@ -400,9 +422,13 @@ export const saveTemplate = mutation({
     body: v.string(),
   },
   handler: async (ctx, { templateId, jobSourceId, name, subject, body }) => {
-    await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
+    requireJob(access, jobSourceId);
     if (!name.trim() || !subject.trim()) throw new Error("Name and subject are required");
     if (templateId) {
+      const existing = await ctx.db.get(templateId);
+      if (!existing) throw new Error("Template not found");
+      requireJob(access, existing.jobSourceId);
       await ctx.db.patch(templateId, { name, subject, body, jobSourceId });
       return templateId;
     }
@@ -416,7 +442,9 @@ export const saveTemplate = mutation({
 export const deleteTemplate = mutation({
   args: { templateId: v.id("recruitTemplates") },
   handler: async (ctx, { templateId }) => {
-    await requireRecruiter(ctx);
+    const template = await ctx.db.get(templateId);
+    if (!template) return;
+    requireJob(await requireRecruiter(ctx), template.jobSourceId);
     await ctx.db.delete(templateId);
   },
 });
@@ -433,7 +461,9 @@ export const setStage = mutation({
     note: v.optional(v.string()),
   },
   handler: async (ctx, { candidateIds, stage, note }) => {
-    const { userId, user } = await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
+    await requireCandidates(ctx, access, candidateIds);
+    const { userId, user } = access;
     const authorName = user.name ?? user.email ?? "HR";
     const now = Date.now();
     let updated = 0;
@@ -462,7 +492,9 @@ export const setStage = mutation({
 export const addNote = mutation({
   args: { candidateId: v.id("recruitCandidates"), body: v.string() },
   handler: async (ctx, { candidateId, body }) => {
-    const { userId, user } = await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
+    await requireCandidates(ctx, access, [candidateId]);
+    const { userId, user } = access;
     if (!body.trim()) throw new Error("Note can't be empty");
     return await ctx.db.insert("recruitActivity", {
       candidateId,
@@ -478,9 +510,10 @@ export const addNote = mutation({
 export const deleteActivity = mutation({
   args: { activityId: v.id("recruitActivity") },
   handler: async (ctx, { activityId }) => {
-    await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
     const a = await ctx.db.get(activityId);
     if (!a) return;
+    await requireCandidates(ctx, access, [a.candidateId]);
     // Stage moves are the audit trail — only notes are removable.
     if (a.kind !== "note") throw new Error("Stage history can't be deleted");
     await ctx.db.delete(activityId);
@@ -492,9 +525,10 @@ export const deleteActivity = mutation({
 export const getCandidate = query({
   args: { candidateId: v.id("recruitCandidates") },
   handler: async (ctx, { candidateId }) => {
-    if (!(await canRecruit(ctx))) return null;
+    const access = await recruitAccess(ctx);
+    if (!access) return null;
     const c = await ctx.db.get(candidateId);
-    if (!c) return null;
+    if (!c || !mayRecruitFor(access, c.jobSourceId)) return null;
 
     const jobs = await ctx.db.query("recruitJobs").collect();
     const activity = await ctx.db
@@ -508,7 +542,7 @@ export const getCandidate = query({
             .query("recruitEmailLogs")
             .withIndex("by_email", (q) => q.eq("contactEmail", c.email))
             .collect()
-        )
+        ).filter((e) => mayRecruitFor(access, e.jobSourceId))
       : [];
 
     // Same email address may have applied to several roles; the timeline is
@@ -545,7 +579,7 @@ export const getCandidate = query({
             .withIndex("by_email", (q) => q.eq("email", c.email))
             .collect()
         )
-          .filter((o) => o._id !== c._id)
+          .filter((o) => o._id !== c._id && mayRecruitFor(access, o.jobSourceId))
           .map((o) => ({
             _id: o._id,
             jobSourceId: o.jobSourceId,
@@ -571,15 +605,17 @@ export const getCandidate = query({
 export const listCampaigns = query({
   args: { jobSourceId: v.optional(v.number()) },
   handler: async (ctx, { jobSourceId }) => {
-    if (!(await canRecruit(ctx))) return [];
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
     const jobs = await ctx.db.query("recruitJobs").collect();
-    const rows =
+    const rows = (
       jobSourceId != null
         ? await ctx.db
             .query("recruitCampaigns")
             .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
             .collect()
-        : await ctx.db.query("recruitCampaigns").collect();
+        : await ctx.db.query("recruitCampaigns").collect()
+    ).filter((c) => mayRecruitFor(access, c.jobSourceId));
 
     const logs = await ctx.db.query("recruitEmailLogs").collect();
     rows.sort((a, b) => b.startDate - a.startDate);
@@ -602,14 +638,17 @@ export const listCampaigns = query({
 export const getCampaign = query({
   args: { campaignId: v.id("recruitCampaigns") },
   handler: async (ctx, { campaignId }) => {
-    if (!(await canRecruit(ctx))) return null;
+    const access = await recruitAccess(ctx);
+    if (!access) return null;
     const c = await ctx.db.get(campaignId);
-    if (!c) return null;
+    if (!c || !mayRecruitFor(access, c.jobSourceId)) return null;
     const members = [];
     for (const id of c.candidateIds ?? []) {
       const cand = await ctx.db.get(id);
-      // Candidates deleted since being added just drop out of the list.
-      if (cand) members.push(cand);
+      // Candidates deleted since being added just drop out of the list, and so
+      // does anyone from a position this person does not have (a campaign can
+      // hold people from more than one).
+      if (cand && mayRecruitFor(access, cand.jobSourceId)) members.push(cand);
     }
     const jobs = await ctx.db.query("recruitJobs").collect();
     return {
@@ -628,7 +667,10 @@ export const createCampaign = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, { name, jobSourceId, candidateIds, notes }) => {
-    const { userId } = await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
+    requireJob(access, jobSourceId);
+    await requireCandidates(ctx, access, candidateIds);
+    const { userId } = access;
     if (!name.trim()) throw new Error("Campaign name is required");
     const all = await ctx.db.query("recruitCampaigns").collect();
     // Stay above the imported MySQL id range so email logs can attribute
@@ -657,9 +699,11 @@ export const updateCampaignMembers = mutation({
     remove: v.optional(v.array(v.id("recruitCandidates"))),
   },
   handler: async (ctx, { campaignId, add, remove }) => {
-    await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
     const c = await ctx.db.get(campaignId);
     if (!c) throw new Error("Campaign not found");
+    requireJob(access, c.jobSourceId);
+    await requireCandidates(ctx, access, add ?? []);
     const set = new Set<string>((c.candidateIds ?? []).map(String));
     for (const id of add ?? []) set.add(String(id));
     for (const id of remove ?? []) set.delete(String(id));
@@ -672,7 +716,9 @@ export const updateCampaignMembers = mutation({
 export const closeCampaign = mutation({
   args: { campaignId: v.id("recruitCampaigns"), reopen: v.optional(v.boolean()) },
   handler: async (ctx, { campaignId, reopen }) => {
-    await requireRecruiter(ctx);
+    const c = await ctx.db.get(campaignId);
+    if (!c) throw new Error("Campaign not found");
+    requireJob(await requireRecruiter(ctx), c.jobSourceId);
     await ctx.db.patch(campaignId, { endDate: reopen ? null : Date.now() });
   },
 });
@@ -680,7 +726,9 @@ export const closeCampaign = mutation({
 export const deleteCampaign = mutation({
   args: { campaignId: v.id("recruitCampaigns") },
   handler: async (ctx, { campaignId }) => {
-    await requireRecruiter(ctx);
+    const c = await ctx.db.get(campaignId);
+    if (!c) return;
+    requireJob(await requireRecruiter(ctx), c.jobSourceId);
     // Only the grouping goes; the candidates and their send history stay.
     await ctx.db.delete(campaignId);
   },
@@ -710,12 +758,21 @@ export const _loadSendContext = internalQuery({
   args: {
     candidateIds: v.array(v.id("recruitCandidates")),
     templateId: v.id("recruitTemplates"),
+    campaignSourceId: v.optional(v.number()),
   },
-  handler: async (ctx, { candidateIds, templateId }) => {
+  handler: async (ctx, { candidateIds, templateId, campaignSourceId }) => {
     // Auth carries over from the calling action; gates sendTemplateEmail.
-    await requireRecruiter(ctx);
+    const access = await requireRecruiter(ctx);
     const template = await ctx.db.get(templateId);
     if (!template) throw new Error("Template not found");
+    requireJob(access, template.jobSourceId);
+    await requireCandidates(ctx, access, candidateIds);
+    // The send is counted against this campaign, so it must be one of theirs too.
+    if (campaignSourceId !== undefined) {
+      const campaign = (await ctx.db.query("recruitCampaigns").collect()).find((c) => c.sourceId === campaignSourceId);
+      if (!campaign) throw new Error("Campaign not found");
+      requireJob(access, campaign.jobSourceId);
+    }
     const jobs = await ctx.db.query("recruitJobs").collect();
     const out = [];
     for (const id of candidateIds) {
@@ -777,7 +834,7 @@ export const sendTemplateEmail = action({
 
     const { templateName, recipients } = await ctx.runQuery(
       internal.recruitment._loadSendContext,
-      { candidateIds, templateId }
+      { candidateIds, templateId, campaignSourceId }
     );
 
     let sent = 0;
@@ -941,7 +998,7 @@ export const apply = mutation({
 export const setJobOpen = mutation({
   args: { jobId: v.id("recruitJobs"), open: v.boolean() },
   handler: async (ctx, { jobId, open }) => {
-    await requireRecruiter(ctx);
+    await requireFull(ctx);
     await ctx.db.patch(jobId, { status: open ? "open" : "closed" });
   },
 });

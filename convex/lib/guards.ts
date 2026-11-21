@@ -77,3 +77,34 @@ export async function canViewBrief(
   const isHRBrief = links.some((l) => l.teamId === hrTeam._id);
   return user.isHR === true ? isHRBrief : !isHRBrief;
 }
+
+/** Who may work in recruitment, and on which positions. */
+export type RecruitAccess = {
+  userId: Id<"users">;
+  user: Doc<"users">;
+  /** HR and super admins: every position, every tracker, and who else gets in. */
+  full: boolean;
+  /** For everyone else: the positions HR gave them (users.recruitJobs), with
+   *  their sub-positions. Applicants file under the parent position. */
+  jobs: ReadonlySet<number>;
+};
+
+/** The caller's recruitment access, or null when they have none. */
+export async function recruitAccess(ctx: Ctx): Promise<RecruitAccess | null> {
+  const userId = await getAuthUserId(ctx);
+  const user = userId ? await ctx.db.get(userId) : null;
+  if (!userId || !user || user.role === "client" || user.isReviewer === true) return null;
+  const full = user.isHR === true || user.isSuperAdmin === true;
+  const jobs = new Set(user.recruitJobs ?? []);
+  if (!full && jobs.size === 0) return null;
+  if (!full) {
+    for (const job of await ctx.db.query("recruitJobs").collect()) {
+      if (job.parentSourceId != null && jobs.has(job.parentSourceId)) jobs.add(job.sourceId);
+    }
+  }
+  return { userId, user, full, jobs };
+}
+
+/** May this person work on that position? */
+export const mayRecruitFor = (access: RecruitAccess, jobSourceId: number) =>
+  access.full || access.jobs.has(jobSourceId);

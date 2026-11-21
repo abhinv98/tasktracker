@@ -101,11 +101,11 @@ export default function DashboardLayout({
       router.replace("/dashboard");
     }
     // Recruitment holds candidate PII — salaries, phone numbers, CVs. HR,
-    // super-admins, and anyone they have handed recruitment access.
+    // super-admins, and anyone they have given positions to.
     if (
       user.isHR !== true &&
       user.isSuperAdmin !== true &&
-      user.canRecruit !== true &&
+      !user.recruitJobs?.length &&
       pathname.startsWith("/recruitment")
     ) {
       router.replace("/dashboard");

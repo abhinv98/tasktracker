@@ -87,6 +87,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/recruitment/candidates": Search,
   "/recruitment/applicants": Inbox,
   "/recruitment/access": KeyRound,
+  "/recruitment/meetings": AudioLines,
   "/recruitment/t/rounds": Briefcase,
   "/recruitment/t/pipeline": Users2,
   "/recruitment/t/interviews": CalendarRange,
@@ -283,6 +284,7 @@ const RECRUITMENT_NAV: NavCategory[] = [
       { href: "/recruitment/t/interviews", label: "Interviews" },
       { href: "/recruitment/t/assignments", label: "Assignments" },
       { href: "/recruitment/t/offers", label: "Offers" },
+      { href: "/recruitment/meetings", label: "Meetings" },
       { href: "/recruitment/t/onboarding", label: "Onboarding", recruitFullOnly: true },
     ],
   },
@@ -322,10 +324,10 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
   const inRecruitment = pathname.startsWith("/recruitment");
-  // HR and super admins see all of recruitment; anyone they handed access to
-  // (canRecruit) sees the hiring side. The backend checks the same.
+  // HR and super admins see all of recruitment; anyone they gave positions to
+  // (recruitJobs) sees those positions only. The backend checks the same.
   const recruitFull = user.isHR === true || user.isSuperAdmin === true;
-  const canRecruit = recruitFull || user.canRecruit === true;
+  const canRecruit = recruitFull || !!user.recruitJobs?.length;
   // Positions are fetched only inside the workspace — no point paying for the
   // query on every other page in the app.
   const jobs = useQuery(

@@ -30,8 +30,10 @@ export default defineSchema({
     isFreelancer: v.optional(v.boolean()),
     /** HR keeps role "admin" (same permissions) — this flag swaps their nav to the HR view & unlocks the HR Requests page */
     isHR: v.optional(v.boolean()),
-    /** Recruitment access handed to a brand manager or employee by HR or a super admin: the hiring trackers and applicants, not the founder dashboard. */
-    canRecruit: v.optional(v.boolean()),
+    /** Recruitment access handed out by HR or a super admin, one position at a
+     *  time: the recruitJobs.sourceId of each position this person may work on.
+     *  They see those positions' applicants and hiring rows, nothing else. */
+    recruitJobs: v.optional(v.array(v.number())),
     /** Finance/accounts. Rides on role "admin" like isHR, but is a label only for now — the nav is still the brand-manager view. */
     isAccountant: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
@@ -398,7 +400,8 @@ export default defineSchema({
       v.literal("oversight_digest"),
       v.literal("deck_approved"),
       v.literal("deck_changes_requested"),
-      v.literal("client_feedback")
+      v.literal("client_feedback"),
+      v.literal("interview")
     ),
     title: v.string(),
     message: v.string(),
@@ -1316,11 +1319,15 @@ export default defineSchema({
     momId: v.optional(v.id("meetingMinutes")),
     /** Set when this recording carries on from another (its recorder left before the call ended). */
     continuesSessionId: v.optional(v.string()),
+    /** The recruitment position (recruitJobs.sourceId) its recorder filed it under, if any:
+     *  HR and the people hiring for that position can then read it under Recruitment. */
+    recruitJobSourceId: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_owner_time", ["ownerId", "startedAt"])
-    .index("by_session", ["sessionId"]),
+    .index("by_session", ["sessionId"])
+    .index("by_recruit_job", ["recruitJobSourceId", "startedAt"]),
 
   // People from outside the company seen in meetings, and the brand they belong
   // to. Once someone is known here, a meeting they are in files itself.

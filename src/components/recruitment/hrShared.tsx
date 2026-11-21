@@ -14,10 +14,12 @@ export type HrData = {
   byId: Map<string, Row>;
   people: { _id: string; name: string }[];
   personName: (id: string) => string;
+  /** Website positions a hiring round can be tied to (the caller's own, unless HR). */
+  jobs: { id: string; name: string }[];
   today: string;
 };
 
-type Loaded = { full: boolean; rows: Row[]; people: { _id: string; name: string }[] };
+type Loaded = { full: boolean; rows: Row[]; people: { _id: string; name: string }[]; jobs: { id: string; name: string }[] };
 
 /** Rows handed in directly, for a preview or a test, instead of the live query. */
 export const HrPreview = createContext<Loaded | null>(null);
@@ -39,6 +41,7 @@ export function useHrData(): HrData | undefined {
       byId: new Map(data.rows.map((r) => [r._id as string, r])),
       people: data.people,
       personName: (id: string) => names.get(id) ?? "",
+      jobs: data.jobs,
       today,
     };
   }, [data, today]);
@@ -72,6 +75,7 @@ export function show(field: Field, row: Row, data: HrData): string {
   const value = row.fields[field.key];
   if (value === null || value === undefined || value === "") return "";
   if (field.type === "user") return data.personName(String(value));
+  if (field.type === "job") return data.jobs.find((j) => j.id === String(value))?.name ?? "";
   if (field.type === "ref") {
     const target = data.byId.get(String(value));
     return target ? (field.ref === "rounds" ? `${target.code} · ${rowTitle(target, data)}` : rowTitle(target, data)) : "";

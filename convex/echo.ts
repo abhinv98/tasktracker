@@ -6,7 +6,7 @@ import { fileMeeting } from "./lib/echoFiling";
 import { joinLinkOf, type CalendarEvent } from "../src/lib/echo";
 import { hmac, sameText, seal, signEchoKey, unseal } from "./lib/echoKey";
 import { calendarEvents, googleToken } from "./lib/google";
-import { requireEchoUser } from "./lib/guards";
+import { mayRecruitFor, recruitAccess, requireEchoUser } from "./lib/guards";
 
 // Echo is the meeting note-taker (a Chrome extension plus its own server). The
 // task tracker owns the accounts: it signs a personal key for each person, the
@@ -153,7 +153,11 @@ async function canSeeMeeting(ctx: QueryCtx, meeting: Doc<"echoMeetings">, userId
     .query("echoMeetingViewers")
     .withIndex("by_meeting_user", (q) => q.eq("meetingId", meeting._id).eq("userId", userId))
     .first();
-  return row !== null;
+  if (row !== null) return true;
+  // Filed under a recruitment position: HR and the people hiring for it.
+  if (meeting.recruitJobSourceId === undefined) return false;
+  const access = await recruitAccess(ctx);
+  return !!access && mayRecruitFor(access, meeting.recruitJobSourceId);
 }
 
 /** My meetings, newest first, without the transcripts: the ones I recorded and
@@ -217,12 +221,89 @@ export const get = query({
     return {
       ...meeting,
       mine,
+      /** Reading it only because it is filed under a recruitment position, not from being in the call. */
+      viaRecruitment: !mine && !viewerRows.some((row) => row.userId === me._id),
       /** Brand folders are staff-only; an outside reviewer never sees them. */
       canFile: me.isReviewer !== true,
       sharedWith,
       recordedBy: mine ? null : ((await ctx.db.get(meeting.ownerId))?.name ?? "A teammate"),
       brandName: meeting.brandId ? ((await ctx.db.get(meeting.brandId))?.name ?? null) : null,
+      recruitJobName: await recruitJobName(ctx, meeting.recruitJobSourceId),
     };
+  },
+});
+
+/* ---------- Recruitment folder ---------- */
+
+async function recruitJobName(ctx: QueryCtx, jobSourceId: number | undefined) {
+  if (jobSourceId === undefined) return null;
+  const job = await ctx.db
+    .query("recruitJobs")
+    .withIndex("by_source", (q) => q.eq("sourceId", jobSourceId))
+    .first();
+  return job?.name ?? null;
+}
+
+/** Positions I may file a meeting under: mine if I was given some, all for HR, none otherwise. */
+export const recruitFolders = query({
+  args: {},
+  handler: async (ctx) => {
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
+    return (await ctx.db.query("recruitJobs").collect())
+      .filter((j) => mayRecruitFor(access, j.sourceId))
+      .map((j) => ({ id: j.sourceId, name: j.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
+
+/** The recorder puts a meeting into Recruitment under a position (or takes it out). */
+export const setRecruitFolder = mutation({
+  args: { meetingId: v.id("echoMeetings"), jobSourceId: v.union(v.number(), v.null()) },
+  handler: async (ctx, { meetingId, jobSourceId }) => {
+    const me = await requireEchoUser(ctx);
+    const meeting = await ctx.db.get(meetingId);
+    if (!meeting || meeting.ownerId !== me._id) throw new Error("Only the person who recorded it can file it");
+    if (jobSourceId !== null) {
+      const access = await recruitAccess(ctx);
+      if (!access || !mayRecruitFor(access, jobSourceId) || !(await recruitJobName(ctx, jobSourceId))) {
+        throw new Error("You do not have access to that position");
+      }
+    }
+    await ctx.db.patch(meetingId, { recruitJobSourceId: jobSourceId ?? undefined, updatedAt: Date.now() });
+  },
+});
+
+/** Meetings filed under the positions I may see, newest first, without transcripts. */
+export const listRecruit = query({
+  args: {},
+  handler: async (ctx) => {
+    const access = await recruitAccess(ctx);
+    if (!access) return null;
+    const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    const out = [];
+    for (const job of jobs) {
+      const rows = await ctx.db
+        .query("echoMeetings")
+        .withIndex("by_recruit_job", (q) => q.eq("recruitJobSourceId", job.sourceId))
+        .order("desc")
+        // ponytail: the latest 50 per position, whole rows read. Page it if a role piles up interviews.
+        .take(50);
+      for (const m of rows) {
+        out.push({
+          _id: m._id,
+          title: m.title,
+          startedAt: m.startedAt,
+          durationMs: m.durationMs,
+          firstLine: m.summary[0] ?? "",
+          actionItems: m.actionItems.length,
+          people: [...m.attendees.map((a) => a.name), ...m.seenNames],
+          jobName: job.name,
+          recordedBy: (await ctx.db.get(m.ownerId))?.name ?? "A teammate",
+        });
+      }
+    }
+    return out.sort((a, b) => b.startedAt - a.startedAt);
   },
 });
 

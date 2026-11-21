@@ -7,7 +7,9 @@
 // The grey "automatic" columns of the workbook (health, counts, days open) are
 // not stored: src/lib/hrHealth.ts works them out from the rows.
 
-export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" | "user" | "ref";
+/** `job` is a position from the website's roles (recruitJobs.sourceId, kept as
+ *  text): it is what ties a hiring round to the people allowed to work on it. */
+export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" | "user" | "ref" | "job";
 
 export type TrackerKey =
   | "rounds" | "pipeline" | "interviews" | "assignments" | "offers" | "onboarding"
@@ -52,6 +54,7 @@ export const TRACKERS = {
     hrOnly: false,
     fields: [
       f("role", "Position / role", "text", { required: true, ...col }),
+      f("job", "Website position", "job", col),
       f("cycle", "Hiring cycle", "text"),
       f("department", "Department", "text"),
       f("employmentType", "Employment type", "select", {
@@ -216,6 +219,11 @@ export const TRACKERS = {
       f("approvalDate", "Approval date", "date"),
       f("proposedCtc", "Proposed CTC (₹ LPA)", "number"),
       f("approvedCtc", "Approved CTC (₹ LPA)", "number", col),
+      // For the appointment letter (see src/lib/appointmentLetter.ts).
+      f("designation", "Designation on the letter", "text"),
+      f("reportsTo", "Reports to (title and name)", "text"),
+      f("probationCtc", "CTC during probation (₹ LPA), if lower", "number"),
+      f("probationMonths", "Probation (months)", "number"),
       f("offerSent", "Offer sent date", "date"),
       f("offerAccepted", "Offer accepted date", "date"),
       f("plannedJoin", "Planned join date", "date", col),
@@ -476,6 +484,7 @@ export function cleanFields(tracker: TrackerKey, input: Record<string, unknown>)
     const text = raw.trim();
     if (field.type === "date" && !DATE.test(text)) throw new Error(`${field.label} must be a date`);
     if (field.type === "time" && !TIME.test(text)) throw new Error(`${field.label} must be a time`);
+    if (field.type === "job" && !/^\d+$/.test(text)) throw new Error(`${field.label}: pick one from the list`);
     if (field.type === "select" && !field.options?.includes(text)) {
       throw new Error(`${field.label}: "${text.slice(0, 40)}" is not one of the options`);
     }

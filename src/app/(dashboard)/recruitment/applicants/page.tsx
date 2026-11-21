@@ -24,6 +24,9 @@ export default function RecruitmentPage() {
   const jobs = useQuery(api.recruitment.listJobs);
   const stats = useQuery(api.recruitment.getStats);
   const setJobOpen = useMutation(api.recruitment.setJobOpen);
+  // Opening and closing a role on the website is HR's call.
+  const me = useQuery(api.users.getCurrentUser);
+  const full = me?.isHR === true || me?.isSuperAdmin === true;
   const [q, setQ] = useState("");
   const results = useQuery(
     api.recruitment.searchCandidates,
@@ -161,7 +164,7 @@ export default function RecruitmentPage() {
                 </div>
               </Link>
               {/* Whether the website form offers this role (and its sub-roles). */}
-              <button
+              {full && <button
                 type="button"
                 role="switch"
                 aria-checked={job.status !== "closed"}
@@ -179,7 +182,7 @@ export default function RecruitmentPage() {
                   aria-hidden
                 />
                 {job.status === "closed" ? "Closed" : "Open"}
-              </button>
+              </button>}
               </div>
 
               {subs.length > 0 && (
