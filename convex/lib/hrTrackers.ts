@@ -27,8 +27,10 @@ export type Field = {
   column?: boolean;
   /** Set to today on every save, so "no update in 5 days" needs no discipline. */
   stamp?: boolean;
-  /** A value for new rows. */
+  /** A value for new rows. "@me" is whoever is adding it, "@today" today's date. */
   initial?: string;
+  /** Rarely touched: the form tucks it under "More details". */
+  more?: boolean;
 };
 
 const PRIORITY = ["Critical", "High", "Medium", "Low"] as const;
@@ -55,18 +57,18 @@ export const TRACKERS = {
     fields: [
       f("role", "Position / role", "text", { required: true, ...col }),
       f("job", "Website position", "job", col),
-      f("cycle", "Hiring cycle", "text"),
-      f("department", "Department", "text"),
+      f("cycle", "Hiring cycle", "text", { more: true }),
+      f("department", "Department", "text", { more: true }),
       f("employmentType", "Employment type", "select", {
         options: ["Full-time", "Intern", "Part-time", "Contract", "Freelance"],
         ...col,
       }),
       f("openings", "Openings", "number"),
       f("priority", "Priority", "select", { options: PRIORITY, ...col }),
-      f("requestedBy", "Requested by", "user"),
-      f("hrOwner", "HR owner", "user", col),
+      f("requestedBy", "Requested by", "user", { more: true }),
+      f("hrOwner", "HR owner", "user", { initial: "@me", ...col }),
       f("hiringManager", "Hiring manager", "user"),
-      f("requestDate", "Request date", "date"),
+      f("requestDate", "Request date", "date", { initial: "@today" }),
       f("targetJoinDate", "Target join date", "date"),
       f("approvalStatus", "Approval status", "select", {
         options: ["Pending", "Approved", "Rejected", "To Confirm"],
@@ -79,7 +81,7 @@ export const TRACKERS = {
         ...col,
       }),
       f("budgetLpa", "Budget approved (₹ LPA)", "number"),
-      f("budgetNote", "Original budget / note", "text"),
+      f("budgetNote", "Original budget / note", "text", { more: true }),
       f("nextAction", "Next action", "text", col),
       f("actionOwner", "Action owner", "user"),
       f("nextDue", "Next action due", "date", col),
@@ -95,6 +97,8 @@ export const TRACKERS = {
     blurb: "One row is one candidate in one hiring round. Every live candidate needs an owner and a dated next step.",
     title: "name",
     hrOnly: false,
+    board: "stage",
+    boardClosed: ["Joined", "Rejected", "Withdrawn", "On Hold"],
     fields: [
       f("name", "Candidate name", "text", { required: true, ...col }),
       f("reqId", "Hiring round", "ref", { ref: "rounds", ...col }),
@@ -103,7 +107,7 @@ export const TRACKERS = {
       f("source", "Source", "select", {
         options: ["LinkedIn", "Naukri", "Internshala", "Referral", "Campus", "Website", "Agency", "Other"],
       }),
-      f("firstContact", "First contact date", "date"),
+      f("firstContact", "First contact date", "date", { initial: "@today" }),
       f("stage", "Pipeline stage", "select", {
         options: [
           "Sourced", "Contacted", "Screening", "Interview 1", "Interview 2", "Assignment",
@@ -117,7 +121,7 @@ export const TRACKERS = {
         initial: "Active",
         ...col,
       }),
-      f("hrOwner", "HR owner", "user", col),
+      f("hrOwner", "HR owner", "user", { initial: "@me", ...col }),
       f("nextAction", "Next action", "text", col),
       f("actionOwner", "Action owner", "user"),
       f("nextDue", "Next action due", "date", col),
@@ -125,8 +129,8 @@ export const TRACKERS = {
         options: ["To Verify", "Verified", "Needs Correction"],
         initial: "Verified",
       }),
-      f("origin", "Origin", "select", { options: ["New", "Imported"], initial: "New" }),
-      f("latestOutcome", "Latest outcome", "text"),
+      f("origin", "Origin", "select", { options: ["New", "Imported"], initial: "New", more: true }),
+      f("latestOutcome", "Latest outcome", "text", { more: true }),
       f("notes", "HR notes", "long"),
       f("lastUpdate", "Last update", "date", { stamp: true }),
     ],
@@ -158,11 +162,11 @@ export const TRACKERS = {
         initial: "Pending",
         ...col,
       }),
-      f("feedbackDue", "Feedback due", "date"),
-      f("feedbackReceived", "Feedback received", "date"),
+      f("feedbackDue", "Feedback due", "date", { more: true }),
+      f("feedbackReceived", "Feedback received", "date", { more: true }),
       f("feedback", "Feedback", "long"),
-      f("nextStep", "Next step", "text"),
-      f("nextStepOwner", "Next step owner", "user"),
+      f("nextStep", "Next step", "text", { more: true }),
+      f("nextStepOwner", "Next step owner", "user", { more: true }),
       f("notes", "Notes", "long"),
       f("lastUpdate", "Last updated", "date", { stamp: true }),
     ],
@@ -177,8 +181,8 @@ export const TRACKERS = {
     fields: [
       f("candidateId", "Candidate", "ref", { ref: "pipeline", required: true, ...col }),
       f("task", "Assignment / task", "text", { required: true, ...col }),
-      f("assignedBy", "Assigned by", "user"),
-      f("sentDate", "Sent date", "date", col),
+      f("assignedBy", "Assigned by", "user", { initial: "@me" }),
+      f("sentDate", "Sent date", "date", { initial: "@today", ...col }),
       f("submissionDue", "Submission due", "date", col),
       f("receivedDate", "Received date", "date"),
       f("reviewer", "Reviewer", "user", col),
@@ -202,6 +206,8 @@ export const TRACKERS = {
     blurb: "One row is one finalist offer: approvals, negotiation, acceptance and the joining date.",
     title: "candidateId",
     hrOnly: false,
+    board: "stage",
+    boardClosed: ["Declined", "Withdrawn"],
     fields: [
       f("candidateId", "Candidate", "ref", { ref: "pipeline", required: true, ...col }),
       f("stage", "Offer stage", "select", {
@@ -228,8 +234,8 @@ export const TRACKERS = {
       f("offerAccepted", "Offer accepted date", "date"),
       f("plannedJoin", "Planned join date", "date", col),
       f("actualJoin", "Actual join date", "date"),
-      f("noticeDays", "Notice period (days)", "number"),
-      f("hrOwner", "HR owner", "user"),
+      f("noticeDays", "Notice period (days)", "number", { more: true }),
+      f("hrOwner", "HR owner", "user", { initial: "@me" }),
       f("nextAction", "Next action", "text", col),
       f("nextDue", "Next action due", "date", col),
       f("blocker", "Blocker", "text"),
@@ -341,6 +347,8 @@ export const TRACKERS = {
     blurb: "One row is one long-running HR process: submit a draft, get feedback, get approval, implement.",
     title: "name",
     hrOnly: true,
+    board: "stage",
+    boardClosed: ["Implemented", "On Hold"],
     fields: [
       f("name", "Process / initiative", "text", { required: true, ...col }),
       f("deliverable", "Deliverable / success criteria", "long"),
@@ -378,10 +386,12 @@ export const TRACKERS = {
     blurb: "Founders add a row to hand HR a piece of work. HR keeps the status, next action and dates current.",
     title: "task",
     hrOnly: true,
+    board: "status",
+    boardClosed: ["Done", "Cancelled"],
     fields: [
       f("task", "Task / deliverable", "text", { required: true, ...col }),
-      f("dateAssigned", "Date assigned", "date"),
-      f("assignedBy", "Assigned by", "user"),
+      f("dateAssigned", "Date assigned", "date", { initial: "@today" }),
+      f("assignedBy", "Assigned by", "user", { initial: "@me" }),
       f("workstream", "Workstream", "select", {
         options: ["Hiring", "Interview", "Assignment", "Offer", "Onboarding", "Interns", "Campus", "HR Project", "Policy", "Admin", "Other"],
         ...col,
@@ -415,8 +425,8 @@ export const TRACKERS = {
     title: "action",
     hrOnly: true,
     fields: [
-      f("date", "Date", "date", { required: true, ...col }),
-      f("member", "HR team member", "user", col),
+      f("date", "Date", "date", { required: true, initial: "@today", ...col }),
+      f("member", "HR team member", "user", { initial: "@me", ...col }),
       f("workstream", "Workstream", "select", {
         options: ["Hiring", "Candidate", "Interview", "Assignment", "Offer", "Onboarding", "Interns", "Campus", "HR Project", "Founder Task", "Admin"],
         ...col,
@@ -441,6 +451,10 @@ export const TRACKERS = {
     blurb: string;
     title: string;
     hrOnly: boolean;
+    /** The dropdown the board view lays its columns out by. */
+    board?: string;
+    /** Board values that mean "finished": shown as slim drop targets at the end. */
+    boardClosed?: readonly string[];
     fields: readonly Field[];
   }
 >;

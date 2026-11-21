@@ -87,6 +87,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/recruitment/candidates": Search,
   "/recruitment/applicants": Inbox,
   "/recruitment/access": KeyRound,
+  "/recruitment/today": ListTodo,
+  "/recruitment/overview": BarChart3,
   "/recruitment/meetings": AudioLines,
   "/recruitment/t/rounds": Briefcase,
   "/recruitment/t/pipeline": Users2,
@@ -109,6 +111,8 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
 
 interface NavCategory {
   category: string;
+  /** Folded away until opened: for the groups most people rarely need. */
+  startClosed?: boolean;
   items: {
     href: string;
     label: string;
@@ -276,22 +280,29 @@ const REVIEWER_NAV: NavCategory[] = [
  */
 const RECRUITMENT_NAV: NavCategory[] = [
   {
+    // The daily loop: what needs doing, the rounds, the people in them.
     category: "Hiring",
     items: [
-      { href: "/recruitment", label: "Dashboard", recruitFullOnly: true, exact: true },
+      { href: "/recruitment/today", label: "Today" },
       { href: "/recruitment/t/rounds", label: "Hiring Rounds" },
       { href: "/recruitment/t/pipeline", label: "Candidates" },
       { href: "/recruitment/t/interviews", label: "Interviews" },
-      { href: "/recruitment/t/assignments", label: "Assignments" },
-      { href: "/recruitment/t/offers", label: "Offers" },
-      { href: "/recruitment/meetings", label: "Meetings" },
-      { href: "/recruitment/t/onboarding", label: "Onboarding", recruitFullOnly: true },
+      { href: "/recruitment/applicants", label: "Website Applicants" },
     ],
   },
   {
-    category: "Applicants",
+    category: "Along the way",
     items: [
-      { href: "/recruitment/applicants", label: "Website Applicants" },
+      { href: "/recruitment/t/assignments", label: "Assignments" },
+      { href: "/recruitment/t/offers", label: "Offers" },
+      { href: "/recruitment/t/onboarding", label: "Onboarding", recruitFullOnly: true },
+      { href: "/recruitment/meetings", label: "Meetings" },
+    ],
+  },
+  {
+    category: "Outreach",
+    startClosed: true,
+    items: [
       { href: "/recruitment/candidates", label: "Search Applicants" },
       { href: "/recruitment/campaigns", label: "Campaigns" },
       { href: "/recruitment/templates", label: "Templates" },
@@ -299,13 +310,14 @@ const RECRUITMENT_NAV: NavCategory[] = [
     ],
   },
   {
-    category: "People",
+    category: "HR office",
     items: [
-      { href: "/recruitment/t/interns", label: "Interns", recruitFullOnly: true },
-      { href: "/recruitment/t/campus", label: "Campus Connect", recruitFullOnly: true },
-      { href: "/recruitment/t/projects", label: "HR Projects", recruitFullOnly: true },
+      { href: "/recruitment/overview", label: "Overview", recruitFullOnly: true },
       { href: "/recruitment/t/tasks", label: "Founder Tasks", recruitFullOnly: true },
       { href: "/recruitment/t/log", label: "Daily HR Log", recruitFullOnly: true },
+      { href: "/recruitment/t/projects", label: "HR Projects", recruitFullOnly: true },
+      { href: "/recruitment/t/interns", label: "Interns", recruitFullOnly: true },
+      { href: "/recruitment/t/campus", label: "Campus Connect", recruitFullOnly: true },
       { href: "/recruitment/access", label: "Access", recruitFullOnly: true },
     ],
   },
@@ -355,10 +367,15 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
     }))
     .filter((cat) => cat.items.length > 0);
 
-  // All categories open by default. Track the collapsed ones, so categories
-  // from a nav set swapped in later (e.g. Recruitment) also start open.
+  // Categories are open unless marked startClosed. Track the collapsed ones, so
+  // categories from a nav set swapped in later (e.g. Recruitment) also start open.
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
-    () => new Set()
+    () =>
+      new Set(
+        RECRUITMENT_NAV.filter(
+          (c) => c.startClosed && !c.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+        ).map((c) => c.category)
+      )
   );
 
   function toggleCategory(cat: string) {

@@ -4,15 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "convex/react";
 import { useAuthToken } from "@convex-dev/auth/react";
-import { ExternalLink, FileText, Plus, Trash2, X } from "lucide-react";
+import { ExternalLink, FileText, KanbanSquare, List, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable, useConfirm, useToast } from "@/components/ui";
-import { fieldBaseClass, fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
+import { iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
-import { TRACKERS, TRACKER_KEYS, maxLength, type Field, type TrackerKey } from "@/convex/lib/hrTrackers";
+import { TRACKERS, TRACKER_KEYS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
-import { HealthBadge, fieldsOf, fmtDate, rowTitle, show, useHrData, type HrData } from "./hrShared";
+import { CandidateWorkspace } from "./CandidateWorkspace";
+import { FieldGrid, toValues } from "./hrFields";
+import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, show, startingValues, useHrData, type HrData } from "./hrShared";
+import { TrackerBoard } from "./TrackerBoard";
 
 type Chip = "all" | "attention" | "live" | "done";
 type Draft = Record<string, string>;
@@ -38,7 +41,13 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
 
   const [chip, setChip] = useState<Chip>("all");
   const [search, setSearch] = useState("");
-  const [picked, setPicked] = useState<Record<string, string>>({});
+  const [picked, setPicked] = useState<Record<string, string>>(() =>
+    // A link can arrive already filtered: ?reqId=<round> shows one round's candidates.
+    Object.fromEntries(fields.filter((f) => params.get(f.key) && !params.get("new")).map((f) => [f.key, params.get(f.key) as string]))
+  );
+  const [mine, setMine] = useState(false);
+  const board = "board" in meta ? meta.board : undefined;
+  const [view, setView] = useState<"table" | "board">(board && params.get("view") === "board" ? "board" : "table");
   const [editing, setEditing] = useState<Editing | null>(null);
 
   // ?new=1&candidateId=… opens a prefilled form; ?open=<id> opens a row. Both
@@ -48,13 +57,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
     const open = params.get("open");
     if (!data || !(open || params.get("new"))) return;
     if (params.get("new")) {
-      const draft: Draft = {};
-      for (const f of fields) {
-        const given = params.get(f.key);
-        if (given) draft[f.key] = given;
-        else if (f.initial) draft[f.key] = f.initial;
-      }
-      setEditing({ row: null, draft });
+      const given = Object.fromEntries(fields.filter((f) => params.get(f.key)).map((f) => [f.key, params.get(f.key) as string]));
+      setEditing({ row: null, draft: startingValues(tracker, data, given) });
     } else {
       const row = data.byId.get(open ?? "");
       if (row && row.tracker === tracker) setEditing({ row, draft: draftOf(row) });
@@ -91,33 +95,60 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   }
 
   const columns = fields.filter((f) => f.column);
-  const filterFields = columns.filter((f) => f.type === "select").slice(0, 3);
+  // Filter by the listed dropdowns, and by what a row belongs to (a candidate's round).
+  const filterFields = [
+    ...columns.filter((f) => f.type === "ref"),
+    ...columns.filter((f) => f.type === "select").slice(0, 3),
+  ];
+  const optionsOf = (f: (typeof fields)[number]) =>
+    f.type === "ref"
+      ? data.book[f.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }))
+      : (f.options ?? []).map((o) => ({ value: o, label: o }));
   const inChip = (label: string, which: Chip) =>
     which === "all" ||
     (which === "attention" && ATTENTION[tracker].includes(label)) ||
     (which === "live" && isLive(label)) ||
     (which === "done" && !isLive(label));
   const needle = search.trim().toLowerCase();
-  const visible = rows.filter(
-    ({ row, label }) =>
-      inChip(label, chip) &&
+  // Everything but the health chip, so the chips count what the other filters leave.
+  const narrowed = rows.filter(
+    ({ row }) =>
+      (!mine || isMine(row, data)) &&
       filterFields.every((f) => !picked[f.key] || row.fields[f.key] === picked[f.key]) &&
       (!needle ||
         `${row.code} ${columns.map((f) => show(f, row, data)).join(" ")}`.toLowerCase().includes(needle))
   );
-  const filtersOn = !!needle || chip !== "all" || Object.values(picked).some(Boolean);
+  const visible = narrowed.filter(({ label }) => inChip(label, chip));
+  const filtersOn = !!needle || mine || chip !== "all" || Object.values(picked).some(Boolean);
 
+  // A new row starts inside what the list is narrowed to (the round being looked
+  // at), but not with a status someone happened to be filtering by.
   const startNew = () =>
     setEditing({
       row: null,
-      draft: Object.fromEntries(fields.filter((f) => f.initial).map((f) => [f.key, f.initial as string])),
+      draft: startingValues(
+        tracker,
+        data,
+        Object.fromEntries(fields.filter((f) => f.type === "ref" && picked[f.key]).map((f) => [f.key, picked[f.key]]))
+      ),
     });
+  const open = (row: Row) => setEditing({ row, draft: draftOf(row) });
+  // The round whose candidates are on screen, when the list is narrowed to one.
+  const round = tracker === "pipeline" && picked.reqId ? data.byId.get(picked.reqId) : undefined;
 
   return (
     <div className="p-4 sm:p-8">
       <PageHeader
-        title={meta.label}
-        subtitle={meta.blurb}
+        title={round ? `${String(round.fields.role ?? "")} candidates` : meta.label}
+        subtitle={
+          round
+            ? `${round.code} · ${String(round.fields.hiringStatus ?? "")}${
+                derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value !== "–" && data.full
+                  ? ` · ${derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value} to fill`
+                  : ""
+              }. Drag a card to move someone along, or open it to plan the next step.`
+            : meta.blurb
+        }
         actions={
           <Button onClick={startNew}>
             <Plus size={14} />
@@ -139,7 +170,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
               ["live", "Live"],
               ["done", "Closed"],
             ] as const
-          ).map(([value, label]) => ({ value, label, count: rows.filter((r) => inChip(r.label, value)).length }))}
+          ).map(([value, label]) => ({ value, label, count: narrowed.filter((r) => inChip(r.label, value)).length }))}
         />
       )}
 
@@ -151,15 +182,30 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
             label={f.label}
             allLabel="All"
             value={picked[f.key] ?? ""}
-            options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
+            options={optionsOf(f)}
             onChange={(value) => setPicked((p) => ({ ...p, [f.key]: value }))}
           />
         ))}
+        {fields.some((f) => f.type === "user") && (
+          <button
+            type="button"
+            aria-pressed={mine}
+            onClick={() => setMine((v) => !v)}
+            className={`h-control rounded-control border px-3 text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+              mine
+                ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] text-[var(--accent-admin-text)]"
+                : "border-[var(--border)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+            }`}
+          >
+            Mine
+          </button>
+        )}
         {filtersOn && (
           <button
             onClick={() => {
               setSearch("");
               setChip("all");
+              setMine(false);
               setPicked({});
             }}
             className="text-[12px] font-medium text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]"
@@ -168,8 +214,31 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           </button>
         )}
         <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
-          {visible.length} of {rows.length}
+          {visible.length === rows.length ? `${rows.length}` : `${visible.length} of ${rows.length}`}
         </span>
+        {board && (
+          <div role="group" aria-label="View" className="flex rounded-control border border-[var(--border)] bg-white p-0.5">
+            {(
+              [
+                ["table", "List", List],
+                ["board", "Board", KanbanSquare],
+              ] as const
+            ).map(([value, label, Icon]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={view === value}
+                onClick={() => setView(value)}
+                className={`inline-flex h-[26px] items-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                  view === value ? "bg-[var(--bg-hover)] text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                <Icon size={13} aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {visible.length === 0 ? (
@@ -177,6 +246,18 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           title={rows.length === 0 ? `No ${meta.label.toLowerCase()} yet` : "Nothing matches"}
           description={rows.length === 0 ? meta.blurb : "Change or clear the filters to see more."}
           action={rows.length === 0 ? <Button onClick={startNew}>New {meta.one}</Button> : undefined}
+        />
+      ) : board && view === "board" ? (
+        <TrackerBoard
+          tracker={tracker}
+          items={visible}
+          data={data}
+          skip={Object.keys(picked).filter((key) => picked[key])}
+          onOpen={open}
+          onShowClosed={(value) => {
+            setPicked((p) => ({ ...p, [board]: value }));
+            setView("table");
+          }}
         />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-white">
@@ -197,11 +278,11 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                 <tr
                   key={row._id}
                   tabIndex={0}
-                  onClick={() => setEditing({ row, draft: draftOf(row) })}
+                  onClick={() => open(row)}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter" && e.key !== " ") return;
                     e.preventDefault();
-                    setEditing({ row, draft: draftOf(row) });
+                    open(row);
                   }}
                   className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
                 >
@@ -233,15 +314,26 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
         </div>
       )}
 
-      {editing && (
-        <RecordPanel
-          key={editing.row?._id ?? "new"}
-          tracker={tracker}
-          editing={editing}
-          data={data}
-          onClose={() => setEditing(null)}
-        />
-      )}
+      {editing &&
+        (tracker === "pipeline" && editing.row ? (
+          // The live row, not the one that was clicked: a stage move shows at once.
+          data.byId.get(editing.row._id) && (
+            <CandidateWorkspace
+              key={editing.row._id}
+              row={data.byId.get(editing.row._id) as Row}
+              data={data}
+              onClose={() => setEditing(null)}
+            />
+          )
+        ) : (
+          <RecordPanel
+            key={editing.row?._id ?? "new"}
+            tracker={tracker}
+            editing={editing}
+            data={data}
+            onClose={() => setEditing(null)}
+          />
+        ))}
     </div>
   );
 }
@@ -308,14 +400,7 @@ function RecordPanel({
     e.preventDefault();
     setSaving(true);
     try {
-      const values: Record<string, string | number | null> = {};
-      for (const f of fields) {
-        if (f.stamp) continue;
-        const raw = (draft[f.key] ?? "").trim();
-        // On an edit, only what this person changed goes up (see hrOps.save).
-        if (row && raw === (editing.draft[f.key] ?? "").trim()) continue;
-        values[f.key] = raw === "" ? null : f.type === "number" ? Number(raw) : raw;
-      }
+      const values = toValues(fields, draft, row ? editing.draft : undefined);
       await save({ tracker, id: row?._id as Id<"hrRecords"> | undefined, fields: values });
       toast("success", row ? "Saved" : `${meta.one[0].toUpperCase()}${meta.one.slice(1)} added`);
       onClose();
@@ -408,6 +493,17 @@ function RecordPanel({
                       </span>
                     </span>
                   ))}
+                {tracker === "rounds" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => router.push(`/recruitment/t/pipeline?view=board&reqId=${row._id}`)}
+                  >
+                    <KanbanSquare size={13} />
+                    Candidates board
+                  </Button>
+                )}
                 {tracker === "offers" && (
                   <Button type="button" size="sm" variant="secondary" loading={makingLetter} onClick={downloadLetter}>
                     <FileText size={13} />
@@ -427,24 +523,27 @@ function RecordPanel({
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-              {fields
-                .filter((f) => !f.stamp)
-                .map((f) => (
-                  <label key={f.key} className={`block ${f.type === "long" ? "sm:col-span-2" : ""}`}>
-                    <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">
-                      {f.label}
-                      {f.required && <span className="text-[var(--danger)]"> *</span>}
-                    </span>
-                    <FieldInput
-                      field={f}
-                      value={draft[f.key] ?? ""}
-                      onChange={(value) => setDraft((d) => ({ ...d, [f.key]: value }))}
-                      data={data}
-                    />
-                  </label>
-                ))}
-            </div>
+            <FieldGrid
+              fields={fields.filter((f) => !f.stamp && !f.more)}
+              draft={draft}
+              onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
+              data={data}
+            />
+            {fields.some((f) => f.more) && (
+              <details className="mt-4" open={fields.some((f) => f.more && !!editing.draft[f.key])}>
+                <summary className="cursor-pointer select-none text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  More details
+                </summary>
+                <div className="mt-3">
+                  <FieldGrid
+                    fields={fields.filter((f) => !f.stamp && f.more)}
+                    draft={draft}
+                    onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
+                    data={data}
+                  />
+                </div>
+              </details>
+            )}
 
             {row && (linked.length > 0 || addable.length > 0) && (
               <div className="mt-6">
@@ -499,52 +598,5 @@ function RecordPanel({
         </form>
       </aside>
     </>
-  );
-}
-
-function FieldInput({
-  field,
-  value,
-  onChange,
-  data,
-}: {
-  field: Field;
-  value: string;
-  onChange: (value: string) => void;
-  data: HrData;
-}) {
-  const common = { value, required: field.required, onChange: (e: { target: { value: string } }) => onChange(e.target.value) };
-  if (field.type === "long") {
-    return <textarea {...common} rows={3} maxLength={maxLength(field)} className={`${fieldBaseClass} w-full py-2`} />;
-  }
-  if (field.type === "select" || field.type === "user" || field.type === "ref" || field.type === "job") {
-    const options =
-      field.type === "select"
-        ? (field.options ?? []).map((o) => ({ value: o, label: o }))
-        : field.type === "job"
-          ? data.jobs.map((j) => ({ value: j.id, label: j.name }))
-          : field.type === "user"
-          ? data.people.map((p) => ({ value: p._id, label: p.name }))
-          : data.book[field.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }));
-    return (
-      <select {...common} className={`${fieldClass} w-full`}>
-        <option value="">{field.required ? "Select…" : "–"}</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    );
-  }
-  return (
-    <input
-      {...common}
-      type={field.type === "date" || field.type === "time" || field.type === "number" ? field.type : "text"}
-      min={field.type === "number" ? 0 : undefined}
-      step={field.type === "number" ? "any" : undefined}
-      maxLength={field.type === "text" ? maxLength(field) : undefined}
-      className={`${fieldClass} w-full`}
-    />
   );
 }

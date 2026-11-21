@@ -10,6 +10,8 @@ import { toBook, todayIST, tone, type Book, type Row } from "@/lib/hrHealth";
 /** What every HR tracker screen needs: the rows by tracker, the staff list and today's date. */
 export type HrData = {
   full: boolean;
+  /** The signed-in person's user id: "mine" filters and "@me" defaults use it. */
+  me: string;
   book: Book;
   byId: Map<string, Row>;
   people: { _id: string; name: string }[];
@@ -19,7 +21,7 @@ export type HrData = {
   today: string;
 };
 
-type Loaded = { full: boolean; rows: Row[]; people: { _id: string; name: string }[]; jobs: { id: string; name: string }[] };
+type Loaded = { full: boolean; me: string; rows: Row[]; people: { _id: string; name: string }[]; jobs: { id: string; name: string }[] };
 
 /** Rows handed in directly, for a preview or a test, instead of the live query. */
 export const HrPreview = createContext<Loaded | null>(null);
@@ -37,6 +39,7 @@ export function useHrData(): HrData | undefined {
     const names = new Map(data.people.map((p) => [p._id as string, p.name]));
     return {
       full: data.full,
+      me: data.me,
       book: toBook(data.rows),
       byId: new Map(data.rows.map((r) => [r._id as string, r])),
       people: data.people,
@@ -48,6 +51,51 @@ export function useHrData(): HrData | undefined {
 }
 
 export const fieldsOf = (tracker: TrackerKey) => TRACKERS[tracker].fields as readonly Field[];
+
+/** Mine: I am named on it in any of its people fields (owner, interviewer, reviewer…). */
+export const isMine = (row: Row, data: HrData) =>
+  fieldsOf(row.tracker).some((f) => f.type === "user" && row.fields[f.key] === data.me);
+
+/** The values a new row starts with: the tracker's defaults, "@me" and "@today" filled in. */
+export function startingValues(tracker: TrackerKey, data: HrData, given: Record<string, string> = {}) {
+  const draft: Record<string, string> = {};
+  for (const f of fieldsOf(tracker)) {
+    const value = given[f.key] || (f.initial === "@me" ? data.me : f.initial === "@today" ? data.today : f.initial);
+    if (value) draft[f.key] = value;
+  }
+  return draft;
+}
+
+/**
+ * What changes when a row moves to another column of its board. A candidate
+ * moved to a closing stage (Rejected, Joined…) takes that as their status too,
+ * and one moved back into play becomes Active again.
+ */
+export function moveFields(tracker: TrackerKey, to: string): Record<string, string> {
+  const meta = TRACKERS[tracker] as { board?: string; boardClosed?: readonly string[] };
+  if (!meta.board) return {};
+  if (tracker !== "pipeline") return { [meta.board]: to };
+  return { stage: to, status: meta.boardClosed?.includes(to) ? to : "Active" };
+}
+
+/**
+ * Which board column a row sits in. A candidate closed by status (Withdrawn,
+ * say) belongs with the closed ones even if their stage was never moved, and an
+ * archived one is off the board. "" means the row has no column yet.
+ */
+export function boardValue(row: Row): string | null {
+  const meta = TRACKERS[row.tracker] as { board?: string; boardClosed?: readonly string[] };
+  if (!meta.board) return null;
+  const value = String(row.fields[meta.board] ?? "");
+  if (row.tracker !== "pipeline") return value;
+  const status = String(row.fields.status ?? "");
+  if (status === "Archived") return null;
+  return meta.boardClosed?.includes(status) ? status : value;
+}
+
+/** YYYY-MM-DD some days after another. */
+export const addDays = (date: string, days: number) =>
+  new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** What a row is called: its title column, followed through to the candidate or round it points at. */
 export function rowTitle(row: Row | undefined, data: HrData): string {

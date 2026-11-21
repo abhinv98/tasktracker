@@ -137,7 +137,7 @@ export const all = query({
       .filter((u) => u.role !== "client" && u.isReviewer !== true)
       .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unnamed" }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    return { full, rows, people, jobs };
+    return { full, me: access.userId, rows, people, jobs };
   },
 });
 
