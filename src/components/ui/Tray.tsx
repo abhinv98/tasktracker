@@ -22,7 +22,7 @@ export function Tray({
   icon: Icon,
   active = false,
   title,
-  width = "w-56",
+  width = "w-max min-w-56 max-w-[24rem]",
   align = "start",
   children,
 }: {
@@ -33,7 +33,8 @@ export function Tray({
   active?: boolean;
   /** A quiet heading inside the tray. */
   title?: string;
-  /** Tailwind width class for the tray. */
+  /** Tailwind width classes for the tray. By default it grows to fit its
+   *  longest row, and is never narrower than the button it hangs from. */
   width?: string;
   align?: "start" | "end";
   children: ReactNode;
@@ -77,7 +78,7 @@ export function Tray({
       </button>
       {open && (
         <div
-          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-[24rem] flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg ${width} ${
+          className={`animate-scaleIn absolute top-full z-30 mt-1.5 flex max-h-[24rem] flex-col gap-0.5 overflow-y-auto rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg min-w-full ${width} ${
             align === "end" ? "right-0" : "left-0"
           }`}
         >
