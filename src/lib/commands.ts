@@ -29,6 +29,7 @@ type CommandUser = {
   email?: string;
   isSuperAdmin?: boolean;
   isHR?: boolean;
+  canRecruit?: boolean;
   isAccountant?: boolean;
 };
 
@@ -46,7 +47,7 @@ const isAdmin = (u: CommandUser) => (u.role ?? "employee") === "admin";
 const isEmployee = (u: CommandUser) => (u.role ?? "employee") !== "admin";
 const isHR = (u: CommandUser) => u.isHR === true;
 /** Recruitment: HR and super admins, as on the server. */
-const canRecruit = (u: CommandUser) => isHR(u) || u.isSuperAdmin === true;
+const canRecruit = (u: CommandUser) => isHR(u) || u.isSuperAdmin === true || u.canRecruit === true;
 // HR's view is deliberately stripped of brand work — mirror the route guard in
 // (dashboard)/layout.tsx so the palette can't offer a page that bounces them.
 const adminNotHR = (u: CommandUser) => isAdmin(u) && !isHR(u);

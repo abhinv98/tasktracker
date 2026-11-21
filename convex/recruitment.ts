@@ -15,8 +15,9 @@ import { Doc } from "./_generated/dataModel";
 // (the original MySQL primary key) rather than Convex Ids, so the public
 // application form can dual-write into both systems and stay reconcilable.
 //
-// Access: HR and super-admins. Brand managers deliberately can't see
-// candidate PII — salaries, phone numbers and CVs are HR's business.
+// Access: HR, super-admins, and anyone they have handed recruitment access
+// (users.canRecruit, see hrOps.setRecruitAccess). Everyone else stays out:
+// salaries, phone numbers and CVs are not general reading.
 
 const stageValidator = v.union(
   v.literal("applied"),
@@ -51,7 +52,7 @@ async function requireRecruiter(ctx: any) {
   const userId = await getAuthUserId(ctx);
   if (!userId) throw new Error("Not authenticated");
   const user = await ctx.db.get(userId);
-  if (!user || (user.isHR !== true && user.isSuperAdmin !== true)) {
+  if (!user || (user.isHR !== true && user.isSuperAdmin !== true && user.canRecruit !== true)) {
     throw new Error("Recruitment is HR only");
   }
   return { userId, user };
@@ -61,7 +62,7 @@ async function canRecruit(ctx: any): Promise<boolean> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return false;
   const user = await ctx.db.get(userId);
-  return user?.isHR === true || user?.isSuperAdmin === true;
+  return user?.isHR === true || user?.isSuperAdmin === true || user?.canRecruit === true;
 }
 
 /** Jobs with their live candidate counts, parents before their sub-positions. */

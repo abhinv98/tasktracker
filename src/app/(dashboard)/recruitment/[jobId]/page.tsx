@@ -22,6 +22,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { STAGES, OPEN_STAGES, stageMeta, type Stage } from "@/lib/recruitStages";
+import { useHrData } from "@/components/recruitment/hrShared";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import {
   parseCtcLpa, formatLpa, parseYears, formatYears, parseNoticeDays, formatNotice,
@@ -90,6 +91,12 @@ export default function RecruitmentJobPage() {
   const createCampaign = useMutation(api.recruitment.createCampaign);
   const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
+  const addApplicants = useMutation(api.hrOps.addApplicants);
+  const hr = useHrData();
+  // Rounds still hiring: where a shortlisted applicant can go next.
+  const openRounds = (hr?.book.rounds ?? []).filter(
+    (r) => !String(r.fields.hiringStatus ?? "").startsWith("Closed")
+  );
   const { toast } = useToast();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -123,6 +130,21 @@ export default function RecruitmentJobPage() {
     try {
       const { updated } = await setStageMut({ candidateIds: ids, stage: next });
       toast("success", `${updated} moved to ${stageMeta(next).label}`);
+      setSelected(new Set());
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function addToRound(roundId: string) {
+    if (!ids.length) return;
+    try {
+      const { added, skipped } = await addApplicants({ candidateIds: ids, roundId: roundId as Id<"hrRecords"> });
+      const code = openRounds.find((r) => r._id === roundId)?.code ?? "the round";
+      toast(
+        "success",
+        `${added} added to ${code}${skipped ? `, ${skipped} already there` : ""}. Find them under Candidates.`
+      );
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
@@ -217,7 +239,7 @@ export default function RecruitmentJobPage() {
   return (
     <div className="p-8">
       <Link
-        href="/recruitment"
+        href="/recruitment/applicants"
         className="inline-flex items-center gap-1.5 mb-4 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
       >
         <ArrowLeft size={13} />
@@ -277,6 +299,20 @@ export default function RecruitmentJobPage() {
               <Megaphone size={14} />
               Add to campaign
             </Button>
+            <select
+              value=""
+              onChange={(e) => e.target.value && addToRound(e.target.value)}
+              aria-label="Add to hiring round"
+              className="max-w-[220px] bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[13px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+            >
+              <option value="">Add to hiring round…</option>
+              {openRounds.length === 0 && <option disabled>No open hiring rounds yet</option>}
+              {openRounds.map((r) => (
+                <option key={r._id} value={r._id}>
+                  {r.code} · {String(r.fields.role ?? "")}
+                </option>
+              ))}
+            </select>
             <select
               value=""
               onChange={(e) => e.target.value && applyStage(e.target.value as Stage)}

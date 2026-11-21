@@ -30,6 +30,8 @@ export default defineSchema({
     isFreelancer: v.optional(v.boolean()),
     /** HR keeps role "admin" (same permissions) — this flag swaps their nav to the HR view & unlocks the HR Requests page */
     isHR: v.optional(v.boolean()),
+    /** Recruitment access handed to a brand manager or employee by HR or a super admin: the hiring trackers and applicants, not the founder dashboard. */
+    canRecruit: v.optional(v.boolean()),
     /** Finance/accounts. Rides on role "admin" like isHR, but is a label only for now — the nav is still the brand-manager view. */
     isAccountant: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
@@ -1211,6 +1213,23 @@ export default defineSchema({
     authorName: v.string(),
     createdAt: v.number(),
   }).index("by_candidate", ["candidateId", "createdAt"]),
+
+  // ─── HR TRACKERS ───────────────────────────────
+  // Every row of the HR operating system (hiring rounds, pipeline candidates,
+  // interviews, assignments, offers, onboarding, interns, campus, HR projects,
+  // founder tasks, daily log). What a tracker's `fields` may hold is defined
+  // once in convex/lib/hrTrackers.ts and checked on every save.
+  // ponytail: one table, joins done in memory. Split a tracker into its own
+  // table with indexes if it passes a few thousand rows.
+  hrRecords: defineTable({
+    tracker: v.string(),
+    /** The workbook-style ID, e.g. REQ-26-013 or C-26-157. */
+    code: v.string(),
+    fields: v.record(v.string(), v.union(v.string(), v.number(), v.null())),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_tracker", ["tracker", "code"]),
 
   // ─── HR REQUESTS ───────────────────────────────
   // Staff → HR asks (appraisal, reimbursement, …). HR accepts/declines, moves

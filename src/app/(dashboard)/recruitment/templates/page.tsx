@@ -76,7 +76,7 @@ export default function RecruitmentTemplatesPage() {
   return (
     <div className="p-8">
       <Link
-        href="/recruitment"
+        href="/recruitment/applicants"
         className="inline-flex items-center gap-1.5 mb-4 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
       >
         <ArrowLeft size={13} />

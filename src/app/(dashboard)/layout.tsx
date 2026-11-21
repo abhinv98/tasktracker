@@ -100,11 +100,12 @@ export default function DashboardLayout({
     if (!canAccessPettyCash(user) && pathname.startsWith("/petty-cash")) {
       router.replace("/dashboard");
     }
-    // Recruitment holds candidate PII — salaries, phone numbers, CVs. HR and
-    // super-admins only; brand managers have no business in there.
+    // Recruitment holds candidate PII — salaries, phone numbers, CVs. HR,
+    // super-admins, and anyone they have handed recruitment access.
     if (
       user.isHR !== true &&
       user.isSuperAdmin !== true &&
+      user.canRecruit !== true &&
       pathname.startsWith("/recruitment")
     ) {
       router.replace("/dashboard");

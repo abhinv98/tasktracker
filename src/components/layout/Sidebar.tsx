@@ -41,6 +41,8 @@ import {
   Wallet,
   ArrowLeft,
   Users2,
+  Search,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -82,7 +84,20 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/invoices": Receipt,
   "/hr-requests": LifeBuoy,
   "/recruitment": UserSearch,
-  "/recruitment/candidates": Users2,
+  "/recruitment/candidates": Search,
+  "/recruitment/applicants": Inbox,
+  "/recruitment/access": KeyRound,
+  "/recruitment/t/rounds": Briefcase,
+  "/recruitment/t/pipeline": Users2,
+  "/recruitment/t/interviews": CalendarRange,
+  "/recruitment/t/assignments": ClipboardList,
+  "/recruitment/t/offers": FileCheck,
+  "/recruitment/t/onboarding": CheckCircle2,
+  "/recruitment/t/interns": UserCog,
+  "/recruitment/t/campus": BookOpen,
+  "/recruitment/t/projects": FileBarChart,
+  "/recruitment/t/tasks": ListTodo,
+  "/recruitment/t/log": NotebookPen,
   "/recruitment/campaigns": Megaphone,
   "/recruitment/templates": FileBarChart,
   "/recruitment/activity": MessageSquare,
@@ -99,6 +114,12 @@ interface NavCategory {
     superAdminOnly?: boolean;
     /** Money — shown only to the few who are allowed in the ledger. */
     pettyCashOnly?: boolean;
+    /** Shown to anyone who may work in recruitment (HR, super admins, delegates). */
+    recruitOnly?: boolean;
+    /** Inside recruitment: HR and super admins only, not delegates. */
+    recruitFullOnly?: boolean;
+    /** Active on its own address only, not on the pages beneath it. */
+    exact?: boolean;
   }[];
 }
 
@@ -135,7 +156,7 @@ const ADMIN_NAV: NavCategory[] = [
       { href: "/worklog", label: "Work Log" },
       { href: "/petty-cash", label: "Petty Cash", pettyCashOnly: true },
       { href: "/users", label: "Users & Teams" },
-      { href: "/recruitment", label: "Recruitment", superAdminOnly: true },
+      { href: "/recruitment", label: "Recruitment", recruitOnly: true },
       { href: "/freelancers", label: "Freelancers" },
       { href: "/archive", label: "Archive" },
     ],
@@ -220,7 +241,10 @@ const EMPLOYEE_NAV: NavCategory[] = [
   },
   {
     category: "Management",
-    items: [{ href: "/deliverables", label: "Deliverables" }],
+    items: [
+      { href: "/deliverables", label: "Deliverables" },
+      { href: "/recruitment", label: "Recruitment", recruitOnly: true },
+    ],
   },
   {
     category: "Personal",
@@ -251,13 +275,36 @@ const REVIEWER_NAV: NavCategory[] = [
  */
 const RECRUITMENT_NAV: NavCategory[] = [
   {
-    category: "Recruitment",
+    category: "Hiring",
     items: [
-      { href: "/recruitment", label: "Overview" },
-      { href: "/recruitment/candidates", label: "All Candidates" },
+      { href: "/recruitment", label: "Dashboard", recruitFullOnly: true, exact: true },
+      { href: "/recruitment/t/rounds", label: "Hiring Rounds" },
+      { href: "/recruitment/t/pipeline", label: "Candidates" },
+      { href: "/recruitment/t/interviews", label: "Interviews" },
+      { href: "/recruitment/t/assignments", label: "Assignments" },
+      { href: "/recruitment/t/offers", label: "Offers" },
+      { href: "/recruitment/t/onboarding", label: "Onboarding", recruitFullOnly: true },
+    ],
+  },
+  {
+    category: "Applicants",
+    items: [
+      { href: "/recruitment/applicants", label: "Website Applicants" },
+      { href: "/recruitment/candidates", label: "Search Applicants" },
       { href: "/recruitment/campaigns", label: "Campaigns" },
       { href: "/recruitment/templates", label: "Templates" },
       { href: "/recruitment/activity", label: "Email Activity" },
+    ],
+  },
+  {
+    category: "People",
+    items: [
+      { href: "/recruitment/t/interns", label: "Interns", recruitFullOnly: true },
+      { href: "/recruitment/t/campus", label: "Campus Connect", recruitFullOnly: true },
+      { href: "/recruitment/t/projects", label: "HR Projects", recruitFullOnly: true },
+      { href: "/recruitment/t/tasks", label: "Founder Tasks", recruitFullOnly: true },
+      { href: "/recruitment/t/log", label: "Daily HR Log", recruitFullOnly: true },
+      { href: "/recruitment/access", label: "Access", recruitFullOnly: true },
     ],
   },
 ];
@@ -275,8 +322,10 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   const pendingHrRequestCount = useQuery(api.hr.countPending) ?? 0;
 
   const inRecruitment = pathname.startsWith("/recruitment");
-  // HR and super admins, the same two the backend lets in.
-  const canRecruit = user.isHR === true || user.isSuperAdmin === true;
+  // HR and super admins see all of recruitment; anyone they handed access to
+  // (canRecruit) sees the hiring side. The backend checks the same.
+  const recruitFull = user.isHR === true || user.isSuperAdmin === true;
+  const canRecruit = recruitFull || user.canRecruit === true;
   // Positions are fetched only inside the workspace — no point paying for the
   // query on every other page in the app.
   const jobs = useQuery(
@@ -297,7 +346,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
       items: cat.items.filter(
         (i) =>
           (!i.superAdminOnly || user.isSuperAdmin === true) &&
-          (!i.pettyCashOnly || canAccessPettyCash(user))
+          (!i.pettyCashOnly || canAccessPettyCash(user)) &&
+          (!i.recruitOnly || canRecruit) &&
+          (!i.recruitFullOnly || recruitFull)
       ),
     }))
     .filter((cat) => cat.items.length > 0);
@@ -367,7 +418,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
           {nav.map((group) => {
             const isOpen = !collapsedCategories.has(group.category);
             const hasActiveItem = group.items.some(
-              (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+              (item) => pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/"))
             );
 
             return (
@@ -398,7 +449,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                   <div className="mt-0.5 space-y-0.5">
                     {group.items.map((item) => {
                       const isActive =
-                        pathname === item.href || pathname.startsWith(item.href + "/");
+                        pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/"));
                       const Icon = getIconForRoute(item.href);
                       return (
                         <Link
