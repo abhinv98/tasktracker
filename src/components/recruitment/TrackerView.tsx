@@ -135,6 +135,16 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const open = (row: Row) => setEditing({ row, draft: draftOf(row) });
   // The round whose candidates are on screen, when the list is narrowed to one.
   const round = tracker === "pipeline" && picked.reqId ? data.byId.get(picked.reqId) : undefined;
+  // Empty because nothing exists yet, not because a filter hid it: the tracker
+  // has no rows, or the only thing narrowing the list is the round.
+  const fresh =
+    rows.length === 0 ||
+    (!!round &&
+      !needle &&
+      !mine &&
+      chip === "all" &&
+      Object.entries(picked).every(([key, value]) => key === "reqId" || !value) &&
+      !rows.some(({ row }) => row.fields.reqId === round._id));
 
   return (
     <div className="p-4 sm:p-8">
@@ -242,11 +252,21 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       </div>
 
       {visible.length === 0 ? (
-        <EmptyState
-          title={rows.length === 0 ? `No ${meta.label.toLowerCase()} yet` : "Nothing matches"}
-          description={rows.length === 0 ? meta.blurb : "Change or clear the filters to see more."}
-          action={rows.length === 0 ? <Button onClick={startNew}>New {meta.one}</Button> : undefined}
-        />
+        fresh ? (
+          // Nothing has been added here yet (to this tracker, or to the round
+          // being looked at): say so and offer the first one.
+          <EmptyState
+            title={round ? `No candidates in ${String(round.fields.role ?? round.code)} yet` : `No ${meta.label.toLowerCase()} yet`}
+            description={
+              round
+                ? "Add the first one here, or go to Website Applicants, tick the people worth a look and use Add to hiring round."
+                : meta.blurb
+            }
+            action={<Button onClick={startNew}>New {meta.one}</Button>}
+          />
+        ) : (
+          <EmptyState title="Nothing matches" description="Change or clear the filters to see more." />
+        )
       ) : board && view === "board" ? (
         <TrackerBoard
           tracker={tracker}
