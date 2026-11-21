@@ -41,11 +41,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fileName and contentType required" }, { status: 400 });
     }
 
-    // Generate a unique key: deliverables/<timestamp>-<random>/<originalFileName>
-    const timestamp = Date.now();
-    const rand = Math.random().toString(36).substring(2, 10);
+    // A key nobody can guess: deliverables/<random uuid>/<originalFileName>. The
+    // file route hands these out to anyone holding the link, so the folder name
+    // is the lock.
     const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const fileKey = `deliverables/${timestamp}-${rand}/${safeFileName}`;
+    const fileKey = `deliverables/${crypto.randomUUID()}/${safeFileName}`;
 
     const command = new PutObjectCommand({
       Bucket: R2_BUCKET,

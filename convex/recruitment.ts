@@ -78,6 +78,27 @@ async function requireCandidates(ctx: Ctx, access: RecruitAccess, ids: Id<"recru
   }
 }
 
+const RESUME_KEY = /^resumes\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,120}\.pdf$/;
+const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+/** Plain text only: these values are later dropped into HTML emails, some
+ *  of them inside an attribute, so quotes go too. */
+const clean = (value: string | undefined, max: number) =>
+  (value ?? "").replace(/[<>"\u0000-\u001f]/g, " ").trim().slice(0, max);
+
+/**
+ * A link someone typed (a resume on Drive, a portfolio, a LinkedIn page), kept
+ * only if it is an ordinary web address. "linkedin.com/in/x" gets its https://.
+ * Anything else is refused, or dropped when `strict` is off (the public form
+ * should not fail an application over a badly typed link).
+ */
+function safeLink(value: string | undefined, label: string, strict = true): string {
+  const text = clean(value, 500);
+  if (!text) return "";
+  const url = /^https?:\/\//i.test(text) ? text : /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(text) ? `https://${text}` : "";
+  if (!url && strict) throw new Error(`${label}: paste a full web address`);
+  return url;
+}
+
 /** Jobs with their live candidate counts, parents before their sub-positions. */
 export const listJobs = query({
   args: {},
@@ -362,9 +383,29 @@ export const deleteCandidates = mutation({
   args: { candidateIds: v.array(v.id("recruitCandidates")) },
   handler: async (ctx, { candidateIds }) => {
     await requireCandidates(ctx, await requireRecruiter(ctx), candidateIds);
-    for (const id of candidateIds) await ctx.db.delete(id);
-    // Drop them from campaign member lists so memberCount stays right.
+    for (const id of candidateIds) {
+      // Their notes and stage history go with them: nothing can show them once the person is gone.
+      const activity = await ctx.db
+        .query("recruitActivity")
+        .withIndex("by_candidate", (q) => q.eq("candidateId", id))
+        .collect();
+      for (const a of activity) await ctx.db.delete(a._id);
+      await ctx.db.delete(id);
+    }
     const del = new Set<string>(candidateIds);
+    // A pipeline candidate made from this application stays (it has its own
+    // history), but stops pointing at an application that no longer exists.
+    for (const row of await ctx.db
+      .query("hrRecords")
+      .withIndex("by_tracker", (q) => q.eq("tracker", "pipeline"))
+      .collect()) {
+      if (typeof row.fields.applicantId === "string" && del.has(row.fields.applicantId)) {
+        const { applicantId: _gone, ...fields } = row.fields;
+        void _gone;
+        await ctx.db.patch(row._id, { fields });
+      }
+    }
+    // Drop them from campaign member lists so memberCount stays right.
     for (const c of await ctx.db.query("recruitCampaigns").collect()) {
       const ids = c.candidateIds ?? [];
       const kept = ids.filter((i) => !del.has(i));
@@ -391,20 +432,22 @@ export const addCandidate = mutation({
   },
   handler: async (ctx, args) => {
     requireJob(await requireRecruiter(ctx), args.jobSourceId);
-    if (!args.name.trim()) throw new Error("Name is required");
-    if (!args.email.trim()) throw new Error("Email is required");
+    const name = clean(args.name, 120);
+    const email = clean(args.email, 200);
+    if (!name) throw new Error("Name is required");
+    if (!EMAIL.test(email)) throw new Error("A valid email is required");
     return await ctx.db.insert("recruitCandidates", {
       jobSourceId: args.jobSourceId,
-      name: args.name.trim(),
-      email: args.email.trim(),
-      number: args.number ?? "",
-      position: args.position ?? "",
-      resume: args.resume ?? "",
-      portfolioLink: args.portfolioLink ?? "",
-      experience: args.experience ?? "",
-      currentCtc: args.currentCtc ?? "",
-      expectedCtc: args.expectedCtc ?? "",
-      noticePeriod: args.noticePeriod ?? "",
+      name,
+      email,
+      number: clean(args.number, 30),
+      position: clean(args.position, 120),
+      resume: safeLink(args.resume, "Resume link"),
+      portfolioLink: safeLink(args.portfolioLink, "Portfolio link"),
+      experience: clean(args.experience, 50),
+      currentCtc: clean(args.currentCtc, 100),
+      expectedCtc: clean(args.expectedCtc, 100),
+      noticePeriod: clean(args.noticePeriod, 100),
       age: args.age ?? null,
       status: "active",
       statusUpdatedAt: null,
@@ -737,7 +780,12 @@ export const deleteCampaign = mutation({
 /* ── Email sending ─────────────────────────────────────────── */
 
 /** Placeholder substitution, matching the PHP app's {{variable}} syntax. */
-function fillPlaceholders(text: string, c: Doc<"recruitCandidates">, jobName: string) {
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** `html` is for the email body, where a value must not be able to add markup
+ *  of its own, whichever way the candidate got into the system. */
+function fillPlaceholders(text: string, c: Doc<"recruitCandidates">, jobName: string, html = false) {
   const map: Record<string, string> = {
     name: c.name,
     email: c.email,
@@ -749,9 +797,10 @@ function fillPlaceholders(text: string, c: Doc<"recruitCandidates">, jobName: st
     portfoliolink: c.portfolioLink,
     jobname: jobName,
   };
-  return text.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (full, key) =>
-    map[String(key).toLowerCase()] ?? full
-  );
+  return text.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (full, key) => {
+    const value = map[String(key).toLowerCase()];
+    return value === undefined ? full : html ? escapeHtml(value) : value;
+  });
 }
 
 export const _loadSendContext = internalQuery({
@@ -786,7 +835,7 @@ export const _loadSendContext = internalQuery({
         email: c.email,
         name: c.name,
         subject: fillPlaceholders(template.subject, c, jobName),
-        body: fillPlaceholders(template.body, c, jobName),
+        body: fillPlaceholders(template.body, c, jobName, true),
       });
     }
     return { templateName: template.name, recipients: out };
@@ -901,13 +950,6 @@ export const openPositions = query({
   },
 });
 
-const RESUME_KEY = /^resumes\/[0-9a-f-]{36}\/[A-Za-z0-9._-]{1,120}\.pdf$/;
-const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
-/** Plain text only: these values are later dropped into HTML emails, some
- *  of them inside an attribute, so quotes go too. */
-const clean = (value: string | undefined, max: number) =>
-  (value ?? "").replace(/[<>"\u0000-\u001f]/g, " ").trim().slice(0, max);
-
 export const apply = mutation({
   args: {
     jobSourceId: v.number(),
@@ -980,7 +1022,7 @@ export const apply = mutation({
       age,
       experience: clean(args.experience, 50),
       resume: args.resumeKey ? `${process.env.SITE_URL}/api/r2-file?key=${args.resumeKey}` : "",
-      portfolioLink: clean(args.portfolioLink, 500),
+      portfolioLink: safeLink(args.portfolioLink, "Portfolio link", false),
       position: selected.name,
       currentCtc: clean(args.currentCtc, 100),
       expectedCtc: clean(args.expectedCtc, 100),
