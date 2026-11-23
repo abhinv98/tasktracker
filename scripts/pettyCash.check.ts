@@ -122,11 +122,11 @@ assert.equal(months.reduce((n, m) => n + m.items.length, 0), 3);
 
 // Access: the reason this page is restricted at all.
 assert.equal(canAccessPettyCash({ isSuperAdmin: true }), true);
-assert.equal(canAccessPettyCash({ isAccountant: true }), true);
 assert.equal(canAccessPettyCash({ isHR: true }), true);
-assert.equal(canAccessPettyCash({ email: "dhriti@ecultify.com" }), true);
-assert.equal(canAccessPettyCash({ email: "DHRITI@ecultify.com" }), true);
-assert.equal(canAccessPettyCash({ email: "someone@ecultify.com" }), false);
+// Only those two: the accountant and everyone else are out.
+assert.equal(canAccessPettyCash({ isAccountant: true } as { isHR?: boolean }), false);
+assert.equal(canAccessPettyCash({ email: "dhriti@ecultify.com" } as { isHR?: boolean }), false);
+assert.equal(canAccessPettyCash({}), false);
 assert.equal(canAccessPettyCash(null), false);
 
 console.log("petty cash float checks passed");

@@ -95,8 +95,8 @@ export default function DashboardLayout({
     if (user.isHR !== true && pathname.startsWith("/hr-requests")) {
       router.replace("/dashboard");
     }
-    // Petty cash is the company's money. Accountant, HR, super admins and the
-    // named exceptions only — a nav item alone would still leave the URL open.
+    // Petty cash is the company's money. Super admins and HR only — a nav item
+    // alone would still leave the URL open.
     if (!canAccessPettyCash(user) && pathname.startsWith("/petty-cash")) {
       router.replace("/dashboard");
     }

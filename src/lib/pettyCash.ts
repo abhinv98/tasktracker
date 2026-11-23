@@ -16,22 +16,13 @@
  * caller appears.
  */
 
-/** Not a role flag because it's one person, not a job function. */
-export const PETTY_CASH_EMAILS = ["dhriti@ecultify.com"];
-
+/** Super admins and HR, nobody else: not the accountant, and no named exceptions. */
 export function canAccessPettyCash(user: {
-  email?: string;
   isSuperAdmin?: boolean;
-  isAccountant?: boolean;
   isHR?: boolean;
 } | null | undefined): boolean {
   if (!user) return false;
-  return (
-    user.isSuperAdmin === true ||
-    user.isAccountant === true ||
-    user.isHR === true ||
-    PETTY_CASH_EMAILS.includes((user.email ?? "").toLowerCase())
-  );
+  return user.isSuperAdmin === true || user.isHR === true;
 }
 
 export type Allocation = {

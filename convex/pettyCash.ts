@@ -18,16 +18,10 @@ import { v } from "convex/values";
  * ponytail: duplicated predicate, collapse into a shared module if a third
  * caller appears.
  */
-const PETTY_CASH_EMAILS = ["dhriti@ecultify.com"];
-
 function hasAccess(user: any): boolean {
   if (!user) return false;
-  return (
-    user.isSuperAdmin === true ||
-    user.isAccountant === true ||
-    user.isHR === true ||
-    PETTY_CASH_EMAILS.includes((user.email ?? "").toLowerCase())
-  );
+  // Super admins and HR, nobody else.
+  return user.isSuperAdmin === true || user.isHR === true;
 }
 
 async function requireAccess(ctx: any) {
