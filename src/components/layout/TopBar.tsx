@@ -39,6 +39,7 @@ const PATH_TO_TITLE: Record<string, string> = {
   "/hr-requests": "HR Requests",
   "/recruitment": "Recruitment",
   "/recruitment/candidates": "All Applicants",
+  "/recruitment/setup": "Recruitment Setup",
   "/recruitment/campaigns": "Campaigns",
   "/recruitment/templates": "Templates",
   "/recruitment/activity": "Email Activity",

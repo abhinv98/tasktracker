@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Badge, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable, useToast } from "@/components/ui";
@@ -14,6 +15,7 @@ import { SearchField, Tray, TrayItem } from "@/components/ui/Tray";
 export default function RecruitmentAccessPage() {
   const data = useQuery(api.hrOps.accessList, {});
   const setAccess = useMutation(api.hrOps.setRecruitAccess);
+  const setPay = useMutation(api.hrOps.setRecruitPay);
   const { toast } = useToast();
   const [search, setSearch] = useState("");
 
@@ -54,7 +56,7 @@ export default function RecruitmentAccessPage() {
     <div className="p-4 sm:p-8">
       <PageHeader
         title="Recruitment Access"
-        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and open positions, and nothing else."
+        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and open positions, and nothing else. What applicants earn and expect stays hidden from them unless you switch it on."
       />
       <div className="mb-3">
         <SearchField value={search} onChange={setSearch} placeholder="Search people" label="Search people" />
@@ -82,6 +84,28 @@ export default function RecruitmentAccessPage() {
                       </Badge>
                     ))}
                   </div>
+                  {p.jobs.length > 0 && (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={p.pay}
+                      aria-label={`${p.name}: see current and expected CTC`}
+                      title={p.pay ? "Sees current and expected CTC. Press to hide them." : "Current and expected CTC are hidden. Press to show them."}
+                      onClick={() =>
+                        setPay({ userId: p._id, allowed: !p.pay })
+                          .then(() => toast("success", p.pay ? `CTC is hidden from ${p.name}` : `${p.name} can see current and expected CTC`))
+                          .catch((err) => toast("error", err instanceof Error ? err.message : "Could not change it"))
+                      }
+                      className={`inline-flex h-control items-center gap-1.5 rounded-control border px-3 text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                        p.pay
+                          ? "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
+                          : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                      }`}
+                    >
+                      {p.pay ? <Eye size={14} aria-hidden /> : <EyeOff size={14} aria-hidden />}
+                      {p.pay ? "Sees CTC" : "CTC hidden"}
+                    </button>
+                  )}
                   <Tray
                     label={p.jobs.length ? "Positions" : "Give access"}
                     active={p.jobs.length > 0}

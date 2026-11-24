@@ -4,12 +4,16 @@ import { createContext, useContext, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Badge } from "@/components/ui";
+import { STANDARD, STANDARD_STEPS, mergeNames, type Step } from "@/convex/lib/hirePipeline";
 import { TRACKERS, type Field, type TrackerKey } from "@/convex/lib/hrTrackers";
+import type { Team } from "@/lib/recruitTeams";
 import { toBook, todayIST, tone, type Book, type Row } from "@/lib/hrHealth";
 
 /** What every HR tracker screen needs: the rows by tracker, the staff list and today's date. */
 export type HrData = {
   full: boolean;
+  /** Sees applicants' current and expected CTC. The server leaves them out for anyone else. */
+  pay: boolean;
   /** The signed-in person's user id: "mine" filters and "@me" defaults use it. */
   me: string;
   book: Book;
@@ -17,11 +21,36 @@ export type HrData = {
   people: { _id: string; name: string }[];
   personName: (id: string) => string;
   /** Website positions a row can be tied to (the caller's own, unless HR). */
-  jobs: { id: string; name: string }[];
+  jobs: Job[];
   today: string;
+  /** The hiring pipelines there are to pick from, the standard one first. */
+  pipelines: Pipeline[];
+  pipelineName: (key: string | undefined) => string;
+  teams: Team[];
+  teamName: (id: string) => string;
+  /** The position someone is hired for: their hiring round's, else the one they applied for, or the role under it they named. */
+  positionOf: (fields: Record<string, unknown>) => Job | undefined;
+  /** The teams a candidate could join: their hiring round's, else their position's. */
+  teamsOf: (row: Row) => string[];
+  /** The steps of a position's pipeline (the standard one without a position). */
+  stepsFor: (job: string | null | undefined) => Step[];
+  /** The steps of a candidate, or of everyone in an open position. */
+  stepsOf: (row: Row) => Step[];
 };
 
-type Loaded = { full: boolean; me: string; rows: Row[]; people: { _id: string; name: string }[]; jobs: { id: string; name: string }[] };
+export type Pipeline = { key: string; name: string; steps: Step[] };
+/** `teams`: the ones its people join, its own or the role above it's. */
+type Job = { id: string; name: string; hrOwner?: string; hiringManager?: string; pipeline?: string; parent?: string; teams?: string[]; divide?: boolean };
+type Loaded = {
+  full: boolean;
+  pay?: boolean;
+  me: string;
+  rows: Row[];
+  people: { _id: string; name: string }[];
+  jobs: Job[];
+  pipelines?: Pipeline[];
+  teams?: Team[];
+};
 
 /** Rows handed in directly, for a preview or a test, instead of the live query. */
 export const HrPreview = createContext<Loaded | null>(null);
@@ -37,15 +66,38 @@ export function useHrData(): HrData | undefined {
   return useMemo(() => {
     if (!data) return undefined;
     const names = new Map(data.people.map((p) => [p._id as string, p.name]));
+    const byId = new Map(data.rows.map((r) => [r._id as string, r]));
+    const pipelines = data.pipelines ?? [{ key: STANDARD, name: "Standard", steps: STANDARD_STEPS }];
+    const positionOf = (fields: Record<string, unknown>) => {
+      const round = byId.get(String(fields.reqId ?? ""))?.fields;
+      const id = String(round?.job || fields.job || "");
+      // The website files people under the position, with a role under it as text.
+      const role = round?.job ? undefined : data.jobs.find((j) => j.parent === id && j.name.toLowerCase() === String(fields.roleOriginal ?? "").trim().toLowerCase());
+      return role ?? data.jobs.find((j) => j.id === id);
+    };
+    const at = (key: string | undefined) => pipelines.find((p) => p.key === key) ?? pipelines[0];
     return {
       full: data.full,
+      pay: data.pay === true,
       me: data.me,
       book: toBook(data.rows),
-      byId: new Map(data.rows.map((r) => [r._id as string, r])),
+      byId,
       people: data.people,
       personName: (id: string) => names.get(id) ?? "",
       jobs: data.jobs,
       today,
+      teams: data.teams ?? [],
+      teamName: (id) => data.teams?.find((t) => t._id === id)?.name ?? "",
+      positionOf,
+      teamsOf: (row) => {
+        const own = String(byId.get(String(row.fields.reqId ?? ""))?.fields.team ?? "");
+        return data.teams?.some((t) => t._id === own) ? [own] : (positionOf(row.fields)?.teams ?? []);
+      },
+      pipelines,
+      pipelineName: (key) => at(key).name,
+      // The server has worked out which pipeline each of them is on (hrOps.all).
+      stepsFor: (job) => at(data.jobs.find((j) => j.id === job)?.pipeline).steps,
+      stepsOf: (row) => at(row.pipeline).steps,
     };
   }, [data, today]);
 }
@@ -93,6 +145,12 @@ export function boardValue(row: Row): string | null {
   return meta.boardClosed?.includes(status) ? status : value;
 }
 
+/** The steps a list of candidates goes through between them, in one order. */
+export function stepNames(rows: readonly Row[], data: HrData): string[] {
+  const lists = [...new Set(rows.map((r) => data.stepsOf(r)))];
+  return mergeNames(lists.length ? lists : [data.stepsFor(null)]);
+}
+
 /** YYYY-MM-DD some days after another. */
 export const addDays = (date: string, days: number) =>
   new Date(Date.parse(date) + days * 86_400_000).toISOString().slice(0, 10);
@@ -120,14 +178,18 @@ export function fmtDate(date: string, today: string) {
 
 /** One cell's value as text. */
 export function show(field: Field, row: Row, data: HrData): string {
-  const value = row.fields[field.key];
+  // Nothing picked still means one applies: its position's.
+  const value = field.type === "pipeline" ? row.pipeline : row.fields[field.key];
   if (value === null || value === undefined || value === "") return "";
   if (field.type === "user") return data.personName(String(value));
-  if (field.type === "job") return data.jobs.find((j) => j.id === String(value))?.name ?? "";
+  // A removed position is not on the list: what they applied for is still known.
+  if (field.type === "job") return data.jobs.find((j) => j.id === String(value))?.name ?? String(row.fields.roleOriginal ?? "");
   if (field.type === "ref") {
     const target = data.byId.get(String(value));
     return target ? (field.ref === "rounds" ? `${target.code} · ${rowTitle(target, data)}` : rowTitle(target, data)) : "";
   }
+  if (field.type === "pipeline") return data.pipelineName(String(value));
+  if (field.type === "team") return data.teamName(String(value));
   if (field.type === "date") return fmtDate(String(value), data.today);
   return String(value);
 }

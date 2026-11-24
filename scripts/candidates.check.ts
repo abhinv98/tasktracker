@@ -1,12 +1,14 @@
 // Shortlisting: applicants land on Candidates once, in the right open position, with an unused ID.
 // Run: npx tsx scripts/candidates.check.ts
 import assert from "node:assert";
-import { addToCandidates, followApplication, followCandidate, placeInRound, standing } from "../convex/lib/candidates";
+import { addToCandidates, followApplication, followCandidate, placeInRound, refit, standing } from "../convex/lib/candidates";
+import { loadPipelines } from "../convex/lib/pipelines";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = any;
 const tables: Record<string, Row[]> = {
   recruitCandidates: [],
+  recruitPipelines: [],
   recruitActivity: [],
   recruitJobs: [
     { _id: "j1", sourceId: 1, name: "Design" },
@@ -194,6 +196,27 @@ async function main() {
   assert.equal(round("w4").fields.reqId, "r1");
   assert.ok(tables.hrRecords.filter((r) => r.fields.reqId === "r9").length > before);
   assert.equal(await placeInRound(ctx, me, { _id: "r10", fields: {} } as any), 0, "an open position with no role takes nobody");
+
+  // A hiring round picks another pipeline: its people take the matching step, nobody else moves.
+  const steps = [["call", "HR call", "screening"], ["folio", "Portfolio", "interview"], ["offer", "Offer", "offer"]].map(([id, name, kind]) => ({ id, name, kind }));
+  tables.recruitPipelines.push({ _id: "pl", name: "Design", steps });
+  tables.hrRecords.push({ _id: "rp", tracker: "rounds", code: "REQ-26-099", fields: { job: "3", hiringStatus: "Open" } });
+  const inIt = add("z1", { job: "3", reqId: "rp", stage: "Interview 2", status: "Active" });
+  const shut = add("z2", { job: "3", reqId: "rp", stage: "Screening", status: "Rejected" });
+  const outside = add("z3", { job: "3", stage: "Interview 2", status: "Active" });
+  const was = await loadPipelines(ctx);
+  const at = tables.hrRecords.findIndex((r) => r._id === "rp");
+  tables.hrRecords[at] = { ...tables.hrRecords[at], fields: { ...tables.hrRecords[at].fields, pipeline: "pl" } };
+  assert.equal(await refit(ctx, was), 1, "one person in play moved");
+  assert.deepEqual([inIt.fields.stage, shut.fields.stage, outside.fields.stage], ["Portfolio", "HR call", "Interview 2"]);
+  assert.equal(await refit(ctx, await loadPipelines(ctx)), 0);
+  // Shortlisted into it: they start at its first real step.
+  await addToCandidates(ctx, me, [person("zz", 3)], round("rp"));
+  assert.equal(pipeline().at(-1).fields.stage, "HR call");
+  // Placed into it from outside: the matching step.
+  add("z4", { job: "3", applicantId: "z4", stage: "Interview 1", status: "Active" });
+  await addToCandidates(ctx, me, [person("z4", 3)], round("rp"));
+  assert.deepEqual([round("z4").fields.reqId, round("z4").fields.stage], ["rp", "Portfolio"]);
   console.log("candidates: ok");
 }
 main();

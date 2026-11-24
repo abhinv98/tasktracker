@@ -28,7 +28,9 @@ import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { Rounds } from "@/components/recruitment/OpenRound";
 import { EmailPreview } from "@/components/recruitment/TemplateEditor";
 import { valuesFor } from "@/lib/templateHtml";
-import { ArrowLeft, Check, Mail, Megaphone, Pause, RotateCcw, Trash2, UserSearch, X } from "lucide-react";
+import { positionCode } from "@/convex/lib/hirePipeline";
+import { MoveApplicants } from "@/components/recruitment/MoveApplicants";
+import { ArrowLeft, ArrowLeftRight, Check, Mail, Megaphone, Pause, RotateCcw, SlidersHorizontal, Trash2, UserSearch, X } from "lucide-react";
 
 type Chip = PositionStatus | "all";
 
@@ -67,6 +69,7 @@ export default function RecruitmentJobPage() {
   const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [moving, setMoving] = useState(false);
   const [campTarget, setCampTarget] = useState("new");
   const [campName, setCampName] = useState("");
   const [campNotes, setCampNotes] = useState("");
@@ -191,14 +194,48 @@ export default function RecruitmentJobPage() {
 
       <PageHeader
         title={job ? job.name[0].toUpperCase() + job.name.slice(1) : "Position"}
-        subtitle={
+        subtitle={[
+          positionCode(jobSourceId),
           job?.parentName
             ? `Under ${job.parentName}`
-            : `${candidates.length.toLocaleString()} ${candidates.length === 1 ? "person has" : "people have"} applied. Shortlisted people carry on under Candidates.`
-        }
+            : `${candidates.length.toLocaleString()} ${candidates.length === 1 ? "person has" : "people have"} applied. Shortlisted people carry on under Candidates.`,
+        ].join("  ·  ")}
         icon={UserSearch}
-        actions={job && <Rounds data={hr} job={job} />}
+        actions={
+          job && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Rounds data={hr} job={job} />
+              {hr?.full && (
+                <Link
+                  href={`/recruitment/setup?job=${jobSourceId}`}
+                  className="inline-flex h-control items-center gap-1.5 rounded-control border border-[var(--border)] bg-white px-3 text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"
+                >
+                  <SlidersHorizontal size={14} aria-hidden />
+                  {hr.pipelineName(hr.jobs.find((j) => j.id === String(jobSourceId))?.pipeline)} pipeline
+                </Link>
+              )}
+            </div>
+          )
+        }
       />
+
+      {!job && hr && (
+        <p className="mb-3 rounded-lg bg-[var(--warning-dim)] px-3 py-2 text-[13px] text-[var(--text-primary)]">
+          {!hr.full ? (
+            "This position is not one of yours, or it was removed."
+          ) : (
+            <>
+              {candidates.length > 0
+                ? "This position was removed, so nobody can apply for it. The people below are kept: tick them to move them to another position, or restore it in "
+                : "This position was removed, or never existed. Removed ones can be restored in "}
+              <Link href="/recruitment/setup" className="font-medium underline underline-offset-2">
+                Setup
+              </Link>
+              .
+            </>
+          )}
+        </p>
+      )}
 
       <StatChips<Chip>
         className="mb-3"
@@ -227,7 +264,7 @@ export default function RecruitmentJobPage() {
             onChange={(role) => setFilter((f) => ({ ...f, role }))}
           />
         )}
-        <NarrowTray value={filter} onChange={setFilter} />
+        <NarrowTray pay={hr?.pay !== false} value={filter} onChange={setFilter} />
         {filtersOn && (
           <button
             type="button"
@@ -268,6 +305,7 @@ export default function RecruitmentJobPage() {
             </Button>
             <Tray label="More" align="end" width="w-64">
               <TrayItem label="Back to New" icon={RotateCcw} onSelect={() => moveSelected("new")} />
+              <TrayItem label="Move to another position" icon={ArrowLeftRight} onSelect={() => setMoving(true)} />
               <TrayItem label="Add to an email campaign" icon={Megaphone} onSelect={() => setCampOpen(true)} />
               {openRounds.length > 0 && (
                 <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Put into a hiring round</p>
@@ -302,6 +340,8 @@ export default function RecruitmentJobPage() {
             onOpen={(id, order) => setPanel({ id, order })}
             onMove={(a, to) => move([a._id], to, a.name)}
             places={places}
+            // The server has left the figures out already; this only drops the empty columns.
+            pay={hr?.pay !== false}
             highlight={highlight}
           />
           {undated > 0 && (
@@ -344,7 +384,7 @@ export default function RecruitmentJobPage() {
             <EmailPreview
               subject={picked.subject}
               body={picked.body}
-              values={valuesFor(firstPicked, job?.name ?? "")}
+              values={valuesFor(firstPicked, job?.name ?? "", hr?.pay === true)}
               to={`${firstPicked.name}, ${firstPicked.email}`}
             />
           )}
@@ -416,6 +456,16 @@ export default function RecruitmentJobPage() {
             if (other === jobSourceId) setPanel((p) => p && { ...p, id });
             else router.push(`/recruitment/${other}?highlight=${id}`);
           }}
+        />
+      )}
+
+      {moving && (
+        <MoveApplicants
+          ids={ids}
+          who={ids.length === 1 ? rows.find((r) => r._id === ids[0])?.name : undefined}
+          from={jobSourceId}
+          onClose={() => setMoving(false)}
+          onMoved={() => setSelected(new Set())}
         />
       )}
 

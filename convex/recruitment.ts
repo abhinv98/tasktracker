@@ -11,8 +11,10 @@ import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mayRecruitFor, myCandidate, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, followApplication, rowsOf, standing } from "./lib/candidates";
+import { ARCHIVED, addToCandidates, followApplication, rowsOf, standing, today } from "./lib/candidates";
+import { livePositions } from "./lib/pipelines";
 import { matches } from "./lib/applicantMatch";
+import { webAddress } from "./lib/links";
 import { mailProblem, stopsEverySend } from "./lib/mail";
 
 // ── RECRUITMENT ────────────────────────────────────────────────
@@ -56,6 +58,13 @@ const STAGE_FROM_STATUS = {
 
 type Ctx = QueryCtx | MutationCtx;
 
+/** An applicant as this person may see them. Every query that hands out applicants goes through here. */
+const shown = (access: RecruitAccess, c: Doc<"recruitCandidates">): Doc<"recruitCandidates"> =>
+  access.pay ? c : { ...c, currentCtc: "", expectedCtc: "" };
+
+/** A position's name, saying so when it has been removed. */
+const nameOf = (j: Doc<"recruitJobs"> | undefined) => (j ? (j.removedAt ? `${j.name} (removed)` : j.name) : "Unknown");
+
 async function requireRecruiter(ctx: Ctx): Promise<RecruitAccess> {
   const access = await recruitAccess(ctx);
   if (!access) throw new Error("Recruitment is HR only");
@@ -98,7 +107,7 @@ const clean = (value: string | undefined, max: number) =>
 function safeLink(value: string | undefined, label: string, strict = true): string {
   const text = clean(value, 500);
   if (!text) return "";
-  const url = /^https?:\/\//i.test(text) ? text : /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(text) ? `https://${text}` : "";
+  const url = webAddress(text);
   if (!url && strict) throw new Error(`${label}: paste a full web address`);
   return url;
 }
@@ -109,7 +118,7 @@ export const listJobs = query({
   handler: async (ctx) => {
     const access = await recruitAccess(ctx);
     if (!access) return [];
-    const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    const jobs = livePositions(await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
     const candidates = await ctx.db.query("recruitCandidates").collect();
 
     const none = () => ({ total: 0, fresh: 0, shortlisted: 0, onHold: 0, rejected: 0, lastApplied: 0 });
@@ -157,8 +166,10 @@ export const getStats = query({
     const access = await recruitAccess(ctx);
     if (!access) return null;
     const mine = <T extends { jobSourceId: number }>(rows: T[]) => rows.filter((r) => mayRecruitFor(access, r.jobSourceId));
-    const candidates = mine(await ctx.db.query("recruitCandidates").collect());
-    const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    const jobs = livePositions(await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    // People left behind in a removed position are not waiting for anyone.
+    const here = new Set(jobs.map((j) => j.sourceId));
+    const candidates = mine(await ctx.db.query("recruitCandidates").collect()).filter((c) => here.has(c.jobSourceId));
     const logs = mine(await ctx.db.query("recruitEmailLogs").collect());
 
     const byStatus: Record<string, number> = {
@@ -212,7 +223,7 @@ export const listCandidates = query({
       .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
       .collect();
     rows.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-    return rows.filter((r) => (!stage || (r.stage ?? "applied") === stage) && (!search || matches(r, search)));
+    return rows.filter((r) => (!stage || (r.stage ?? "applied") === stage) && (!search || matches(r, search))).map((r) => shown(access, r));
   },
 });
 
@@ -227,19 +238,21 @@ export const recentApplicants = query({
   handler: async (ctx, { limit, status, jobSourceId }) => {
     const access = await recruitAccess(ctx);
     if (!access) return [];
-    const jobs = new Map((await ctx.db.query("recruitJobs").collect()).map((j) => [j.sourceId, j.name]));
+    // Who was left in a removed position is found by searching, not listed as new.
+    const jobs = new Map(livePositions(await ctx.db.query("recruitJobs").collect()).map((j) => [j.sourceId, j.name]));
     const statusOf = (stage: string) =>
       stage === "applied" ? "new" : stage === "on_hold" || stage === "rejected" ? stage : "shortlisted";
     return (await ctx.db.query("recruitCandidates").collect())
       .filter(
         (r) =>
           mayRecruitFor(access, r.jobSourceId) &&
+          jobs.has(r.jobSourceId) &&
           (jobSourceId === undefined || r.jobSourceId === jobSourceId) &&
           (!status || statusOf(r.stage ?? "applied") === status)
       )
       .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
       .slice(0, Math.min(limit ?? 10, 300))
-      .map((r) => ({ ...r, jobName: jobs.get(r.jobSourceId) ?? "Unknown" }));
+      .map((r) => ({ ...shown(access, r), jobName: jobs.get(r.jobSourceId)! }));
   },
 });
 
@@ -258,8 +271,8 @@ export const searchCandidates = query({
       .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
       .slice(0, limit ?? 20)
       .map((r) => ({
-        ...r,
-        jobName: jobs.find((j) => j.sourceId === r.jobSourceId)?.name ?? "Unknown",
+        ...shown(access, r),
+        jobName: nameOf(jobs.find((j) => j.sourceId === r.jobSourceId)),
       }));
   },
 });
@@ -321,46 +334,6 @@ export const setCandidateStatus = mutation({
   },
 });
 
-export const createJob = mutation({
-  args: {
-    name: v.string(),
-    description: v.optional(v.string()),
-    parentSourceId: v.optional(v.union(v.number(), v.null())),
-  },
-  handler: async (ctx, { name, description, parentSourceId }) => {
-    await requireFull(ctx);
-    if (!name.trim()) throw new Error("Name is required");
-    // Keep allocating sourceIds above the imported range so a later
-    // reconciliation against MySQL can still tell the two apart.
-    const all = await ctx.db.query("recruitJobs").collect();
-    const nextId = Math.max(1000, ...all.map((j) => j.sourceId)) + 1;
-    return await ctx.db.insert("recruitJobs", {
-      sourceId: nextId,
-      name: name.trim(),
-      description: description?.trim() ?? "",
-      formUrl: "",
-      parentSourceId: parentSourceId ?? null,
-      createdAt: Date.now(),
-    });
-  },
-});
-
-export const updateJob = mutation({
-  args: {
-    jobId: v.id("recruitJobs"),
-    name: v.optional(v.string()),
-    description: v.optional(v.string()),
-    formUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, { jobId, ...patch }) => {
-    await requireFull(ctx);
-    const clean = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined)
-    );
-    await ctx.db.patch(jobId, clean);
-  },
-});
-
 export const deleteCandidates = mutation({
   args: { candidateIds: v.array(v.id("recruitCandidates")) },
   handler: async (ctx, { candidateIds }) => {
@@ -411,6 +384,9 @@ export const addCandidate = mutation({
   },
   handler: async (ctx, args) => {
     requireJob(await requireRecruiter(ctx), args.jobSourceId);
+    if (!livePositions(await ctx.db.query("recruitJobs").collect()).some((j) => j.sourceId === args.jobSourceId)) {
+      throw new Error("That position no longer exists");
+    }
     const name = clean(args.name, 120);
     const email = clean(args.email, 200);
     if (!name) throw new Error("Name is required");
@@ -493,6 +469,14 @@ export const setStage = mutation({
     const { userId, user } = access;
     const authorName = user.name ?? user.email ?? "HR";
     const now = Date.now();
+    if (ONTO_CANDIDATES.includes(stage)) {
+      // Candidates has no place for someone whose position is gone.
+      const live = new Set(livePositions(await ctx.db.query("recruitJobs").collect()).map((j) => j.sourceId));
+      for (const id of candidateIds) {
+        const c = await ctx.db.get(id);
+        if (c && !live.has(c.jobSourceId)) throw new Error(`${c.name}'s position was removed. Move them to another position first.`);
+      }
+    }
     let updated = 0;
     // Before adding: a reopened row is already there, so nobody is added twice.
     // Only people whose status really changes: pressing Shortlist on someone
@@ -595,7 +579,7 @@ export const getCandidate = query({
     const timeline = [
       ...activity.map((a) => ({
         id: String(a._id),
-        kind: a.kind as "note" | "stage" | "email",
+        kind: a.kind as "note" | "stage" | "move" | "email",
         at: a.createdAt,
         body: a.body,
         fromStage: a.fromStage ?? null,
@@ -648,9 +632,10 @@ export const getCandidate = query({
     }
 
     return {
-      ...c,
+      ...shown(access, c),
+      pay: access.pay,
       stage: c.stage ?? "applied",
-      jobName: jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "Unknown",
+      jobName: nameOf(jobs.find((j) => j.sourceId === c.jobSourceId)),
       timeline,
       alsoApplied,
       onCandidates,
@@ -707,7 +692,7 @@ export const getCampaign = query({
       // Candidates deleted since being added just drop out of the list, and so
       // does anyone from a position this person does not have (a campaign can
       // hold people from more than one).
-      if (cand && mayRecruitFor(access, cand.jobSourceId)) members.push(cand);
+      if (cand && mayRecruitFor(access, cand.jobSourceId)) members.push(shown(access, cand));
     }
     const jobs = await ctx.db.query("recruitJobs").collect();
     return {
@@ -832,6 +817,10 @@ export const _loadSendContext = internalQuery({
     const template = await ctx.db.get(templateId);
     if (!template) throw new Error("Template not found");
     requireJob(access, template.jobSourceId);
+    // The filled-in text can end up anywhere the template's author points it (an image address, say).
+    if (!access.pay && /\{\{\s*(currentctc|expectedctc)\s*\}\}/i.test(`${template.subject} ${template.body}`)) {
+      throw new Error("This template includes the candidate's CTC, which you do not see. Ask HR to send it.");
+    }
     await requireCandidates(ctx, access, candidateIds);
     // The send is counted against this campaign, so it must be one of theirs too.
     if (campaignSourceId !== undefined) {
@@ -961,9 +950,9 @@ export const sendTemplateEmail = action({
 export const openPositions = query({
   args: {},
   handler: async (ctx) => {
-    const jobs = await ctx.db.query("recruitJobs").collect();
-    const closed = new Set(jobs.filter((j) => j.status === "closed").map((j) => j.sourceId));
-    return jobs
+    const all = await ctx.db.query("recruitJobs").collect();
+    const closed = new Set(all.filter((j) => j.status === "closed").map((j) => j.sourceId));
+    return livePositions(all)
       // Closing a role closes its sub-positions with it.
       .filter((j) => !closed.has(j.sourceId) && !(j.parentSourceId && closed.has(j.parentSourceId)))
       .map((j) => ({ id: j.sourceId, label: j.name }))
@@ -1012,7 +1001,7 @@ export const apply = mutation({
             .withIndex("by_source", (q) => q.eq("sourceId", selected.parentSourceId as number))
             .first()
         : selected;
-    if (!selected || jobSourceId === undefined || selected.status === "closed" || parent?.status === "closed") {
+    if (!selected || jobSourceId === undefined || [selected, parent].some((j) => !j || j.removedAt || j.status === "closed")) {
       throw new ConvexError("This role is no longer open. Please pick another one.");
     }
 
@@ -1062,7 +1051,11 @@ export const setJobOpen = mutation({
   args: { jobId: v.id("recruitJobs"), open: v.boolean() },
   handler: async (ctx, { jobId, open }) => {
     await requireFull(ctx);
-    await ctx.db.patch(jobId, { status: open ? "open" : "closed" });
+    const job = await ctx.db.get(jobId);
+    if (!job || job.removedAt) throw new Error("This position was removed");
+    // Opened again after its last day: that day no longer closes it.
+    const past = open && job.closesOn && job.closesOn < today();
+    await ctx.db.patch(jobId, { status: open ? "open" : "closed", ...(past ? { closesOn: undefined } : {}) });
   },
 });
 
@@ -1071,7 +1064,9 @@ export const setJobOpen = mutation({
 /**
  * Bring the cultform JobData tables across, a batch at a time. Every row is
  * matched on its MySQL id (`sourceId`), so it is safe to run again: rows that
- * exist are updated, rows that don't are added, nothing is deleted.
+ * exist are updated, rows that don't are added, nothing is deleted. Positions,
+ * and which one anything is filed under, are decided in this app (Setup): a
+ * later run leaves both alone.
  *
  * A candidate's stage follows the cultform status only while nobody has moved
  * it here: once HR sets a stage in this app, a later run leaves it alone.
@@ -1156,9 +1151,6 @@ export const importFromCultform = internalMutation({
         // formUrl is edited here, not in cultform (its column is dead there).
         await ctx.db.insert("recruitJobs", { ...j, formUrl: "" });
         done.added++;
-      } else if (differs(existing, j)) {
-        await ctx.db.patch(existing._id, j);
-        done.updated++;
       } else done.unchanged++;
     }
 
@@ -1182,10 +1174,11 @@ export const importFromCultform = internalMutation({
       // nobody moved it here.
       const untouched =
         existing.stage === undefined || existing.stage === STAGE_FROM_STATUS[existing.status];
+      const kept = { ...c, jobSourceId: existing.jobSourceId, position: existing.position };
       const row =
         untouched && existing.stage !== stage
-          ? { ...c, stage, stageUpdatedAt: c.statusUpdatedAt ?? Date.now() }
-          : c;
+          ? { ...kept, stage, stageUpdatedAt: c.statusUpdatedAt ?? Date.now() }
+          : kept;
       if (differs(existing, row)) {
         await ctx.db.patch(existing._id, row);
         done.updated++;
@@ -1199,8 +1192,8 @@ export const importFromCultform = internalMutation({
         if (!existing) {
           await ctx.db.insert("recruitTemplates", t);
           done.added++;
-        } else if (differs(existing, t)) {
-          await ctx.db.patch(existing._id, t);
+        } else if (differs(existing, { ...t, jobSourceId: existing.jobSourceId })) {
+          await ctx.db.patch(existing._id, { ...t, jobSourceId: existing.jobSourceId });
           done.updated++;
         } else done.unchanged++;
       }
@@ -1219,7 +1212,7 @@ export const importFromCultform = internalMutation({
         }
         const existing = all.find((x) => x.sourceId === c.sourceId);
         // Members added here stay: the cultform list only ever adds to it.
-        const row = { ...c, candidateIds: [...new Set([...(existing?.candidateIds ?? []), ...candidateIds])] };
+        const row = { ...c, jobSourceId: existing?.jobSourceId ?? c.jobSourceId, candidateIds: [...new Set([...(existing?.candidateIds ?? []), ...candidateIds])] };
         if (!existing) {
           await ctx.db.insert("recruitCampaigns", row);
           done.added++;

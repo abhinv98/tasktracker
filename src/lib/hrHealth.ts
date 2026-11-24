@@ -7,7 +7,14 @@ import type { Fields, TrackerKey } from "../../convex/lib/hrTrackers";
 // ponytail: every lookup scans the rows it needs. Fine for hundreds of rows;
 // build maps once per render if a tracker reaches thousands.
 
-export type Row = { _id: string; tracker: TrackerKey; code: string; fields: Fields };
+export type Row = {
+  _id: string;
+  tracker: TrackerKey;
+  code: string;
+  fields: Fields;
+  /** Candidates and open positions: the pipeline they are on. */
+  pipeline?: string;
+};
 export type Book = Record<TrackerKey, Row[]>;
 
 /** Today's date in India, as the trackers store dates (YYYY-MM-DD). */

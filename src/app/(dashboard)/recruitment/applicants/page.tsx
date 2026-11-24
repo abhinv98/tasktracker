@@ -4,16 +4,17 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { EmptyState, PageHeader, Panel, SkeletonPageHeader, SkeletonTable, StatStrip, StatTile, useToast } from "@/components/ui";
+import { Button, EmptyState, PageHeader, Panel, SkeletonPageHeader, SkeletonTable, StatStrip, StatTile, useToast } from "@/components/ui";
 import { SearchField } from "@/components/ui/Tray";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { useLast } from "@/components/recruitment/ApplicantsTable";
 import { Rounds } from "@/components/recruitment/OpenRound";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { POSITION_STATUSES, positionStatus } from "@/lib/recruitStages";
+import { byTeam } from "@/lib/recruitTeams";
 
 const COUNTS = [
   ["fresh", "New", "new"],
@@ -32,9 +33,11 @@ export default function PositionsPage() {
   const jobs = useQuery(api.recruitment.listJobs);
   const data = useHrData();
   const setJobOpen = useMutation(api.recruitment.setJobOpen);
+  const savePosition = useMutation(api.recruitSetup.savePosition);
   const { toast } = useToast();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Set<number>>(new Set());
+  const [folded, setFolded] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<Id<"recruitCandidates"> | null>(null);
   const needle = q.trim().toLowerCase();
   const people = useLast(useQuery(api.recruitment.searchCandidates, needle.length >= 2 ? { search: needle, limit: 12 } : "skip"));
@@ -50,12 +53,30 @@ export default function PositionsPage() {
 
   // Opening and closing a role on the website is HR's call.
   const full = data?.full === true;
-  const parents = jobs
-    .filter((j) => j.parentSourceId == null || !jobs.some((p) => p.sourceId === j.parentSourceId))
-    .filter((j) => !needle || j.name.toLowerCase().includes(needle) || jobs.some((s) => s.parentSourceId === j.sourceId && s.name.toLowerCase().includes(needle)))
-    // Whoever has people waiting comes first.
-    .sort((a, b) => b.fresh - a.fresh || b.total - a.total);
-  const sum = (key: (typeof COUNTS)[number][0]) => jobs.reduce((n, j) => n + j[key], 0);
+  type Job = (typeof jobs)[number];
+  const teamsOf = (j: Job) => data?.jobs.find((x) => x.id === String(j.sourceId))?.teams ?? [];
+  const isRole = (j: Job) => j.parentSourceId != null && jobs.some((p) => p.sourceId === j.parentSourceId);
+  const hit = (j: Job) => !needle || j.name.toLowerCase().includes(needle);
+  // Team, then position, then the roles under it. A position that hires into two teams is under both.
+  const tree = byTeam(jobs, data?.teams ?? [], teamsOf)
+    .map((g) => ({
+      ...g,
+      // A role sits inside its position, or by itself where its position is not in this team.
+      positions: g.positions
+        .filter((j) => !isRole(j) || !g.positions.some((p) => p.sourceId === j.parentSourceId))
+        .filter((j) => hit(j) || g.positions.some((s) => s.parentSourceId === j.sourceId && hit(s)))
+        // Whoever has people waiting comes first.
+        .sort((a, b) => b.fresh - a.fresh || b.total - a.total),
+      roles: g.positions.filter(isRole),
+    }))
+    .filter((g) => g.positions.length > 0);
+  const columns = COUNTS.length + (full ? 3 : 2);
+  const sum = (key: (typeof COUNTS)[number][0], of: readonly Job[] = jobs) => of.reduce((n, j) => n + j[key], 0);
+  /** The other teams a position hires into, seen from one of them. */
+  const shared = (j: Job, team: string | undefined) => {
+    const others = teamsOf(j).filter((t) => t !== team).map((t) => data?.teamName(t)).filter(Boolean);
+    return others.length ? `${data?.jobs.find((x) => x.id === String(j.sourceId))?.divide ? "divided with" : "or"} ${others.join(", ")}` : "";
+  };
 
   const cells = (j: (typeof jobs)[number]) =>
     COUNTS.map(([key, label, status]) => (
@@ -82,6 +103,14 @@ export default function PositionsPage() {
       <PageHeader
         title="Positions"
         subtitle="Everyone who applied on ecultify.com, by position. Shortlist, hold or reject here; shortlisted people carry on under Candidates."
+        actions={
+          full && (
+            <Button onClick={() => router.push("/recruitment/setup?new=position")}>
+              <Plus size={14} />
+              New position
+            </Button>
+          )
+        }
       />
 
       <StatStrip className="mb-4">
@@ -121,7 +150,7 @@ export default function PositionsPage() {
         </Panel>
       )}
 
-      {parents.length === 0 ? (
+      {tree.length === 0 ? (
         <EmptyState
           title={jobs.length === 0 ? "No positions yet" : "No position by that name"}
           description={jobs.length === 0 ? "HR can give you the ones you are hiring for, under HR Office, Access." : people?.length ? "The people above match, though." : "Nobody by that name either. Try fewer letters."}
@@ -142,8 +171,42 @@ export default function PositionsPage() {
               </tr>
             </thead>
             <tbody>
-              {parents.map((job) => {
-                const subs = jobs.filter((s) => s.parentSourceId === job.sourceId);
+              {tree.map(({ team, positions, roles }) => {
+              const key = team?._id ?? "none";
+              const shut = folded.has(key) && !needle;
+              return (
+              <Fragment key={key}>
+              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+                <td className="px-4 py-2">
+                  <button
+                    type="button"
+                    aria-expanded={!shut}
+                    onClick={() =>
+                      setFolded((was) => {
+                        const next = new Set(was);
+                        if (!next.delete(key)) next.add(key);
+                        return next;
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-md text-[13px] font-semibold text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
+                  >
+                    {shut ? <ChevronRight size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+                    {team && <span className="h-2 w-2 rounded-full" style={{ background: team.color }} aria-hidden />}
+                    {team?.name ?? "No team yet"}
+                    <span className="font-normal tabular-nums text-[var(--text-muted)]">
+                      {positions.length} {positions.length === 1 ? "position" : "positions"}
+                    </span>
+                  </button>
+                </td>
+                {COUNTS.map(([k]) => (
+                  <td key={k} className="px-3 text-right text-[12px] tabular-nums text-[var(--text-muted)]">
+                    {sum(k, positions).toLocaleString()}
+                  </td>
+                ))}
+                <td colSpan={columns - COUNTS.length - 1} />
+              </tr>
+              {!shut && positions.map((job) => {
+                const subs = roles.filter((s) => s.parentSourceId === job.sourceId);
                 const shown = open.has(job.sourceId) || (!!needle && !job.name.toLowerCase().includes(needle));
                 const closed = job.status === "closed";
                 return (
@@ -152,7 +215,10 @@ export default function PositionsPage() {
                       onClick={() => router.push(`/recruitment/${job.sourceId}`)}
                       className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-primary)]"
                     >
-                      <td className="px-4 py-2.5">
+                      <td className="py-2.5 pl-6 pr-4">
+                        <span className="flex items-start">
+                        <span className="mr-2 mt-0.5 h-3 w-3 shrink-0 rounded-bl border-b border-l border-[var(--border-strong)]" aria-hidden />
+                        <span className="min-w-0">
                         <span className="flex items-center gap-1.5">
                           {subs.length > 0 && (
                             <button
@@ -181,9 +247,33 @@ export default function PositionsPage() {
                           </Link>
                         </span>
                         <span className="block text-[12px] tabular-nums text-[var(--text-muted)]">
-                          {job.total.toLocaleString()} in all
+                          {isRole(job) ? `Its applicants are listed under ${jobs.find((p) => p.sourceId === job.parentSourceId)?.name}` : `${job.total.toLocaleString()} in all`}
                           {job.lastApplied > 0 &&
                             `, last one ${new Date(job.lastApplied).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                          {shared(job, team?._id) && ` · ${shared(job, team?._id)}`}
+                        </span>
+                        {!team && full && (
+                          <select
+                            value=""
+                            aria-label={`Team for ${job.name}`}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const to = e.target.value;
+                              savePosition({ id: job.sourceId, teams: [to as Id<"teams">] })
+                                .then(() => toast("success", `${job.name} is under ${data?.teamName(to)} now. Add another team in Setup.`))
+                                .catch((err) => toast("error", err instanceof Error ? err.message : "Could not change it"));
+                            }}
+                            className="mt-1 h-7 rounded-md border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text-secondary)]"
+                          >
+                            <option value="">Put under a team</option>
+                            {data?.teams.map((t) => (
+                              <option key={t._id} value={t._id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        </span>
                         </span>
                       </td>
                       {cells(job)}
@@ -221,7 +311,8 @@ export default function PositionsPage() {
                           onClick={() => router.push(`/recruitment/${s.sourceId}`)}
                           className="cursor-pointer border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] last:border-0 hover:bg-[var(--bg-hover)]"
                         >
-                          <td className="py-2 pl-11 pr-4">
+                          <td className="py-2 pl-14 pr-4">
+                            <span className="mr-2 inline-block h-3 w-3 rounded-bl border-b border-l border-[var(--border-strong)]" aria-hidden />
                             <Link href={`/recruitment/${s.sourceId}`} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
                               {s.name}
                             </Link>
@@ -235,6 +326,9 @@ export default function PositionsPage() {
                       ))}
                   </Fragment>
                 );
+              })}
+              </Fragment>
+              );
               })}
             </tbody>
           </table>

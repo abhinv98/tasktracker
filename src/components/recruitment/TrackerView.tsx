@@ -3,18 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "convex/react";
+import Link from "next/link";
 import { useAuthToken } from "@convex-dev/auth/react";
-import { ExternalLink, FileText, KanbanSquare, List, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, FileText, KanbanSquare, List, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable, useConfirm, useToast } from "@/components/ui";
 import { iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
 import { TRACKERS, TRACKER_KEYS, type TrackerKey } from "@/convex/lib/hrTrackers";
+import { webLink } from "@/convex/lib/links";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 import { FieldGrid, toValues } from "./hrFields";
-import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, show, startingValues, useHrData, type HrData } from "./hrShared";
+import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
+import { looseRounds } from "./RoundsMatch";
 import { TrackerBoard } from "./TrackerBoard";
 
 type Chip = "all" | "attention" | "live" | "done";
@@ -49,6 +52,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const board = "board" in meta ? meta.board : undefined;
   const [view, setView] = useState<"table" | "board">(board && params.get("view") === "board" ? "board" : "table");
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
 
   // ?new=1&candidateId=… opens a prefilled form; ?open=<id> opens a row. Both
   // come from links elsewhere (the dashboard, a candidate's linked records).
@@ -105,7 +109,12 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       ? data.book[f.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }))
       : f.type === "job"
         ? data.jobs.map((j) => ({ value: j.id, label: j.name }))
-        : (f.options ?? []).map((o) => ({ value: o, label: o }));
+        : f.free
+          ? (tracker === "pipeline"
+              ? [...stepNames(data.book.pipeline, data), ...TRACKERS.pipeline.boardClosed]
+              : [...new Set(data.book[tracker].map((r) => String(r.fields[f.key] ?? "")))].filter(Boolean)
+            ).map((o) => ({ value: o, label: o }))
+          : (f.options ?? []).map((o) => ({ value: o, label: o }));
   const inChip = (label: string, which: Chip) =>
     which === "all" ||
     (which === "attention" && ATTENTION[tracker].includes(label)) ||
@@ -120,7 +129,17 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       (!needle ||
         `${row.code} ${columns.map((f) => show(f, row, data)).join(" ")}`.toLowerCase().includes(needle))
   );
-  const visible = narrowed.filter(({ label }) => inChip(label, chip));
+  const sorting = sort && columns.find((f) => f.key === sort.key);
+  const keyed = narrowed.filter(({ label }) => inChip(label, chip));
+  const visible = sorting
+    ? keyed
+        .map((r) => ({ r, v: sorting.type === "date" || sorting.type === "number" ? (r.row.fields[sorting.key] ?? "") : show(sorting, r.row, data).toLowerCase() }))
+        .sort((a, b) =>
+          // Blank last, whichever way it is sorted.
+          a.v === "" || b.v === "" ? Number(a.v === "") - Number(b.v === "") : (typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v))) * sort.dir
+        )
+        .map(({ r }) => r)
+    : keyed;
   const filtersOn = !!needle || mine || chip !== "all" || Object.values(picked).some(Boolean);
 
   // A new row starts inside what the list is narrowed to (the round being looked
@@ -164,12 +183,35 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
             : meta.blurb
         }
         actions={
-          <Button onClick={startNew}>
-            <Plus size={14} />
-            New {meta.one}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {round && webLink(String(round.fields.submitLink ?? "")) && (
+              <a
+                href={webLink(String(round.fields.submitLink))}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-control items-center gap-1.5 rounded-control border border-[var(--border)] bg-white px-3 text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"
+              >
+                Submissions <ExternalLink size={13} aria-hidden />
+              </a>
+            )}
+            <Button onClick={startNew}>
+              <Plus size={14} />
+              New {meta.one}
+            </Button>
+          </div>
         }
       />
+
+      {/* Nobody goes into a round that is tied to no position. */}
+      {data.full && (tracker === "rounds" || (tracker === "pipeline" && !round)) && looseRounds(data).length > 0 && (
+        <p className="mb-3 rounded-lg bg-[var(--warning-dim)] px-3 py-2 text-[13px] text-[var(--text-primary)]">
+          {looseRounds(data).length} hiring {looseRounds(data).length === 1 ? "round is" : "rounds are"} not tied to a position, so no candidate goes into{" "}
+          {looseRounds(data).length === 1 ? "it" : "them"}.{" "}
+          <Link href="/recruitment/setup?rounds=1" className="font-medium underline underline-offset-2">
+            Match them
+          </Link>
+        </p>
+      )}
 
       {tracker !== "log" && (
         <StatChips<Chip>
@@ -279,6 +321,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           items={visible}
           data={data}
           skip={Object.keys(picked).filter((key) => picked[key])}
+          columns={tracker === "pipeline" ? stepNames(visible.map((v) => v.row), data) : undefined}
           onOpen={open}
           onShowClosed={(value) => {
             setPicked((p) => ({ ...p, [board]: value }));
@@ -292,8 +335,25 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
               <tr className="border-b border-[var(--border)] text-left text-[12px] text-[var(--text-muted)]">
                 <th className="whitespace-nowrap px-3 py-2 font-medium">ID</th>
                 {columns.map((f) => (
-                  <th key={f.key} className="whitespace-nowrap px-3 py-2 font-medium">
-                    {f.label}
+                  <th
+                    key={f.key}
+                    aria-sort={sort?.key === f.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
+                    className="whitespace-nowrap px-3 py-2 font-medium"
+                  >
+                    {/* Newest first for a date, A to Z for the rest; a second press turns it round, a third clears it. */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSort((s) => {
+                          const first = f.type === "date" ? -1 : 1;
+                          return s?.key !== f.key ? { key: f.key, dir: first } : s.dir === first ? { key: f.key, dir: first === 1 ? -1 : 1 } : null;
+                        })
+                      }
+                      className={`inline-flex items-center gap-1 hover:text-[var(--text-primary)] ${sort?.key === f.key ? "text-[var(--text-primary)]" : ""}`}
+                    >
+                      {f.label}
+                      {sort?.key === f.key && (sort.dir === 1 ? <ChevronUp size={12} aria-hidden /> : <ChevronDown size={12} aria-hidden />)}
+                    </button>
                   </th>
                 ))}
                 {tracker !== "log" && <th className="whitespace-nowrap px-3 py-2 font-medium">Health</th>}
@@ -320,7 +380,20 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                         i === 0 ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                       } ${f.type === "date" || f.type === "time" || f.type === "number" ? "whitespace-nowrap tabular-nums" : ""}`}
                     >
-                      {show(f, row, data) || <span className="text-[var(--text-disabled)]">–</span>}
+                      {f.type === "link" && webLink(show(f, row, data)) ? (
+                        <a
+                          href={webLink(show(f, row, data))}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 font-medium text-[var(--accent-admin-text)] hover:underline"
+                        >
+                          Open <ExternalLink size={12} aria-hidden />
+                        </a>
+                      ) : (
+                        show(f, row, data) || <span className="text-[var(--text-disabled)]">–</span>
+                      )}
                     </td>
                   ))}
                   {tracker !== "log" && (

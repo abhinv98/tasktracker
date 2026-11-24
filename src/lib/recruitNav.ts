@@ -13,6 +13,7 @@ export const RECRUIT_SECTIONS: Section[] = [
     tabs: [
       { label: "By position", href: "/recruitment/applicants" },
       { label: "All applicants", href: "/recruitment/candidates" },
+      { label: "Setup", href: "/recruitment/setup", fullOnly: true },
     ],
     also: /^\/recruitment\/\d+$/,
   },

@@ -12,8 +12,14 @@ import type { Row } from "@/lib/hrHealth";
 import { FieldGrid, toValues } from "./hrFields";
 import { fieldsOf, startingValues, type HrData } from "./hrShared";
 
-const KEYS = ["role", "job", "openings", "employmentType", "priority", "hiringManager", "targetJoinDate", "budgetLpa"];
+const KEYS = ["role", "job", "pipeline", "team", "submitLink", "openings", "employmentType", "priority", "hiringManager", "targetJoinDate", "budgetLpa"];
 const isOpen = (r: Row) => !String(r.fields.hiringStatus ?? "").startsWith("Closed");
+
+/** Who a position's setup says it is hired by. */
+const peopleOf = (data: HrData, id: number) => {
+  const job = data.jobs.find((j) => j.id === String(id));
+  return { ...(job?.hrOwner ? { hrOwner: job.hrOwner } : {}), ...(job?.hiringManager ? { hiringManager: job.hiringManager } : {}) };
+};
 
 /** Hiring rounds (open positions) still running for a website position. */
 export const roundsFor = (data: HrData | undefined, jobId: number) =>
@@ -66,7 +72,7 @@ export function OpenRoundModal({
   const place = useMutation(api.hrOps.placeShortlisted);
   const { toast } = useToast();
   const [draft, setDraft] = useState(() =>
-    startingValues("rounds", data, job ? { role: job.name, job: String(job.sourceId) } : {})
+    startingValues("rounds", data, job ? { role: job.name, job: String(job.sourceId), ...peopleOf(data, job.sourceId) } : {})
   );
   const [existing, setExisting] = useState("");
   const [bring, setBring] = useState(true);
@@ -124,7 +130,7 @@ export function OpenRoundModal({
             </select>
           </label>
         )}
-        {!existing && <FieldGrid fields={fields} draft={draft} onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))} data={data} />}
+        {!existing && <FieldGrid fields={fields} draft={draft} onChange={(key, value) => setDraft((d) => ({ ...d, ...(key === "job" ? peopleOf(data, Number(value)) : {}), [key]: value }))} data={data} />}
         {draft.job && (
           <label className="flex cursor-pointer select-none items-start gap-2.5">
             <input

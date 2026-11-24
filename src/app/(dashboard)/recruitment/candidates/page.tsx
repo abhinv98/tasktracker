@@ -3,13 +3,14 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
-import { Check, Pause, RotateCcw, Users2, X } from "lucide-react";
+import { ArrowLeftRight, Check, Pause, RotateCcw, Users2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable } from "@/components/ui";
 import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
 import { ApplicantsTable, NarrowTray, placesOf, useLast, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
+import { MoveApplicants } from "@/components/recruitment/MoveApplicants";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { NO_NARROW, narrow, type Narrow } from "@/lib/applicantSearch";
 import { POSITION_STATUSES, isPositionStatus, positionStatus, type PositionStatus } from "@/lib/recruitStages";
@@ -40,6 +41,7 @@ function AllApplicants() {
   const [filter, setFilter] = useState<Narrow>({ ...NO_NARROW, search: params.get("q") ?? "" });
   const [job, setJob] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [moving, setMoving] = useState(false);
   const [panel, setPanel] = useState<{ id: Id<"recruitCandidates">; order: Id<"recruitCandidates">[] } | null>(null);
 
   // The newest of the list picked, or a search of everyone. The last answer
@@ -125,7 +127,7 @@ function AllApplicants() {
           options={jobs.map((j) => ({ value: String(j.sourceId), label: j.name }))}
           onChange={(v) => reset(() => setJob(v))}
         />
-        <NarrowTray value={filter} onChange={(n) => reset(() => setFilter(n))} />
+        <NarrowTray pay={hr?.pay !== false} value={filter} onChange={(n) => reset(() => setFilter(n))} />
         <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
           {list === undefined
             ? "Looking…"
@@ -157,6 +159,10 @@ function AllApplicants() {
               <RotateCcw size={14} />
               Back to New
             </Button>
+            <Button variant="secondary" onClick={() => setMoving(true)}>
+              <ArrowLeftRight size={14} />
+              Move
+            </Button>
           </div>
         </div>
       )}
@@ -174,6 +180,17 @@ function AllApplicants() {
           onOpen={(id, order) => setPanel({ id, order })}
           onMove={(a, to) => move([a._id], to, a.name)}
           places={places}
+          // The server has left the figures out already; this only drops the empty columns.
+          pay={hr?.pay !== false}
+        />
+      )}
+
+      {moving && (
+        <MoveApplicants
+          ids={ids}
+          who={ids.length === 1 ? rows.find((r) => r._id === ids[0])?.name : undefined}
+          onClose={() => setMoving(false)}
+          onMoved={() => setSelected(new Set())}
         />
       )}
 

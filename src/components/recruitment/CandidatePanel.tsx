@@ -9,12 +9,13 @@ import { Button, Textarea, useToast } from "@/components/ui";
 import { iconButtonClass } from "@/components/ui/classes";
 import { positionStatus, stageMeta, type PositionStatus, type Stage } from "@/lib/recruitStages";
 import { DECISIONS, Decide, useLast, useMoveApplicants } from "./ApplicantsTable";
+import { MoveApplicants } from "./MoveApplicants";
 import {
   formatLpa, formatYears, formatNotice,
   parseCtcLpa, parseYears, parseNoticeDays,
 } from "@/lib/recruitParse";
 import {
-  X, FileText, ExternalLink, Mail, StickyNote, ArrowRight, Trash2, ChevronLeft, ChevronRight,
+  X, FileText, ExternalLink, Mail, StickyNote, ArrowLeftRight, ArrowRight, Trash2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 function when(ts: number) {
@@ -52,6 +53,7 @@ export function CandidatePanel({
   const deleteActivity = useMutation(api.recruitment.deleteActivity);
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   // What is typed belongs to the person it was typed on, also while stepping through the list.
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -82,6 +84,8 @@ export function CandidatePanel({
   // Escape closes, arrows step, S H R decide. Never while typing a note.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A dialog on top has the keyboard to itself.
+      if (document.querySelector("dialog[open]")) return;
       if (e.key === "Escape") return onClose();
       const el = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return;
@@ -159,7 +163,13 @@ export function CandidatePanel({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-subtle)] px-6 py-3">
-              <Decide stage={c.stage as Stage} name={c.name} onMove={decide} large />
+              <div className="flex flex-wrap gap-1">
+                <Decide stage={c.stage as Stage} name={c.name} onMove={decide} large />
+                <Button type="button" variant="secondary" disabled={!ready} onClick={() => setMoving(true)}>
+                  <ArrowLeftRight size={14} />
+                  Move
+                </Button>
+              </div>
               {c.onCandidates.length > 0 ? (
                 <span className="flex flex-wrap gap-x-3 text-[13px]">
                   {c.onCandidates.map((row) => (
@@ -191,8 +201,12 @@ export function CandidatePanel({
                     ["Phone", c.number, c.number ? `tel:${c.number}` : null],
                     ["Experience", formatYears(parseYears(c.experience)), null],
                     ["Notice", formatNotice(parseNoticeDays(c.noticePeriod)), null],
-                    ["Current", formatLpa(parseCtcLpa(c.currentCtc)), null],
-                    ["Expected", formatLpa(parseCtcLpa(c.expectedCtc)), null],
+                    ...(c.pay
+                      ? [
+                          ["Current", formatLpa(parseCtcLpa(c.currentCtc)), null],
+                          ["Expected", formatLpa(parseCtcLpa(c.expectedCtc)), null],
+                        ]
+                      : []),
                   ].map(([label, value, href]) => (
                     <div key={label as string} className="min-w-0">
                       <p className="text-[12px] font-medium text-[var(--text-muted)]">
@@ -266,6 +280,8 @@ export function CandidatePanel({
                             <StickyNote size={14} />
                           ) : t.kind === "email" ? (
                             <Mail size={14} className={t.ok ? "" : "text-[var(--danger)]"} />
+                          ) : t.kind === "move" ? (
+                            <ArrowLeftRight size={14} />
                           ) : (
                             <ArrowRight size={14} />
                           )}
@@ -283,7 +299,7 @@ export function CandidatePanel({
                             </p>
                           ) : (
                             <p className="whitespace-pre-wrap text-[13px] text-[var(--text-primary)]">
-                              {t.body}
+                              {t.kind === "move" ? `Moved: ${t.body[0].toLowerCase()}${t.body.slice(1)}` : t.body}
                             </p>
                           )}
                           <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
@@ -369,6 +385,9 @@ export function CandidatePanel({
           </>
         )}
       </aside>
+      {moving && c && (
+        <MoveApplicants ids={[candidateId]} who={c.name} from={c.jobSourceId} onClose={() => setMoving(false)} />
+      )}
     </>
   );
 }

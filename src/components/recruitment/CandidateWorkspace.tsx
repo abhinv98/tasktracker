@@ -4,17 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { ExternalLink, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, ExternalLink, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, StatusBadge, useConfirm, useToast } from "@/components/ui";
 import { fieldBaseClass, fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 import { Tray, TrayItem } from "@/components/ui/Tray";
+import { STANDARD, STEP_KINDS, type Step } from "@/convex/lib/hirePipeline";
+import { webLink } from "@/convex/lib/links";
 import { TRACKERS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { health, type Row } from "@/lib/hrHealth";
 import { taskStatusMeta } from "@/lib/status";
 import { AssignTask } from "./AssignTask";
 import { FieldGrid, InlineAdd, toValues, useQuickSave } from "./hrFields";
+import { JoinTeam } from "./JoinTeam";
+import { MoveApplicants } from "./MoveApplicants";
 import { HealthBadge, addDays, boardValue, fieldsOf, fmtDate, moveFields, show, type HrData } from "./hrShared";
 
 const text = (row: Row, key: string) => {
@@ -23,9 +27,8 @@ const text = (row: Row, key: string) => {
 };
 
 const CLOSED: readonly string[] = TRACKERS.pipeline.boardClosed;
-const STAGES = (fieldsOf("pipeline").find((f) => f.key === "stage")?.options ?? []).filter((s) => !CLOSED.includes(s));
 /** What this panel edits itself; "All details" holds the rest. */
-const OWN_FIELDS = ["stage", "nextAction", "actionOwner", "nextDue", "notes"];
+const OWN_FIELDS = ["stage", "nextAction", "actionOwner", "nextDue", "notes", "team"];
 const NEXT_KEYS = ["nextAction", "nextDue", "actionOwner", "notes"] as const;
 type NextKey = (typeof NEXT_KEYS)[number];
 
@@ -42,6 +45,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
   const { toast } = useToast();
   const router = useRouter();
   const [adding, setAdding] = useState<TrackerKey | null>(null);
+  const [moving, setMoving] = useState(false);
   // Only what this person has typed is kept here. Everything else is read from
   // the live row, so a change made elsewhere (or by a button above) is never
   // sent back as if it were an edit.
@@ -56,7 +60,9 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
   );
   const nextChanged = Object.keys(nextChanges).length > 0;
 
-  const detailFields = fieldsOf("pipeline").filter((f) => !f.stamp && !OWN_FIELDS.includes(f.key));
+  // Someone who applied on the website changes position together with their application (the Move button).
+  const applicantId = text(row, "applicantId");
+  const detailFields = fieldsOf("pipeline").filter((f) => !f.stamp && !OWN_FIELDS.includes(f.key) && !(applicantId && f.key === "job"));
   const live = Object.fromEntries(detailFields.map((f) => [f.key, text(row, f.key)]));
   const [detailEdits, setDetailEdits] = useState<Record<string, string>>({});
   const details = { ...live, ...detailEdits };
@@ -67,7 +73,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
     closeButton.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       // Escape closes an open menu first, not the whole panel with what was typed.
-      if (e.key !== "Escape" || document.querySelector('aside[role="dialog"] [aria-expanded="true"]')) return;
+      if (e.key !== "Escape" || document.querySelector('dialog[open], aside[role="dialog"] [aria-expanded="true"]')) return;
       onClose();
     };
     document.addEventListener("keydown", onKey);
@@ -79,16 +85,30 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
   }, [onClose]);
 
   // Closed by stage or by status: either way they are out of the running.
+  const steps = data.stepsOf(row);
   const stage = boardValue(row) ?? text(row, "status");
-  const closed = stage !== "" && !STAGES.includes(stage);
-  const at = STAGES.indexOf(text(row, "stage"));
+  const closed = stage === "Archived" || CLOSED.includes(stage);
+  const at = steps.findIndex((s) => s.name === text(row, "stage"));
+  const step = closed ? undefined : steps[at];
+  /** What to fill in for an interview or assignment: this step's, or the next one of its kind. */
+  const planned = (kind: Step["kind"]) => (step?.kind === kind ? step : steps.slice(Math.max(at, 0)).find((s) => s.kind === kind)) ?? steps.find((s) => s.kind === kind);
+  const interviewStep = step?.kind === "screening" ? step : planned("interview");
+  const assignmentStep = planned("assignment");
   const round = data.byId.get(text(row, "reqId"));
+  /** Where everyone in their hiring round hands the assignment in, if it has one place. */
+  const form = round ? webLink(text(round, "submitLink")) : "";
   const mine = (tracker: TrackerKey) => data.book[tracker].filter((r) => r.fields.candidateId === row._id);
   const interviews = mine("interviews");
   const assignments = mine("assignments");
   const offer = mine("offers")[0];
   const resume = text(row, "resume");
   const today = data.today;
+  // A team that was deleted since is none.
+  const team = data.teamName(text(row, "team")) ? text(row, "team") : "";
+  const teams = data.teamsOf(row);
+  const position = data.positionOf(row.fields);
+  /** Far enough for their team to matter. */
+  const hiring = step?.kind === "offer" || step?.kind === "joining" || stage === "Joined" || text(row, "status") === "Joined";
 
   /** One click moves the candidate. A closing stage sets the matching status too. */
   const moveTo = (to: string) =>
@@ -114,6 +134,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                 round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "No open position yet",
                 text(row, "contact"),
                 text(row, "source"),
+                text(row, "firstContact") && `shortlisted ${fmtDate(text(row, "firstContact"), today)}`,
               ]
                 .filter(Boolean)
                 .join("  ·  ")}
@@ -129,6 +150,11 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               >
                 Resume <ExternalLink size={12} aria-hidden />
               </a>
+            )}
+            {applicantId && (
+              <button type="button" aria-label="Move to another position" title="Move to another position" className={iconButtonClass} onClick={() => setMoving(true)}>
+                <ArrowLeftRight size={15} />
+              </button>
             )}
             <button
               type="button"
@@ -168,15 +194,17 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             <div className="mb-2 flex items-center gap-2">
               <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Stage</h3>
               <HealthBadge label={health(row, data.book, today)} />
+              {row.pipeline && row.pipeline !== STANDARD && <span className="text-[12px] text-[var(--text-muted)]">{data.pipelineName(row.pipeline)} pipeline</span>}
               {closed && <span className="text-[12px] text-[var(--text-muted)]">Closed as {stage}. Pick a stage to reopen.</span>}
+              {!closed && stage && at < 0 && <span className="text-[12px] text-[var(--text-muted)]">At {stage}, which their pipeline does not have. Pick a stage.</span>}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {STAGES.map((s, i) => {
+              {steps.map(({ id, name: s }, i) => {
                 const current = !closed && s === stage;
                 const done = !closed && at > i;
                 return (
                   <button
-                    key={s}
+                    key={id}
                     type="button"
                     aria-pressed={current}
                     onClick={() => !current && moveTo(s)}
@@ -199,6 +227,26 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               </Tray>
             </div>
           </section>
+
+          {/* What this step is for, as set up in their pipeline, and the one thing to do in it. */}
+          {step && (step.note || step.link || step.owner || step.days || ACTION[step.kind]) && (
+            <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-lg bg-[var(--bg-primary)] px-3 py-2.5">
+              <div className="min-w-0 flex-1 text-[12px] text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text-primary)]">{step.name}</span>
+                {[STEP_KINDS[step.kind] !== step.name && STEP_KINDS[step.kind], step.owner && data.personName(step.owner), step.days && `${step.days} ${step.days === 1 ? "day" : "days"}`]
+                  .filter(Boolean)
+                  .map((x) => `  ·  ${x}`)
+                  .join("")}
+                {step.note && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-[var(--text-secondary)]">{step.note}</p>}
+                {step.link && <LinkOut href={step.link} label={step.kind === "assignment" ? "Open the assignment" : "Open the link"} />}
+              </div>
+              {ACTION[step.kind] && !(step.kind === "offer" && offer) && (
+                <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(ACTION[step.kind]!.tracker)}>
+                  {ACTION[step.kind]!.label}
+                </Button>
+              )}
+            </div>
+          )}
 
           {/* What happens next, and when. Most visits change only this. */}
           <form
@@ -297,7 +345,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               tracker="interviews"
               keys={["round", "interviewer", "date", "time", "mode"]}
               required={["interviewer", "date"]}
-              preset={{ candidateId: row._id }}
+              preset={{ candidateId: row._id, ...(interviewStep ? { round: interviewStep.name, ...(interviewStep.owner ? { interviewer: interviewStep.owner } : {}) } : {}) }}
               data={data}
               submitLabel="Schedule and tell the interviewer"
               onDone={() => setAdding(null)}
@@ -311,14 +359,22 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             onOpen={openRow}
             line={(r) => [text(r, "task"), text(r, "submissionDue") && `due ${fmtDate(text(r, "submissionDue"), today)}`, data.personName(text(r, "reviewer"))]}
             detail={(r) => (text(r, "decision") !== "Pending" ? text(r, "decision") : "")}
+            top={form && <LinkOut href={form} label={`Submission form for ${round!.code}`} />}
+            under={(r) => <AssignmentLinks row={r} />}
             addLabel="Send an assignment"
             adding={adding === "assignments"}
             onAdd={() => setAdding("assignments")}
           >
             <InlineAdd
               tracker="assignments"
-              keys={["task", "submissionDue", "reviewer", "reviewDue"]}
-              preset={{ candidateId: row._id }}
+              keys={["task", "link", "submissionDue", "reviewer", "reviewDue"]}
+              preset={{
+                candidateId: row._id,
+                ...(assignmentStep?.note ? { task: assignmentStep.note.split("\n")[0].slice(0, 300) } : {}),
+                ...(assignmentStep?.link ? { link: assignmentStep.link } : {}),
+                ...(assignmentStep?.owner ? { reviewer: assignmentStep.owner } : {}),
+                ...(assignmentStep?.days ? { submissionDue: addDays(today, assignmentStep.days) } : {}),
+              }}
               data={data}
               submitLabel="Add assignment"
               onDone={() => setAdding(null)}
@@ -350,6 +406,42 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             />
           </Related>
 
+          {/* Which team they join, and getting them onto it once they are hired. */}
+          {data.teams.length > 0 && (hiring || team || teams.length > 1) && (
+            <section className="mt-6">
+              <h3 className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">Team</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={team}
+                  aria-label="Team they join"
+                  onChange={(e) => void quickSave(row, { team: e.target.value || null }, e.target.value ? `Joining ${data.teamName(e.target.value)}` : "Team cleared")}
+                  className={`${fieldClass} w-[220px]`}
+                >
+                  <option value="">Not decided</option>
+                  {data.teams
+                    .filter((t) => !teams.length || teams.includes(t._id) || t._id === team)
+                    .map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+                {!team && (
+                  <span className="text-[12px] text-[var(--text-muted)]">
+                    {hiring
+                      ? `${teams.length > 1 ? `${teams.map(data.teamName).join(" or ")}. ` : ""}Pick the team they join.`
+                      : position?.divide
+                        ? `Divided between ${teams.map(data.teamName).join(" and ")}. Picked for them at the offer, or pick now.`
+                        : `${teams.map(data.teamName).join(" or ")}. Pick one before the offer.`}
+                  </span>
+                )}
+              </div>
+              {data.full && hiring && team && (
+                <JoinTeam key={team} row={row} data={data} designation={(offer && text(offer, "designation")) || (round ? text(round, "role") : text(row, "roleOriginal"))} />
+              )}
+            </section>
+          )}
+
           <details className="mt-6 rounded-lg border border-[var(--border)]">
             <summary className="cursor-pointer select-none px-3 py-2.5 text-[13px] font-semibold text-[var(--text-primary)]">
               All details
@@ -378,9 +470,87 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
           </details>
         </div>
       </aside>
+      {moving && (
+        <MoveApplicants
+          ids={[applicantId as Id<"recruitCandidates">]}
+          who={text(row, "name")}
+          from={Number(text(row, "job"))}
+          onClose={() => setMoving(false)}
+        />
+      )}
     </>
   );
 }
+
+function LinkOut({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
+    >
+      {label} <ExternalLink size={12} aria-hidden />
+    </a>
+  );
+}
+
+/** An assignment's links, and a place to paste what came back. */
+function AssignmentLinks({ row }: { row: Row }) {
+  const quickSave = useQuickSave();
+  const [draft, setDraft] = useState<string | null>(null);
+  const assignment = webLink(text(row, "link"));
+  const work = webLink(text(row, "submission"));
+  if (draft !== null) {
+    return (
+      <form
+        className="flex gap-2 px-3 pb-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await quickSave(row, { submission: draft.trim() || null }, "Saved")) setDraft(null);
+        }}
+      >
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-label={`Submitted link for ${text(row, "task")}`}
+          inputMode="url"
+          placeholder="Link to what they submitted"
+          maxLength={500}
+          className={`${fieldClass} min-w-0 flex-1`}
+        />
+        <Button type="button" size="sm" variant="secondary" onClick={() => setDraft(null)}>
+          Cancel
+        </Button>
+        <Button type="submit" size="sm">
+          Save
+        </Button>
+      </form>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 px-3 pb-2">
+      {assignment && <LinkOut href={assignment} label="Assignment" />}
+      {work && <LinkOut href={work} label="Submitted" />}
+      <button
+        type="button"
+        onClick={() => setDraft(text(row, "submission"))}
+        className="mt-1 text-[12px] font-medium text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-primary)] hover:underline"
+      >
+        {work ? "Change submitted link" : "Add submitted link"}
+      </button>
+    </div>
+  );
+}
+
+/** The one thing most steps come down to, and the part of this panel that does it. */
+const ACTION: Partial<Record<Step["kind"], { label: string; tracker: TrackerKey }>> = {
+  screening: { label: "Schedule the call", tracker: "interviews" },
+  interview: { label: "Schedule interview", tracker: "interviews" },
+  assignment: { label: "Send the assignment", tracker: "assignments" },
+  offer: { label: "Start an offer", tracker: "offers" },
+};
 
 /** What people on the team have to do about this candidate. Each is an ordinary task in its owner's list. */
 function CandidateTasks({ row, data }: { row: Row; data: HrData }) {
@@ -444,6 +614,8 @@ function Related({
   data,
   line,
   detail,
+  top,
+  under,
   onOpen,
   addLabel,
   adding,
@@ -455,14 +627,23 @@ function Related({
   data: HrData;
   line: (row: Row) => (string | false | undefined)[];
   detail: (row: Row) => string;
+  /** Said once, above the rows. */
+  top?: React.ReactNode;
+  /** More about one row, outside the button that opens it. */
+  under?: (row: Row) => React.ReactNode;
   onOpen: (row: Row) => void;
   addLabel: string;
   adding: boolean;
   onAdd: () => void;
   children: React.ReactNode;
 }) {
+  // Opened by the step's own button, further up: bring it into view.
+  const form = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (adding) form.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [adding]);
   return (
-    <section className="mt-6">
+    <section ref={form} className="mt-6">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
           {title}
@@ -475,6 +656,7 @@ function Related({
           </Button>
         )}
       </div>
+      {top && <div className="mb-2">{top}</div>}
       {rows.length > 0 && (
         <ul className="mb-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
           {rows.map((r) => (
@@ -490,6 +672,7 @@ function Related({
                 </span>
                 <HealthBadge label={health(r, data.book, data.today)} />
               </button>
+              {under?.(r)}
             </li>
           ))}
         </ul>

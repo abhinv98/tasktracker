@@ -25,18 +25,20 @@ export type FieldValues = Partial<Record<string, string>>;
 /** Sample values, for a preview before anyone is picked. */
 export const SAMPLE: FieldValues = Object.fromEntries(TEMPLATE_FIELDS.map((f) => [f.key, f.sample]));
 
-/** The values a real candidate fills in, as the server does it. */
+/** The values a real candidate fills in, as the server does it. Without `pay` the
+ *  person looking may not see what they earn: the email itself still says it. */
 export const valuesFor = (
   c: { name: string; email: string; number: string; position: string; currentCtc: string; expectedCtc: string; resume: string; portfolioLink: string },
-  jobName: string
+  jobName: string,
+  pay: boolean
 ): FieldValues => ({
   name: c.name,
   email: c.email,
   number: c.number,
   position: c.position || jobName,
   jobname: jobName,
-  currentctc: c.currentCtc,
-  expectedctc: c.expectedCtc,
+  currentctc: pay ? c.currentCtc : "(hidden from you)",
+  expectedctc: pay ? c.expectedCtc : "(hidden from you)",
   resume: c.resume,
   portfoliolink: c.portfolioLink,
 });

@@ -40,4 +40,11 @@ crons.daily(
   internal.hr.remindStaleRequests
 );
 
+// Positions past their last day to apply come off the website form (18:45 UTC, 12:15 am IST).
+crons.daily(
+  "close positions",
+  { hourUTC: 18, minuteUTC: 45 },
+  internal.recruitSetup.closePositions
+);
+
 export default crons;

@@ -5,7 +5,9 @@ import { getAuthUserId } from "./lib/internalAuth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, followCandidate, nextCode, placeInRound, rowsOf, standing, today } from "./lib/candidates";
+import { ARCHIVED, addToCandidates, atStep, followCandidate, nextCode, placeInRound, refit, standing, teamFor, rowsOf, today } from "./lib/candidates";
+import { CLOSING, STANDARD, entryStep, fitStage } from "./lib/hirePipeline";
+import { livePositions, loadPipelines, type Pipelines } from "./lib/pipelines";
 import { inScope, scopeOf } from "./lib/recruitScope";
 import {
   TRACKERS,
@@ -71,6 +73,18 @@ async function checkLinks(ctx: MutationCtx, tracker: TrackerKey, fields: Fields)
   }
 }
 
+/** The pipelines someone may see and pick: all of them for HR; for the rest the
+ *  standard one, their positions' and those of the rows they work on. */
+function pipelinesFor(book: Pipelines, access: RecruitAccess, seen: { tracker: string; fields: Fields }[]): Set<string> {
+  if (access.full) return new Set(book.list.keys());
+  return new Set([
+    STANDARD,
+    ...book.jobs.filter((j) => mayRecruitFor(access, j.sourceId)).map((j) => book.keyFor(j.sourceId)),
+    ...seen.filter((r) => r.tracker === "rounds").map((r) => book.keyFor(Number(r.fields.job), r.fields)),
+    ...seen.filter((r) => r.tracker === "pipeline").map((r) => book.keyOf(r)),
+  ]);
+}
+
 /** Everything the caller may see, in one read: the screens work out health,
  *  counts and the dashboard from it (src/lib/hrHealth.ts). */
 export const all = query({
@@ -81,19 +95,43 @@ export const all = query({
     const { full } = access;
     const every = await ctx.db.query("hrRecords").collect();
     const seen = full ? null : scopeOf(every, access);
+    const book = await loadPipelines(ctx);
     const rows = every
       .filter((r) => isTracker(r.tracker) && (seen ? seen.has(r._id) : true))
-      .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: r.fields }));
+      .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: r.fields }))
+      // Which pipeline a candidate, or a hiring round, is on.
+      .map((r) =>
+        r.tracker === "pipeline"
+          ? { ...r, pipeline: book.keyOf(r) }
+          : r.tracker === "rounds"
+            ? { ...r, pipeline: book.keyFor(Number(r.fields.job), r.fields) }
+            : r
+      );
+    const teams = (await ctx.db.query("teams").collect())
+      .map((t) => ({ _id: t._id as string, name: t.name, color: t.color }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const teamIds = new Set(teams.map((t) => t._id));
+    const known = pipelinesFor(book, access, rows);
+    const pipelines = [...book.list].filter(([key]) => known.has(key)).map(([key, p]) => ({ key, ...p }));
     // The website positions a row can be tied to: all of them for HR, their own for the rest.
-    const jobs = (await ctx.db.query("recruitJobs").collect())
+    const jobs = livePositions(book.jobs)
       .filter((j) => mayRecruitFor(access, j.sourceId))
-      .map((j) => ({ id: String(j.sourceId), name: j.name }))
+      .map((j) => ({
+        id: String(j.sourceId),
+        name: j.name,
+        hrOwner: (j.hrOwner ?? "") as string,
+        hiringManager: (j.hiringManager ?? "") as string,
+        parent: j.parentSourceId == null ? "" : String(j.parentSourceId),
+        pipeline: book.keyFor(j.sourceId),
+        teams: book.teamsOf(j.sourceId).teams.filter((t) => teamIds.has(t)),
+        divide: book.teamsOf(j.sourceId).divide,
+      }))
       .sort((a, b) => a.name.localeCompare(b.name));
     const people = (await ctx.db.query("users").collect())
       .filter((u) => u.role !== "client" && u.isReviewer !== true)
       .map((u) => ({ _id: u._id, name: u.name ?? u.email ?? "Unnamed" }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    return { full, me: access.userId, rows, people, jobs };
+    return { full, pay: access.pay, me: access.userId, rows, people, jobs, pipelines, teams };
   },
 });
 
@@ -107,7 +145,8 @@ export const save = mutation({
     if (args.id && (!existing || existing.tracker !== tracker)) throw new Error("Row not found");
     // Someone with positions works inside them: the row as it is, and as it
     // will be after this save, must both sit under one of their positions.
-    const seen = full ? null : scopeOf(await ctx.db.query("hrRecords").collect(), access);
+    const every = full ? [] : await ctx.db.query("hrRecords").collect();
+    const seen = full ? null : scopeOf(every, access);
     if (seen && existing && !seen.has(existing._id)) throw new Error("Row not found");
     // An edit sends only what changed, laid over the row as it is now, so two
     // people editing different fields of one row do not undo each other.
@@ -138,6 +177,43 @@ export const save = mutation({
     if (tracker === "interviews" && typeof fields.date === "string" && !fields.feedbackDue) {
       fields.feedbackDue = new Date(Date.parse(fields.date) + 86_400_000).toISOString().slice(0, 10);
     }
+    // What came back says it came back.
+    if (tracker === "assignments" && fields.submission && !fields.receivedDate) fields.receivedDate = today();
+    const book = tracker === "pipeline" || tracker === "rounds" ? await loadPipelines(ctx) : null;
+    if (book && tracker === "rounds" && fields.pipeline && fields.pipeline !== existing?.fields.pipeline) {
+      const theirs = pipelinesFor(book, access, every.filter((r) => seen?.has(r._id)));
+      if (!theirs.has(String(fields.pipeline))) throw new Error("Hiring pipeline: pick one from the list");
+    }
+    if (fields.team && fields.team !== existing?.fields.team) {
+      const team = ctx.db.normalizeId("teams", String(fields.team));
+      if (!team || !(await ctx.db.get(team))) throw new Error("Team: pick one from the list");
+    }
+    // A candidate's stage is one of their own pipeline's steps.
+    if (book && tracker === "pipeline") {
+      const steps = book.stepsOf({ fields });
+      const before = String(existing?.fields.stage ?? "");
+      const stage = String(fields.stage ?? "");
+      const known = steps.some((s) => s.name === stage) || (CLOSING as readonly string[]).includes(stage);
+      if (!stage) fields.stage = entryStep(steps).name;
+      else if (!known && stage === before && existing) {
+        // Moved to a position with other steps: the matching one of theirs.
+        fields.stage = fitStage(stage, book.stepsOf(existing), steps);
+      } else if (!known) {
+        throw new Error(`The ${book.list.get(book.keyOf({ fields }))!.name} pipeline has no step called "${stage}"`);
+      }
+      if (fields.stage !== before) {
+        // The step says who does it and by when, unless this save says otherwise.
+        const says = await atStep(ctx, steps.find((s) => s.name === fields.stage));
+        for (const [key, value] of Object.entries(says)) if (!(key in args.fields)) fields[key] = value;
+      }
+      // Whoever gets to the offer, or joins, has a team to join. Cleared by hand after that, it stays cleared.
+      const kind = steps.find((s) => s.name === fields.stage)?.kind;
+      const arrives = fields.stage !== before || standing(fields) !== (existing ? standing(existing.fields) : "");
+      if (!fields.team && !("team" in args.fields) && arrives && ["Active", "Joined"].includes(standing(fields)) && (kind === "offer" || kind === "joining" || standing(fields) === "Joined")) {
+        const team = await teamFor(ctx, book, { fields });
+        if (team) fields.team = team;
+      }
+    }
     const now = Date.now();
     if (!existing) {
       const id = await ctx.db.insert("hrRecords", {
@@ -158,6 +234,7 @@ export const save = mutation({
     // Closed or reopened here by hand: no longer something Positions may undo.
     if (tracker === "pipeline" && standing(existing.fields) !== standing(fields)) delete hidden.closedFrom;
     await ctx.db.patch(existing._id, { fields: { ...hidden, ...fields }, updatedAt: now });
+    if (book && tracker === "rounds") await refit(ctx, book);
     if (tracker === "interviews") await tellInterviewer(ctx, existing._id, existing.fields, fields, user._id);
     if (tracker === "pipeline") await followCandidate(ctx, access, existing, { ...hidden, ...fields }, user);
     return existing._id;
@@ -502,7 +579,7 @@ export const accessList = query({
     const access = await recruitAccess(ctx);
     if (!access?.full) return null;
     // Positions are handed out by parent role; sub-roles come with their parent.
-    const positions = (await ctx.db.query("recruitJobs").collect())
+    const positions = livePositions(await ctx.db.query("recruitJobs").collect())
       .filter((j) => j.parentSourceId == null)
       .map((j) => ({ id: j.sourceId, name: j.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -517,6 +594,7 @@ export const accessList = query({
         // HR and super admins always see every position.
         builtIn: u.isHR === true || u.isSuperAdmin === true,
         jobs: u.recruitJobs ?? [],
+        pay: u.recruitPay === true,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
     return { positions, people };
@@ -533,11 +611,26 @@ export const setRecruitAccess = mutation({
     if (!full) throw new Error("Only HR and super admins manage recruitment access");
     const target = await ctx.db.get(userId);
     if (!target || target.role === "client" || target.isReviewer === true) throw new Error("Pick a team member");
-    const known = new Set((await ctx.db.query("recruitJobs").collect()).map((j) => j.sourceId));
+    const known = new Set(livePositions(await ctx.db.query("recruitJobs").collect()).map((j) => j.sourceId));
     if (allowed && !known.has(jobSourceId)) throw new Error("That position no longer exists");
     const jobs = (target.recruitJobs ?? []).filter((id) => id !== jobSourceId && known.has(id));
     if (allowed) jobs.push(jobSourceId);
-    await ctx.db.patch(userId, { recruitJobs: jobs.length ? jobs : undefined });
+    // Without recruitment there is no pay to see; given back later, it starts hidden again.
+    await ctx.db.patch(userId, jobs.length ? { recruitJobs: jobs } : { recruitJobs: undefined, recruitPay: undefined });
+  },
+});
+
+/** Whether someone sees the current and expected CTC of the applicants they work on. */
+export const setRecruitPay = mutation({
+  args: { userId: v.id("users"), allowed: v.boolean() },
+  handler: async (ctx, { userId, allowed }) => {
+    const { full } = await requireAccess(ctx);
+    if (!full) throw new Error("Only HR and super admins manage recruitment access");
+    const target = await ctx.db.get(userId);
+    if (!target || target.role === "client" || target.isReviewer === true || !target.recruitJobs?.length) {
+      throw new Error("Give them a position first");
+    }
+    await ctx.db.patch(userId, { recruitPay: allowed || undefined });
   },
 });
 

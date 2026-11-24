@@ -7,6 +7,7 @@ import { joinLinkOf, type CalendarEvent } from "../src/lib/echo";
 import { hmac, sameText, seal, signEchoKey, unseal } from "./lib/echoKey";
 import { calendarEvents, googleToken } from "./lib/google";
 import { mayRecruitFor, recruitAccess, requireEchoUser } from "./lib/guards";
+import { livePositions } from "./lib/pipelines";
 
 // Echo is the meeting note-taker (a Chrome extension plus its own server). The
 // task tracker owns the accounts: it signs a personal key for each person, the
@@ -250,7 +251,7 @@ export const recruitFolders = query({
   handler: async (ctx) => {
     const access = await recruitAccess(ctx);
     if (!access) return [];
-    return (await ctx.db.query("recruitJobs").collect())
+    return livePositions(await ctx.db.query("recruitJobs").collect())
       .filter((j) => mayRecruitFor(access, j.sourceId))
       .map((j) => ({ id: j.sourceId, name: j.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -266,7 +267,8 @@ export const setRecruitFolder = mutation({
     if (!meeting || meeting.ownerId !== me._id) throw new Error("Only the person who recorded it can file it");
     if (jobSourceId !== null) {
       const access = await recruitAccess(ctx);
-      if (!access || !mayRecruitFor(access, jobSourceId) || !(await recruitJobName(ctx, jobSourceId))) {
+      const live = livePositions(await ctx.db.query("recruitJobs").collect());
+      if (!access || !mayRecruitFor(access, jobSourceId) || !live.some((j) => j.sourceId === jobSourceId)) {
         throw new Error("You do not have access to that position");
       }
     }

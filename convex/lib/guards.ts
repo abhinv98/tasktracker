@@ -198,6 +198,8 @@ export type RecruitAccess = {
   /** For everyone else: the positions HR gave them (users.recruitJobs), with
    *  their sub-positions. Applicants file under the parent position. */
   jobs: ReadonlySet<number>;
+  /** Sees applicants' current and expected CTC: HR, super admins, and whoever HR allows. */
+  pay: boolean;
 };
 
 /** The caller's recruitment access, or null when they have none. */
@@ -217,7 +219,7 @@ async function accessOf(ctx: Ctx, user: Doc<"users">): Promise<RecruitAccess | n
       if (job.parentSourceId != null && jobs.has(job.parentSourceId)) jobs.add(job.sourceId);
     }
   }
-  return { userId: user._id, user, full, jobs };
+  return { userId: user._id, user, full, jobs, pay: full || user.recruitPay === true };
 }
 
 /** May this person work on that position? */

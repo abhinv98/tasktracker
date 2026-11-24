@@ -34,6 +34,8 @@ export default defineSchema({
      *  time: the recruitJobs.sourceId of each position this person may work on.
      *  They see those positions' applicants and hiring rows, nothing else. */
     recruitJobs: v.optional(v.array(v.number())),
+    /** May see those applicants' current and expected CTC. HR and super admins always do. */
+    recruitPay: v.optional(v.boolean()),
     /** Finance/accounts. Rides on role "admin" like isHR, but is a label only for now — the nav is still the brand-manager view. */
     isAccountant: v.optional(v.boolean()),
     /** For role "client": the single brand this portal login belongs to. */
@@ -1117,7 +1119,52 @@ export default defineSchema({
     /** Closed roles drop off the website's application form. Missing = open. */
     status: v.optional(v.union(v.literal("open"), v.literal("closed"))),
     createdAt: v.number(),
+    /** Last day to apply (YYYY-MM-DD, India). The role closes itself after it. */
+    closesOn: v.optional(v.string()),
+    /** Who shortlisted people go to, and who the hiring round is for. */
+    hrOwner: v.optional(v.id("users")),
+    hiringManager: v.optional(v.id("users")),
+    /** Which pipeline its people go through: "standard" or a recruitPipelines id.
+     *  Missing = the role above it's, or the standard one. */
+    pipeline: v.optional(v.string()),
+    /** The teams its people join. Missing = the role above it's. With several, each
+     *  person joins one: HR picks, or with `divide` whichever has had fewest. */
+    teams: v.optional(v.array(v.id("teams"))),
+    divide: v.optional(v.boolean()),
+    /** Removed positions keep their row: their ID is never given out again, the
+     *  past still has a name, and they can be restored. */
+    removedAt: v.optional(v.number()),
+    removedBy: v.optional(v.id("users")),
   }).index("by_source", ["sourceId"]),
+
+  /** Hiring pipelines (lib/hirePipeline.ts), picked by positions and hiring rounds. */
+  recruitPipelines: defineTable({
+    name: v.string(),
+    /** The one for everyone who has not been given another. At most one row. */
+    standard: v.optional(v.literal(true)),
+    steps: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        kind: v.union(
+          v.literal("sourcing"),
+          v.literal("screening"),
+          v.literal("interview"),
+          v.literal("assignment"),
+          v.literal("review"),
+          v.literal("offer"),
+          v.literal("joining"),
+          v.literal("other")
+        ),
+        owner: v.optional(v.id("users")),
+        days: v.optional(v.number()),
+        note: v.optional(v.string()),
+        link: v.optional(v.string()),
+      })
+    ),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+  }),
 
   recruitCandidates: defineTable({
     sourceId: v.optional(v.number()),
@@ -1214,7 +1261,8 @@ export default defineSchema({
    *  duplicating them here would let the two disagree. */
   recruitActivity: defineTable({
     candidateId: v.id("recruitCandidates"),
-    kind: v.union(v.literal("note"), v.literal("stage")),
+    /** "move": to another position. */
+    kind: v.union(v.literal("note"), v.literal("stage"), v.literal("move")),
     body: v.string(),
     fromStage: v.optional(v.string()),
     toStage: v.optional(v.string()),

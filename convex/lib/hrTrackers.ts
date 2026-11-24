@@ -10,7 +10,7 @@
 /** `job` is a position from the website's roles (recruitJobs.sourceId, kept as
  *  text): it is what ties an open position, or a candidate shortlisted from the
  *  website, to the people allowed to work on it. */
-export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" | "user" | "ref" | "job";
+export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" | "user" | "ref" | "job" | "link" | "pipeline" | "team";
 
 export type TrackerKey =
   | "rounds" | "pipeline" | "interviews" | "assignments" | "offers" | "onboarding"
@@ -32,7 +32,13 @@ export type Field = {
   initial?: string;
   /** Rarely touched: the form tucks it under "More details". */
   more?: boolean;
+  /** For `select`: the options are suggestions. A candidate's stage is checked
+   *  against their position's pipeline instead (hrOps.save); an interview's
+   *  round can be anything. */
+  free?: boolean;
 };
+
+import { webLink } from "./links";
 
 const PRIORITY = ["Critical", "High", "Medium", "Low"] as const;
 const YES_NO = ["Yes", "No"] as const;
@@ -58,6 +64,12 @@ export const TRACKERS = {
     fields: [
       f("role", "Position / role", "text", { required: true, ...col }),
       f("job", "Website position", "job", col),
+      // Blank: the position's own.
+      f("pipeline", "Hiring pipeline", "pipeline", col),
+      // Blank: the position's. For a position that hires into several.
+      f("team", "Team", "team"),
+      // One Google Form or sheet that everyone in the round hands their assignment in through.
+      f("submitLink", "Assignment form or sheet (link)", "link"),
       f("cycle", "Hiring cycle", "text", { more: true }),
       f("department", "Department", "text", { more: true }),
       f("employmentType", "Employment type", "select", {
@@ -109,21 +121,17 @@ export const TRACKERS = {
       f("source", "Source", "select", {
         options: ["LinkedIn", "Naukri", "Internshala", "Referral", "Campus", "Website", "Agency", "Other"],
       }),
-      f("firstContact", "First contact date", "date", { initial: "@today" }),
-      f("stage", "Pipeline stage", "select", {
-        options: [
-          "Sourced", "Contacted", "Screening", "Interview 1", "Interview 2", "Assignment",
-          "Final Review", "Offer", "Joining", "Joined", "Rejected", "Withdrawn", "On Hold",
-        ],
-        initial: "Sourced",
-        ...col,
-      }),
+      // Set the day they were shortlisted or added (lib/candidates.ts).
+      f("firstContact", "Shortlisted on", "date", { initial: "@today", ...col }),
+      f("stage", "Pipeline stage", "select", { free: true, ...col }),
       f("status", "Candidate status", "select", {
         options: ["Active", "On Hold", "Rejected", "Withdrawn", "Joined", "Archived"],
         initial: "Active",
         ...col,
       }),
       f("hrOwner", "HR owner", "user", { initial: "@me", ...col }),
+      // Which of their position's teams they join. Set at the offer if there is only one.
+      f("team", "Team", "team"),
       f("nextAction", "Next action", "text", col),
       f("actionOwner", "Action owner", "user"),
       f("nextDue", "Next action due", "date", col),
@@ -148,6 +156,7 @@ export const TRACKERS = {
       f("candidateId", "Candidate", "ref", { ref: "pipeline", required: true, ...col }),
       f("round", "Round", "select", {
         options: ["HR Screening", "Round 1", "Round 2", "Founder Round", "Technical Round", "Culture Round", "Final Round"],
+        free: true,
         ...col,
       }),
       f("interviewer", "Interviewer", "user", col),
@@ -183,10 +192,12 @@ export const TRACKERS = {
     fields: [
       f("candidateId", "Candidate", "ref", { ref: "pipeline", required: true, ...col }),
       f("task", "Assignment / task", "text", { required: true, ...col }),
+      f("link", "Assignment link", "link"),
       f("assignedBy", "Assigned by", "user", { initial: "@me" }),
       f("sentDate", "Sent date", "date", { initial: "@today", ...col }),
       f("submissionDue", "Submission due", "date", col),
       f("receivedDate", "Received date", "date"),
+      f("submission", "Submitted link", "link", col),
       f("reviewer", "Reviewer", "user", col),
       f("reviewDue", "Review due", "date"),
       f("reviewedDate", "Reviewed date", "date"),
@@ -432,7 +443,7 @@ export type FieldValue = string | number | null;
 export type Fields = Record<string, FieldValue>;
 
 /** How much text a field holds. The form enforces it too, so nothing is cut silently. */
-export const maxLength = (field: Field) => (field.type === "long" ? 5000 : 300);
+export const maxLength = (field: Field) => (field.type === "long" ? 5000 : field.type === "link" ? 500 : 300);
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -459,11 +470,15 @@ export function cleanFields(tracker: TrackerKey, input: Record<string, unknown>)
       continue;
     }
     if (typeof raw !== "string") throw new Error(`${field.label} is not valid`);
-    const text = raw.trim();
+    let text = raw.trim();
+    if (field.type === "link") {
+      text = webLink(text);
+      if (!text) throw new Error(`${field.label}: paste a full web address`);
+    }
     if (field.type === "date" && !DATE.test(text)) throw new Error(`${field.label} must be a date`);
     if (field.type === "time" && !TIME.test(text)) throw new Error(`${field.label} must be a time`);
     if (field.type === "job" && !/^\d+$/.test(text)) throw new Error(`${field.label}: pick one from the list`);
-    if (field.type === "select" && !field.options?.includes(text)) {
+    if (field.type === "select" && !field.free && !field.options?.includes(text)) {
       throw new Error(`${field.label}: "${text.slice(0, 40)}" is not one of the options`);
     }
     if (text.length > maxLength(field)) throw new Error(`${field.label} is too long (${maxLength(field)} characters at most)`);

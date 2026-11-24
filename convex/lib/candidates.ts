@@ -2,7 +2,9 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { RecruitAccess } from "./guards";
+import { barelyStarted, entryStep, fitStage, type Step } from "./hirePipeline";
 import { TRACKERS, type Fields, type TrackerKey } from "./hrTrackers";
+import { loadPipelines, type Pipelines } from "./pipelines";
 
 // Website applicants (recruitCandidates) becoming candidates (the `pipeline`
 // tracker). Shortlisting someone on a position, and adding them to an open
@@ -36,7 +38,24 @@ export const nextCode = async (ctx: MutationCtx, tracker: TrackerKey) =>
   codeAfter([...(await rowsOf(ctx, tracker)), ...(await rowsOf(ctx, ARCHIVED + tracker))], tracker);
 
 /** Where a candidate starts, from where their application is. */
-const START: Partial<Record<string, string>> = { interview: "Interview 1", offer: "Offer" };
+const startAt = (steps: readonly Step[], stage: string | undefined): Step =>
+  ((stage === "interview" || stage === "offer") && steps.find((s) => s.kind === stage)) || entryStep(steps);
+
+/** Someone named in the setup, if they still work here: rows may not name anyone who does not. */
+async function staff(ctx: MutationCtx, id: string | undefined) {
+  const userId = id ? ctx.db.normalizeId("users", id) : null;
+  const user = userId ? await ctx.db.get(userId) : null;
+  return user && user.role !== "client" && user.isReviewer !== true ? user._id : undefined;
+}
+
+/** What being at a step sets: its owner, and a date to have it done by. Nothing the step does not say. */
+export async function atStep(ctx: MutationCtx, step: Step | undefined): Promise<Fields> {
+  const owner = await staff(ctx, step?.owner);
+  return {
+    ...(owner ? { actionOwner: owner } : {}),
+    ...(step?.days ? { nextDue: today(Date.now() + step.days * 86_400_000) } : {}),
+  };
+}
 
 /**
  * Put applicants on the Candidates list. With a `round` (an open position) they
@@ -62,17 +81,16 @@ export async function addToCandidates(
     const key = String(row.fields.applicantId ?? "");
     if (key) byApplicant.set(key, [...(byApplicant.get(key) ?? []), row]);
   }
-  const jobs = await ctx.db.query("recruitJobs").collect();
+  const pipelines = await loadPipelines(ctx);
+  const { jobs } = pipelines;
   const openRounds = round ? [] : (await rowsOf(ctx, "rounds")).filter((r) => r.fields.hiringStatus === "Open");
   const newestFor = (id: number | null | undefined) =>
     id == null ? undefined : openRounds.filter((r) => r.fields.job === String(id)).at(-1);
-  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
   let added = 0;
   for (const c of applicants) {
     const job = jobs.find((j) => j.sourceId === c.jobSourceId);
-    // The website files people under the parent role, with the sub-role as text.
-    const sub = jobs.find((j) => j.parentSourceId === c.jobSourceId && same(j.name, c.position));
+    const sub = pipelines.roleOf(c.jobSourceId, c.position);
     const target = round ?? newestFor(sub?.sourceId) ?? newestFor(c.jobSourceId) ?? newestFor(job?.parentSourceId);
 
     const there = byApplicant.get(c._id) ?? [];
@@ -80,7 +98,7 @@ export async function addToCandidates(
     if (here) {
       // Put into this one by hand although they were closed in it: back into play.
       if (round && !["Active", "Joined"].includes(standing(here.fields))) {
-        await reopen(ctx, here);
+        await reopen(ctx, here, pipelines.stepsOf(here));
         added++;
       }
       continue;
@@ -90,7 +108,9 @@ export async function addToCandidates(
       (r) => !r.fields.reqId && r.fields.status === "Active" && (access.full || access.jobs.has(Number(r.fields.job)))
     );
     if (target && unplaced) {
-      unplaced.fields = { ...unplaced.fields, reqId: target._id, lastUpdate: today() };
+      const there = { ...unplaced.fields, reqId: target._id, lastUpdate: today() };
+      const stage = fitStage(String(unplaced.fields.stage ?? ""), pipelines.stepsOf(unplaced), pipelines.stepsOf({ fields: there }));
+      unplaced.fields = { ...there, stage };
       await ctx.db.patch(unplaced._id, { fields: unplaced.fields, updatedAt: Date.now() });
       added++;
       continue;
@@ -99,6 +119,10 @@ export async function addToCandidates(
 
     const now = Date.now();
     const code = codeAfter(codes, "pipeline");
+    const hiredFor = target?.fields.job ? Number(target.fields.job) : (sub?.sourceId ?? c.jobSourceId);
+    const step = startAt(pipelines.stepsFor(hiredFor, target?.fields), c.stage);
+    // Their position says who takes them on; otherwise whoever shortlisted them.
+    const owner = (await staff(ctx, sub?.hrOwner)) ?? (await staff(ctx, job?.hrOwner)) ?? access.userId;
     const fields: Doc<"hrRecords">["fields"] = {
       name: c.name,
       job: String(c.jobSourceId),
@@ -107,9 +131,10 @@ export async function addToCandidates(
       contact: [c.email, c.number].filter(Boolean).join(" · "),
       source: "Website",
       firstContact: today(access.userId ? undefined : (c.stageUpdatedAt ?? c.createdAt ?? undefined)),
-      stage: START[c.stage ?? ""] ?? "Screening",
+      stage: step.name,
       status: "Active",
-      ...(access.userId ? { hrOwner: access.userId } : {}),
+      ...(access.userId && owner ? { hrOwner: owner } : {}),
+      ...(access.userId ? await atStep(ctx, step) : {}),
       verification: "Verified",
       origin: "New",
       lastUpdate: today(),
@@ -139,18 +164,18 @@ export function standing(fields: Fields): string {
   return CLOSED.includes(stage) ? stage : "Active";
 }
 
+/** `closedFrom` of rows (and rounds) set aside because their position was removed. */
+export const REMOVED = "removed";
+
 /** What an application's status says about the person on Candidates. */
 const STATUS_FOR: Partial<Record<string, string>> = { rejected: "Rejected", on_hold: "On Hold", applied: "Archived" };
-/** Nothing has happened with them yet: the only place "back to New" can take someone from. */
-const BARELY_STARTED = ["", "Sourced", "Contacted", "Screening"];
-
 type PipelineRow = { _id: Id<"hrRecords">; fields: Fields };
 
-/** Back into play, where they were (or at Screening, if the stage itself was a closing one). */
-async function reopen(ctx: MutationCtx, row: PipelineRow) {
+/** Back into play, where they were (or at the start, if the stage itself was a closing one or is gone). */
+async function reopen(ctx: MutationCtx, row: PipelineRow, steps: readonly Step[]) {
   const fields: Fields = { ...row.fields, status: "Active", lastUpdate: today() };
   delete fields.closedFrom;
-  if (CLOSED.includes(String(fields.stage))) fields.stage = "Screening";
+  if (!steps.some((s) => s.name === fields.stage)) fields.stage = entryStep(steps).name;
   row.fields = fields;
   await ctx.db.patch(row._id, { fields, updatedAt: Date.now() });
 }
@@ -171,6 +196,7 @@ export async function followApplication(
   stage: string
 ): Promise<Set<string>> {
   const ids = new Set(applicantIds);
+  const { stepsOf } = await loadPipelines(ctx);
   const reopened = new Set<string>();
   const people = new Map<string, Doc<"hrRecords">[]>();
   for (const row of ids.size ? await rowsOf(ctx, "pipeline") : []) {
@@ -184,7 +210,7 @@ export async function followApplication(
       const live = rows.length > closed.length;
       const latest = [...closed].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 1);
       for (const row of fromHere.length || live ? fromHere : latest) {
-        await reopen(ctx, row);
+        await reopen(ctx, row, stepsOf(row));
         reopened.add(id);
       }
       continue;
@@ -204,8 +230,10 @@ export async function followApplication(
       }
       // What is live closes, and what was closed from here changes with a change of
       // mind. A withdrawal is not turned into a rejection.
-      if (now !== "Active" && !ours && !(now === "On Hold" && status === "Rejected")) continue;
-      if (status === "Archived" && !BARELY_STARTED.includes(String(row.fields.stage ?? ""))) {
+      // Set aside with a removed position: decided on since, so restoring it does not bring them back.
+      const aside = row.fields.closedFrom === REMOVED;
+      if (now !== "Active" && !ours && !aside && !(now === "On Hold" && status === "Rejected")) continue;
+      if (status === "Archived" && !aside && !barelyStarted(stepsOf(row), String(row.fields.stage ?? ""))) {
         throw new ConvexError(`${String(row.fields.name ?? "This person")} is at ${String(row.fields.stage)} on Candidates. Close them there first.`);
       }
       await ctx.db.patch(row._id, {
@@ -263,19 +291,154 @@ export async function followCandidate(
 
 /** Everyone live on Candidates for an open position's role who is not in one yet, put into it. */
 export async function placeInRound(ctx: MutationCtx, access: Pick<RecruitAccess, "full" | "jobs">, round: Doc<"hrRecords">) {
-  const jobs = await ctx.db.query("recruitJobs").collect();
+  const { jobs, rounds, roleOf, stepsFor, stepsOf } = await loadPipelines(ctx);
   const target = Number(round.fields.job);
-  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const open = new Set([...rounds.values()].filter((r) => r.fields.hiringStatus === "Open").map((r) => Number(r.fields.job)));
   let placed = 0;
   for (const row of round.fields.job ? await rowsOf(ctx, "pipeline") : []) {
     const job = Number(row.fields.job);
     if (row.fields.reqId || !row.fields.job || standing(row.fields) !== "Active") continue;
     if (!access.full && !access.jobs.has(job)) continue;
     // Same order as shortlisting: their sub-role, the role, then the role above it.
-    const sub = jobs.find((j) => j.parentSourceId === job && same(j.name, String(row.fields.roleOriginal ?? "")));
-    if (![sub?.sourceId, job, jobs.find((j) => j.sourceId === job)?.parentSourceId].includes(target)) continue;
-    await ctx.db.patch(row._id, { fields: { ...row.fields, reqId: round._id, lastUpdate: today() }, updatedAt: Date.now() });
+    const sub = roleOf(job, String(row.fields.roleOriginal ?? ""));
+    const order = [sub?.sourceId, job, jobs.find((j) => j.sourceId === job)?.parentSourceId];
+    // The first of those with a round open takes them. This one counts, open or not.
+    if (order.find((id) => id != null && (id === target || open.has(id))) !== target) continue;
+    const stage = fitStage(String(row.fields.stage ?? ""), stepsOf(row), stepsFor(target, round.fields));
+    await ctx.db.patch(row._id, { fields: { ...row.fields, reqId: round._id, stage, lastUpdate: today() }, updatedAt: Date.now() });
     placed++;
   }
   return placed;
+}
+
+/** Which pipeline people are on changed (a position or a hiring round picked
+ *  another): everyone takes the matching step. Returns how many in play moved. */
+export async function refit(ctx: MutationCtx, before: Pipelines) {
+  const after = await loadPipelines(ctx);
+  const now = Date.now();
+  let moved = 0;
+  for (const row of await rowsOf(ctx, "pipeline")) {
+    if (before.keyOf(row) === after.keyOf(row)) continue;
+    const stage = fitStage(String(row.fields.stage ?? ""), before.stepsOf(row), after.stepsOf(row));
+    if (stage === row.fields.stage) continue;
+    await ctx.db.patch(row._id, { fields: { ...row.fields, stage }, updatedAt: now });
+    if (standing(row.fields) === "Active") moved++;
+  }
+  return moved;
+}
+
+/**
+ * The team someone hired joins: their hiring round's, else their position's.
+ * With several it is HR's pick, unless the position divides people between
+ * them: then the team that has had fewest.
+ */
+export async function teamFor(ctx: MutationCtx, book: Pipelines, row: { fields: Fields }): Promise<string | undefined> {
+  const known = new Set<string>((await ctx.db.query("teams").collect()).map((t) => t._id));
+  const round = book.rounds.get(String(row.fields.reqId ?? ""))?.fields.team;
+  if (typeof round === "string" && known.has(round)) return round;
+  const { of, teams, divide } = book.teamsOf(book.jobOf(row));
+  const live = teams.filter((t) => known.has(t));
+  if (live.length < 2 || !divide) return live.length === 1 ? live[0] : undefined;
+  const had = new Map(live.map((t) => [t, 0]));
+  for (const r of await rowsOf(ctx, "pipeline")) {
+    const team = String(r.fields.team ?? "");
+    if (!had.has(team) || book.teamsOf(book.jobOf(r)).of !== of || !["Active", "Joined"].includes(standing(r.fields))) continue;
+    had.set(team, had.get(team)! + 1);
+  }
+  return live.reduce((best, t) => (had.get(t)! < had.get(best)! ? t : best));
+}
+
+/* ── Moving people to another position ─────────────────────── */
+
+type Rounds = ReadonlyMap<string, { fields: Fields }>;
+/** What moving needs to know, as it was before anything moved. `kept`: hiring
+ *  rounds that go to the new position too, so people stay in those. */
+export type MoveFrom = Pick<Pipelines, "jobs" | "rounds" | "stepsFor" | "stepsOf" | "teamsOf"> & { kept?: ReadonlySet<string> };
+
+/**
+ * Applications, and whoever they are on Candidates, from one position to
+ * another. They file under the role, with a sub-role as text, as the website
+ * does it. On Candidates they keep their standing and take the matching step of
+ * the new pipeline. A hiring round for the old position is left; one for some
+ * other position is not touched.
+ */
+export async function moveToPosition(
+  ctx: MutationCtx,
+  applicants: Doc<"recruitCandidates">[],
+  target: Doc<"recruitJobs">,
+  by: Who,
+  from: MoveFrom,
+  /** Which Candidates rows this person may change. An application can be theirs and the row another position's. */
+  mine: (row: Doc<"hrRecords">) => Promise<boolean>
+) {
+  const filedUnder = target.parentSourceId ?? target.sourceId;
+  const name = (id: number) => from.jobs.find((j) => j.sourceId === id)?.name ?? "another position";
+  const now = Date.now();
+  const moved = new Map<string, number>(); // application -> the position it was under
+  for (const a of applicants) {
+    if (a.jobSourceId === filedUnder && a.position.trim().toLowerCase() === target.name.trim().toLowerCase()) continue;
+    await ctx.db.patch(a._id, { jobSourceId: filedUnder, position: target.name });
+    const was = name(a.jobSourceId);
+    await ctx.db.insert("recruitActivity", {
+      candidateId: a._id,
+      kind: "move",
+      body: `From ${a.position && a.position.toLowerCase() !== was.toLowerCase() ? `${was} (${a.position})` : was} to ${target.name}`,
+      authorId: by._id,
+      authorName: by.name ?? by.email ?? "HR",
+      createdAt: now,
+    });
+    moved.set(a._id, a.jobSourceId);
+  }
+  const newRound = newestRound(from.rounds, target.sourceId, filedUnder);
+  for (const row of moved.size ? await rowsOf(ctx, "pipeline") : []) {
+    const was = moved.get(String(row.fields.applicantId ?? ""));
+    if (was === undefined || !(await mine(row))) continue;
+    await ctx.db.patch(row._id, { fields: moveRow(row, target, newRound, from, was), updatedAt: now });
+  }
+  return moved.size;
+}
+
+/** The newest round open for the sub-role, else for the role. */
+export const newestRound = (rounds: Rounds, ...ids: number[]): string | undefined => {
+  for (const id of ids) {
+    const hit = [...rounds].filter(([, r]) => r.fields.hiringStatus === "Open" && r.fields.job === String(id)).at(-1);
+    if (hit) return hit[0];
+  }
+};
+
+/** One Candidates row, as it is under another position. */
+export function moveRow(
+  row: PipelineRow,
+  target: Pick<Doc<"recruitJobs">, "sourceId" | "name" | "parentSourceId">,
+  newRound: string | undefined,
+  { jobs, rounds, stepsFor, stepsOf, teamsOf, kept }: MoveFrom,
+  /** The position they are moved out of. */
+  was: number
+): Fields {
+  const root = (id: number) => jobs.find((j) => j.sourceId === id)?.parentSourceId ?? id;
+  const filedUnder = target.parentSourceId ?? target.sourceId;
+  const fields: Fields = { ...row.fields, job: String(filedUnder), roleOriginal: target.name, lastUpdate: today() };
+  // Set aside when their position was removed: moved, they are back in play.
+  if (fields.closedFrom === REMOVED) {
+    fields.status = "Active";
+    delete fields.closedFrom;
+  }
+  const jobOfRound = (id: unknown) => Number(rounds.get(String(id ?? ""))?.fields.job || NaN);
+  const roundJob = jobOfRound(fields.reqId);
+  const stays = !!fields.reqId && !!kept?.has(String(fields.reqId));
+  // The round of the role they go to, or of the role above it while it has none of its own.
+  const fits = roundJob === target.sourceId || (roundJob === filedUnder && jobOfRound(newRound) !== target.sourceId);
+  // Someone closed for good keeps the round they were closed in: its history counts
+  // them. Held or rejected on Positions can still be taken back there, into a round of the new position.
+  const active = standing(fields) === "Active";
+  if ((active || fields.closedFrom === "positions") && fields.reqId && !stays && !fits && root(roundJob) === root(was)) delete fields.reqId;
+  if (active && !fields.reqId && newRound) fields.reqId = newRound;
+  // As everywhere: the round's position decides, and only without one the position itself.
+  const inRound = rounds.get(String(fields.reqId ?? ""))?.fields;
+  const hiredFor = stays || !Number(inRound?.job) ? target.sourceId : Number(inRound!.job);
+  fields.stage = fitStage(String(fields.stage ?? ""), stepsOf(row), stepsFor(hiredFor, inRound));
+  // A team that neither their round nor the position hires into is not theirs any more.
+  const teams = inRound?.team ? [String(inRound.team)] : teamsOf(hiredFor).teams;
+  if (fields.team && teams.length && !teams.includes(String(fields.team))) delete fields.team;
+  return fields;
 }

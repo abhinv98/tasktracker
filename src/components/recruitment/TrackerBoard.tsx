@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui";
 import { TRACKERS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { tone, type Row } from "@/lib/hrHealth";
 import { useQuickSave } from "./hrFields";
@@ -20,6 +21,7 @@ export function TrackerBoard({
   items,
   data,
   skip = [],
+  columns,
   onOpen,
   onShowClosed,
 }: {
@@ -28,6 +30,8 @@ export function TrackerBoard({
   data: HrData;
   /** Fields the list is already filtered to: every card would say the same thing. */
   skip?: string[];
+  /** Candidates: the steps of the pipelines on screen, in order. */
+  columns?: string[];
   onOpen: (row: Row) => void;
   /** Switch to the list filtered to one finished value. */
   onShowClosed: (value: string) => void;
@@ -35,8 +39,9 @@ export function TrackerBoard({
   const meta = TRACKERS[tracker] as (typeof TRACKERS)[TrackerKey] & { board: string; boardClosed?: readonly string[] };
   const field = fieldsOf(tracker).find((f) => f.key === meta.board)!;
   const closed = meta.boardClosed ?? [];
-  const live = (field.options ?? []).filter((o) => !closed.includes(o));
+  const live = columns ?? (field.options ?? []).filter((o) => !closed.includes(o));
   const quickSave = useQuickSave();
+  const { toast } = useToast();
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
@@ -45,6 +50,11 @@ export function TrackerBoard({
     setDragging(null);
     setOver(null);
     if (!moved || boardValue(moved) === value) return;
+    // Several pipelines on one board: a step of one is not a step of another.
+    if (tracker === "pipeline" && !closed.includes(value) && !data.stepsOf(moved).some((s) => s.name === value)) {
+      toast("error", `${rowTitle(moved, data) || moved.code} is on the ${data.pipelineName(moved.pipeline)} pipeline, which has no step called "${value}"`);
+      return;
+    }
     void quickSave(moved, moveFields(tracker, value), `${rowTitle(moved, data) || moved.code} moved to ${value}`);
   };
   const target = (value: string) => ({
@@ -71,7 +81,7 @@ export function TrackerBoard({
 
   // Rows with no value yet (or one that is no longer an option) get a column of
   // their own at the front, so nothing is on the list but missing from the board.
-  const known = new Set<string>(field.options ?? []);
+  const known = new Set<string>([...live, ...closed]);
   const unplaced = items.some((i) => {
     const v = boardValue(i.row);
     return v !== null && !known.has(v);

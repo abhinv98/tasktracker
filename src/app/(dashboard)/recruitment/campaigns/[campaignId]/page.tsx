@@ -23,11 +23,13 @@ import {
 } from "lucide-react";
 import { stageMeta, type Stage } from "@/lib/recruitStages";
 import { EmailPreview } from "@/components/recruitment/TemplateEditor";
+import { useHrData } from "@/components/recruitment/hrShared";
 import { valuesFor } from "@/lib/templateHtml";
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.campaignId as Id<"recruitCampaigns">;
+  const hr = useHrData();
   const campaign = useQuery(api.recruitment.getCampaign, { campaignId });
   const templates = useQuery(api.recruitment.listTemplates, {});
   const jobs = useQuery(api.recruitment.listJobs);
@@ -291,7 +293,7 @@ export default function CampaignDetailPage() {
             <EmailPreview
               subject={picked.subject}
               body={picked.body}
-              values={valuesFor(first, jobs?.find((j) => j.sourceId === first.jobSourceId)?.name ?? "")}
+              values={valuesFor(first, jobs?.find((j) => j.sourceId === first.jobSourceId)?.name ?? "", hr?.pay === true)}
               to={`${first.name}, ${first.email}`}
             />
           )}

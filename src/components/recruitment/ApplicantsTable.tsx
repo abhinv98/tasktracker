@@ -112,7 +112,7 @@ export function useLast<T>(value: T | undefined, of = ""): T | undefined {
 }
 
 /** Experience, pay and notice, in one small panel. */
-export function NarrowTray({ value, onChange }: { value: Narrow; onChange: (n: Narrow) => void }) {
+export function NarrowTray({ value, onChange, pay }: { value: Narrow; onChange: (n: Narrow) => void; pay: boolean }) {
   const on = [value.years, value.expected, value.notice].filter(Boolean).length;
   return (
     <Tray icon={SlidersHorizontal} active={on > 0} label={on ? `Filters · ${on}` : "Filters"} width="w-60">
@@ -123,7 +123,9 @@ export function NarrowTray({ value, onChange }: { value: Narrow; onChange: (n: N
             ["expected", "Expects at most (₹ LPA)", "8"],
             ["notice", "Notice of at most (days)", "30"],
           ] as const
-        ).map(([key, label, hint]) => (
+        )
+          .filter(([key]) => pay || key !== "expected")
+          .map(([key, label, hint]) => (
           <label key={key} className="block">
             <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">{label}</span>
             <input
@@ -177,6 +179,7 @@ export function ApplicantsTable({
   onOpen,
   onMove,
   places,
+  pay,
   highlight,
 }: {
   rows: Applicant[];
@@ -188,6 +191,8 @@ export function ApplicantsTable({
   onOpen: (id: Id<"recruitCandidates">, order: Id<"recruitCandidates">[]) => void;
   onMove: (a: Applicant, to: PositionStatus) => void;
   places: ReadonlyMap<string, { id: string; stage: string }>;
+  /** Shows what they earn and expect. Off for whoever HR has not given it to. */
+  pay: boolean;
   highlight?: string | null;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "added", dir: -1 });
@@ -220,8 +225,12 @@ export function ApplicantsTable({
     { key: "name", label: "Applicant" },
     ...(roleColumn ? [{ key: null, label: roleColumn.label }] : []),
     { key: "years", label: "Exp", right: true },
-    { key: "current", label: "Current", right: true },
-    { key: "expected", label: "Expects", right: true },
+    ...(pay
+      ? [
+          { key: "current" as const, label: "Current", right: true },
+          { key: "expected" as const, label: "Expects", right: true },
+        ]
+      : []),
     { key: "notice", label: "Notice", right: true },
     { key: "added", label: "Applied", right: true },
     { key: null, label: "CV" },
@@ -315,8 +324,12 @@ export function ApplicantsTable({
                     </td>
                   )}
                   <td className={NUM}>{years == null ? dash : formatYears(years)}</td>
-                  <td className={NUM}>{current == null ? dash : formatLpa(current)}</td>
-                  <td className={`${NUM} text-[var(--text-primary)]`}>{expected == null ? dash : formatLpa(expected)}</td>
+                  {pay && (
+                    <>
+                      <td className={NUM}>{current == null ? dash : formatLpa(current)}</td>
+                      <td className={`${NUM} text-[var(--text-primary)]`}>{expected == null ? dash : formatLpa(expected)}</td>
+                    </>
+                  )}
                   <td className={NUM}>{notice == null ? dash : formatNotice(notice)}</td>
                   <td className={`${NUM} text-[12px] text-[var(--text-muted)]`}>{added(a.createdAt) || dash}</td>
                   <td className="whitespace-nowrap px-3 py-2">
