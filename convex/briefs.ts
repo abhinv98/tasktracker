@@ -303,7 +303,7 @@ export const createBrief = mutation({
       if (!access) throw new Error("Recruitment briefs are for HR and people hiring");
       const round = args.hiringRoundId ? await ctx.db.get(args.hiringRoundId) : null;
       if (args.hiringRoundId && (round?.tracker !== "rounds" || !(access.full || mayRecruitFor(access, Number(round.fields.job))))) {
-        throw new Error("Open position not found");
+        throw new Error("Hiring round not found");
       }
       args.brandId = undefined;
       // Whoever manages it sees all of it: not something to hand to oneself.

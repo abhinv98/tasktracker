@@ -70,7 +70,7 @@ export default function RecruitmentOverview() {
   const { book, today } = data;
   const top = headline(book, today);
   const places = placesOf(data);
-  const open = (row: Row) => router.push(`/recruitment/t/${row.tracker}?open=${row._id}`);
+  const open = (row: Row) => router.push(`/recruitment/t/${row.tracker === "rounds" ? "pipeline" : row.tracker}?open=${row._id}`);
 
   // Everything late, stuck or missing its next date, worst first.
   const flagged = TRACKER_KEYS.flatMap((key) =>
@@ -121,10 +121,10 @@ export default function RecruitmentOverview() {
         <StatTile label="Interviews" value={interviews.length} hint="In the next 7 days" href="/recruitment/t/interviews" />
         <StatTile label="Offers" value={offers} hint="Out or being agreed" href="/recruitment/t/offers" />
         <StatTile
-          label="Open positions"
+          label="Hiring rounds"
           value={rounds.length}
           hint={top.roundsToConfirm > 0 ? `${top.roundsToConfirm} to confirm` : "Open or on hold"}
-          href="/recruitment/t/rounds"
+          href="/recruitment/t/pipeline"
         />
         <StatTile label="Tasks" value={tasks?.length ?? "–"} hint={lateTasks ? `${lateTasks} late` : "Open"} bad={lateTasks > 0} href="#tasks" />
       </StatStrip>
@@ -311,7 +311,7 @@ export default function RecruitmentOverview() {
             </Panel>
           </div>
 
-          <Panel title="Open positions" count={rounds.length} action={{ label: "Open Positions", href: "/recruitment/t/rounds" }}>
+          <Panel title="Hiring rounds" count={rounds.length} action={{ label: "Candidates", href: "/recruitment/t/pipeline" }}>
             {rounds.length === 0 ? (
               <PanelEmpty>None open. Open a hiring round above, or from a position.</PanelEmpty>
             ) : (

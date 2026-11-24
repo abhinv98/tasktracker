@@ -12,10 +12,8 @@ import { SearchField } from "@/components/ui/Tray";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { useLast } from "@/components/recruitment/ApplicantsTable";
 import { Rounds } from "@/components/recruitment/OpenRound";
-import { TeamsButton } from "@/components/recruitment/TeamsButton";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { POSITION_STATUSES, positionStatus } from "@/lib/recruitStages";
-import { byTeam } from "@/lib/recruitTeams";
 
 const COUNTS = [
   ["fresh", "New", "new"],
@@ -37,7 +35,6 @@ export default function PositionsPage() {
   const { toast } = useToast();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Set<number>>(new Set());
-  const [folded, setFolded] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<Id<"recruitCandidates"> | null>(null);
   const needle = q.trim().toLowerCase();
   const people = useLast(useQuery(api.recruitment.searchCandidates, needle.length >= 2 ? { search: needle, limit: 12 } : "skip"));
@@ -54,65 +51,27 @@ export default function PositionsPage() {
   // Opening and closing a role on the website is HR's call.
   const full = data?.full === true;
   type Job = (typeof jobs)[number];
-  const teamsOf = (j: Job) => data?.jobs.find((x) => x.id === String(j.sourceId))?.teams ?? [];
   const isRole = (j: Job) => j.parentSourceId != null && jobs.some((p) => p.sourceId === j.parentSourceId);
   const hit = (j: Job) => !needle || j.name.toLowerCase().includes(needle);
-  // Team, then position, then the roles under it. A position that hires into two teams is under both.
-  const tree = byTeam(jobs, data?.teams ?? [], teamsOf)
-    .map((g) => ({
-      ...g,
-      // A role sits inside its position, or by itself where its position is not in this team.
-      positions: g.positions
-        .filter((j) => !isRole(j) || !g.positions.some((p) => p.sourceId === j.parentSourceId))
-        .filter((j) => hit(j) || g.positions.some((s) => s.parentSourceId === j.sourceId && hit(s)))
-        // Whoever has people waiting comes first.
-        .sort((a, b) => b.fresh - a.fresh || b.total - a.total),
-      roles: g.positions.filter(isRole),
-    }))
-    .filter((g) => g.positions.length > 0);
-  const columns = COUNTS.length + (full ? 3 : 2);
+  const roles = jobs.filter(isRole);
+  // A position, then the roles under it. Whoever has people waiting comes first.
+  const positions = jobs
+    .filter((j) => !isRole(j))
+    .filter((j) => hit(j) || roles.some((s) => s.parentSourceId === j.sourceId && hit(s)))
+    .sort((a, b) => b.fresh - a.fresh || b.total - a.total);
   const sum = (key: (typeof COUNTS)[number][0]) => jobs.reduce((n, j) => n + j[key], 0);
-  const meta = (j: Job) => data?.jobs.find((x) => x.id === String(j.sourceId));
-  /** Into this team's entry of a position that hires into several. */
-  const entry = (j: Job, team: string | undefined, more = "") => {
-    // A role's applicants are filed under its position: that page, narrowed to the role.
-    const q = [team && teamsOf(j).length > 1 ? `team=${team}` : "", isRole(j) ? `role=${encodeURIComponent(j.name)}` : "", more].filter(Boolean).join("&");
+  /** A role's applicants are filed under its position: that page, narrowed to the role. */
+  const entry = (j: Job, more = "") => {
+    const q = [isRole(j) ? `role=${encodeURIComponent(j.name)}` : "", more].filter(Boolean).join("&");
     return `/recruitment/${isRole(j) ? j.parentSourceId : j.sourceId}${q ? `?${q}` : ""}`;
   };
-  /** The other teams a position hires into, seen from one of them. */
-  const shared = (j: Job, team: string | undefined) => {
-    const others = teamsOf(j).filter((t) => t !== team).map((t) => data?.teamName(t)).filter(Boolean);
-    return others.length ? `${meta(j)?.divide ? "divided with" : "or"} ${others.join(", ")}` : "";
-  };
 
-  const cells = (j: (typeof jobs)[number], team?: string) =>
+  const cells = (j: Job) =>
     COUNTS.map(([key, label, status]) => (
       <td key={key} className="px-1 py-1 text-right">
-        {key === "shortlisted" && team && data && teamsOf(j).length > 1 ? (
-          // Its own people. Whoever is not decided yet is offered to each of the teams.
-          <span className="inline-flex flex-col items-end">
-            <Link
-              href={entry(j, team, `status=${status}`)}
-              aria-label={`${j.name}: ${data.inTeam(String(j.sourceId), team).length} shortlisted for ${data.teamName(team)}`}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-block min-w-[44px] rounded-md px-2 py-1 text-[13px] tabular-nums text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-            >
-              {data.inTeam(String(j.sourceId), team).length}
-            </Link>
-            {data.inTeam(String(j.sourceId), "").length > 0 && (
-              <Link
-                href={entry(j, undefined, `team=none&status=${status}`)}
-                aria-label={`${j.name}: ${data.inTeam(String(j.sourceId), "").length} with no team decided`}
-                onClick={(e) => e.stopPropagation()}
-                className="whitespace-nowrap px-2 text-[12px] tabular-nums text-[var(--accent-admin-text)] hover:underline"
-              >
-                {data.inTeam(String(j.sourceId), "").length} to decide
-              </Link>
-            )}
-          </span>
-        ) : j[key] > 0 ? (
+        {j[key] > 0 ? (
           <Link
-            href={entry(j, team, `status=${status}`)}
+            href={entry(j, `status=${status}`)}
             aria-label={`${j.name}: ${j[key]} ${label.toLowerCase()}`}
             onClick={(e) => e.stopPropagation()}
             className={`inline-block min-w-[44px] rounded-md px-2 py-1 text-[13px] tabular-nums hover:bg-[var(--bg-hover)] ${
@@ -179,7 +138,7 @@ export default function PositionsPage() {
         </Panel>
       )}
 
-      {tree.length === 0 ? (
+      {positions.length === 0 ? (
         <EmptyState
           title={jobs.length === 0 ? "No positions yet" : "No position by that name"}
           description={jobs.length === 0 ? "HR can give you the ones you are hiring for, under HR Office, Access." : people?.length ? "The people above match, though." : "Nobody by that name either. Try fewer letters."}
@@ -200,57 +159,17 @@ export default function PositionsPage() {
               </tr>
             </thead>
             <tbody>
-              {tree.map(({ team, positions, roles }) => {
-              const key = team?._id ?? "none";
-              const shut = folded.has(key) && !needle;
-              return (
-              <Fragment key={key}>
-              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                <td className="px-4 py-2">
-                  <button
-                    type="button"
-                    aria-expanded={!shut}
-                    onClick={() =>
-                      setFolded((was) => {
-                        const next = new Set(was);
-                        if (!next.delete(key)) next.add(key);
-                        return next;
-                      })
-                    }
-                    className="inline-flex items-center gap-2 rounded-md text-[13px] font-semibold text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
-                  >
-                    {shut ? <ChevronRight size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-                    {team && <span className="h-2 w-2 rounded-full" style={{ background: team.color }} aria-hidden />}
-                    {team?.name ?? "No team yet"}
-                    <span className="font-normal tabular-nums text-[var(--text-muted)]">
-                      {positions.length} {positions.length === 1 ? "position" : "positions"}
-                    </span>
-                  </button>
-                </td>
-                {COUNTS.map(([k]) => (
-                  <td key={k} className="px-3 text-right text-[12px] tabular-nums text-[var(--text-muted)]">
-                    {/* A team's shortlisted people are its own; the rest of a shared position is common. */}
-                    {positions
-                      .reduce((n, j) => n + (k === "shortlisted" && team && data && teamsOf(j).length > 1 ? data.inTeam(String(j.sourceId), team._id).length : j[k]), 0)
-                      .toLocaleString()}
-                  </td>
-                ))}
-                <td colSpan={columns - COUNTS.length - 1} />
-              </tr>
-              {!shut && positions.map((job) => {
-                const subs = roles.filter((s) => s.parentSourceId === job.sourceId);
+              {positions.map((job) => {
+                const subs = roles.filter((s) => s.parentSourceId === job.sourceId && (hit(s) || hit(job)));
                 const shown = open.has(job.sourceId) || (!!needle && !job.name.toLowerCase().includes(needle));
                 const closed = job.status === "closed";
                 return (
                   <Fragment key={job._id}>
                     <tr
-                      onClick={() => router.push(entry(job, team?._id))}
+                      onClick={() => router.push(entry(job))}
                       className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-primary)]"
                     >
-                      <td className="py-2.5 pl-6 pr-4">
-                        <span className="flex items-start">
-                        <span className="mr-2 mt-0.5 h-3 w-3 shrink-0 rounded-bl border-b border-l border-[var(--border-strong)]" aria-hidden />
-                        <span className="min-w-0">
+                      <td className="px-4 py-2.5">
                         <span className="flex items-center gap-1.5">
                           {subs.length > 0 && (
                             <button
@@ -271,7 +190,7 @@ export default function PositionsPage() {
                             </button>
                           )}
                           <Link
-                            href={entry(job, team?._id)}
+                            href={entry(job)}
                             onClick={(e) => e.stopPropagation()}
                             className="text-[14px] font-medium text-[var(--text-primary)] underline-offset-2 first-letter:uppercase hover:underline"
                           >
@@ -279,22 +198,14 @@ export default function PositionsPage() {
                           </Link>
                         </span>
                         <span className="block text-[12px] tabular-nums text-[var(--text-muted)]">
-                          {isRole(job) ? `Its applicants are listed under ${jobs.find((p) => p.sourceId === job.parentSourceId)?.name}` : `${job.total.toLocaleString()} in all`}
+                          {job.total.toLocaleString()} in all
                           {job.lastApplied > 0 &&
                             `, last one ${new Date(job.lastApplied).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                          {shared(job, team?._id) && ` · ${shared(job, team?._id)}. New, on hold and rejected are common.`}
-                        </span>
-                        {full && data && meta(job) && !isRole(job) && (
-                          <span className="mt-1.5 block" onClick={(e) => e.stopPropagation()}>
-                            <TeamsButton data={data} job={meta(job)!} />
-                          </span>
-                        )}
-                        </span>
                         </span>
                       </td>
-                      {cells(job, team?._id)}
+                      {cells(job)}
                       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Rounds data={data} job={job} team={teamsOf(job).length > 1 ? team?._id : undefined} />
+                        <Rounds data={data} job={job} />
                       </td>
                       {full && (
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
@@ -324,16 +235,16 @@ export default function PositionsPage() {
                       subs.map((s) => (
                         <tr
                           key={s._id}
-                          onClick={() => router.push(entry(s, team?._id))}
+                          onClick={() => router.push(entry(s))}
                           className="cursor-pointer border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] last:border-0 hover:bg-[var(--bg-hover)]"
                         >
-                          <td className="py-2 pl-14 pr-4">
+                          <td className="py-2 pl-9 pr-4">
                             <span className="mr-2 inline-block h-3 w-3 rounded-bl border-b border-l border-[var(--border-strong)]" aria-hidden />
-                            <Link href={entry(s, team?._id)} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
+                            <Link href={entry(s)} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
                               {s.name}
                             </Link>
                           </td>
-                          {cells(s, team?._id)}
+                          {cells(s)}
                           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                             <Rounds data={data} job={s} />
                           </td>
@@ -342,9 +253,6 @@ export default function PositionsPage() {
                       ))}
                   </Fragment>
                 );
-              })}
-              </Fragment>
-              );
               })}
             </tbody>
           </table>

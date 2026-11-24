@@ -56,7 +56,7 @@ export default function RecruitmentAccessPage() {
     <div className="p-4 sm:p-8">
       <PageHeader
         title="Recruitment Access"
-        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and open positions, and nothing else. What applicants earn and expect, offer amounts and budgets stay hidden from them unless you switch CTC on."
+        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and hiring rounds, and nothing else. What applicants earn and expect, offer amounts and budgets stay hidden from them unless you switch CTC on."
       />
       <div className="mb-3">
         <SearchField value={search} onChange={setSearch} placeholder="Search people" label="Search people" />

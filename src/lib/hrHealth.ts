@@ -213,14 +213,14 @@ export function radar(book: Book, today: string) {
   return [
     {
       key: "rounds" as TrackerKey,
-      label: "Hiring requirements",
+      label: "Hiring rounds",
       open: count("rounds", (r) => ["Open", "On Hold"].includes(text(r, "hiringStatus"))),
       attention: attention("rounds"),
       check: "Confirm every cycle, approve scope, note owner, due date and blockers",
     },
     {
       key: "pipeline" as TrackerKey,
-      label: "Candidate pipeline",
+      label: "Candidates",
       open: count("pipeline", (r) => text(r, "verification") === "Verified" && text(r, "status") === "Active"),
       attention: attention("pipeline"),
       check: "Every live candidate needs an owner, last update and dated next step",
@@ -241,14 +241,14 @@ export function radar(book: Book, today: string) {
     },
     {
       key: "offers" as TrackerKey,
-      label: "Finalisation / offers",
+      label: "Offers",
       open: count("offers", (_r, l) => !["Closed", "Joined"].includes(l)),
       attention: attention("offers"),
       check: "Approvals, offer status, joining commitment and salary sign-off",
     },
     {
       key: "onboarding" as TrackerKey,
-      label: "Joining / onboarding",
+      label: "Onboarding",
       open: count("onboarding", (_r, l) => l !== "Complete"),
       attention: attention("onboarding"),
       check: "Documents verified, BGV, IT and email, induction",
@@ -262,21 +262,21 @@ export function radar(book: Book, today: string) {
     },
     {
       key: "campus" as TrackerKey,
-      label: "Colleges / institutes",
+      label: "Campus connect",
       open: count("campus", (r) => text(r, "stage") !== "Closed"),
       attention: attention("campus"),
       check: "Relationships, campus drive plan and next outreach date",
     },
     {
       key: "projects" as TrackerKey,
-      label: "HR projects / SOPs",
+      label: "HR projects",
       open: count("projects", (r) => text(r, "stage") !== "Implemented"),
       attention: attention("projects"),
       check: "Draft, feedback, founder approval, implementation",
     },
     {
       key: "log" as TrackerKey,
-      label: "HR updates (7 days)",
+      label: "Daily log (7 days)",
       open: thisWeek.length,
       attention: thisWeek.filter((r) => text(r, "founderAttention") === "Yes").length,
       check: "Daily completed actions, escalations and next working-day priorities",

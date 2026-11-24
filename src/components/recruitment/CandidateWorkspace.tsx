@@ -130,7 +130,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
               {[
                 row.code,
-                round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "No open position yet",
+                round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "Not in a hiring round yet",
                 text(row, "contact"),
                 text(row, "source"),
                 text(row, "appliedOn") && `applied ${fmtDate(text(row, "appliedOn"), today)}`,

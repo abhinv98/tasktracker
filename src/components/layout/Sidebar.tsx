@@ -85,7 +85,6 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/recruitment": UserSearch,
   "/recruitment/overview": BarChart3,
   "/recruitment/applicants": Inbox,
-  "/recruitment/t/rounds": Briefcase,
   "/recruitment/t/pipeline": Users2,
   "/recruitment/campaigns": Megaphone,
   "/recruitment/t/projects": FileBarChart,

@@ -59,8 +59,8 @@ const col = { column: true } as const;
 
 export const TRACKERS = {
   rounds: {
-    label: "Open Positions",
-    one: "open position",
+    label: "Hiring rounds",
+    one: "hiring round",
     prefix: "REQ",
     blurb: "One row is one hiring cycle. When a role reopens, add a new row. Never reuse an old one.",
     title: "role",
@@ -119,7 +119,7 @@ export const TRACKERS = {
     fields: [
       f("name", "Candidate name", "text", { required: true, ...col }),
       f("job", "Position", "job", col),
-      f("reqId", "Open position", "ref", { ref: "rounds", ...col }),
+      f("reqId", "Hiring round", "ref", { ref: "rounds", ...col }),
       f("roleOriginal", "Role (original)", "text"),
       f("contact", "Contact / email", "text"),
       f("source", "Source", "select", {

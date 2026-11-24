@@ -89,8 +89,8 @@ export function ApplyLinks({ data, job, team }: { data: HrData; job: { sourceId:
 }
 
 /**
- * Open a hiring round for a position: a new one, or one already in Open
- * Positions that was never tied to it. Everyone already shortlisted for the
+ * Open a hiring round for a position: a new one, or one that was never tied
+ * to a position. Everyone already shortlisted for the
  * position can go straight in.
  */
 export function OpenRoundModal({
@@ -184,7 +184,7 @@ export function OpenRoundModal({
       <form id="open-round" onSubmit={submit} className="flex flex-col gap-4">
         {loose.length > 0 && (
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">New, or one already in Open Positions</span>
+            <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">New, or a round that is tied to no position yet</span>
             <select value={existing} onChange={(e) => setExisting(e.target.value)} className={`${fieldClass} w-full`}>
               <option value="">Start a new one</option>
               {loose.map((r) => (

@@ -329,7 +329,7 @@ export const addApplicants = mutation({
     const { user } = access;
     const round = await ctx.db.get(roundId);
     if (!round || round.tracker !== "rounds" || (!access.full && !inScope(round, access, new Set()))) {
-      throw new Error("Open position not found");
+      throw new Error("Hiring round not found");
     }
     const applicants = [];
     for (const id of candidateIds) {
@@ -349,7 +349,7 @@ export const addApplicants = mutation({
       await ctx.db.insert("recruitActivity", {
         candidateId: c._id,
         kind: "stage",
-        body: `Added to open position ${round.code}`,
+        body: `Added to hiring round ${round.code}`,
         fromStage: from,
         toStage: "screened",
         authorId: user._id,
@@ -368,7 +368,7 @@ export const placeShortlisted = mutation({
     const access = await requireAccess(ctx);
     const round = await ctx.db.get(roundId);
     if (!round || round.tracker !== "rounds" || (!access.full && !inScope(round, access, new Set()))) {
-      throw new Error("Open position not found");
+      throw new Error("Hiring round not found");
     }
     const placed = await placeInRound(ctx, access, round);
     await settleTeams(ctx);

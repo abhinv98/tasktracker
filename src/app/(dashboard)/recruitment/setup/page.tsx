@@ -12,7 +12,6 @@ import { PositionEditor } from "@/components/recruitment/PositionSetup";
 import { movedNote, type Position } from "@/components/recruitment/setupShared";
 import { RoundsMatch, looseRounds } from "@/components/recruitment/RoundsMatch";
 import { useHrData } from "@/components/recruitment/hrShared";
-import { byTeam } from "@/lib/recruitTeams";
 
 /**
  * Positions and pipelines. A position is on the website's application form when
@@ -119,11 +118,8 @@ function Setup() {
   const pipeline = job || making || matching ? undefined : (setup.pipelines.find((p) => p.key === params.get("pipeline")) ?? setup.pipelines[0]);
   const gone = params.get("job") && !job ? "position" : params.get("pipeline") && pipeline && pipeline.key !== params.get("pipeline") ? "pipeline" : null;
 
-  // Team, then position, then the roles under it. A position that hires into two teams is under both.
-  const tree = byTeam(live, setup.teams, (p) => p.usesTeams).map((g) => ({
-    ...g,
-    roots: g.positions.filter((p) => p.parent === null || !g.positions.some((x) => x.id === p.parent)),
-  }));
+  // A position, then the roles under it.
+  const roots = live.filter((p) => p.parent === null || !live.some((x) => x.id === p.parent));
   const item = (on: boolean) =>
     `flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
       on ? "bg-[var(--accent-admin-dim)] font-medium text-[var(--accent-admin-text)]" : "text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
@@ -132,7 +128,7 @@ function Setup() {
     const closed = !p.open || (p.parent !== null && live.find((x) => x.id === p.parent)?.open === false);
     return (
       <li key={p.id}>
-        <button type="button" aria-current={job?.id === p.id ? "true" : undefined} onClick={() => go(`?job=${p.id}`)} className={`${item(job?.id === p.id)} ${nested ? "pl-9" : "pl-5"}`}>
+        <button type="button" aria-current={job?.id === p.id ? "true" : undefined} onClick={() => go(`?job=${p.id}`)} className={`${item(job?.id === p.id)} ${nested ? "pl-7" : ""}`}>
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${closed ? "bg-[var(--text-disabled)]" : "bg-[var(--accent-employee)]"}`}
             title={closed ? "Not on the website" : "On the website form"}
@@ -191,15 +187,7 @@ function Setup() {
           </section>
           <section>
             {heading("Positions", "New", "?new=position")}
-            {tree.map((g) => (
-              <div key={g.team?._id ?? "none"} className="mb-2">
-                <h3 className="flex items-center gap-2 px-2 py-1 text-[12px] font-medium text-[var(--text-muted)]">
-                  {g.team && <span className="h-2 w-2 rounded-full" style={{ background: g.team.color }} aria-hidden />}
-                  {g.team?.name ?? "No team yet"}
-                </h3>
-                <ul>{g.roots.flatMap((r) => [line(r, false), ...g.positions.filter((p) => p.parent === r.id).map((p) => line(p, true))])}</ul>
-              </div>
-            ))}
+            <ul>{roots.flatMap((r) => [line(r, false), ...live.filter((p) => p.parent === r.id).map((p) => line(p, true))])}</ul>
           </section>
           {removed.length > 0 && (
             <details>

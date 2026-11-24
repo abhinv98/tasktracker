@@ -17,8 +17,8 @@ export const RECRUIT_SECTIONS: Section[] = [
     ],
     also: /^\/recruitment\/\d+$/,
   },
-  { label: "Open Positions", href: "/recruitment/t/rounds" },
   {
+    // Hiring rounds and the candidates in them, on one screen.
     label: "Candidates",
     href: "/recruitment/t/pipeline",
     tabs: [

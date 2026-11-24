@@ -1278,7 +1278,7 @@ export default function BriefsPage() {
               )}
               {forHiring && (
                 <div>
-                  <label className={FIELD_LABEL_CLASS}>Open position (optional)</label>
+                  <label className={FIELD_LABEL_CLASS}>Hiring round (optional)</label>
                   <select
                     value={hiringRoundId}
                     onChange={(e) => {

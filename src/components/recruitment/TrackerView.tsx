@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useAuthToken } from "@convex-dev/auth/react";
-import { ChevronDown, ChevronUp, ExternalLink, FileText, KanbanSquare, List, Plus, Trash2, X } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronUp, ExternalLink, FileText, KanbanSquare, List, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable, useConfirm, useToast } from "@/components/ui";
@@ -16,7 +16,8 @@ import { webLink } from "@/convex/lib/links";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 import { CopyLink } from "./CopyLink";
-import { noLink } from "./OpenRound";
+import { OpenRoundModal, noLink } from "./OpenRound";
+import { NO_ROUND, RoundsRail } from "./RoundsRail";
 import { FieldGrid, toValues } from "./hrFields";
 import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, seenFields, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
 import { looseRounds } from "./RoundsMatch";
@@ -34,7 +35,8 @@ const draftOf = (row: Row): Draft =>
 
 /**
  * One HR tracker: its list, its filters and its form. Every tracker in
- * convex/lib/hrTrackers.ts is drawn by this one screen.
+ * convex/lib/hrTrackers.ts is drawn by this one screen. On Candidates the
+ * hiring rounds are down the side, and picking one shows its people.
  */
 export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const meta = TRACKERS[tracker];
@@ -54,6 +56,10 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const board = "board" in meta ? meta.board : undefined;
   const [view, setView] = useState<"table" | "board">(board && params.get("view") === "board" ? "board" : "table");
   const [editing, setEditing] = useState<Editing | null>(null);
+  const hiring = tracker === "pipeline";
+  // Hiring: the round whose details are open, and whether a new one is being opened.
+  const [roundPanel, setRoundPanel] = useState<Editing | null>(null);
+  const [opening, setOpening] = useState(false);
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
 
   // ?new=1&candidateId=… opens a prefilled form; ?open=<id> opens a row. Both
@@ -61,7 +67,24 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const paramKey = params.toString();
   useEffect(() => {
     const open = params.get("open");
-    if (!data || !(open || params.get("new"))) return;
+    if (!data) return;
+    if (hiring) {
+      // A round picked somewhere else: a link, the Overview, a round's own panel.
+      // The address says which round is picked: a link, the Overview, a round's own panel, or none.
+      if (!open && !params.get("new")) {
+        const reqId = params.get("reqId") ?? "";
+        setPicked((p) => ((p.reqId ?? "") === reqId ? p : { ...p, reqId }));
+        if (params.get("view") === "board") setView("board");
+      }
+      // A hiring round to open: it is picked, with its details up.
+      const round = data.byId.get(open ?? "");
+      if (round?.tracker === "rounds") {
+        setPicked((p) => ({ ...p, reqId: round._id }));
+        setRoundPanel({ row: round, draft: draftOf(round) });
+        return router.replace(`${pathname}?reqId=${round._id}`);
+      }
+    }
+    if (!(open || params.get("new"))) return;
     if (params.get("new")) {
       const given = Object.fromEntries(fields.filter((f) => params.get(f.key)).map((f) => [f.key, params.get(f.key) as string]));
       setEditing({ row: null, draft: startingValues(tracker, data, given) });
@@ -69,7 +92,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       const row = data.byId.get(open ?? "");
       if (row && row.tracker === tracker) setEditing({ row, draft: draftOf(row) });
     }
-    router.replace(pathname);
+    setRoundPanel(null);
+    router.replace(hiring && picked.reqId ? `${pathname}?reqId=${picked.reqId}` : pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey, data === undefined]);
 
@@ -101,10 +125,18 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   }
 
   const columns = fields.filter((f) => f.column);
+  // A round that was deleted while it was picked is no filter.
+  const chosen = hiring && picked.reqId && picked.reqId !== NO_ROUND && !data.byId.has(picked.reqId) ? { ...picked, reqId: "" } : picked;
+  /** Hiring: the round whose people are shown. In the address too, so a reload or a shared link shows the same. */
+  const pickRound = (id: string) => {
+    setPicked((p) => ({ ...p, reqId: id }));
+    window.history.replaceState(null, "", id ? `${pathname}?reqId=${id}` : pathname);
+  };
   // Filter by the listed dropdowns, and by what a row belongs to (a candidate's position).
   const filterFields = [
     ...columns.filter((f) => f.type === "ref" || f.type === "job"),
-    ...(tracker === "pipeline" && data.teams.length > 0 ? fields.filter((f) => f.type === "team") : []),
+    // Only where some position hires into more than one team.
+    ...(hiring && data.jobs.some((j) => (j.teams?.length ?? 0) > 1) ? fields.filter((f) => f.type === "team") : []),
     ...columns.filter((f) => f.type === "select").slice(0, 3),
   ];
   const optionsOf = (f: (typeof fields)[number]) =>
@@ -130,7 +162,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const narrowed = rows.filter(
     ({ row }) =>
       (!mine || isMine(row, data)) &&
-      filterFields.every((f) => !picked[f.key] || (f.type === "team" ? row.team || "none" : row.fields[f.key]) === picked[f.key]) &&
+      filterFields.every((f) => !chosen[f.key] || (f.type === "team" || chosen[f.key] === NO_ROUND ? (f.type === "team" ? row.team : row.fields[f.key]) || NO_ROUND : row.fields[f.key]) === chosen[f.key]) &&
       (!needle ||
         `${row.code} ${columns.map((f) => show(f, row, data)).join(" ")}`.toLowerCase().includes(needle))
   );
@@ -145,7 +177,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
         )
         .map(({ r }) => r)
     : keyed;
-  const filtersOn = !!needle || mine || chip !== "all" || Object.values(picked).some(Boolean);
+  // Hiring: the round is picked at the side, and stays when the filters are cleared.
+  const filtersOn = !!needle || mine || chip !== "all" || Object.entries(chosen).some(([key, value]) => value && !(hiring && key === "reqId"));
 
   // A new row starts inside what the list is narrowed to (the round being looked
   // at), but not with a status someone happened to be filtering by.
@@ -156,13 +189,21 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
         tracker,
         data,
         Object.fromEntries(
-          fields.filter((f) => (f.type === "ref" || f.type === "job") && picked[f.key]).map((f) => [f.key, picked[f.key]])
+          fields.filter((f) => (f.type === "ref" || f.type === "job") && chosen[f.key] && chosen[f.key] !== NO_ROUND).map((f) => [f.key, chosen[f.key]])
         )
       ),
     });
   const open = (row: Row) => setEditing({ row, draft: draftOf(row) });
   // The round whose candidates are on screen, when the list is narrowed to one.
-  const round = tracker === "pipeline" && picked.reqId ? data.byId.get(picked.reqId) : undefined;
+  const at = hiring && chosen.reqId ? data.byId.get(chosen.reqId) : undefined;
+  const round = at?.tracker === "rounds" ? at : undefined;
+  const roundJob = round && data.jobs.find((j) => j.id === String(round.fields.job ?? ""));
+  // Running and tied to nothing, as Setup lists them. A closed one, or one whose position was removed, is not that.
+  const untied = !!round && looseRounds(data).some((r) => r._id === round._id);
+  const unplaced = hiring && data.book.pipeline.some((r) => !r.fields.reqId);
+  // In one round's list its own name would only repeat itself.
+  const shown = columns.filter((f) => !(round && f.key === "reqId"));
+  const toFill = round && data.full ? derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value : undefined;
   // Empty because nothing exists yet, not because a filter hid it: the tracker
   // has no rows, or the only thing narrowing the list is the round.
   const fresh =
@@ -171,34 +212,21 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       !needle &&
       !mine &&
       chip === "all" &&
-      Object.entries(picked).every(([key, value]) => key === "reqId" || !value) &&
+      Object.entries(chosen).every(([key, value]) => key === "reqId" || !value) &&
       !rows.some(({ row }) => row.fields.reqId === round._id));
 
   return (
     <div className="p-4 sm:p-8">
       <PageHeader
-        title={round ? `${String(round.fields.role ?? "")} candidates` : meta.label}
-        subtitle={
-          round
-            ? `${round.code} · ${String(round.fields.hiringStatus ?? "")}${
-                derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value !== "–" && data.full
-                  ? ` · ${derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value} to fill`
-                  : ""
-              }. Drag a card to move someone along, or open it to plan the next step.`
-            : meta.blurb
-        }
+        title={meta.label}
+        subtitle={hiring ? "Everyone you shortlisted, by hiring round. Pick a round to see who is in it." : meta.blurb}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {round && <CopyLink code={round.code} off={noLink(data, round)} />}
-            {round && webLink(String(round.fields.submitLink ?? "")) && (
-              <a
-                href={webLink(String(round.fields.submitLink))}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-control items-center gap-1.5 rounded-control border border-[var(--border)] bg-white px-3 text-[13px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"
-              >
-                Submissions <ExternalLink size={13} aria-hidden />
-              </a>
+            {hiring && (
+              <Button variant="secondary" onClick={() => setOpening(true)}>
+                <Briefcase size={14} />
+                New hiring round
+              </Button>
             )}
             <Button onClick={startNew}>
               <Plus size={14} />
@@ -209,14 +237,62 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       />
 
       {/* Nobody goes into a round that is tied to no position. */}
-      {data.full && (tracker === "rounds" || (tracker === "pipeline" && !round)) && looseRounds(data).length > 0 && (
+      {data.full && hiring && looseRounds(data).length > 0 && (
         <p className="mb-3 rounded-lg bg-[var(--warning-dim)] px-3 py-2 text-[13px] text-[var(--text-primary)]">
-          {looseRounds(data).length} hiring {looseRounds(data).length === 1 ? "round is" : "rounds are"} not tied to a position, so no candidate goes into{" "}
+          {looseRounds(data).length} hiring {looseRounds(data).length === 1 ? "round is" : "rounds are"} not tied to a position, so nobody you shortlist goes into{" "}
           {looseRounds(data).length === 1 ? "it" : "them"}.{" "}
           <Link href="/recruitment/setup?rounds=1" className="font-medium underline underline-offset-2">
             Match them
           </Link>
         </p>
+      )}
+
+      <div className={hiring ? "lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-6" : ""}>
+      {hiring && <RoundsRail data={data} value={chosen.reqId ?? ""} onPick={pickRound} />}
+      <div className="min-w-0">
+      {round && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-[var(--border)] bg-white px-4 py-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-semibold text-[var(--text-primary)] first-letter:uppercase">{String(round.fields.role ?? round.code)}</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+              {[round.code, String(round.fields.hiringStatus ?? ""), toFill && toFill !== "–" && `${toFill} to fill`, roundJob ? `for ${roundJob.name}` : untied && "not tied to a position"]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {untied && data.full ? (
+              <Button size="sm" onClick={() => router.push("/recruitment/setup?rounds=1")}>
+                Tie to a position
+              </Button>
+            ) : (
+              <CopyLink code={round.code} off={noLink(data, round)} />
+            )}
+            {webLink(String(round.fields.submitLink ?? "")) && (
+              <a
+                href={webLink(String(round.fields.submitLink))}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-7 items-center gap-1.5 rounded-control border border-[var(--border)] bg-white px-2.5 text-[12px] font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-hover)]"
+              >
+                Submissions <ExternalLink size={12} aria-hidden />
+              </a>
+            )}
+            {roundJob && (
+              <Button
+                size="sm"
+                variant="secondary"
+                title={`Everyone who applied for ${roundJob.name}`}
+                onClick={() => router.push(roundJob.parent ? `/recruitment/${roundJob.parent}?role=${encodeURIComponent(roundJob.name)}` : `/recruitment/${roundJob.id}`)}
+              >
+                Applicants
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => setRoundPanel({ row: round, draft: draftOf(round) })}>
+              Round details
+            </Button>
+          </div>
+        </div>
       )}
 
       {tracker !== "log" && (
@@ -238,16 +314,21 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <SearchField value={search} onChange={setSearch} placeholder={`Search ${meta.label.toLowerCase()}`} label={`Search ${meta.label}`} />
-        {filterFields.map((f) => (
-          <FilterTray
-            key={f.key}
-            label={f.label}
-            allLabel="All"
-            value={picked[f.key] ?? ""}
-            options={optionsOf(f)}
-            onChange={(value) => setPicked((p) => ({ ...p, [f.key]: value }))}
-          />
-        ))}
+        {filterFields.map((f) => {
+          // Hiring: on a wide screen the rounds are down the side instead.
+          const rounds = hiring && f.key === "reqId";
+          const tray = (
+            <FilterTray
+              key={f.key}
+              label={f.label}
+              allLabel="All"
+              value={chosen[f.key] ?? ""}
+              options={rounds && unplaced ? [...optionsOf(f), { value: NO_ROUND, label: "Not in a round yet" }] : optionsOf(f)}
+              onChange={(value) => (rounds ? pickRound(value) : setPicked((p) => ({ ...p, [f.key]: value })))}
+            />
+          );
+          return rounds ? <span key={f.key} className="lg:hidden">{tray}</span> : tray;
+        })}
         {fields.some((f) => f.type === "user") && (
           <button
             type="button"
@@ -268,7 +349,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
               setSearch("");
               setChip("all");
               setMine(false);
-              setPicked({});
+              setPicked(hiring && chosen.reqId ? { reqId: chosen.reqId } : {});
             }}
             className="text-[12px] font-medium text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]"
           >
@@ -276,7 +357,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           </button>
         )}
         <span className="ml-auto text-[12px] tabular-nums text-[var(--text-muted)]">
-          {visible.length === rows.length ? `${rows.length}` : `${visible.length} of ${rows.length}`}
+          {/* Hiring: the list is one round's, so "of everyone" would say nothing. */}
+          {visible.length === rows.length || hiring ? visible.length : `${visible.length} of ${rows.length}`}
         </span>
         {board && (
           <div role="group" aria-label="View" className="flex rounded-control border border-[var(--border)] bg-white p-0.5">
@@ -308,12 +390,16 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           // Nothing has been added here yet (to this tracker, or to the round
           // being looked at): say so and offer the first one.
           <EmptyState
-            title={round ? `No candidates in ${String(round.fields.role ?? round.code)} yet` : `No ${meta.label.toLowerCase()} yet`}
+            title={round ? `Nobody in ${String(round.fields.role ?? round.code)} yet` : `No ${meta.label.toLowerCase()} yet`}
             description={
-              tracker === "pipeline" && !round
+              hiring && !round
                 ? "Go to Positions, open one and shortlist people. They show up here, whatever they applied for."
                 : round
-                ? "Add the first one here, or go to Positions, tick the people worth a look and use Add to open position."
+                ? untied
+                  ? "It is not tied to a position yet, so nobody you shortlist comes here. Tie it under Positions, Setup, or add someone by hand."
+                  : roundJob
+                    ? `Shortlist people under Positions, ${roundJob.name}, and they come here by themselves. Or add someone by hand.`
+                    : "Add someone by hand with the button below."
                 : meta.blurb
             }
             action={<Button onClick={startNew}>New {meta.one}</Button>}
@@ -326,7 +412,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           tracker={tracker}
           items={visible}
           data={data}
-          skip={Object.keys(picked).filter((key) => picked[key])}
+          skip={Object.keys(chosen).filter((key) => chosen[key] && chosen[key] !== NO_ROUND)}
           columns={tracker === "pipeline" ? stepNames(visible.map((v) => v.row), data) : undefined}
           onOpen={open}
           onShowClosed={(value) => {
@@ -340,7 +426,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-[12px] text-[var(--text-muted)]">
                 <th className="whitespace-nowrap px-3 py-2 font-medium">ID</th>
-                {columns.map((f) => (
+                {shown.map((f) => (
                   <th
                     key={f.key}
                     aria-sort={sort?.key === f.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
@@ -379,7 +465,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                   className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
                 >
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums text-[var(--text-muted)]">{row.code}</td>
-                  {columns.map((f, i) => (
+                  {shown.map((f, i) => (
                     <td
                       key={f.key}
                       className={`max-w-[260px] truncate px-3 py-2 ${
@@ -439,6 +525,10 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
             onClose={() => setEditing(null)}
           />
         ))}
+      </div>
+      </div>
+      {roundPanel && <RecordPanel key={roundPanel.row?._id} tracker="rounds" editing={roundPanel} data={data} onClose={() => setRoundPanel(null)} />}
+      {opening && <OpenRoundModal data={data} onClose={() => setOpening(false)} />}
     </div>
   );
 }
@@ -603,7 +693,10 @@ function RecordPanel({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    onClick={() => router.push(`/recruitment/t/pipeline?view=board&reqId=${row._id}`)}
+                    onClick={() => {
+                      router.push(`/recruitment/t/pipeline?view=board&reqId=${row._id}`);
+                      onClose();
+                    }}
                   >
                     <KanbanSquare size={13} />
                     Candidates board

@@ -1,16 +1,6 @@
-// Positions as a tree under the teams their people join, and hiring rounds
-// matched to positions by name. Pure: checked by scripts/recruitTeams.check.ts.
+// Hiring rounds matched to positions by name. Pure: checked by scripts/recruitTeams.check.ts.
 
 export type Team = { _id: string; name: string; color: string };
-
-/** A position that hires into several teams is under each of them; one with none comes last, under null. */
-export function byTeam<T>(positions: readonly T[], teams: readonly Team[], teamsOf: (p: T) => readonly string[]) {
-  const groups: { team: Team | null; positions: T[] }[] = teams
-    .map((team) => ({ team, positions: positions.filter((p) => teamsOf(p).includes(team._id)) }))
-    .filter((g) => g.positions.length > 0);
-  const none = positions.filter((p) => !teams.some((t) => teamsOf(p).includes(t._id)));
-  return none.length ? [...groups, { team: null, positions: none }] : groups;
-}
 
 const WEIGHT: Record<string, number> = { jr: 0.25, sr: 0.25, junior: 0.25, senior: 0.25, intern: 2 };
 const words = (text: string) =>
