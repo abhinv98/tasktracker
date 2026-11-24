@@ -2,6 +2,7 @@ import {
   mutation,
   query,
   action,
+  internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
@@ -1271,5 +1272,24 @@ export const backfillStages = internalMutation({
       updated++;
     }
     return { total: rows.length, updated };
+  },
+});
+
+/** Is email working? Sends one plain message from the app's own sender to that same address. Run by hand. */
+export const mailCheck = internalAction({
+  args: {},
+  handler: async (): Promise<string> => {
+    const from = process.env.ZEPTO_FROM_EMAIL ?? "hr@ecultify.com";
+    const res = await fetch("https://api.zeptomail.com/v1.1/email", {
+      method: "POST",
+      headers: { Authorization: process.env.ZEPTO_API_TOKEN ?? "", "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        from: { address: from, name: process.env.ZEPTO_FROM_NAME ?? "HR Team" },
+        to: [{ email_address: { address: from, name: "HR Team" } }],
+        subject: "Tasktracker email check",
+        textbody: "This is a test from tasktracker. Email sending works.",
+      }),
+    });
+    return `HTTP ${res.status} | ${(await res.text()).slice(0, 300)}`;
   },
 });

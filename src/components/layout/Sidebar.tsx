@@ -111,8 +111,6 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
 
 interface NavCategory {
   category: string;
-  /** Folded away until opened: for the groups most people rarely need. */
-  startClosed?: boolean;
   items: {
     href: string;
     label: string;
@@ -302,7 +300,6 @@ const RECRUITMENT_NAV: NavCategory[] = [
   },
   {
     category: "Outreach",
-    startClosed: true,
     items: [
       { href: "/recruitment/candidates", label: "Search Applicants" },
       { href: "/recruitment/campaigns", label: "Campaigns" },
@@ -361,16 +358,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
     }))
     .filter((cat) => cat.items.length > 0);
 
-  // Categories are open unless marked startClosed. Track the collapsed ones, so
-  // categories from a nav set swapped in later (e.g. Recruitment) also start open.
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
-    () =>
-      new Set(
-        RECRUITMENT_NAV.filter(
-          (c) => c.startClosed && !c.items.some((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
-        ).map((c) => c.category)
-      )
-  );
+  // Track the collapsed categories, not the open ones, so those from a nav set
+  // swapped in later (e.g. Recruitment) also start open.
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   function toggleCategory(cat: string) {
     setCollapsedCategories((prev) => {
