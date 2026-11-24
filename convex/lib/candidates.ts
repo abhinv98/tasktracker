@@ -12,7 +12,7 @@ import { TRACKERS, type TrackerKey } from "./hrTrackers";
 export const ARCHIVED = "archived:";
 
 /** Today's date in India, the way the trackers store dates. */
-export const today = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+export const today = (at = Date.now()) => new Date(at + 5.5 * 3_600_000).toISOString().slice(0, 10);
 
 export const rowsOf = (ctx: MutationCtx, tracker: string) =>
   ctx.db
@@ -44,10 +44,13 @@ const START: Partial<Record<string, string>> = { interview: "Interview 1", offer
  * position. Someone already on the list is not added again by shortlisting; a
  * live row that had no open position is given one. Returns how many rows were
  * added or placed.
+ *
+ * Without a `userId` this is bringing over people shortlisted earlier: nobody
+ * in particular owns them, and first contact is the day they were shortlisted.
  */
 export async function addToCandidates(
   ctx: MutationCtx,
-  access: RecruitAccess,
+  access: Pick<RecruitAccess, "full" | "jobs"> & { userId?: Id<"users"> },
   applicants: Doc<"recruitCandidates">[],
   round?: Doc<"hrRecords">
 ) {
@@ -94,10 +97,10 @@ export async function addToCandidates(
       roleOriginal: c.position || job?.name || "",
       contact: [c.email, c.number].filter(Boolean).join(" · "),
       source: "Website",
-      firstContact: today(),
+      firstContact: today(access.userId ? undefined : (c.stageUpdatedAt ?? c.createdAt ?? undefined)),
       stage: START[c.stage ?? ""] ?? "Screening",
       status: "Active",
-      hrOwner: access.userId,
+      ...(access.userId ? { hrOwner: access.userId } : {}),
       verification: "Verified",
       origin: "New",
       lastUpdate: today(),

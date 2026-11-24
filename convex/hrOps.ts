@@ -254,6 +254,16 @@ export const addApplicants = mutation({
   },
 });
 
+/** Bring everyone already marked Shortlisted onto Candidates. Run by hand; a second run adds nobody twice. */
+export const backfillShortlisted = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const shortlisted = (await ctx.db.query("recruitCandidates").collect()).filter((c) => c.stage === "screened");
+    const added = await addToCandidates(ctx, { full: true, jobs: new Set() }, shortlisted);
+    return { shortlisted: shortlisted.length, added };
+  },
+});
+
 /* ── Interviews: telling the interviewer, and their feedback ── */
 
 const text = (fields: Fields, key: string) => (typeof fields[key] === "string" ? (fields[key] as string) : "");

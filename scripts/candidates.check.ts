@@ -91,6 +91,10 @@ async function main() {
   const design = { userId: "u2", full: false, jobs: new Set([1, 2]) } as any;
   await addToCandidates(ctx, design, [person("g", 1)], round("r1"));
   assert.equal(round("y").fields.reqId, undefined);
+  // Brought over from before: no owner, and first contact is when they were shortlisted.
+  await addToCandidates(ctx, { full: true, jobs: new Set() }, [{ ...person("h", 4), stageUpdatedAt: Date.UTC(2026, 7, 14, 20) }]);
+  assert.equal(pipeline().at(-1).fields.hrOwner, undefined);
+  assert.equal(pipeline().at(-1).fields.firstContact, "2026-08-15", "20:00 UTC is already the 15th in India");
   console.log("candidates: ok");
 }
 main();
