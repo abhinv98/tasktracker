@@ -17,7 +17,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * account already, otherwise an invite that puts them on it when they sign up.
  */
 export function JoinTeam({ row, data, designation }: { row: Row; data: HrData; designation: string }) {
-  const team = String(row.fields.team ?? "");
+  const team = row.team ?? "";
   const teamName = data.teamName(team);
   const [email, setEmail] = useState("");
   const [link, setLink] = useState("");

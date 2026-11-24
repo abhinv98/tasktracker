@@ -1169,6 +1169,8 @@ export default defineSchema({
   recruitCandidates: defineTable({
     sourceId: v.optional(v.number()),
     jobSourceId: v.number(),
+    /** The hiring round whose application link they used, if any. */
+    roundId: v.optional(v.id("hrRecords")),
     name: v.string(),
     number: v.string(),
     email: v.string(),

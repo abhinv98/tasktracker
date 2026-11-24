@@ -12,6 +12,7 @@ import { SearchField } from "@/components/ui/Tray";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { useLast } from "@/components/recruitment/ApplicantsTable";
 import { Rounds } from "@/components/recruitment/OpenRound";
+import { TeamsButton } from "@/components/recruitment/TeamsButton";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { POSITION_STATUSES, positionStatus } from "@/lib/recruitStages";
 import { byTeam } from "@/lib/recruitTeams";
@@ -33,7 +34,6 @@ export default function PositionsPage() {
   const jobs = useQuery(api.recruitment.listJobs);
   const data = useHrData();
   const setJobOpen = useMutation(api.recruitment.setJobOpen);
-  const savePosition = useMutation(api.recruitSetup.savePosition);
   const { toast } = useToast();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Set<number>>(new Set());
@@ -71,19 +71,48 @@ export default function PositionsPage() {
     }))
     .filter((g) => g.positions.length > 0);
   const columns = COUNTS.length + (full ? 3 : 2);
-  const sum = (key: (typeof COUNTS)[number][0], of: readonly Job[] = jobs) => of.reduce((n, j) => n + j[key], 0);
+  const sum = (key: (typeof COUNTS)[number][0]) => jobs.reduce((n, j) => n + j[key], 0);
+  const meta = (j: Job) => data?.jobs.find((x) => x.id === String(j.sourceId));
+  /** Into this team's entry of a position that hires into several. */
+  const entry = (j: Job, team: string | undefined, more = "") => {
+    // A role's applicants are filed under its position: that page, narrowed to the role.
+    const q = [team && teamsOf(j).length > 1 ? `team=${team}` : "", isRole(j) ? `role=${encodeURIComponent(j.name)}` : "", more].filter(Boolean).join("&");
+    return `/recruitment/${isRole(j) ? j.parentSourceId : j.sourceId}${q ? `?${q}` : ""}`;
+  };
   /** The other teams a position hires into, seen from one of them. */
   const shared = (j: Job, team: string | undefined) => {
     const others = teamsOf(j).filter((t) => t !== team).map((t) => data?.teamName(t)).filter(Boolean);
-    return others.length ? `${data?.jobs.find((x) => x.id === String(j.sourceId))?.divide ? "divided with" : "or"} ${others.join(", ")}` : "";
+    return others.length ? `${meta(j)?.divide ? "divided with" : "or"} ${others.join(", ")}` : "";
   };
 
-  const cells = (j: (typeof jobs)[number]) =>
+  const cells = (j: (typeof jobs)[number], team?: string) =>
     COUNTS.map(([key, label, status]) => (
       <td key={key} className="px-1 py-1 text-right">
-        {j[key] > 0 ? (
+        {key === "shortlisted" && team && data && teamsOf(j).length > 1 ? (
+          // Its own people. Whoever is not decided yet is offered to each of the teams.
+          <span className="inline-flex flex-col items-end">
+            <Link
+              href={entry(j, team, `status=${status}`)}
+              aria-label={`${j.name}: ${data.inTeam(String(j.sourceId), team).length} shortlisted for ${data.teamName(team)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-block min-w-[44px] rounded-md px-2 py-1 text-[13px] tabular-nums text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+            >
+              {data.inTeam(String(j.sourceId), team).length}
+            </Link>
+            {data.inTeam(String(j.sourceId), "").length > 0 && (
+              <Link
+                href={entry(j, undefined, `team=none&status=${status}`)}
+                aria-label={`${j.name}: ${data.inTeam(String(j.sourceId), "").length} with no team decided`}
+                onClick={(e) => e.stopPropagation()}
+                className="whitespace-nowrap px-2 text-[12px] tabular-nums text-[var(--accent-admin-text)] hover:underline"
+              >
+                {data.inTeam(String(j.sourceId), "").length} to decide
+              </Link>
+            )}
+          </span>
+        ) : j[key] > 0 ? (
           <Link
-            href={`/recruitment/${j.sourceId}?status=${status}`}
+            href={entry(j, team, `status=${status}`)}
             aria-label={`${j.name}: ${j[key]} ${label.toLowerCase()}`}
             onClick={(e) => e.stopPropagation()}
             className={`inline-block min-w-[44px] rounded-md px-2 py-1 text-[13px] tabular-nums hover:bg-[var(--bg-hover)] ${
@@ -200,7 +229,10 @@ export default function PositionsPage() {
                 </td>
                 {COUNTS.map(([k]) => (
                   <td key={k} className="px-3 text-right text-[12px] tabular-nums text-[var(--text-muted)]">
-                    {sum(k, positions).toLocaleString()}
+                    {/* A team's shortlisted people are its own; the rest of a shared position is common. */}
+                    {positions
+                      .reduce((n, j) => n + (k === "shortlisted" && team && data && teamsOf(j).length > 1 ? data.inTeam(String(j.sourceId), team._id).length : j[k]), 0)
+                      .toLocaleString()}
                   </td>
                 ))}
                 <td colSpan={columns - COUNTS.length - 1} />
@@ -212,7 +244,7 @@ export default function PositionsPage() {
                 return (
                   <Fragment key={job._id}>
                     <tr
-                      onClick={() => router.push(`/recruitment/${job.sourceId}`)}
+                      onClick={() => router.push(entry(job, team?._id))}
                       className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-primary)]"
                     >
                       <td className="py-2.5 pl-6 pr-4">
@@ -239,7 +271,7 @@ export default function PositionsPage() {
                             </button>
                           )}
                           <Link
-                            href={`/recruitment/${job.sourceId}`}
+                            href={entry(job, team?._id)}
                             onClick={(e) => e.stopPropagation()}
                             className="text-[14px] font-medium text-[var(--text-primary)] underline-offset-2 first-letter:uppercase hover:underline"
                           >
@@ -250,35 +282,19 @@ export default function PositionsPage() {
                           {isRole(job) ? `Its applicants are listed under ${jobs.find((p) => p.sourceId === job.parentSourceId)?.name}` : `${job.total.toLocaleString()} in all`}
                           {job.lastApplied > 0 &&
                             `, last one ${new Date(job.lastApplied).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                          {shared(job, team?._id) && ` · ${shared(job, team?._id)}`}
+                          {shared(job, team?._id) && ` · ${shared(job, team?._id)}. New, on hold and rejected are common.`}
                         </span>
-                        {!team && full && (
-                          <select
-                            value=""
-                            aria-label={`Team for ${job.name}`}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              const to = e.target.value;
-                              savePosition({ id: job.sourceId, teams: [to as Id<"teams">] })
-                                .then(() => toast("success", `${job.name} is under ${data?.teamName(to)} now. Add another team in Setup.`))
-                                .catch((err) => toast("error", err instanceof Error ? err.message : "Could not change it"));
-                            }}
-                            className="mt-1 h-7 rounded-md border border-[var(--border)] bg-white px-2 text-[12px] text-[var(--text-secondary)]"
-                          >
-                            <option value="">Put under a team</option>
-                            {data?.teams.map((t) => (
-                              <option key={t._id} value={t._id}>
-                                {t.name}
-                              </option>
-                            ))}
-                          </select>
+                        {full && data && meta(job) && !isRole(job) && (
+                          <span className="mt-1.5 block" onClick={(e) => e.stopPropagation()}>
+                            <TeamsButton data={data} job={meta(job)!} />
+                          </span>
                         )}
                         </span>
                         </span>
                       </td>
-                      {cells(job)}
+                      {cells(job, team?._id)}
                       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Rounds data={data} job={job} />
+                        <Rounds data={data} job={job} team={teamsOf(job).length > 1 ? team?._id : undefined} />
                       </td>
                       {full && (
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
@@ -308,16 +324,16 @@ export default function PositionsPage() {
                       subs.map((s) => (
                         <tr
                           key={s._id}
-                          onClick={() => router.push(`/recruitment/${s.sourceId}`)}
+                          onClick={() => router.push(entry(s, team?._id))}
                           className="cursor-pointer border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] last:border-0 hover:bg-[var(--bg-hover)]"
                         >
                           <td className="py-2 pl-14 pr-4">
                             <span className="mr-2 inline-block h-3 w-3 rounded-bl border-b border-l border-[var(--border-strong)]" aria-hidden />
-                            <Link href={`/recruitment/${s.sourceId}`} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
+                            <Link href={entry(s, team?._id)} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
                               {s.name}
                             </Link>
                           </td>
-                          {cells(s)}
+                          {cells(s, team?._id)}
                           <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                             <Rounds data={data} job={s} />
                           </td>

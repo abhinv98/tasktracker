@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { settleTeams } from "./lib/candidates";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -184,6 +185,8 @@ export const deleteTeam = mutation({
       await ctx.db.delete(ut._id);
     }
     await ctx.db.delete(teamId);
+    // Whoever was being hired for it: theirs no more, or divided again.
+    await settleTeams(ctx);
   },
 });
 

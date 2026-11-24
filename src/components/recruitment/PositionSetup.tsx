@@ -87,7 +87,7 @@ export function PositionEditor({
     try {
       // Only what changed, so two people editing one position do not undo each other.
       const changed = (key: keyof typeof live) => !position || draft[key] !== live[key];
-      const { id, code } = await save({
+      const { id, code, divided } = await save({
         ...(position ? { id: position.id } : { parent: draft.parent ? Number(draft.parent) : null, pipeline: draft.pipeline }),
         ...(changed("name") ? { name: draft.name } : {}),
         ...(changed("description") ? { description: draft.description } : {}),
@@ -100,7 +100,7 @@ export function PositionEditor({
       });
       setEdits({});
       onDirty(false);
-      if (position) return toast("success", "Saved");
+      if (position) return toast("success", `Saved${divided ? `. ${divided} shortlisted ${divided === 1 ? "person was" : "people were"} divided between the teams` : ""}`);
       toast("success", `${code} created. ${!draft.open ? "It is not on the website form yet." : parent && !parent.open ? `It shows on the website form once ${parent.name} is open.` : "It is on the website form now."}`);
       onCreated?.(id);
     } catch (err) {
@@ -186,7 +186,7 @@ export function PositionEditor({
           <fieldset className="sm:col-span-2">
             <legend className={LABEL}>Teams its people join</legend>
             <div className="flex flex-wrap gap-1.5">
-              {setup.teams.map((t) => {
+              {(parent ? [] : setup.teams).map((t) => {
                 const on = draft.teams.includes(t._id);
                 return (
                   <button
@@ -206,19 +206,21 @@ export function PositionEditor({
                 );
               })}
             </div>
-            {draft.teams.length === 0 && (
+            {(parent || draft.teams.length === 0) && (
               <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-                {parent?.usesTeams.length
-                  ? `Same as ${parent.name}: ${parent.usesTeams.map((id) => setup.teams.find((t) => t._id === id)?.name).join(", ")}.`
+                {parent
+                  ? parent.usesTeams.length
+                    ? `Same as ${parent.name}: ${parent.usesTeams.map((id) => setup.teams.find((t) => t._id === id)?.name).join(", ")}.`
+                    : `Same as ${parent.name}, which has none yet.`
                   : "Pick the team, or teams, people hired for it join in the task tracker."}
               </p>
             )}
-            {draft.teams.length > 1 && (
+            {!parent && draft.teams.length > 1 && (
               <div className="mt-2 flex flex-col gap-1.5">
                 {(
                   [
-                    [false, "Either one: HR picks the team for each person"],
-                    [true, "Divide them: each person goes to the team that has had fewest, and HR can change it"],
+                    [false, "Either one: the team someone is shortlisted from has them"],
+                    [true, "Divide them: each person goes to the team that has had fewest. It can be changed"],
                   ] as const
                 ).map(([value, label]) => (
                   <label key={label} className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--text-primary)]">

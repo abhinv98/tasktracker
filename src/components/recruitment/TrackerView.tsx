@@ -15,6 +15,8 @@ import { TRACKERS, TRACKER_KEYS, type TrackerKey } from "@/convex/lib/hrTrackers
 import { webLink } from "@/convex/lib/links";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
 import { CandidateWorkspace } from "./CandidateWorkspace";
+import { CopyLink } from "./CopyLink";
+import { noLink } from "./OpenRound";
 import { FieldGrid, toValues } from "./hrFields";
 import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, seenFields, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
 import { looseRounds } from "./RoundsMatch";
@@ -102,6 +104,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   // Filter by the listed dropdowns, and by what a row belongs to (a candidate's position).
   const filterFields = [
     ...columns.filter((f) => f.type === "ref" || f.type === "job"),
+    ...(tracker === "pipeline" && data.teams.length > 0 ? fields.filter((f) => f.type === "team") : []),
     ...columns.filter((f) => f.type === "select").slice(0, 3),
   ];
   const optionsOf = (f: (typeof fields)[number]) =>
@@ -109,6 +112,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       ? data.book[f.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }))
       : f.type === "job"
         ? data.jobs.map((j) => ({ value: j.id, label: j.name }))
+        : f.type === "team"
+          ? [...data.teams.map((t) => ({ value: t._id, label: t.name })), { value: "none", label: "Not decided" }]
         : f.free
           ? (tracker === "pipeline"
               ? [...stepNames(data.book.pipeline, data), ...TRACKERS.pipeline.boardClosed]
@@ -125,7 +130,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const narrowed = rows.filter(
     ({ row }) =>
       (!mine || isMine(row, data)) &&
-      filterFields.every((f) => !picked[f.key] || row.fields[f.key] === picked[f.key]) &&
+      filterFields.every((f) => !picked[f.key] || (f.type === "team" ? row.team || "none" : row.fields[f.key]) === picked[f.key]) &&
       (!needle ||
         `${row.code} ${columns.map((f) => show(f, row, data)).join(" ")}`.toLowerCase().includes(needle))
   );
@@ -184,6 +189,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {round && <CopyLink code={round.code} off={noLink(data, round)} />}
             {round && webLink(String(round.fields.submitLink ?? "")) && (
               <a
                 href={webLink(String(round.fields.submitLink))}
@@ -603,6 +609,7 @@ function RecordPanel({
                     Candidates board
                   </Button>
                 )}
+                {tracker === "rounds" && <CopyLink code={row.code} off={noLink(data, data.byId.get(row._id) ?? row)} />}
                 {tracker === "offers" && data.pay && (
                   <Button type="button" size="sm" variant="secondary" loading={makingLetter} onClick={downloadLetter}>
                     <FileText size={13} />

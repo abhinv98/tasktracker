@@ -55,6 +55,7 @@ import type * as lib_openBriefs from "../lib/openBriefs.js";
 import type * as lib_pipelines from "../lib/pipelines.js";
 import type * as lib_recomputeBriefDeadline from "../lib/recomputeBriefDeadline.js";
 import type * as lib_recruitScope from "../lib/recruitScope.js";
+import type * as lib_rounds from "../lib/rounds.js";
 import type * as lib_stopTaskTimers from "../lib/stopTaskTimers.js";
 import type * as lib_syncBriefStatus from "../lib/syncBriefStatus.js";
 import type * as lib_tagForOversight from "../lib/tagForOversight.js";
@@ -169,6 +170,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pipelines": typeof lib_pipelines;
   "lib/recomputeBriefDeadline": typeof lib_recomputeBriefDeadline;
   "lib/recruitScope": typeof lib_recruitScope;
+  "lib/rounds": typeof lib_rounds;
   "lib/stopTaskTimers": typeof lib_stopTaskTimers;
   "lib/syncBriefStatus": typeof lib_syncBriefStatus;
   "lib/tagForOversight": typeof lib_tagForOversight;

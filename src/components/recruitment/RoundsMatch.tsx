@@ -9,7 +9,8 @@ import { Button, EmptyState, useToast } from "@/components/ui";
 import { fieldClass } from "@/components/ui/classes";
 import type { Row } from "@/lib/hrHealth";
 import { guessPosition } from "@/lib/recruitTeams";
-import { OpenRoundModal, roundsFor } from "./OpenRound";
+import { openRound, takes, type TeamRule } from "@/convex/lib/rounds";
+import { OpenRoundModal } from "./OpenRound";
 import { boardValue, type HrData } from "./hrShared";
 
 const str = (row: Row, key: string) => String(row.fields[key] ?? "");
@@ -21,21 +22,23 @@ export const looseRounds = (data: HrData) =>
 
 const CLOSED = ["Joined", "Rejected", "Withdrawn", "On Hold"];
 
-/**
- * Live candidates a round for this position would take in: in no round yet, and
- * nearest to it. Their role's round comes before their position's, and that one
- * before the one above (as placeInRound does). `taking` is what has a round.
- */
-function waiting(data: HrData, id: string, taking: ReadonlySet<string>) {
-  return data.book.pipeline.filter((r) => {
+/** Live candidates in no round yet, each with the positions whose rounds could take them, nearest first. */
+function loosePeople(data: HrData) {
+  return data.book.pipeline.flatMap((r) => {
     const at = boardValue(r);
-    if (r.fields.reqId || !r.fields.job || at === null || CLOSED.includes(at)) return false;
+    if (r.fields.reqId || !r.fields.job || at === null || CLOSED.includes(at)) return [];
     const job = str(r, "job");
     const role = data.jobs.find((j) => j.parent === job && same(j.name, str(r, "roleOriginal")))?.id;
-    const above = data.jobs.find((j) => j.id === job)?.parent;
-    return [role, job, above].find((x) => !!x && (x === id || taking.has(x))) === id;
-  }).length;
+    const order = [role, job, data.jobs.find((j) => j.id === job)?.parent].map((x) => (x ? Number(x) : null));
+    return [{ row: r, order, team: r.team || undefined }];
+  });
 }
+
+/** The server's rule (convex/lib/rounds.ts), over what this screen knows. */
+const ruleOf = (data: HrData): TeamRule => ({
+  isTeam: (id) => data.teams.some((t) => t._id === id),
+  teamsOf: (job) => ({ teams: data.jobs.find((j) => j.id === String(job))?.teams ?? [] }),
+});
 
 /** Puts people into hiring rounds: ties the ones that hang loose to their position, and says where a round is missing. */
 export function RoundsMatch({ data }: { data: HrData }) {
@@ -50,20 +53,38 @@ export function RoundsMatch({ data }: { data: HrData }) {
   const loose = looseRounds(data);
   const jobOf = (r: Row) => picked[r._id] ?? guessPosition(str(r, "role"), data.jobs)?.id ?? "";
   const isRole = (id: string) => !!data.jobs.find((j) => j.id === id)?.parent;
-  // A role's round first: its people are its own before they are the position's.
-  const ready = loose.filter((r) => jobOf(r)).sort((a, b) => Number(isRole(jobOf(b))) - Number(isRole(jobOf(a))));
-  /** Positions that have a round open, or are about to. */
-  const taking = new Set([...data.book.rounds.filter((r) => str(r, "hiringStatus") === "Open").map((r) => str(r, "job")), ...ready.filter((r) => str(r, "hiringStatus") !== "On Hold").map(jobOf)]);
-  taking.delete("");
+  // A role's round first, then a team's: their people are theirs before they are everyone's.
+  const rule = ruleOf(data);
+  /** Whose round it would be there. In a position that does not hire into its team, or says nothing about teams, everyone's. */
+  const teamThere = (r: Row) => (data.jobs.find((j) => j.id === jobOf(r))?.teams?.includes(str(r, "team")) ? str(r, "team") : "");
+  const rank = (r: Row) => Number(isRole(jobOf(r))) * 2 + Number(!!teamThere(r));
+  const ready = loose.filter((r) => jobOf(r)).sort((a, b) => rank(b) - rank(a));
+  // Tied in this order, who goes where: each person is taken once.
+  const left = loosePeople(data);
+  const open: [string, { fields: Record<string, unknown> }][] = data.book.rounds.filter((r) => str(r, "hiringStatus") === "Open" && r.fields.job).map((r) => [r._id, r]);
+  const into = new Map<string, number>();
+  for (const r of ready) {
+    if (str(r, "hiringStatus") === "On Hold") continue;
+    const tied: [string, { fields: Record<string, unknown> }] = [r._id, { fields: { ...r.fields, job: jobOf(r), hiringStatus: "Open" } }];
+    const before = left.length;
+    for (let i = left.length - 1; i >= 0; i--) if (takes(tied, open, left[i].order, left[i].team, rule)) left.splice(i, 1);
+    into.set(r._id, before - left.length);
+    open.push(tied);
+  }
+  // Whoever is still left has no round that would take them.
   const missing = data.jobs
-    // Not the ones a round above is about to be tied to.
-    .filter((j) => !j.parent && roundsFor(data, Number(j.id)).length === 0 && !ready.some((r) => jobOf(r) === j.id))
-    .map((j) => ({ ...j, n: waiting(data, j.id, taking) }))
+    .filter((j) => !j.parent)
+    .map((j) => ({ ...j, n: left.filter((p) => takes(["new", { fields: { job: j.id } }], open, p.order, p.team, rule) && !openRound(open, p.order, p.team, rule)).length }))
     .filter((j) => j.n > 0)
     .sort((a, b) => b.n - a.n);
 
-  /** A role's round that has to be tied before its position's: until it is, that one would take its people. */
-  const before = (id: string) => ready.find((r) => str(r, "hiringStatus") !== "On Hold" && data.jobs.find((j) => j.id === jobOf(r))?.parent === id);
+  /** A round that has to be tied first (a role's, or a team's): until it is, this position's would take its people. */
+  const before = (id: string, own?: Row) =>
+    ready.find(
+      (r) =>
+        r !== own && str(r, "hiringStatus") !== "On Hold" &&
+        (data.jobs.find((j) => j.id === jobOf(r))?.parent === id || (jobOf(r) === id && !!teamThere(r) && !(own && teamThere(own))))
+    );
 
   async function tie(rounds: Row[]) {
     setBusy(true);
@@ -113,9 +134,9 @@ export function RoundsMatch({ data }: { data: HrData }) {
           <ul className="divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)] bg-white">
             {loose.map((r) => {
               const job = jobOf(r);
-              const first = ready.find((x) => jobOf(x) === job && str(x, "hiringStatus") !== "On Hold");
-              const n = job ? waiting(data, job, taking) : 0;
-              const wait = before(job);
+              const first = ready.find((x) => jobOf(x) === job && teamThere(x) === teamThere(r) && str(x, "hiringStatus") !== "On Hold");
+              const n = into.get(r._id) ?? 0;
+              const wait = job ? before(job, r) : undefined;
               const takes = !job
                 ? ""
                 : wait

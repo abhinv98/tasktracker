@@ -25,7 +25,7 @@ import { NO_NARROW, narrow, type Narrow } from "@/lib/applicantSearch";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { ApplicantsTable, NarrowTray, placesOf, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
-import { Rounds } from "@/components/recruitment/OpenRound";
+import { ApplyLinks, Rounds } from "@/components/recruitment/OpenRound";
 import { EmailPreview } from "@/components/recruitment/TemplateEditor";
 import { valuesFor } from "@/lib/templateHtml";
 import { positionCode } from "@/convex/lib/hirePipeline";
@@ -56,10 +56,13 @@ export default function RecruitmentJobPage() {
   const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
   const addApplicants = useMutation(api.hrOps.addApplicants);
+  const setTeam = useMutation(api.recruitSetup.setTeam);
   const move = useMoveApplicants();
   const hr = useHrData();
   const { toast } = useToast();
 
+  // Which team's entry of the position this is: one team's, "none" for whoever is not decided, or all of them.
+  const teamView = searchParams.get("team") ?? "";
   const [chip, setChip] = useState<Chip>(isPositionStatus(asked) ? asked : highlight ? "all" : "new");
   const [filter, setFilter] = useState<Narrow>(NO_NARROW);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -75,11 +78,27 @@ export default function RecruitmentJobPage() {
   const [campNotes, setCampNotes] = useState("");
 
   // Bulk delete, mail and move act on every pick, so drop the ones a new filter hides.
-  useEffect(() => setSelected(new Set()), [chip, filter, jobSourceId]);
+  useEffect(() => setSelected(new Set()), [chip, filter, jobSourceId, teamView]);
+  // A role under this position opens it narrowed to that role.
+  const roleAsked = searchParams.get("role") ?? "";
+  useEffect(() => setFilter((f) => (roleAsked ? { ...f, role: roleAsked } : f)), [roleAsked]);
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
-  const places = useMemo(() => placesOf(hr), [hr]);
-  const narrowed = useMemo(() => narrow((candidates ?? []) as Applicant[], filter), [candidates, filter]);
+  const places = useMemo(() => placesOf(hr, String(jobSourceId)), [hr, jobSourceId]);
+  const meta = hr?.jobs.find((j) => j.id === String(jobSourceId));
+  const teams = useMemo(() => (hr?.teams ?? []).filter((t) => meta?.teams?.includes(t._id)), [hr, meta]);
+  const several = teams.length > 1;
+  const viewed = several ? teams.find((t) => t._id === teamView) : undefined;
+  // A team it does not hire into (any more) shows everyone.
+  const only = viewed?._id ?? (several && teamView === "none" ? "none" : "");
+  const narrowed = useMemo(
+    () =>
+      narrow((candidates ?? []) as Applicant[], filter).filter(
+        // Only shortlisted people are one team's. Everyone before that is common to all of them.
+        (a) => !only || positionStatus(a.stage) !== "shortlisted" || (places.get(a._id)?.team || "none") === only
+      ),
+    [candidates, filter, only, places]
+  );
   const rows = useMemo(() => (chip === "all" ? narrowed : narrowed.filter((c) => positionStatus(c.stage) === chip)), [narrowed, chip]);
   const roles = useMemo(
     () => [...new Set((candidates ?? []).map((c) => c.position.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
@@ -105,9 +124,25 @@ export default function RecruitmentJobPage() {
   const firstPicked = rows.find((r) => picks.has(r._id) && r.email);
   const undated = candidates.filter((c) => c.createdAt == null).length;
 
-  async function moveSelected(to: PositionStatus) {
-    if (ids.length && (await move(ids, to))) setSelected(new Set());
+  /** Where the team is an either-or, shortlisting from a team's entry gives them to it. */
+  const gives = viewed && !meta?.divide ? viewed : undefined;
+
+  async function moveSelected(to: PositionStatus, team = gives?._id) {
+    if (ids.length && (await move(ids, to, undefined, team))) setSelected(new Set());
   }
+
+  async function putInTeam(people: Id<"recruitCandidates">[], team: string) {
+    try {
+      const { set } = await setTeam({ candidateIds: people, team: (team || null) as Id<"teams"> | null, position: jobSourceId });
+      toast("success", set === 0 ? "Nothing to change" : `${set} ${set === 1 ? "person is" : "people are"} ${team ? `${hr?.teamName(team)}'s now` : "not decided"}`);
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not change the team");
+    }
+  }
+  const go = (team: string) => {
+    const q = new URLSearchParams({ ...(team ? { team } : {}), ...(roleAsked ? { role: roleAsked } : {}) }).toString();
+    router.replace(`/recruitment/${jobSourceId}${q ? `?${q}` : ""}`);
+  };
 
   async function addToRound(roundId: string) {
     try {
@@ -193,7 +228,7 @@ export default function RecruitmentJobPage() {
       </div>
 
       <PageHeader
-        title={job ? job.name[0].toUpperCase() + job.name.slice(1) : "Position"}
+        title={`${job ? job.name[0].toUpperCase() + job.name.slice(1) : "Position"}${viewed ? ` for ${viewed.name}` : ""}`}
         subtitle={[
           positionCode(jobSourceId),
           job?.parentName
@@ -204,7 +239,8 @@ export default function RecruitmentJobPage() {
         actions={
           job && (
             <div className="flex flex-wrap items-center gap-2">
-              <Rounds data={hr} job={job} />
+              <Rounds data={hr} job={job} team={viewed?._id} />
+              {hr && <ApplyLinks data={hr} job={job} team={viewed?._id} />}
               {hr?.full && (
                 <Link
                   href={`/recruitment/setup?job=${jobSourceId}`}
@@ -235,6 +271,36 @@ export default function RecruitmentJobPage() {
             </>
           )}
         </p>
+      )}
+
+      {several && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Team">
+          {[{ _id: "", name: "All teams" }, ...teams, { _id: "none", name: "Not decided" }].map((t) => {
+            const n = t._id === "" ? null : hr!.inTeam(String(jobSourceId), t._id === "none" ? "" : t._id).length;
+            const on = only === t._id;
+            return (
+              <button
+                key={t._id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => go(t._id)}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                  on ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-white" : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                }`}
+              >
+                {t.name}
+                {n !== null && <span className={`tabular-nums ${on ? "opacity-70" : "text-[var(--text-muted)]"}`}>{n}</span>}
+              </button>
+            );
+          })}
+          <span className="text-[12px] text-[var(--text-muted)]">
+            {meta?.divide
+              ? "Whoever is shortlisted goes to the team that has had fewest."
+              : viewed
+                ? `Whoever you shortlist here is ${viewed.name}'s. New, on hold and rejected are common to all teams.`
+                : "Open a team to shortlist for it."}
+          </span>
+        </div>
       )}
 
       <StatChips<Chip>
@@ -287,10 +353,19 @@ export default function RecruitmentJobPage() {
             Clear
           </button>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button onClick={() => moveSelected("shortlisted")}>
-              <Check size={14} />
-              Shortlist
-            </Button>
+            {several && !gives && !meta?.divide ? (
+              <Tray label="Shortlist for" icon={Check} align="end">
+                {teams.map((t) => (
+                  <TrayItem key={t._id} label={t.name} onSelect={() => moveSelected("shortlisted", t._id)} />
+                ))}
+                <TrayItem label="Decide the team later" onSelect={() => moveSelected("shortlisted")} />
+              </Tray>
+            ) : (
+              <Button onClick={() => moveSelected("shortlisted")}>
+                <Check size={14} />
+                Shortlist{gives ? ` for ${gives.name}` : ""}
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => moveSelected("on_hold")}>
               <Pause size={14} />
               Hold
@@ -306,6 +381,9 @@ export default function RecruitmentJobPage() {
             <Tray label="More" align="end" width="w-64">
               <TrayItem label="Back to New" icon={RotateCcw} onSelect={() => moveSelected("new")} />
               <TrayItem label="Move to another position" icon={ArrowLeftRight} onSelect={() => setMoving(true)} />
+              {several && <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Team of the shortlisted ones</p>}
+              {several &&
+                [...teams, ...(meta?.divide ? [] : [{ _id: "", name: "Not decided" }])].map((t) => <TrayItem key={t._id} label={t.name} onSelect={() => void putInTeam(ids, t._id).then(() => setSelected(new Set()))} />)}
               <TrayItem label="Add to an email campaign" icon={Megaphone} onSelect={() => setCampOpen(true)} />
               {openRounds.length > 0 && (
                 <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Put into a hiring round</p>
@@ -338,8 +416,9 @@ export default function RecruitmentJobPage() {
             selected={picks}
             onSelect={setSelected}
             onOpen={(id, order) => setPanel({ id, order })}
-            onMove={(a, to) => move([a._id], to, a.name)}
+            onMove={(a, to) => move([a._id], to, a.name, gives?._id)}
             places={places}
+            teams={several ? { options: teams, divide: meta?.divide === true, onPick: (a, team) => void putInTeam([a._id], team) } : undefined}
             // The server has left the figures out already; this only drops the empty columns.
             pay={hr?.pay !== false}
             highlight={highlight}
@@ -450,6 +529,7 @@ export default function RecruitmentJobPage() {
         <CandidatePanel
           candidateId={panel.id}
           order={panel.order}
+          team={gives}
           onGo={(id) => setPanel((p) => p && { ...p, id })}
           onClose={() => setPanel(null)}
           onOpenOther={(id, other) => {

@@ -14,6 +14,8 @@ export type Row = {
   fields: Fields;
   /** Candidates and open positions: the pipeline they are on. */
   pipeline?: string;
+  /** Candidates: whose they are. "" is not decided. */
+  team?: string;
 };
 export type Book = Record<TrackerKey, Row[]>;
 

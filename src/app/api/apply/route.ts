@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 /**
  * The job application form on ecultify.com/job-application.
  *   GET  /api/apply  -> [{ id, label }] the roles that are open
+ *        ?opening=REQ-26-013 (a hiring round) or POS-007 -> only that one, or none
  *   POST /api/apply  -> multipart form; stores the resume in R2 and files the
  *                       application (recruitment.apply checks every field).
  * Public: there is no login on a job form.
@@ -37,7 +38,8 @@ export function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    return json(req, await convex().query(api.recruitment.openPositions, {}));
+    const opening = req.nextUrl.searchParams.get("opening")?.slice(0, 40);
+    return json(req, await convex().query(api.recruitment.openPositions, opening ? { opening } : {}));
   } catch (err) {
     console.error("apply: positions failed", err);
     return json(req, { error: "Could not load positions" }, 500);
@@ -104,6 +106,7 @@ export async function POST(req: NextRequest) {
       expectedCtc: text("expected_ctc"),
       noticePeriod: text("notice_period"),
       portfolioLink: text("portfolio_link"),
+      opening: text("opening").slice(0, 40) || undefined,
       resumeKey,
     });
     if (!result.saved) await dropResume();

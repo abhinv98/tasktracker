@@ -2,8 +2,9 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { RecruitAccess } from "./guards";
+import { openRound, takes } from "./rounds";
 import { barelyStarted, entryStep, fitStage, type Step } from "./hirePipeline";
-import { TRACKERS, type Fields, type TrackerKey } from "./hrTrackers";
+import { TRACKERS, standing, type Fields, type TrackerKey } from "./hrTrackers";
 import { loadPipelines, type Pipelines } from "./pipelines";
 
 // Website applicants (recruitCandidates) becoming candidates (the `pipeline`
@@ -13,6 +14,9 @@ import { loadPipelines, type Pipelines } from "./pipelines";
 /** Cleared rows are kept under this prefix: off every screen, but recoverable
  *  (hrOps.restoreArchived), and their IDs are never handed out again. */
 export const ARCHIVED = "archived:";
+
+/** What is left of a deleted hiring round: its ID, which is out there in application links and is never used again. */
+export const GONE = "gone:";
 
 /** Today's date in India, the way the trackers store dates. */
 export const today = (at = Date.now()) => new Date(at + 5.5 * 3_600_000).toISOString().slice(0, 10);
@@ -33,9 +37,9 @@ export function codeAfter(rows: { code: string }[], tracker: TrackerKey) {
   return head + String(last + 1).padStart(3, "0");
 }
 
-/** The next ID for a tracker, counting the rows that were cleared out of it. */
+/** The next ID for a tracker, counting the rows that were cleared out of it or deleted. */
 export const nextCode = async (ctx: MutationCtx, tracker: TrackerKey) =>
-  codeAfter([...(await rowsOf(ctx, tracker)), ...(await rowsOf(ctx, ARCHIVED + tracker))], tracker);
+  codeAfter([...(await rowsOf(ctx, tracker)), ...(await rowsOf(ctx, ARCHIVED + tracker)), ...(await rowsOf(ctx, GONE + tracker))], tracker);
 
 /** Where a candidate starts, from where their application is. */
 const startAt = (steps: readonly Step[], stage: string | undefined): Step =>
@@ -72,7 +76,9 @@ export async function addToCandidates(
   ctx: MutationCtx,
   access: Pick<RecruitAccess, "full" | "jobs"> & { userId?: Id<"users"> },
   applicants: Doc<"recruitCandidates">[],
-  round?: Doc<"hrRecords">
+  round?: Doc<"hrRecords">,
+  /** The team they were shortlisted for, where their position hires into several. */
+  wanted?: string
 ) {
   const rows = await rowsOf(ctx, "pipeline");
   const codes: { code: string }[] = [...rows, ...(await rowsOf(ctx, `${ARCHIVED}pipeline`))];
@@ -83,32 +89,54 @@ export async function addToCandidates(
   }
   const pipelines = await loadPipelines(ctx);
   const { jobs } = pipelines;
-  const openRounds = round ? [] : (await rowsOf(ctx, "rounds")).filter((r) => r.fields.hiringStatus === "Open");
-  const newestFor = (id: number | null | undefined) =>
-    id == null ? undefined : openRounds.filter((r) => r.fields.job === String(id)).at(-1);
 
   let added = 0;
   for (const c of applicants) {
     const job = jobs.find((j) => j.sourceId === c.jobSourceId);
     const sub = pipelines.roleOf(c.jobSourceId, c.position);
-    const target = round ?? newestFor(sub?.sourceId) ?? newestFor(c.jobSourceId) ?? newestFor(job?.parentSourceId);
-
     const there = byApplicant.get(c._id) ?? [];
+    // Only a row that is still live, and that this person may see.
+    const unplaced = there.find(
+      (r) => !r.fields.reqId && r.fields.status === "Active" && (access.full || access.jobs.has(Number(r.fields.job)))
+    );
+    if (there.length > 0 && !round && !unplaced) continue;
+    const { teams, divide } = pipelines.teamsOf(sub?.sourceId ?? c.jobSourceId);
+    // Whose they are: what they were given before, else the team they are shortlisted for now. Divided ones get theirs in settleTeams.
+    const asked = teams.length > 1 && !divide && wanted && teams.includes(wanted) ? wanted : undefined;
+    const team = (unplaced && pipelines.teamOf(unplaced)) ?? (teams.length === 1 ? teams[0] : asked);
+    const waits = teams.length > 1 && divide && !team;
+    const order = pipelines.orderOf(c.jobSourceId, c.position);
+    // The round whose link they used, while it is open, is for their position, and is not another team's.
+    // Moved to a role since, that role's own round comes first.
+    const link = c.roundId ? pipelines.rounds.get(c.roundId) : undefined;
+    const of = link && pipelines.roundTeam({ fields: { reqId: link._id } });
+    const nearer = order.slice(0, Math.max(0, order.indexOf(Number(link?.fields.job))));
+    const fits = order.includes(Number(link?.fields.job)) && (!of || !team || of === team) && !openRound(pipelines.rounds, nearer, team, pipelines.rule);
+    const through = link?.fields.hiringStatus === "Open" && fits ? String(link._id) : undefined;
+    const openId = round ? undefined : (through ?? (waits ? undefined : openRound(pipelines.rounds, order, team, pipelines.rule)));
+    const target = round ?? (openId ? pipelines.rounds.get(openId) : undefined);
+    // Put into a team's round by hand, they are that team's.
+    const given = (target && pipelines.roundTeam({ fields: { reqId: target._id } })) ?? (teams.length > 1 ? team : undefined);
     const here = target && there.find((r) => r.fields.reqId === target._id);
     if (here) {
       // Put into this one by hand although they were closed in it: back into play.
       if (round && !["Active", "Joined"].includes(standing(here.fields))) {
+        const theirs = pipelines.roundTeam(here);
+        if (theirs) here.fields = { ...here.fields, team: theirs };
         await reopen(ctx, here, pipelines.stepsOf(here));
         added++;
       }
       continue;
     }
-    // Only a row that is still live, and that this person may see.
-    const unplaced = there.find(
-      (r) => !r.fields.reqId && r.fields.status === "Active" && (access.full || access.jobs.has(Number(r.fields.job)))
-    );
     if (target && unplaced) {
-      const there = { ...unplaced.fields, reqId: target._id, lastUpdate: today() };
+      const there: Fields = { ...unplaced.fields, ...(given ? { team: given } : {}), reqId: target._id, lastUpdate: today() };
+      const to = pipelines.jobOf({ fields: there });
+      if (!pipelines.roundTeam({ fields: there }) && pipelines.teamsOf(to).of !== pipelines.teamsOf(pipelines.jobOf(unplaced)).of) {
+        // Hired for another position from now on.
+        const along = pipelines.carried(unplaced, to);
+        if (along) there.team = along;
+        else delete there.team;
+      }
       const stage = fitStage(String(unplaced.fields.stage ?? ""), pipelines.stepsOf(unplaced), pipelines.stepsOf({ fields: there }));
       unplaced.fields = { ...there, stage };
       await ctx.db.patch(unplaced._id, { fields: unplaced.fields, updatedAt: Date.now() });
@@ -127,6 +155,7 @@ export async function addToCandidates(
       name: c.name,
       job: String(c.jobSourceId),
       ...(target ? { reqId: target._id } : {}),
+      ...(given ? { team: given } : {}),
       roleOriginal: c.position || job?.name || "",
       contact: [c.email, c.number].filter(Boolean).join(" · "),
       source: "Website",
@@ -154,15 +183,7 @@ export async function addToCandidates(
 /* ── Positions and Candidates in step ──────────────────────── */
 
 type Who = Pick<Doc<"users">, "_id" | "name" | "email">;
-const CLOSED: readonly string[] = TRACKERS.pipeline.boardClosed;
-
-/** Where a candidate stands: "Active", or how they were closed (by status, or by the stage alone). */
-export function standing(fields: Fields): string {
-  const status = String(fields.status ?? "");
-  if (status === "Archived" || CLOSED.includes(status)) return status;
-  const stage = String(fields.stage ?? "");
-  return CLOSED.includes(stage) ? stage : "Active";
-}
+export { standing };
 
 /** `closedFrom` of rows (and rounds) set aside because their position was removed. */
 export const REMOVED = "removed";
@@ -291,21 +312,18 @@ export async function followCandidate(
 
 /** Everyone live on Candidates for an open position's role who is not in one yet, put into it. */
 export async function placeInRound(ctx: MutationCtx, access: Pick<RecruitAccess, "full" | "jobs">, round: Doc<"hrRecords">) {
-  const { jobs, rounds, roleOf, stepsFor, stepsOf } = await loadPipelines(ctx);
+  const book = await loadPipelines(ctx);
   const target = Number(round.fields.job);
-  const open = new Set([...rounds.values()].filter((r) => r.fields.hiringStatus === "Open").map((r) => Number(r.fields.job)));
   let placed = 0;
   for (const row of round.fields.job ? await rowsOf(ctx, "pipeline") : []) {
     const job = Number(row.fields.job);
     if (row.fields.reqId || !row.fields.job || standing(row.fields) !== "Active") continue;
     if (!access.full && !access.jobs.has(job)) continue;
     // Same order as shortlisting: their sub-role, the role, then the role above it.
-    const sub = roleOf(job, String(row.fields.roleOriginal ?? ""));
-    const order = [sub?.sourceId, job, jobs.find((j) => j.sourceId === job)?.parentSourceId];
-    // The first of those with a round open takes them. This one counts, open or not.
-    if (order.find((id) => id != null && (id === target || open.has(id))) !== target) continue;
-    const stage = fitStage(String(row.fields.stage ?? ""), stepsOf(row), stepsFor(target, round.fields));
-    await ctx.db.patch(row._id, { fields: { ...row.fields, reqId: round._id, stage, lastUpdate: today() }, updatedAt: Date.now() });
+    if (!takes([round._id, round], book.rounds, book.orderOf(job, String(row.fields.roleOriginal ?? "")), book.teamOf(row), book.rule)) continue;
+    const stage = fitStage(String(row.fields.stage ?? ""), book.stepsOf(row), book.stepsFor(target, round.fields));
+    const fields = { ...row.fields, reqId: round._id, stage, lastUpdate: today() };
+    await ctx.db.patch(row._id, { fields, updatedAt: Date.now() });
     placed++;
   }
   return placed;
@@ -327,33 +345,74 @@ export async function refit(ctx: MutationCtx, before: Pipelines) {
   return moved;
 }
 
-/**
- * The team someone hired joins: their hiring round's, else their position's.
- * With several it is HR's pick, unless the position divides people between
- * them: then the team that has had fewest.
- */
-export async function teamFor(ctx: MutationCtx, book: Pipelines, row: { fields: Fields }): Promise<string | undefined> {
-  const known = new Set<string>((await ctx.db.query("teams").collect()).map((t) => t._id));
-  const round = book.rounds.get(String(row.fields.reqId ?? ""))?.fields.team;
-  if (typeof round === "string" && known.has(round)) return round;
-  const { of, teams, divide } = book.teamsOf(book.jobOf(row));
-  const live = teams.filter((t) => known.has(t));
-  if (live.length < 2 || !divide) return live.length === 1 ? live[0] : undefined;
-  const had = new Map(live.map((t) => [t, 0]));
-  for (const r of await rowsOf(ctx, "pipeline")) {
-    const team = String(r.fields.team ?? "");
-    if (!had.has(team) || book.teamsOf(book.jobOf(r)).of !== of || !["Active", "Joined"].includes(standing(r.fields))) continue;
-    had.set(team, had.get(team)! + 1);
+/** A Candidates row with another team, or none: out of the old team's round, and into the new one's if it has one open. */
+export function withTeam(row: { fields: Fields }, team: string | undefined, book: Pipelines): Fields {
+  const fields: Fields = { ...row.fields };
+  if (team) fields.team = team;
+  else delete fields.team;
+  // Someone closed keeps the round they were closed in: its history counts them.
+  if (standing(fields) !== "Active") return fields;
+  const round = book.roundTeam(row);
+  if (round && round !== team) {
+    delete fields.reqId;
+    // Their round may be all that says what they are hired for. That stays.
+    const was = book.jobOf(row);
+    if (was !== null && book.jobOf({ fields }) !== was) {
+      const job = book.jobs.find((j) => j.sourceId === was);
+      fields.job = String(job?.parentSourceId ?? was);
+      if (book.jobOf({ fields }) !== was) fields.roleOriginal = job?.name ?? "";
+    }
   }
-  return live.reduce((best, t) => (had.get(t)! < had.get(best)! ? t : best));
+  if (!fields.reqId && team) {
+    const next = book.roundFor(row, team);
+    if (next) fields.reqId = next;
+  }
+  if (fields.reqId !== row.fields.reqId) fields.stage = fitStage(String(fields.stage ?? ""), book.stepsOf(row), book.stepsOf({ fields }));
+  return fields;
+}
+
+/**
+ * Everyone's team, put right after a change. What was decided for someone stays:
+ * in a round that is another team's, they leave it for their own. Whoever is not
+ * decided and sits in one team's round is that team's. With `divide`, whoever is
+ * left goes to the team that has had fewest. Returns how many were divided, by
+ * position. This is the only place that gives anyone a team HR did not.
+ */
+export async function settleTeams(ctx: MutationCtx): Promise<Map<number | null, number>> {
+  const book = await loadPipelines(ctx);
+  const rows = await rowsOf(ctx, "pipeline");
+  const now = Date.now();
+  const put = async (row: Doc<"hrRecords">, fields: Fields) => {
+    row.fields = fields;
+    await ctx.db.patch(row._id, { fields, updatedAt: now });
+  };
+  const had = new Map<string, number>();
+  const count = (of: number | null, team: string) => had.set(`${of} ${team}`, (had.get(`${of} ${team}`) ?? 0) + 1);
+  for (const row of rows) {
+    const own = book.teamOf(row);
+    const round = standing(row.fields) === "Active" ? book.roundTeam(row) : undefined;
+    if (round && round !== own) await put(row, own ? withTeam(row, own, book) : { ...row.fields, team: round });
+    const team = book.teamOf(row);
+    if (team && ["Active", "Joined"].includes(standing(row.fields))) count(book.teamsOf(book.jobOf(row)).of, team);
+  }
+  const divided = new Map<number | null, number>();
+  for (const row of rows) {
+    const { of, teams, divide } = book.teamsOf(book.jobOf(row));
+    if (!divide || teams.length < 2 || standing(row.fields) !== "Active" || book.teamOf(row)) continue;
+    const at = (t: string) => had.get(`${of} ${t}`) ?? 0;
+    const team = teams.reduce((best, t) => (at(t) < at(best) ? t : best));
+    count(of, team);
+    divided.set(of, (divided.get(of) ?? 0) + 1);
+    await put(row, withTeam(row, team, book));
+  }
+  return divided;
 }
 
 /* ── Moving people to another position ─────────────────────── */
 
-type Rounds = ReadonlyMap<string, { fields: Fields }>;
 /** What moving needs to know, as it was before anything moved. `kept`: hiring
  *  rounds that go to the new position too, so people stay in those. */
-export type MoveFrom = Pick<Pipelines, "jobs" | "rounds" | "stepsFor" | "stepsOf" | "teamsOf"> & { kept?: ReadonlySet<string> };
+export type MoveFrom = Pick<Pipelines, "jobs" | "rounds" | "stepsFor" | "stepsOf" | "jobOf" | "teamsOf" | "teamOf" | "carried" | "rule"> & { kept?: ReadonlySet<string> };
 
 /**
  * Applications, and whoever they are on Candidates, from one position to
@@ -389,29 +448,19 @@ export async function moveToPosition(
     });
     moved.set(a._id, a.jobSourceId);
   }
-  const newRound = newestRound(from.rounds, target.sourceId, filedUnder);
   for (const row of moved.size ? await rowsOf(ctx, "pipeline") : []) {
     const was = moved.get(String(row.fields.applicantId ?? ""));
     if (was === undefined || !(await mine(row))) continue;
-    await ctx.db.patch(row._id, { fields: moveRow(row, target, newRound, from, was), updatedAt: now });
+    await ctx.db.patch(row._id, { fields: moveRow(row, target, from, was), updatedAt: now });
   }
   return moved.size;
 }
-
-/** The newest round open for the sub-role, else for the role. */
-export const newestRound = (rounds: Rounds, ...ids: number[]): string | undefined => {
-  for (const id of ids) {
-    const hit = [...rounds].filter(([, r]) => r.fields.hiringStatus === "Open" && r.fields.job === String(id)).at(-1);
-    if (hit) return hit[0];
-  }
-};
 
 /** One Candidates row, as it is under another position. */
 export function moveRow(
   row: PipelineRow,
   target: Pick<Doc<"recruitJobs">, "sourceId" | "name" | "parentSourceId">,
-  newRound: string | undefined,
-  { jobs, rounds, stepsFor, stepsOf, teamsOf, kept }: MoveFrom,
+  { jobs, rounds, stepsFor, stepsOf, jobOf, teamsOf, teamOf, carried, rule, kept }: MoveFrom,
   /** The position they are moved out of. */
   was: number
 ): Fields {
@@ -423,6 +472,14 @@ export function moveRow(
     fields.status = "Active";
     delete fields.closedFrom;
   }
+  // Whose they are there: the team they had, if it hires into it too, else its only one. Divided ones are given theirs in settleTeams.
+  const { teams: into, divide } = teamsOf(target.sourceId);
+  const family = teamsOf(target.sourceId).of;
+  // Between a position and its roles whose they are does not change.
+  const same = teamsOf(jobOf(row)).of === family;
+  const along = carried(row, target.sourceId);
+  const team = same ? teamOf(row) : (along ?? (into.length === 1 ? into[0] : undefined));
+  const newRound = divide && into.length > 1 && !team ? undefined : openRound(rounds, [target.sourceId, filedUnder], team, rule);
   const jobOfRound = (id: unknown) => Number(rounds.get(String(id ?? ""))?.fields.job || NaN);
   const roundJob = jobOfRound(fields.reqId);
   const stays = !!fields.reqId && !!kept?.has(String(fields.reqId));
@@ -437,8 +494,10 @@ export function moveRow(
   const inRound = rounds.get(String(fields.reqId ?? ""))?.fields;
   const hiredFor = stays || !Number(inRound?.job) ? target.sourceId : Number(inRound!.job);
   fields.stage = fitStage(String(fields.stage ?? ""), stepsOf(row), stepsFor(hiredFor, inRound));
-  // A team that neither their round nor the position hires into is not theirs any more.
-  const teams = inRound?.team ? [String(inRound.team)] : teamsOf(hiredFor).teams;
-  if (fields.team && teams.length && !teams.includes(String(fields.team))) delete fields.team;
+  // Still in some other position's round: that one's team stays theirs.
+  if (!same && teamsOf(hiredFor).of === family) {
+    if (along) fields.team = along;
+    else delete fields.team;
+  }
   return fields;
 }

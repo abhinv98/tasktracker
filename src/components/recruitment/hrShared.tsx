@@ -30,8 +30,12 @@ export type HrData = {
   teamName: (id: string) => string;
   /** The position someone is hired for: their hiring round's, else the one they applied for, or the role under it they named. */
   positionOf: (fields: Record<string, unknown>) => Job | undefined;
-  /** The teams a candidate could join: their hiring round's, else their position's. */
+  /** The teams a candidate could be for: their position's. */
   teamsOf: (row: Row) => string[];
+  /** A position's live candidates that are one team's ("" for not decided). */
+  inTeam: (job: string, team: string) => Row[];
+  /** Is this row's position that one, or a role under it? */
+  isAt: (row: Row, job: string) => boolean;
   /** The steps of a position's pipeline (the standard one without a position). */
   stepsFor: (job: string | null | undefined) => Step[];
   /** The steps of a candidate, or of everyone in an open position. */
@@ -40,7 +44,7 @@ export type HrData = {
 
 export type Pipeline = { key: string; name: string; steps: Step[] };
 /** `teams`: the ones its people join, its own or the role above it's. */
-type Job = { id: string; name: string; hrOwner?: string; hiringManager?: string; pipeline?: string; parent?: string; teams?: string[]; divide?: boolean };
+type Job = { id: string; name: string; hrOwner?: string; hiringManager?: string; pipeline?: string; parent?: string; open?: boolean; teams?: string[]; divide?: boolean };
 type Loaded = {
   full: boolean;
   pay?: boolean;
@@ -75,6 +79,8 @@ export function useHrData(): HrData | undefined {
       const role = round?.job ? undefined : data.jobs.find((j) => j.parent === id && j.name.toLowerCase() === String(fields.roleOriginal ?? "").trim().toLowerCase());
       return role ?? data.jobs.find((j) => j.id === id);
     };
+    // A position's people include those of the roles under it.
+    const sameOrAbove = (j: Job | undefined, id: string) => j?.id === id || (j?.parent === id && !!j);
     const at = (key: string | undefined) => pipelines.find((p) => p.key === key) ?? pipelines[0];
     return {
       full: data.full,
@@ -89,10 +95,13 @@ export function useHrData(): HrData | undefined {
       teams: data.teams ?? [],
       teamName: (id) => data.teams?.find((t) => t._id === id)?.name ?? "",
       positionOf,
-      teamsOf: (row) => {
-        const own = String(byId.get(String(row.fields.reqId ?? ""))?.fields.team ?? "");
-        return data.teams?.some((t) => t._id === own) ? [own] : (positionOf(row.fields)?.teams ?? []);
-      },
+      inTeam: (job, team) =>
+        data.rows.filter((r) => {
+          const at = boardValue(r);
+          return r.tracker === "pipeline" && (r.team ?? "") === team && at !== null && (at === "Joined" ? team !== "" : !CLOSED.includes(at)) && sameOrAbove(positionOf(r.fields), job);
+        }),
+      isAt: (row, job) => sameOrAbove(positionOf(row.fields), job),
+      teamsOf: (row) => positionOf(row.fields)?.teams ?? [],
       pipelines,
       pipelineName: (key) => at(key).name,
       // The server has worked out which pipeline each of them is on (hrOps.all).
@@ -101,6 +110,8 @@ export function useHrData(): HrData | undefined {
     };
   }, [data, today]);
 }
+
+const CLOSED: readonly string[] = TRACKERS.pipeline.boardClosed;
 
 export const fieldsOf = (tracker: TrackerKey) => TRACKERS[tracker].fields as readonly Field[];
 
@@ -182,7 +193,7 @@ export function fmtDate(date: string, today: string) {
 /** One cell's value as text. */
 export function show(field: Field, row: Row, data: HrData): string {
   // Nothing picked still means one applies: its position's.
-  const value = field.type === "pipeline" ? row.pipeline : row.fields[field.key];
+  const value = field.type === "pipeline" ? row.pipeline : field.type === "team" ? row.team : row.fields[field.key];
   if (value === null || value === undefined || value === "") return "";
   if (field.type === "user") return data.personName(String(value));
   // A removed position is not on the list: what they applied for is still known.

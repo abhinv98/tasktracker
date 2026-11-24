@@ -37,8 +37,11 @@ export function CandidatePanel({
   onGo,
   onClose,
   onOpenOther,
+  team,
 }: {
   candidateId: Id<"recruitCandidates">;
+  /** The team shortlisting from here puts them in, where the position hires into several. */
+  team?: { _id: string; name: string };
   /** The list it was opened from, as it stood then. */
   order?: Id<"recruitCandidates">[];
   onGo?: (id: Id<"recruitCandidates">) => void;
@@ -70,7 +73,7 @@ export function CandidatePanel({
     // A fresh application is dealt with: on to the next one straight away. If the
     // save fails, its message names the person.
     if (positionStatus(c.stage as Stage) === "new") go(after);
-    void moveApplicants([candidateId], to, c.name);
+    void moveApplicants([candidateId], to, c.name, team?._id);
   }
 
   // The page behind shouldn't scroll under the panel.
@@ -140,6 +143,7 @@ export function CandidatePanel({
                 <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                   {c.position || c.jobName}
                   {c.createdAt ? ` · applied ${when(c.createdAt).split(",")[0]}` : ` · applied b${UNDATED.slice(1)}`}
+                  {c.through ? ` · through ${c.through}` : ""}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -167,7 +171,7 @@ export function CandidatePanel({
                 <Decide stage={c.stage as Stage} name={c.name} onMove={decide} large />
                 <Button type="button" variant="secondary" disabled={!ready} onClick={() => setMoving(true)}>
                   <ArrowLeftRight size={14} />
-                  Move
+                  Move to another position
                 </Button>
               </div>
               {c.onCandidates.length > 0 ? (
@@ -187,7 +191,7 @@ export function CandidatePanel({
                 <span className="text-[12px] text-[var(--text-muted)]">
                   {DECISIONS.includes(positionStatus(c.stage as Stage) as (typeof DECISIONS)[number])
                     ? ""
-                    : "Shortlisting puts them on Candidates, where interviews, tasks and the offer are."}
+                    : `Shortlisting puts them on Candidates${team ? ` for ${team.name}` : ""}, where interviews, tasks and the offer are.`}
                 </span>
               )}
             </div>

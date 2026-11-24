@@ -9,6 +9,7 @@ type Row = any;
 const tables: Record<string, Row[]> = {
   recruitCandidates: [],
   recruitPipelines: [],
+  teams: [],
   recruitActivity: [],
   recruitJobs: [
     { _id: "j1", sourceId: 1, name: "Design" },

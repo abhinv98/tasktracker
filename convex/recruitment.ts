@@ -11,8 +11,8 @@ import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mayRecruitFor, myCandidate, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, followApplication, rowsOf, standing, today } from "./lib/candidates";
-import { livePositions } from "./lib/pipelines";
+import { ARCHIVED, addToCandidates, followApplication, rowsOf, settleTeams, standing, today, withTeam } from "./lib/candidates";
+import { livePositions, loadPipelines } from "./lib/pipelines";
 import { matches } from "./lib/applicantMatch";
 import { webAddress } from "./lib/links";
 import { mailProblem, stopsEverySend } from "./lib/mail";
@@ -462,8 +462,10 @@ export const setStage = mutation({
     candidateIds: v.array(v.id("recruitCandidates")),
     stage: stageValidator,
     note: v.optional(v.string()),
+    /** Shortlisted for this team, where the position hires into several. */
+    team: v.optional(v.id("teams")),
   },
-  handler: async (ctx, { candidateIds, stage, note }) => {
+  handler: async (ctx, { candidateIds, stage, note, team }) => {
     const access = await requireRecruiter(ctx);
     await requireCandidates(ctx, access, candidateIds);
     const { userId, user } = access;
@@ -506,15 +508,34 @@ export const setStage = mutation({
       updated++;
     }
     let added = 0;
+    let teamed = 0;
     if (ONTO_CANDIDATES.includes(stage)) {
       const people = [];
       for (const id of new Set(candidateIds)) {
         const c = await ctx.db.get(id);
         if (c) people.push(c);
       }
-      added = await addToCandidates(ctx, access, people);
+      added = await addToCandidates(ctx, access, people, undefined, team);
+      // Shortlisted from a team's entry: whoever comes back for it, or was not decided yet, is that team's.
+      const ids = new Set<string>(candidateIds);
+      const book = team ? await loadPipelines(ctx) : null;
+      const root = (id: number | null) => book?.jobs.find((j) => j.sourceId === id)?.parentSourceId ?? id;
+      const filed = new Map(people.map((c) => [String(c._id), c.jobSourceId]));
+      for (const row of book ? await rowsOf(ctx, "pipeline") : []) {
+        const id = String(row.fields.applicantId ?? "");
+        const job = book!.jobOf(row);
+        const { teams, divide } = book!.teamsOf(job);
+        // Their row for this position, not one they have in another's round.
+        if (!ids.has(id) || standing(row.fields) !== "Active" || root(job) !== root(filed.get(id) ?? null)) continue;
+        if (teams.length < 2 || divide || !teams.includes(team!) || book!.teamOf(row) === team) continue;
+        if (book!.teamOf(row) && !reopened.has(id)) continue;
+        if (!access.full && !(await myCandidate(ctx, row._id, access))) continue;
+        await ctx.db.patch(row._id, { fields: withTeam(row, team, book!), updatedAt: now });
+        teamed++;
+      }
     }
-    return { updated, added: Math.min(added + reopened.size, new Set(candidateIds).size) };
+    await settleTeams(ctx);
+    return { updated, added: Math.min(added + reopened.size, new Set(candidateIds).size), teamed };
   },
 });
 
@@ -640,9 +661,12 @@ export const getCandidate = query({
       ...past("status", c.sourceId == null ? null : c.statusUpdatedAt, SAID[c.status] ?? "Status set in cultform"),
     ];
 
+    const link = c.roundId ? await ctx.db.get(c.roundId) : null;
     return {
       ...shown(access, c),
       pay: access.pay,
+      /** The hiring round whose link they used. */
+      through: link?.tracker === "rounds" && mayRecruitFor(access, Number(link.fields.job)) ? link.code : "",
       stage: c.stage ?? "applied",
       jobName: nameOf(jobs.find((j) => j.sourceId === c.jobSourceId)),
       timeline: [...timeline, ...before].sort((a, b) => b.at - a.at),
@@ -955,19 +979,38 @@ export const sendTemplateEmail = action({
 // which stores the resume and calls these two. Both are public on purpose: the
 // form is public. So this file is the trust boundary and checks everything.
 
+/**
+ * What an application link is for: a position (POS-007), or a hiring round that
+ * is open and tied to one (REQ-26-013). Null when there is no such thing to apply for.
+ */
+async function openingFor(ctx: Ctx, code: string): Promise<{ id: number; roundId?: Id<"hrRecords"> } | null> {
+  const asked = code.trim().toUpperCase();
+  const position = /^POS-(\d{1,9})$/.exec(asked);
+  if (position) return { id: Number(position[1]) };
+  if (!/^REQ-\d{2}-\d{1,6}$/.test(asked)) return null;
+  const round = (await ctx.db.query("hrRecords").withIndex("by_tracker", (q) => q.eq("tracker", "rounds")).collect()).find((r) => r.code === asked);
+  return round?.fields.job && round.fields.hiringStatus === "Open" ? { id: Number(round.fields.job), roundId: round._id } : null;
+}
+
 /** Roles the website form offers: every role that is not closed. */
 export const openPositions = query({
-  args: {},
-  handler: async (ctx) => {
+  /** With an opening's code, only that one: the form is then for nothing else. */
+  args: { opening: v.optional(v.string()) },
+  handler: async (ctx, { opening }) => {
+    const only = opening ? await openingFor(ctx, opening) : undefined;
+    if (only === null) return [];
     const all = await ctx.db.query("recruitJobs").collect();
     const closed = new Set(all.filter((j) => j.status === "closed").map((j) => j.sourceId));
     return livePositions(all)
       // Closing a role closes its sub-positions with it.
       .filter((j) => !closed.has(j.sourceId) && !(j.parentSourceId && closed.has(j.parentSourceId)))
+      .filter((j) => !only || j.sourceId === only.id)
       .map((j) => ({ id: j.sourceId, label: j.name }))
       .sort((a, b) => a.label.localeCompare(b.label));
   },
 });
+
+const CLOSED_LINK = "This opening is closed. Please ask for a new link.";
 
 export const apply = mutation({
   args: {
@@ -983,6 +1026,8 @@ export const apply = mutation({
     portfolioLink: v.optional(v.string()),
     /** The R2 key /api/apply stored the resume under. */
     resumeKey: v.optional(v.string()),
+    /** The opening their link was for. */
+    opening: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const name = clean(args.name, 120);
@@ -1011,8 +1056,11 @@ export const apply = mutation({
             .first()
         : selected;
     if (!selected || jobSourceId === undefined || [selected, parent].some((j) => !j || j.removedAt || j.status === "closed")) {
-      throw new ConvexError("This role is no longer open. Please pick another one.");
+      throw new ConvexError(args.opening ? CLOSED_LINK : "This role is no longer open. Please pick another one.");
     }
+    // A link is for one opening. Changed by hand, or out of date, it is not quietly turned into something else.
+    const opening = args.opening ? await openingFor(ctx, args.opening) : undefined;
+    if (opening === null || (opening && opening.id !== selected.sourceId)) throw new ConvexError(CLOSED_LINK);
 
     const now = Date.now();
     // ponytail: one global flood breaker, no per-IP limit. Add a captcha on the
@@ -1035,6 +1083,7 @@ export const apply = mutation({
 
     await ctx.db.insert("recruitCandidates", {
       jobSourceId,
+      ...(opening?.roundId ? { roundId: opening.roundId } : {}),
       name,
       email,
       number: clean(args.number, 30),

@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { mayRecruitFor, myCandidate, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { REMOVED, moveRow, moveToPosition, newestRound, refit, rowsOf, standing, today } from "./lib/candidates";
+import { REMOVED, moveRow, moveToPosition, refit, rowsOf, settleTeams, standing, today, withTeam } from "./lib/candidates";
 import { CLOSING, STANDARD, cleanSteps, fitStage, positionCode, type Step } from "./lib/hirePipeline";
 import { livePositions, loadPipelines, type Pipelines } from "./lib/pipelines";
 import type { Fields } from "./lib/hrTrackers";
@@ -139,7 +139,7 @@ export const savePosition = mutation({
     hiringManager: v.optional(v.union(v.id("users"), v.null())),
     /** "" is the role above it's, or the standard one. */
     pipeline: v.optional(v.string()),
-    /** None is the role above it's. */
+    /** A main position's. A role under it joins the same. */
     teams: v.optional(v.array(v.id("teams"))),
     divide: v.optional(v.boolean()),
   },
@@ -162,6 +162,8 @@ export const savePosition = mutation({
     if (open && closesOn && closesOn < today() && (args.open || args.closesOn)) {
       throw new ConvexError("The last day to apply has already passed");
     }
+    // A role joins its position's teams.
+    const says = job ? before.teamsOf(job.sourceId).of === job.sourceId : args.parent == null;
     const patch = {
       ...(args.open === undefined ? {} : { status: args.open ? ("open" as const) : ("closed" as const) }),
       ...(args.description === undefined ? {} : { description: args.description.replace(/[<>\u0000-\u0008]/g, " ").trim().slice(0, 2000) }),
@@ -169,8 +171,8 @@ export const savePosition = mutation({
       ...(args.hrOwner === undefined ? {} : { hrOwner: args.hrOwner ?? undefined }),
       ...(args.hiringManager === undefined ? {} : { hiringManager: args.hiringManager ?? undefined }),
       ...(args.pipeline === undefined ? {} : { pipeline: args.pipeline || undefined }),
-      ...(args.teams === undefined ? {} : { teams: args.teams.length ? [...new Set(args.teams)] : undefined }),
-      ...(args.divide === undefined ? {} : { divide: args.divide || undefined }),
+      ...(args.teams === undefined || !says ? {} : { teams: args.teams.length ? [...new Set(args.teams)] : undefined }),
+      ...(args.divide === undefined || !says ? {} : { divide: args.divide || undefined }),
     };
     if (!job) {
       if (args.parent != null && (await livePosition(ctx, args.parent)).parentSourceId != null) {
@@ -189,7 +191,7 @@ export const savePosition = mutation({
         ...patch,
       });
       // Anyone who already carries this role's name is under it now.
-      return { id, code: positionCode(id), moved: await refit(ctx, before) };
+      return { id, code: positionCode(id), moved: await refit(ctx, before), divided: (await settleTeams(ctx)).get(id) ?? 0 };
     }
     await ctx.db.patch(job._id, patch);
     // Before a rename: people are found under a sub-role by its name.
@@ -200,7 +202,7 @@ export const savePosition = mutation({
       await renamed(ctx, job, name);
       moved += await refit(ctx, named);
     }
-    return { id: job.sourceId, code: positionCode(job.sourceId), moved };
+    return { id: job.sourceId, code: positionCode(job.sourceId), moved, divided: (await settleTeams(ctx)).get(job.sourceId) ?? 0 };
   },
 });
 
@@ -238,6 +240,40 @@ export const closePositions = internalMutation({
   },
 });
 
+/* ── Which team someone is for ─────────────────────────────── */
+
+/** Say which team shortlisted people are for, where their position hires into
+ *  several (null: not decided). Their own positions', for someone hiring for a few. */
+export const setTeam = mutation({
+  args: {
+    candidateIds: v.array(v.id("recruitCandidates")),
+    team: v.union(v.id("teams"), v.null()),
+    /** The position it is said for. What they are in another position is not touched. */
+    position: v.number(),
+  },
+  handler: async (ctx, { candidateIds, team, position }) => {
+    const access = await recruitAccess(ctx);
+    if (!access) throw new ConvexError("Recruitment is HR only");
+    const book = await loadPipelines(ctx);
+    const root = (id: number | null) => book.jobs.find((j) => j.sourceId === id)?.parentSourceId ?? id;
+    const ids = new Set<string>(candidateIds);
+    let set = 0;
+    for (const row of await rowsOf(ctx, "pipeline")) {
+      if (!ids.has(String(row.fields.applicantId ?? "")) || standing(row.fields) !== "Active") continue;
+      if (!access.full && !(await myCandidate(ctx, row._id, access))) continue;
+      const job = book.jobOf(row);
+      if (root(job) !== root(position)) continue;
+      const { teams } = book.teamsOf(job);
+      if (team !== null && teams.length > 0 && !teams.includes(team)) throw new ConvexError(`${String(row.fields.name ?? "Their")}: that position does not hire into this team`);
+      if ((book.teamOf(row) ?? null) === team) continue;
+      await ctx.db.patch(row._id, { fields: withTeam(row, team ?? undefined, book), updatedAt: Date.now() });
+      set++;
+    }
+    await settleTeams(ctx);
+    return { set };
+  },
+});
+
 /* ── Joining a team ────────────────────────────────────────── */
 
 /** Whether someone being hired has an account here yet, by the email they will
@@ -251,7 +287,7 @@ export const joiner = query({
     if (!row || row.tracker !== "pipeline") return null;
     const typed = email.trim().toLowerCase();
     const user = typed ? (await ctx.db.query("users").collect()).find((u) => u.email?.trim().toLowerCase() === typed && u.role !== "client" && u.isReviewer !== true) : undefined;
-    const team = ctx.db.normalizeId("teams", String(row.fields.team ?? ""));
+    const team = ctx.db.normalizeId("teams", (await loadPipelines(ctx)).teamOf(row) ?? "");
     const member =
       user && team
         ? await ctx.db.query("userTeams").withIndex("by_user_team", (q) => q.eq("userId", user._id).eq("teamId", team)).first()
@@ -284,7 +320,9 @@ export const moveApplicants = mutation({
     );
     const twice = people.filter((c) => c.jobSourceId !== filedUnder && c.email && there.has(c.email.toLowerCase())).length;
     const mine = async (row: Doc<"hrRecords">) => access.full || !!(await myCandidate(ctx, row._id, access));
-    return { moved: await moveToPosition(ctx, people, target, access.user, await loadPipelines(ctx), mine), twice };
+    const moved = await moveToPosition(ctx, people, target, access.user, await loadPipelines(ctx), mine);
+    await settleTeams(ctx);
+    return { moved, twice };
   },
 });
 
@@ -371,10 +409,9 @@ export const removePosition = mutation({
       for (const c of going) gone.add(c._id);
       moved = await moveToPosition(ctx, going, target, access.user, from, async () => true);
       // People on Candidates who did not come from the website come too.
-      const round = newestRound(from.rounds, target.sourceId, filedUnder);
       for (const row of f.pipeline) {
         if (row.fields.applicantId || !f.here(row.fields.job, row.fields.roleOriginal)) continue;
-        await ctx.db.patch(row._id, { fields: moveRow(row, target, round, from, Number(row.fields.job)), updatedAt: now });
+        await ctx.db.patch(row._id, { fields: moveRow(row, target, from, Number(row.fields.job)), updatedAt: now });
       }
       // ponytail: meetings are rewritten whole, transcripts included; page this if one position ever files hundreds.
       for (const jobId of f.ids) {
@@ -423,6 +460,7 @@ export const removePosition = mutation({
     for (const j of f.jobs) await ctx.db.patch(j._id, { status: "closed", removedAt: now, removedBy: access.userId });
     // Whoever else is in rounds that went is hired for another position now; a role's people are under the one above it.
     await refit(ctx, book);
+    await settleTeams(ctx);
     return { moved, left: f.applicants.length - moved, name: job.name };
   },
 });
@@ -465,6 +503,7 @@ export const restorePosition = mutation({
       if (row.fields.closedFrom !== REMOVED || !ids.has(Number(row.fields.job))) continue;
       await ctx.db.patch(row._id, { fields: { ...without(row.fields, "closedFrom"), status: "Active", lastUpdate: today() }, updatedAt: now });
     }
+    await settleTeams(ctx);
   },
 });
 

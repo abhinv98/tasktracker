@@ -14,6 +14,7 @@ import { Tray } from "@/components/ui/Tray";
 import { POSITION_STATUSES, positionStatus, type PositionStatus, type Stage } from "@/lib/recruitStages";
 import type { Narrow } from "@/lib/applicantSearch";
 import { formatLpa, formatNotice, formatYears, parseCtcLpa, parseNoticeDays, parseYears } from "@/lib/recruitParse";
+import type { Row } from "@/lib/hrHealth";
 import { boardValue, type HrData } from "./hrShared";
 
 export type Applicant = Doc<"recruitCandidates"> & { jobName?: string };
@@ -28,16 +29,20 @@ const DONE: Record<PositionStatus, string> = {
 export function useMoveApplicants() {
   const setStage = useMutation(api.recruitment.setStage);
   const { toast } = useToast();
-  return async (ids: Id<"recruitCandidates">[], to: PositionStatus, who?: string) => {
+  /** `team`: whose they are shortlisted for, where the position hires into several. */
+  return async (ids: Id<"recruitCandidates">[], to: PositionStatus, who?: string, team?: string) => {
     try {
-      const { updated, added } = await setStage({
+      const { updated, added, teamed } = await setStage({
         candidateIds: ids,
         stage: POSITION_STATUSES.find((s) => s.value === to)!.stage,
+        ...(team && to === "shortlisted" ? { team: team as Id<"teams"> } : {}),
       });
       const subject = ids.length === 1 && who ? who : `${updated}`;
       toast(
         "success",
-        updated || added
+        !updated && !added && teamed
+          ? `${teamed === 1 && who ? who : teamed} ${teamed === 1 ? "has" : "have"} their team now`
+          : updated || added
           ? `${subject} ${DONE[to]}${to === "shortlisted" && added ? `. ${added === 1 ? "Now" : `${added} now`} on Candidates` : ""}`
           : "Nothing to change"
       );
@@ -159,13 +164,18 @@ const PAGE = 100;
 const dash = <span className="text-[var(--text-disabled)]">–</span>;
 
 /** Where each applicant is on Candidates, by application. */
-export function placesOf(data: HrData | undefined): Map<string, { id: string; stage: string }> {
-  return new Map(
-    (data?.book.pipeline ?? [])
-      .filter((r) => typeof r.fields.applicantId === "string" && boardValue(r) !== null)
-      .map((r) => [String(r.fields.applicantId), { id: r._id, stage: boardValue(r) || "Candidates" }])
-  );
+export function placesOf(data: HrData | undefined, job?: string): Map<string, Place> {
+  const places = new Map<string, Place>();
+  // Someone can be in more than one position's round: here, what they are in this one.
+  const last = (r: Row) => Number(!!job && !!data?.isAt(r, job));
+  for (const r of [...(data?.book.pipeline ?? [])].sort((a, b) => last(a) - last(b))) {
+    if (typeof r.fields.applicantId !== "string" || boardValue(r) === null) continue;
+    places.set(r.fields.applicantId, { id: r._id, stage: boardValue(r) || "Candidates", team: r.team ?? "", here: !job || !!data?.isAt(r, job) });
+  }
+  return places;
 }
+/** `here`: for the position asked about, not another one. */
+type Place = { id: string; stage: string; team: string; here: boolean };
 
 /** The old form kept no dates until 22 May 2026. Everyone without one came before that (cultform's ids run in order). */
 export const UNDATED = "Before 22 May 26";
@@ -181,6 +191,7 @@ export function ApplicantsTable({
   onOpen,
   onMove,
   places,
+  teams,
   pay,
   highlight,
 }: {
@@ -192,7 +203,9 @@ export function ApplicantsTable({
   /** Opens someone, with the list as it is on screen so the panel can step through it. */
   onOpen: (id: Id<"recruitCandidates">, order: Id<"recruitCandidates">[]) => void;
   onMove: (a: Applicant, to: PositionStatus) => void;
-  places: ReadonlyMap<string, { id: string; stage: string }>;
+  places: ReadonlyMap<string, Place>;
+  /** Where a position hires into several teams: whose each shortlisted person is, and a way to say. */
+  teams?: { options: { _id: string; name: string }[]; divide: boolean; onPick: (a: Applicant, team: string) => void };
   /** Shows what they earn and expect. Off for whoever HR has not given it to. */
   pay: boolean;
   highlight?: string | null;
@@ -363,12 +376,30 @@ export function ApplicantsTable({
                   <td className="whitespace-nowrap px-3 py-2">
                     <Decide stage={a.stage} name={a.name} onMove={(to) => onMove(a, to)} />
                     {place && positionStatus(a.stage) === "shortlisted" && (
-                      <Link
-                        href={`/recruitment/t/pipeline?open=${place.id}`}
-                        className="mt-1 block text-[12px] text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
-                      >
-                        On Candidates: {place.stage}
-                      </Link>
+                      <span className="mt-1 flex items-center gap-2">
+                        <Link
+                          href={`/recruitment/t/pipeline?open=${place.id}`}
+                          className="text-[12px] text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
+                        >
+                          On Candidates: {place.stage}
+                        </Link>
+                        {teams && place.here && (
+                          <select
+                            value={place.team ?? ""}
+                            aria-label={`Team for ${a.name}`}
+                            onChange={(e) => teams.onPick(a, e.target.value)}
+                            className={`h-6 rounded-md border bg-white px-1 text-[12px] ${place.team ? "border-[var(--border)] text-[var(--text-secondary)]" : "border-[var(--accent-admin)] text-[var(--accent-admin-text)]"}`}
+                          >
+                            {/* Where people are divided, nobody stays undecided. */}
+                            {(!teams.divide || !place.team) && <option value="">Team not decided</option>}
+                            {teams.options.map((t) => (
+                              <option key={t._id} value={t._id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </span>
                     )}
                   </td>
                 </tr>

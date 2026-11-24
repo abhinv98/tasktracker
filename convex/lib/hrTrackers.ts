@@ -493,3 +493,13 @@ export function cleanFields(tracker: TrackerKey, input: Record<string, unknown>)
   }
   return out;
 }
+
+const CLOSED: readonly string[] = TRACKERS.pipeline.boardClosed;
+
+/** Where a candidate stands: "Active", or how they were closed (by status, or by the stage alone). */
+export function standing(fields: Fields): string {
+  const status = String(fields.status ?? "");
+  if (status === "Archived" || CLOSED.includes(status)) return status;
+  const stage = String(fields.stage ?? "");
+  return CLOSED.includes(stage) ? stage : "Active";
+}

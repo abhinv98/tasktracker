@@ -5,7 +5,7 @@ import { getAuthUserId } from "./lib/internalAuth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, atStep, followCandidate, nextCode, placeInRound, refit, standing, teamFor, rowsOf, today } from "./lib/candidates";
+import { ARCHIVED, GONE, addToCandidates, atStep, followCandidate, nextCode, placeInRound, refit, rowsOf, settleTeams, standing, today, withTeam } from "./lib/candidates";
 import { CLOSING, STANDARD, entryStep, fitStage } from "./lib/hirePipeline";
 import { livePositions, loadPipelines, type Pipelines } from "./lib/pipelines";
 import { inScope, scopeOf } from "./lib/recruitScope";
@@ -102,6 +102,9 @@ export const all = query({
     const every = await ctx.db.query("hrRecords").collect();
     const seen = full ? null : scopeOf(every, access);
     const book = await loadPipelines(ctx);
+    const teams = (await ctx.db.query("teams").collect())
+      .map((t) => ({ _id: t._id as string, name: t.name, color: t.color }))
+      .sort((a, b) => a.name.localeCompare(b.name));
     /** When each candidate applied: their application knows. ponytail: one read per candidate; store it on the row past ~3,000 of them. */
     const applied = new Map<string, string>();
     for (const r of every) {
@@ -114,18 +117,14 @@ export const all = query({
       .filter((r) => isTracker(r.tracker) && (seen ? seen.has(r._id) : true))
       .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: access.pay ? r.fields : withoutPay(r.tracker as TrackerKey, r.fields) }))
       .map((r) => (applied.has(r._id) ? { ...r, fields: { ...r.fields, appliedOn: applied.get(r._id)! } } : r))
-      // Which pipeline a candidate, or a hiring round, is on.
+      // Which pipeline a candidate, or a hiring round, is on, and whose they are.
       .map((r) =>
         r.tracker === "pipeline"
-          ? { ...r, pipeline: book.keyOf(r) }
+          ? { ...r, pipeline: book.keyOf(r), team: book.teamOf(r) ?? "" }
           : r.tracker === "rounds"
-            ? { ...r, pipeline: book.keyFor(Number(r.fields.job), r.fields) }
+            ? { ...r, pipeline: book.keyFor(Number(r.fields.job), r.fields), team: book.valid(Number(r.fields.job) || null, r.fields.team) ?? "" }
             : r
       );
-    const teams = (await ctx.db.query("teams").collect())
-      .map((t) => ({ _id: t._id as string, name: t.name, color: t.color }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const teamIds = new Set(teams.map((t) => t._id));
     const known = pipelinesFor(book, access, rows);
     const pipelines = [...book.list].filter(([key]) => known.has(key)).map(([key, p]) => ({ key, ...p }));
     // The website positions a row can be tied to: all of them for HR, their own for the rest.
@@ -137,8 +136,10 @@ export const all = query({
         hrOwner: (j.hrOwner ?? "") as string,
         hiringManager: (j.hiringManager ?? "") as string,
         parent: j.parentSourceId == null ? "" : String(j.parentSourceId),
+        // On the website's form.
+        open: j.status !== "closed" && book.jobs.find((p) => p.sourceId === j.parentSourceId)?.status !== "closed",
         pipeline: book.keyFor(j.sourceId),
-        teams: book.teamsOf(j.sourceId).teams.filter((t) => teamIds.has(t)),
+        teams: book.teamsOf(j.sourceId).teams,
         divide: book.teamsOf(j.sourceId).divide,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -226,10 +227,32 @@ export const save = mutation({
       // Whoever gets to the offer, or joins, has a team to join. Cleared by hand after that, it stays cleared.
       const kind = steps.find((s) => s.name === fields.stage)?.kind;
       const arrives = fields.stage !== before || standing(fields) !== (existing ? standing(existing.fields) : "");
-      if (!fields.team && !("team" in args.fields) && arrives && ["Active", "Joined"].includes(standing(fields)) && (kind === "offer" || kind === "joining" || standing(fields) === "Joined")) {
-        const team = await teamFor(ctx, book, { fields });
-        if (team) fields.team = team;
+      const hired = arrives && ["Active", "Joined"].includes(standing(fields)) && (kind === "offer" || kind === "joining" || standing(fields) === "Joined");
+      const to = book.jobOf({ fields });
+      // Said in this save, and not just sent along by a form.
+      const said = "team" in args.fields && (fields.team ?? "") !== (existing?.fields.team ?? "");
+      if (existing && !said && book.teamsOf(to).of !== book.teamsOf(book.jobOf(existing)).of) {
+        // Hired for another position from now on.
+        const along = book.carried(existing, to);
+        if (along) fields.team = along;
+        else delete fields.team;
       }
+      const round = book.roundTeam({ fields });
+      const putIn = fields.reqId !== existing?.fields.reqId;
+      if (said && fields.team && !(putIn && round) && book.teamOf({ fields }) !== fields.team) {
+        throw new Error("Team: their position does not hire into that one");
+      }
+      if (putIn) {
+        // Put into a team's round by hand, they are that team's.
+        if (round) fields.team = round;
+      } else if (existing && said && book.teamOf({ fields }) !== book.teamOf(existing)) {
+        // Given to another team: out of the old one's round, into the new one's.
+        const seated = withTeam({ fields }, book.teamOf({ fields }), book);
+        if (!seated.reqId) delete fields.reqId;
+        Object.assign(fields, seated);
+      }
+      const team = hired && !said ? book.teamOf({ fields }) : undefined;
+      if (team) fields.team = team;
     }
     const now = Date.now();
     if (!existing) {
@@ -242,6 +265,7 @@ export const save = mutation({
         updatedAt: now,
       });
       if (tracker === "interviews") await tellInterviewer(ctx, id, {}, fields, user._id);
+      if (book) await settleTeams(ctx);
       return id;
     }
     // Values the form does not show (the link back to a website application)
@@ -252,6 +276,9 @@ export const save = mutation({
     if (tracker === "pipeline" && standing(existing.fields) !== standing(fields)) delete hidden.closedFrom;
     await ctx.db.patch(existing._id, { fields: { ...hidden, ...fields }, updatedAt: now });
     if (book && tracker === "rounds") await refit(ctx, book);
+    // Only what can change whose someone is: a note does not read everyone.
+    const matters = ["team", "reqId", "job", "roleOriginal", "stage", "status", "hiringStatus"];
+    if (book && matters.some((key) => (existing.fields[key] ?? "") !== (fields[key] ?? ""))) await settleTeams(ctx);
     if (tracker === "interviews") await tellInterviewer(ctx, existing._id, existing.fields, fields, user._id);
     if (tracker === "pipeline") await followCandidate(ctx, access, existing, { ...hidden, ...fields }, user);
     return existing._id;
@@ -290,6 +317,7 @@ export const remove = mutation({
       if (brief.hiringRoundId === id) await ctx.db.patch(brief._id, { hiringRoundId: undefined });
     }
     await ctx.db.delete(id);
+    if (row.tracker === "rounds") await ctx.db.insert("hrRecords", { tracker: `${GONE}rounds`, code: row.code, fields: {}, createdAt: row.createdAt, updatedAt: Date.now() });
   },
 });
 
@@ -311,6 +339,7 @@ export const addApplicants = mutation({
       applicants.push(c);
     }
     const added = await addToCandidates(ctx, access, applicants, round);
+    await settleTeams(ctx);
     // The application itself moves to Shortlisted, unless HR already moved it on.
     const now = Date.now();
     for (const c of applicants) {
@@ -341,7 +370,9 @@ export const placeShortlisted = mutation({
     if (!round || round.tracker !== "rounds" || (!access.full && !inScope(round, access, new Set()))) {
       throw new Error("Open position not found");
     }
-    return { placed: await placeInRound(ctx, access, round) };
+    const placed = await placeInRound(ctx, access, round);
+    await settleTeams(ctx);
+    return { placed };
   },
 });
 

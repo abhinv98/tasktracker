@@ -103,10 +103,9 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
   const offer = mine("offers")[0];
   const resume = text(row, "resume");
   const today = data.today;
-  // A team that was deleted since is none.
-  const team = data.teamName(text(row, "team")) ? text(row, "team") : "";
+  // Given to them, their round's, or their position's only one (hrOps.all).
+  const team = row.team ?? "";
   const teams = data.teamsOf(row);
-  const position = data.positionOf(row.fields);
   /** Far enough for their team to matter. */
   const hiring = step?.kind === "offer" || step?.kind === "joining" || stage === "Joined" || text(row, "status") === "Joined";
 
@@ -418,7 +417,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                   onChange={(e) => void quickSave(row, { team: e.target.value || null }, e.target.value ? `Joining ${data.teamName(e.target.value)}` : "Team cleared")}
                   className={`${fieldClass} w-[220px]`}
                 >
-                  <option value="">Not decided</option>
+                  {(teams.length !== 1 && !(team && data.positionOf(row.fields)?.divide)) && <option value="">Not decided</option>}
                   {data.teams
                     .filter((t) => !teams.length || teams.includes(t._id) || t._id === team)
                     .map((t) => (
@@ -431,9 +430,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                   <span className="text-[12px] text-[var(--text-muted)]">
                     {hiring
                       ? `${teams.length > 1 ? `${teams.map(data.teamName).join(" or ")}. ` : ""}Pick the team they join.`
-                      : position?.divide
-                        ? `Divided between ${teams.map(data.teamName).join(" and ")}. Picked for them at the offer, or pick now.`
-                        : `${teams.map(data.teamName).join(" or ")}. Pick one before the offer.`}
+                      : `${teams.map(data.teamName).join(" or ")}. Pick one before the offer.`}
                   </span>
                 )}
               </div>
