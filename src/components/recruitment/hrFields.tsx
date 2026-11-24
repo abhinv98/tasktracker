@@ -11,7 +11,7 @@ import { maxLength, type Field, type TrackerKey } from "@/convex/lib/hrTrackers"
 import type { Row } from "@/lib/hrHealth";
 import { CLOSING } from "@/convex/lib/hirePipeline";
 import { webLink } from "@/convex/lib/links";
-import { fieldsOf, rowTitle, startingValues, type HrData } from "./hrShared";
+import { rowTitle, seenFields, startingValues, type HrData } from "./hrShared";
 
 /** The steps someone being filled in would go through. */
 function stepsIn(draft: Record<string, string>, data: HrData) {
@@ -154,7 +154,7 @@ export function FieldGrid({
 export function toValues(fields: readonly Field[], draft: Record<string, string>, before?: Record<string, string>) {
   const values: Record<string, string | number | null> = {};
   for (const f of fields) {
-    if (f.stamp) continue;
+    if (f.stamp || f.auto) continue;
     const raw = (draft[f.key] ?? "").trim();
     // On an edit, only what this person changed goes up (see hrOps.save).
     if (before && raw === (before[f.key] ?? "").trim()) continue;
@@ -202,7 +202,7 @@ export function InlineAdd({
   onDone: () => void;
 }) {
   const fields = keys
-    .map((key) => fieldsOf(tracker).find((f) => f.key === key))
+    .map((key) => seenFields(tracker, data).find((f) => f.key === key))
     .filter((f): f is Field => !!f)
     .map((f) => (required.includes(f.key) ? { ...f, required: true } : f));
   const [draft, setDraft] = useState(() => startingValues(tracker, data, preset));
@@ -217,7 +217,7 @@ export function InlineAdd({
         e.preventDefault();
         setSaving(true);
         try {
-          await save({ tracker, fields: toValues(fieldsOf(tracker), draft) });
+          await save({ tracker, fields: toValues(seenFields(tracker, data), draft) });
           toast("success", "Added");
           onDone();
         } catch (err) {

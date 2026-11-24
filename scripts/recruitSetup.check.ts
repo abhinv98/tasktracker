@@ -221,6 +221,29 @@ async function main() {
   w.as("del");
   assert.equal(await seen(), "hidden", "taken away and given back: hidden again");
 
+  // Offer amounts and budgets go with it: not sent, not changed, not cleared, and no letter.
+  w = world({
+    recruitJobs: [job(1, "Design")],
+    recruitCandidates: [{ ...app("a", 1), createdAt: Date.UTC(2026, 7, 14, 20) }],
+    hrRecords: [round("r", { job: "1", budgetLpa: 77, budgetNote: "seventy-seven" }), on("p", { job: "1", applicantId: "a", reqId: "r" }), { _id: "o", tracker: "offers", code: "OF", fields: { candidateId: "p", proposedCtc: 66, approvedCtc: 55, probationCtc: 44, stage: "Approved" } }],
+  });
+  const amounts = async () => JSON.stringify((await w.run(H.all, {})).rows.map((r: any) => r.fields)).match(/77|seventy|66|55|44/g)?.length ?? 0;
+  const letter = () => w.run(H.letterData, { offerId: "o" });
+  assert.deepEqual([await amounts(), !!(await letter())], [5, true]);
+  assert.equal((await w.run(H.all, {})).rows.find((r: any) => r._id === "p").fields.appliedOn, "2026-08-15", "when they applied, in India");
+  w.as("del");
+  assert.deepEqual([await amounts(), await letter()], [0, null]);
+  await w.run(H.save, { tracker: "offers", id: "o", fields: { stage: "Offer Sent", approvedCtc: 1, proposedCtc: null, appliedOn: "x" } });
+  await w.run(H.save, { tracker: "rounds", id: "r", fields: { notes: "x", budgetLpa: null } });
+  assert.deepEqual([w.f("o").stage, w.f("o").approvedCtc, w.f("o").proposedCtc, w.f("o").probationCtc, w.f("r").budgetLpa, w.f("r").budgetNote], ["Offer Sent", 55, 66, 44, 77, "seventy-seven"]);
+  await fails(w.run(H.remove, { id: "o" }), /amounts you do not see/);
+  w.tables.users.find((u) => u._id === "del")!.recruitPay = true;
+  assert.deepEqual([await amounts(), !!(await letter())], [5, true]);
+  await w.run(H.save, { tracker: "pipeline", id: "p", fields: { appliedOn: "2020-01-01", notes: "y" } });
+  assert.equal(w.f("p").appliedOn, undefined, "worked out, never stored");
+  await w.run(H.remove, { id: "o" });
+  assert.ok(!w.tables.hrRecords.some((r) => r._id === "o"), "with pay, they may");
+
   // Only what changed is saved, so a stale screen does not reopen a position.
   w = world({ recruitPipelines: [pl("own")], recruitJobs: [job(1, "Design", { status: "closed", hrOwner: "hr", closesOn: "2020-01-01" }), job(2, "Intern", { parentSourceId: 1, pipeline: "own" })], hrRecords: [on("p", { job: "1", roleOriginal: "Interns", stage: "Final Review" })] });
   await w.run(S.savePosition, { id: 1, description: "two\nlines" });

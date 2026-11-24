@@ -73,6 +73,12 @@ async function checkLinks(ctx: MutationCtx, tracker: TrackerKey, fields: Fields)
   }
 }
 
+/** A row's values without the amounts, for someone who does not see pay. */
+const withoutPay = <T>(tracker: TrackerKey, fields: Record<string, T>): Record<string, T> => {
+  const pay = new Set((TRACKERS[tracker].fields as readonly Field[]).filter((f) => f.pay).map((f) => f.key));
+  return Object.fromEntries(Object.entries(fields).filter(([key]) => !pay.has(key)));
+};
+
 /** The pipelines someone may see and pick: all of them for HR; for the rest the
  *  standard one, their positions' and those of the rows they work on. */
 function pipelinesFor(book: Pipelines, access: RecruitAccess, seen: { tracker: string; fields: Fields }[]): Set<string> {
@@ -96,9 +102,18 @@ export const all = query({
     const every = await ctx.db.query("hrRecords").collect();
     const seen = full ? null : scopeOf(every, access);
     const book = await loadPipelines(ctx);
+    /** When each candidate applied: their application knows. ponytail: one read per candidate; store it on the row past ~3,000 of them. */
+    const applied = new Map<string, string>();
+    for (const r of every) {
+      if (r.tracker !== "pipeline" || (seen && !seen.has(r._id))) continue;
+      const id = ctx.db.normalizeId("recruitCandidates", text(r.fields, "applicantId"));
+      const at = id ? (await ctx.db.get(id))?.createdAt : null;
+      if (at) applied.set(r._id, today(at));
+    }
     const rows = every
       .filter((r) => isTracker(r.tracker) && (seen ? seen.has(r._id) : true))
-      .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: r.fields }))
+      .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: access.pay ? r.fields : withoutPay(r.tracker as TrackerKey, r.fields) }))
+      .map((r) => (applied.has(r._id) ? { ...r, fields: { ...r.fields, appliedOn: applied.get(r._id)! } } : r))
       // Which pipeline a candidate, or a hiring round, is on.
       .map((r) =>
         r.tracker === "pipeline"
@@ -150,7 +165,9 @@ export const save = mutation({
     if (seen && existing && !seen.has(existing._id)) throw new Error("Row not found");
     // An edit sends only what changed, laid over the row as it is now, so two
     // people editing different fields of one row do not undo each other.
-    const fields = cleanFields(tracker, { ...existing?.fields, ...args.fields });
+    // Amounts they do not see are not theirs to change, or to clear.
+    const given = access.pay ? args.fields : withoutPay(tracker, args.fields);
+    const fields = cleanFields(tracker, { ...existing?.fields, ...given });
     await checkLinks(ctx, tracker, fields);
     if (seen && !inScope({ tracker, fields }, access, seen)) {
       throw new Error(
@@ -251,6 +268,10 @@ export const remove = mutation({
     trackerFor(row.tracker, full);
     const others = (await ctx.db.query("hrRecords").collect()).filter((o) => isTracker(o.tracker));
     if (!full && !scopeOf(others, access).has(id)) return;
+    // Amounts they do not see are not theirs to delete either.
+    if (!access.pay && Object.keys(withoutPay(row.tracker as TrackerKey, row.fields)).length < Object.keys(row.fields).length) {
+      throw new Error(`${row.code} holds amounts you do not see. Ask HR to remove it.`);
+    }
     // An open position with candidates, or a candidate with interviews, stays: deleting
     // it would leave those rows pointing at nothing.
     const user = others.find((o) => Object.values(o.fields).includes(id));
@@ -541,7 +562,8 @@ export const letterData = query({
   handler: async (ctx, { offerId }) => {
     const access = await recruitAccess(ctx);
     const offer = await ctx.db.get(offerId);
-    if (!access || !offer || offer.tracker !== "offers") return null;
+    // The letter is about pay.
+    if (!access?.pay || !offer || offer.tracker !== "offers") return null;
     if (!access.full && !scopeOf(await ctx.db.query("hrRecords").collect(), access).has(offerId)) return null;
     const candidateId = ctx.db.normalizeId("hrRecords", text(offer.fields, "candidateId"));
     const candidate = candidateId ? await ctx.db.get(candidateId) : null;

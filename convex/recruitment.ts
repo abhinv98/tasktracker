@@ -631,12 +631,21 @@ export const getCandidate = query({
       });
     }
 
+    // What cultform recorded before this app: when they applied, and when its status was last set.
+    const past = (id: string, at: number | null | undefined, body: string) =>
+      at ? [{ id: `${c._id}:${id}`, kind: "past" as const, at, body, fromStage: null, toStage: null, who: "", ok: true }] : [];
+    const SAID: Record<string, string> = { shortlisted: "Shortlisted in cultform", rejected: "Rejected in cultform", on_hold: "Put on hold in cultform", active: "Set to active in cultform", non_active: "Set to not active in cultform" };
+    const before = [
+      ...past("applied", c.createdAt, c.sourceId == null ? "Application added" : "Applied on the website"),
+      ...past("status", c.sourceId == null ? null : c.statusUpdatedAt, SAID[c.status] ?? "Status set in cultform"),
+    ];
+
     return {
       ...shown(access, c),
       pay: access.pay,
       stage: c.stage ?? "applied",
       jobName: nameOf(jobs.find((j) => j.sourceId === c.jobSourceId)),
-      timeline,
+      timeline: [...timeline, ...before].sort((a, b) => b.at - a.at),
       alsoApplied,
       onCandidates,
     };

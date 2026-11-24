@@ -16,7 +16,7 @@ import { webLink } from "@/convex/lib/links";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 import { FieldGrid, toValues } from "./hrFields";
-import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
+import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, seenFields, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
 import { looseRounds } from "./RoundsMatch";
 import { TrackerBoard } from "./TrackerBoard";
 
@@ -36,8 +36,8 @@ const draftOf = (row: Row): Draft =>
  */
 export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const meta = TRACKERS[tracker];
-  const fields = fieldsOf(tracker);
   const data = useHrData();
+  const fields = seenFields(tracker, data);
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -450,7 +450,7 @@ function RecordPanel({
   onClose: () => void;
 }) {
   const meta = TRACKERS[tracker];
-  const fields = fieldsOf(tracker);
+  const fields = seenFields(tracker, data);
   const { row } = editing;
   const [draft, setDraft] = useState<Draft>(editing.draft);
   const [saving, setSaving] = useState(false);
@@ -603,7 +603,7 @@ function RecordPanel({
                     Candidates board
                   </Button>
                 )}
-                {tracker === "offers" && (
+                {tracker === "offers" && data.pay && (
                   <Button type="button" size="sm" variant="secondary" loading={makingLetter} onClick={downloadLetter}>
                     <FileText size={13} />
                     Appointment letter
@@ -623,7 +623,7 @@ function RecordPanel({
             )}
 
             <FieldGrid
-              fields={fields.filter((f) => !f.stamp && !f.more)}
+              fields={fields.filter((f) => !f.stamp && !f.auto && !f.more)}
               draft={draft}
               onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
               data={data}
@@ -635,7 +635,7 @@ function RecordPanel({
                 </summary>
                 <div className="mt-3">
                   <FieldGrid
-                    fields={fields.filter((f) => !f.stamp && f.more)}
+                    fields={fields.filter((f) => !f.stamp && !f.auto && f.more)}
                     draft={draft}
                     onChange={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
                     data={data}

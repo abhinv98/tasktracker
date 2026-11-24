@@ -167,6 +167,8 @@ export function placesOf(data: HrData | undefined): Map<string, { id: string; st
   );
 }
 
+/** The old form kept no dates until 22 May 2026. Everyone without one came before that (cultform's ids run in order). */
+export const UNDATED = "Before 22 May 26";
 const added = (ts?: number | null) =>
   ts ? new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "";
 
@@ -207,7 +209,8 @@ export function ApplicantsTable({
       current: parseCtcLpa(a.currentCtc),
       expected: parseCtcLpa(a.expectedCtc),
       notice: parseNoticeDays(a.noticePeriod),
-      added: a.createdAt ?? null,
+      // No date means before there were any.
+      added: a.createdAt ?? 0,
     }));
     return parsed.sort((x, y) => {
       if (sort.key === "name") return x.a.name.localeCompare(y.a.name) * sort.dir;
@@ -331,7 +334,7 @@ export function ApplicantsTable({
                     </>
                   )}
                   <td className={NUM}>{notice == null ? dash : formatNotice(notice)}</td>
-                  <td className={`${NUM} text-[12px] text-[var(--text-muted)]`}>{added(a.createdAt) || dash}</td>
+                  <td className={`${NUM} text-[12px] text-[var(--text-muted)]`}>{added(a.createdAt) || UNDATED}</td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <div className="flex items-center gap-1">
                       {(

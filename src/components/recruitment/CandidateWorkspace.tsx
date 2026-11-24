@@ -62,7 +62,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
 
   // Someone who applied on the website changes position together with their application (the Move button).
   const applicantId = text(row, "applicantId");
-  const detailFields = fieldsOf("pipeline").filter((f) => !f.stamp && !OWN_FIELDS.includes(f.key) && !(applicantId && f.key === "job"));
+  const detailFields = fieldsOf("pipeline").filter((f) => !f.stamp && !f.auto && !OWN_FIELDS.includes(f.key) && !(applicantId && f.key === "job"));
   const live = Object.fromEntries(detailFields.map((f) => [f.key, text(row, f.key)]));
   const [detailEdits, setDetailEdits] = useState<Record<string, string>>({});
   const details = { ...live, ...detailEdits };
@@ -134,6 +134,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                 round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "No open position yet",
                 text(row, "contact"),
                 text(row, "source"),
+                text(row, "appliedOn") && `applied ${fmtDate(text(row, "appliedOn"), today)}`,
                 text(row, "firstContact") && `shortlisted ${fmtDate(text(row, "firstContact"), today)}`,
               ]
                 .filter(Boolean)
@@ -391,7 +392,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               text(r, "approvedCtc") ? `₹${text(r, "approvedCtc")} LPA approved` : text(r, "proposedCtc") && `₹${text(r, "proposedCtc")} LPA proposed`,
               text(r, "plannedJoin") && `joining ${fmtDate(text(r, "plannedJoin"), today)}`,
             ]}
-            detail={() => "Open it to approve, edit or download the appointment letter."}
+            detail={() => (data.pay ? "Open it to approve, edit or download the appointment letter." : "Open it to follow it along.")}
             addLabel={offer ? "" : "Start an offer"}
             adding={adding === "offers"}
             onAdd={() => setAdding("offers")}

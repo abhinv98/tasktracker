@@ -36,6 +36,10 @@ export type Field = {
    *  against their position's pipeline instead (hrOps.save); an interview's
    *  round can be anything. */
   free?: boolean;
+  /** An amount someone is, or would be, paid: only for people who see pay (lib/guards.ts). */
+  pay?: boolean;
+  /** Worked out by the server (hrOps.all): shown, never typed or stored. */
+  auto?: boolean;
 };
 
 import { webLink } from "./links";
@@ -93,8 +97,8 @@ export const TRACKERS = {
         initial: "Open",
         ...col,
       }),
-      f("budgetLpa", "Budget approved (₹ LPA)", "number"),
-      f("budgetNote", "Original budget / note", "text", { more: true }),
+      f("budgetLpa", "Budget approved (₹ LPA)", "number", { pay: true }),
+      f("budgetNote", "Original budget / note", "text", { more: true, pay: true }),
       f("nextAction", "Next action", "text", col),
       f("actionOwner", "Action owner", "user"),
       f("nextDue", "Next action due", "date", col),
@@ -121,6 +125,8 @@ export const TRACKERS = {
       f("source", "Source", "select", {
         options: ["LinkedIn", "Naukri", "Internshala", "Referral", "Campus", "Website", "Agency", "Other"],
       }),
+      // When they applied on the website.
+      f("appliedOn", "Applied on", "date", { auto: true, ...col }),
       // Set the day they were shortlisted or added (lib/candidates.ts).
       f("firstContact", "Shortlisted on", "date", { initial: "@today", ...col }),
       f("stage", "Pipeline stage", "select", { free: true, ...col }),
@@ -236,12 +242,12 @@ export const TRACKERS = {
         ...col,
       }),
       f("approvalDate", "Approval date", "date"),
-      f("proposedCtc", "Proposed CTC (₹ LPA)", "number"),
-      f("approvedCtc", "Approved CTC (₹ LPA)", "number", col),
+      f("proposedCtc", "Proposed CTC (₹ LPA)", "number", { pay: true }),
+      f("approvedCtc", "Approved CTC (₹ LPA)", "number", { pay: true, ...col }),
       // For the appointment letter (see src/lib/appointmentLetter.ts).
       f("designation", "Designation on the letter", "text"),
       f("reportsTo", "Reports to (title and name)", "text"),
-      f("probationCtc", "CTC during probation (₹ LPA), if lower", "number"),
+      f("probationCtc", "CTC during probation (₹ LPA), if lower", "number", { pay: true }),
       f("probationMonths", "Probation (months)", "number"),
       f("offerSent", "Offer sent date", "date"),
       f("offerAccepted", "Offer accepted date", "date"),
@@ -457,6 +463,7 @@ const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 export function cleanFields(tracker: TrackerKey, input: Record<string, unknown>): Fields {
   const out: Fields = {};
   for (const field of TRACKERS[tracker].fields as readonly Field[]) {
+    if (field.auto) continue;
     const raw = input[field.key];
     const blank = raw === undefined || raw === null || (typeof raw === "string" && raw.trim() === "");
     if (blank) {

@@ -8,7 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { Button, Textarea, useToast } from "@/components/ui";
 import { iconButtonClass } from "@/components/ui/classes";
 import { positionStatus, stageMeta, type PositionStatus, type Stage } from "@/lib/recruitStages";
-import { DECISIONS, Decide, useLast, useMoveApplicants } from "./ApplicantsTable";
+import { DECISIONS, Decide, UNDATED, useLast, useMoveApplicants } from "./ApplicantsTable";
 import { MoveApplicants } from "./MoveApplicants";
 import {
   formatLpa, formatYears, formatNotice,
@@ -139,7 +139,7 @@ export function CandidatePanel({
                 </h2>
                 <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                   {c.position || c.jobName}
-                  {c.createdAt ? ` · applied ${when(c.createdAt).split(",")[0]}` : ""}
+                  {c.createdAt ? ` · applied ${when(c.createdAt).split(",")[0]}` : ` · applied b${UNDATED.slice(1)}`}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -303,7 +303,7 @@ export function CandidatePanel({
                             </p>
                           )}
                           <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
-                            {t.who} · {when(t.at)}
+                            {[t.who, when(t.at)].filter(Boolean).join(" · ")}
                           </p>
                         </div>
                         {t.kind === "note" && (

@@ -104,6 +104,9 @@ export function useHrData(): HrData | undefined {
 
 export const fieldsOf = (tracker: TrackerKey) => TRACKERS[tracker].fields as readonly Field[];
 
+/** The ones this person sees: amounts are for whoever sees pay. */
+export const seenFields = (tracker: TrackerKey, data: HrData | undefined) => fieldsOf(tracker).filter((f) => !f.pay || data?.pay);
+
 /** Mine: I am named on it in any of its people fields (owner, interviewer, reviewer…). */
 export const isMine = (row: Row, data: HrData) =>
   fieldsOf(row.tracker).some((f) => f.type === "user" && row.fields[f.key] === data.me);

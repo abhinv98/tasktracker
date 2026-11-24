@@ -10,7 +10,7 @@ import { Button, Modal, useToast } from "@/components/ui";
 import { fieldClass } from "@/components/ui/classes";
 import type { Row } from "@/lib/hrHealth";
 import { FieldGrid, toValues } from "./hrFields";
-import { fieldsOf, startingValues, type HrData } from "./hrShared";
+import { seenFields, startingValues, type HrData } from "./hrShared";
 
 const KEYS = ["role", "job", "pipeline", "team", "submitLink", "openings", "employmentType", "priority", "hiringManager", "targetJoinDate", "budgetLpa"];
 const isOpen = (r: Row) => !String(r.fields.hiringStatus ?? "").startsWith("Closed");
@@ -78,7 +78,7 @@ export function OpenRoundModal({
   const [bring, setBring] = useState(true);
   const [saving, setSaving] = useState(false);
   const loose = job ? data.book.rounds.filter((r) => !r.fields.job && isOpen(r)) : [];
-  const fields = KEYS.flatMap((key) => fieldsOf("rounds").find((f) => f.key === key) ?? []).filter((f) => !(job && f.key === "job"));
+  const fields = KEYS.flatMap((key) => seenFields("rounds", data).find((f) => f.key === key) ?? []).filter((f) => !(job && f.key === "job"));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,7 +86,7 @@ export function OpenRoundModal({
     try {
       const id = existing
         ? await save({ tracker: "rounds", id: existing as Id<"hrRecords">, fields: { job: draft.job, ...(reopen(existing) ? { hiringStatus: "Open" } : {}) } })
-        : await save({ tracker: "rounds", fields: toValues(fieldsOf("rounds"), draft) });
+        : await save({ tracker: "rounds", fields: toValues(seenFields("rounds", data), draft) });
       const { placed } = bring && draft.job ? await place({ roundId: id }) : { placed: 0 };
       toast("success", `Hiring round open${placed ? `. ${placed} shortlisted ${placed === 1 ? "person is" : "people are"} in it` : ""}`);
       onClose();

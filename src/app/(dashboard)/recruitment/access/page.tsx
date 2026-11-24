@@ -56,7 +56,7 @@ export default function RecruitmentAccessPage() {
     <div className="p-4 sm:p-8">
       <PageHeader
         title="Recruitment Access"
-        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and open positions, and nothing else. What applicants earn and expect stays hidden from them unless you switch it on."
+        subtitle="HR and super admins see everything. Give anyone else the positions they are hiring for: in Recruitment they see those positions' applicants, candidates and open positions, and nothing else. What applicants earn and expect, offer amounts and budgets stay hidden from them unless you switch CTC on."
       />
       <div className="mb-3">
         <SearchField value={search} onChange={setSearch} placeholder="Search people" label="Search people" />
@@ -89,11 +89,11 @@ export default function RecruitmentAccessPage() {
                       type="button"
                       role="switch"
                       aria-checked={p.pay}
-                      aria-label={`${p.name}: see current and expected CTC`}
-                      title={p.pay ? "Sees current and expected CTC. Press to hide them." : "Current and expected CTC are hidden. Press to show them."}
+                      aria-label={`${p.name}: see CTC, offer amounts and budgets`}
+                      title={p.pay ? "Sees current and expected CTC, offer amounts and budgets. Press to hide them." : "Current and expected CTC, offer amounts and budgets are hidden. Press to show them."}
                       onClick={() =>
                         setPay({ userId: p._id, allowed: !p.pay })
-                          .then(() => toast("success", p.pay ? `CTC is hidden from ${p.name}` : `${p.name} can see current and expected CTC`))
+                          .then(() => toast("success", p.pay ? `CTC is hidden from ${p.name}` : `${p.name} can see CTC`))
                           .catch((err) => toast("error", err instanceof Error ? err.message : "Could not change it"))
                       }
                       className={`inline-flex h-control items-center gap-1.5 rounded-control border px-3 text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
