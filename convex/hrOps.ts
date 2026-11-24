@@ -5,7 +5,8 @@ import { getAuthUserId } from "./lib/internalAuth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, nextCode, rowsOf, today } from "./lib/candidates";
+import { ARCHIVED, addToCandidates, followCandidate, nextCode, placeInRound, rowsOf, standing, today } from "./lib/candidates";
+import { inScope, scopeOf } from "./lib/recruitScope";
 import {
   TRACKERS,
   TRACKER_KEYS,
@@ -35,38 +36,6 @@ async function requireAccess(ctx: QueryCtx | MutationCtx): Promise<RecruitAccess
   const access = await recruitAccess(ctx);
   if (!access) throw new Error("Recruitment is HR only");
   return access;
-}
-
-type Slim = { _id: string; tracker: string; fields: Fields };
-
-/** Is this row inside a scoped person's positions, given the rows already known to be? */
-function inScope(row: Omit<Slim, "_id">, access: RecruitAccess, seen: ReadonlySet<string>) {
-  if (!isTracker(row.tracker) || TRACKERS[row.tracker].hrOnly) return false;
-  if (row.tracker === "rounds") {
-    return typeof row.fields.job === "string" && mayRecruitFor(access, Number(row.fields.job));
-  }
-  // A candidate with no open position yet belongs to the website position they
-  // were shortlisted from. Once they have one, that decides.
-  if (row.tracker === "pipeline" && !row.fields.reqId) {
-    return typeof row.fields.job === "string" && mayRecruitFor(access, Number(row.fields.job));
-  }
-  // Everything else belongs to whatever it points at: a candidate to its open
-  // position, an interview to its candidate.
-  return (TRACKERS[row.tracker].fields as readonly Field[]).some(
-    (f) => f.type === "ref" && seen.has(String(row.fields[f.key] ?? ""))
-  );
-}
-
-/** The ids a scoped person may see. Trackers only point back at earlier ones
- *  (candidate -> round, interview -> candidate), so one pass in tracker order does it. */
-function scopeOf(rows: Slim[], access: RecruitAccess): Set<string> {
-  const seen = new Set<string>();
-  for (const tracker of TRACKER_KEYS) {
-    for (const row of rows) {
-      if (row.tracker === tracker && inScope(row, access, seen)) seen.add(row._id);
-    }
-  }
-  return seen;
 }
 
 function trackerFor(key: string, full: boolean): TrackerKey {
@@ -186,8 +155,11 @@ export const save = mutation({
     // ride along untouched.
     const known = new Set((TRACKERS[tracker].fields as readonly Field[]).map((x) => x.key));
     const hidden = Object.fromEntries(Object.entries(existing.fields).filter(([key]) => !known.has(key)));
+    // Closed or reopened here by hand: no longer something Positions may undo.
+    if (tracker === "pipeline" && standing(existing.fields) !== standing(fields)) delete hidden.closedFrom;
     await ctx.db.patch(existing._id, { fields: { ...hidden, ...fields }, updatedAt: now });
     if (tracker === "interviews") await tellInterviewer(ctx, existing._id, existing.fields, fields, user._id);
+    if (tracker === "pipeline") await followCandidate(ctx, access, existing, { ...hidden, ...fields }, user);
     return existing._id;
   },
 });
@@ -211,6 +183,13 @@ export const remove = mutation({
       if (hrOnly && !full) throw new Error(`${row.code} is linked to an HR record. Ask HR to remove it.`);
       const label = isTracker(user.tracker) ? TRACKERS[user.tracker].label : user.tracker;
       throw new Error(`${row.code} is still used by ${user.code} in ${label}. Remove or re-point that first.`);
+    }
+    // Tasks and briefs outlive it; they just stop pointing here.
+    for (const task of await ctx.db.query("tasks").withIndex("by_candidate", (q) => q.eq("candidateId", id)).collect()) {
+      await ctx.db.patch(task._id, { candidateId: undefined });
+    }
+    for (const brief of await ctx.db.query("briefs").withIndex("by_type_brand", (q) => q.eq("briefType", "recruitment")).collect()) {
+      if (brief.hiringRoundId === id) await ctx.db.patch(brief._id, { hiringRoundId: undefined });
     }
     await ctx.db.delete(id);
   },
@@ -237,13 +216,14 @@ export const addApplicants = mutation({
     // The application itself moves to Shortlisted, unless HR already moved it on.
     const now = Date.now();
     for (const c of applicants) {
-      if ((c.stage ?? "applied") !== "applied") continue;
+      const from = c.stage ?? "applied";
+      if (!["applied", "on_hold", "rejected"].includes(from)) continue;
       await ctx.db.patch(c._id, { stage: "screened", stageUpdatedAt: now });
       await ctx.db.insert("recruitActivity", {
         candidateId: c._id,
         kind: "stage",
         body: `Added to open position ${round.code}`,
-        fromStage: "applied",
+        fromStage: from,
         toStage: "screened",
         authorId: user._id,
         authorName: user.name ?? user.email ?? "HR",
@@ -251,6 +231,19 @@ export const addApplicants = mutation({
       });
     }
     return { added, skipped: candidateIds.length - added };
+  },
+});
+
+/** Put everyone already shortlisted for an open position's role, and not yet in one, into it. */
+export const placeShortlisted = mutation({
+  args: { roundId: v.id("hrRecords") },
+  handler: async (ctx, { roundId }) => {
+    const access = await requireAccess(ctx);
+    const round = await ctx.db.get(roundId);
+    if (!round || round.tracker !== "rounds" || (!access.full && !inScope(round, access, new Set()))) {
+      throw new Error("Open position not found");
+    }
+    return { placed: await placeInRound(ctx, access, round) };
   },
 });
 

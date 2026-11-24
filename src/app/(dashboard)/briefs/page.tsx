@@ -31,6 +31,7 @@ function fmtYmd(ymd: string): string {
 import { Trash2, Calendar, ChevronDown, ChevronRight, Plus, List, FolderClosed, Briefcase, X, Eye, ExternalLink } from "lucide-react";
 import { BRIEF_STATUS_COLORS, BRIEF_STATUS_LABELS } from "@/lib/statusColors";
 import { taskStatusMeta } from "@/lib/status";
+import { BRIEF_TYPE_LABELS, briefTypeLabel } from "@/lib/briefTypes";
 import { fieldClass } from "@/components/ui/classes";
 import { FilterTray, SearchField, StatChips, Tray } from "@/components/ui/Tray";
 
@@ -140,6 +141,7 @@ export default function BriefsPage() {
   );
   const [deadline, setDeadline] = useState<number | undefined>(undefined);
   const [briefType, setBriefType] = useState<string>("");
+  const [hiringRoundId, setHiringRoundId] = useState("");
   const [briefMode, setBriefMode] = useState<"master" | "individual">("master");
 
   const [clientFacing, setClientFacing] = useState(false);
@@ -166,6 +168,13 @@ export default function BriefsPage() {
   const [navTaskId, setNavTaskId] = useState<string | null>(null);
   const { toast } = useToast();
   const isAdmin = user?.role === "admin";
+  // Recruitment briefs are for people who may work in recruitment; the server checks the same.
+  const canRecruit = user?.isHR === true || user?.isSuperAdmin === true || !!user?.recruitJobs?.length;
+  const forHiring = briefMode === "master" && briefType === "recruitment";
+  const recruitment = useQuery(api.hrOps.all, forHiring && canRecruit ? {} : "skip");
+  const hiringRounds = recruitment?.rows
+    .filter((r) => r.tracker === "rounds" && !String(r.fields.hiringStatus ?? "").startsWith("Closed"))
+    .map((r) => ({ _id: r._id as string, code: r.code, role: String(r.fields.role ?? "") }));
 
   const [viewMode, setViewMode] = useState<"folders" | "all">("folders");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(() => new Set());
@@ -426,16 +435,6 @@ export default function BriefsPage() {
     setSearch("");
   }
 
-  const TYPE_LABELS: Record<string, string> = {
-    developmental: "Developmental",
-    designing: "Designing",
-    video_editing: "Video Editing",
-    production: "Production",
-    copywriting: "Copywriting",
-    content_calendar: "Content Calendar",
-    single_task: "Single Task",
-  };
-
   const filtersActive =
     !!filterManagerId || !!filterBriefType || !!filterTeamId || !!filterDateStart || !!filterDateEnd || !!search.trim();
 
@@ -497,6 +496,7 @@ export default function BriefsPage() {
     setTitle("");
     setDescription("");
     setDeadline(undefined);
+    setHiringRoundId("");
     setBriefType("");
     setBriefMode("master");
     setClientFacing(false);
@@ -655,10 +655,11 @@ export default function BriefsPage() {
       // backend strips it too — this just keeps the payload tidy).
       const includeDeadline =
         deadline !== undefined && briefType !== "content_calendar";
-      await createBrief({
+      const newBriefId = await createBrief({
         title,
         description,
-        ...(brandId ? { brandId: brandId as Id<"brands"> } : {}),
+        ...(brandId && !forHiring ? { brandId: brandId as Id<"brands"> } : {}),
+        ...(forHiring && hiringRoundId ? { hiringRoundId: hiringRoundId as Id<"hrRecords"> } : {}),
         ...(managerId ? { assignedManagerId: managerId as Id<"users"> } : {}),
         ...(includeDeadline ? { deadline } : {}),
         briefType: (briefType || undefined) as any,
@@ -668,6 +669,8 @@ export default function BriefsPage() {
       setShowModal(false);
       resetFormToDefaults();
       toast("success", "Brief created");
+      // Its tasks are the point of it: straight there to assign them.
+      if (forHiring && newBriefId) router.push(`/brief/${newBriefId}`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed to create brief");
     } finally {
@@ -719,7 +722,7 @@ export default function BriefsPage() {
           allLabel="All types"
           value={filterBriefType}
           onChange={setFilterBriefType}
-          options={Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+          options={Object.entries(BRIEF_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
         />
         <FilterTray
           label="Team"
@@ -915,11 +918,7 @@ export default function BriefsPage() {
                               <TableCell className="hidden xl:table-cell">
                                 {(brief as any).briefType ? (
                                   <Badge variant="neutral">
-                                    {(brief as any).briefType === "content_calendar" ? "Content Calendar" :
-                                     (brief as any).briefType === "video_editing" ? "Video Editing" :
-                                     (brief as any).briefType === "production" ? "Production" :
-                                     (brief as any).briefType === "developmental" ? "Developmental" :
-                                     (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
+                                    {briefTypeLabel((brief as any).briefType)}
                                   </Badge>
                                 ) : "-"}
                               </TableCell>
@@ -1123,11 +1122,7 @@ export default function BriefsPage() {
                             <TableCell className="hidden xl:table-cell">
                               {(brief as any).briefType ? (
                                 <Badge variant="neutral">
-                                  {(brief as any).briefType === "content_calendar" ? "Content Calendar" :
-                                   (brief as any).briefType === "video_editing" ? "Video Editing" :
-                                     (brief as any).briefType === "production" ? "Production" :
-                                   (brief as any).briefType === "developmental" ? "Developmental" :
-                                   (brief as any).briefType === "designing" ? "Designing" : (brief as any).briefType}
+                                  {briefTypeLabel((brief as any).briefType)}
                                 </Badge>
                               ) : "-"}
                             </TableCell>
@@ -1277,7 +1272,32 @@ export default function BriefsPage() {
                     <option value="video_editing">Video Editing</option>
               <option value="production">Production</option>
                     <option value="copywriting">Copywriting</option>
+                    {canRecruit && <option value="recruitment">Recruitment</option>}
                   </select>
+                </div>
+              )}
+              {forHiring && (
+                <div>
+                  <label className={FIELD_LABEL_CLASS}>Open position (optional)</label>
+                  <select
+                    value={hiringRoundId}
+                    onChange={(e) => {
+                      setHiringRoundId(e.target.value);
+                      const round = hiringRounds?.find((r) => r._id === e.target.value);
+                      if (round && !title.trim()) setTitle(`Hiring: ${round.role}`);
+                    }}
+                    className={FIELD_CLASS}
+                  >
+                    <option value="">Not for one position</option>
+                    {(hiringRounds ?? []).map((r) => (
+                      <option key={r._id} value={r._id}>
+                        {r.code} · {r.role}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[12px] text-[var(--text-muted)] mt-1">
+                    Once it is made, assign tasks inside it: what, about which candidate, and who does it. Only HR, super admins and people given a task can see it.
+                  </p>
                 </div>
               )}
 
@@ -1317,6 +1337,7 @@ export default function BriefsPage() {
                   Content Calendar briefs run month after month. Deadlines live on the individual entries inside, not on the brief itself.
                 </p>
               )}
+              {!forHiring && (
               <div>
                 <label className={FIELD_LABEL_CLASS}>
                   Brand{briefMode === "individual" && itAddToCalendar ? " *" : ""}
@@ -1333,7 +1354,9 @@ export default function BriefsPage() {
                   ))}
                 </select>
               </div>
-              {isAdmin && (
+              )}
+              {/* Whoever manages a recruitment brief sees all of it: HR and super admins choose. */}
+              {isAdmin && !(forHiring && user?.isHR !== true && user?.isSuperAdmin !== true) && (
                 <div>
                   <label className={FIELD_LABEL_CLASS}>
                     {briefMode === "individual" ? "Assignor / manager (optional)" : "Assign manager (optional)"}

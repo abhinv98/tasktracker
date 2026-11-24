@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { canViewTask, recruitmentBriefView } from "./lib/guards";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -13,8 +14,13 @@ export const globalSearch = query({
     const user = await ctx.db.get(userId);
     const role = user?.role ?? "employee";
 
-    // Briefs
+    // Briefs (recruitment ones only for whoever may see them)
     let briefs = await ctx.db.query("briefs").collect();
+    const hiring = new Set<string>();
+    for (const b of briefs) if (b.briefType === "recruitment") hiring.add(b._id);
+    const seen = new Set<string>();
+    for (const b of briefs) if (hiring.has(b._id) && user && (await recruitmentBriefView(ctx, user, b))) seen.add(b._id);
+    briefs = briefs.filter((b) => !hiring.has(b._id) || seen.has(b._id));
     if (role === "employee") {
       const myTasks = await ctx.db
         .query("tasks")
@@ -37,9 +43,14 @@ export const globalSearch = query({
     if (role === "employee") {
       tasks = tasks.filter((t) => t.assigneeId === userId);
     }
-    const matchedTasks = tasks
-      .filter((t) => t.title.toLowerCase().includes(term))
-      .slice(0, 5)
+    const found = [];
+    for (const t of tasks) {
+      if (found.length === 5) break;
+      if (!t.title.toLowerCase().includes(term)) continue;
+      if (hiring.has(t.briefId) && !(user && (await canViewTask(ctx, user, t)))) continue;
+      found.push(t);
+    }
+    const matchedTasks = found
       .map((t) => ({ _id: t._id, title: t.title, status: t.status, briefId: t.briefId, type: "task" as const }));
 
     // Brands

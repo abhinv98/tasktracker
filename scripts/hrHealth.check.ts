@@ -60,8 +60,6 @@ assert.equal(h(row("onboarding", { plannedJoining: "2026-11-20" })), "Joining de
 assert.equal(h(row("interns", { status: "Active", endDate: "2026-12-01" })), "End date near");
 assert.equal(h(row("campus", { stage: "Contacted", nextFollowUp: "2026-12-01", lastContact: "2026-10-01" })), "No recent contact");
 assert.equal(h(row("projects", { stage: "Drafting" })), "Needs next date");
-assert.equal(h(row("tasks", { status: "Waiting Approval", approvalStatus: "Pending", dueDate: "2026-12-01" })), "Approval pending");
-assert.equal(h(row("tasks", { status: "In Progress" })), "Set due date");
 
 // Calculated columns on the round: only the verified candidate counts, one joined of two openings.
 const d = Object.fromEntries(derived(round, book, today).map((x) => [x.label, x.value]));

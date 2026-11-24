@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { canViewThread, visibleTasks } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
@@ -10,7 +11,7 @@ export const getComments = query({
   },
   handler: async (ctx, { parentType, parentId }) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    if (!userId || !(await canViewThread(ctx, userId, parentType, parentId))) return [];
 
     const comments = await ctx.db
       .query("comments")
@@ -47,20 +48,30 @@ export const getCommentsForBrief = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
-    // Get all tasks belonging to this brief
-    const tasks = await ctx.db
-      .query("tasks")
-      .withIndex("by_brief", (q) => q.eq("briefId", briefId))
-      .collect();
+    // Get all tasks belonging to this brief (in a recruitment brief, the ones this person sees)
+    const me = await ctx.db.get(userId);
+    const brief = await ctx.db.get(briefId);
+    if (!me || !brief) return [];
+    const tasks = await visibleTasks(
+      ctx,
+      me,
+      brief,
+      await ctx.db
+        .query("tasks")
+        .withIndex("by_brief", (q) => q.eq("briefId", briefId))
+        .collect()
+    );
     const taskMap = new Map(tasks.map((t) => [t._id, t.title]));
 
     // Get brief-level comments
-    const briefComments = await ctx.db
-      .query("comments")
-      .withIndex("by_parent", (q) =>
-        q.eq("parentType", "brief").eq("parentId", briefId)
-      )
-      .collect();
+    const briefComments = (await canViewThread(ctx, userId, "brief", briefId))
+      ? await ctx.db
+          .query("comments")
+          .withIndex("by_parent", (q) =>
+            q.eq("parentType", "brief").eq("parentId", briefId)
+          )
+          .collect()
+      : [];
 
     // Get task-level comments for all tasks in this brief
     const taskCommentArrays = await Promise.all(
@@ -113,6 +124,7 @@ export const addComment = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    if (!(await canViewThread(ctx, userId, args.parentType, args.parentId))) throw new Error("Not authorized");
 
     const commentId = await ctx.db.insert("comments", {
       parentType: args.parentType,

@@ -41,13 +41,12 @@ import {
   Wallet,
   ArrowLeft,
   Users2,
-  Search,
-  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
 import { getDisplayRole } from "@/lib/roles";
 import { canAccessPettyCash } from "@/lib/pettyCash";
+import { RECRUIT_SECTIONS, inSection } from "@/lib/recruitNav";
 
 interface SidebarProps {
   user: Doc<"users">;
@@ -84,26 +83,12 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   "/invoices": Receipt,
   "/hr-requests": LifeBuoy,
   "/recruitment": UserSearch,
-  "/recruitment/candidates": Search,
-  "/recruitment/applicants": Inbox,
-  "/recruitment/access": KeyRound,
-  "/recruitment/today": ListTodo,
   "/recruitment/overview": BarChart3,
-  "/recruitment/meetings": AudioLines,
+  "/recruitment/applicants": Inbox,
   "/recruitment/t/rounds": Briefcase,
   "/recruitment/t/pipeline": Users2,
-  "/recruitment/t/interviews": CalendarRange,
-  "/recruitment/t/assignments": ClipboardList,
-  "/recruitment/t/offers": FileCheck,
-  "/recruitment/t/onboarding": CheckCircle2,
-  "/recruitment/t/interns": UserCog,
-  "/recruitment/t/campus": BookOpen,
-  "/recruitment/t/projects": FileBarChart,
-  "/recruitment/t/tasks": ListTodo,
-  "/recruitment/t/log": NotebookPen,
   "/recruitment/campaigns": Megaphone,
-  "/recruitment/templates": FileBarChart,
-  "/recruitment/activity": MessageSquare,
+  "/recruitment/t/projects": FileBarChart,
   "/my-requests": Send,
   "/petty-cash": Wallet,
   "/meetings": AudioLines,
@@ -121,8 +106,8 @@ interface NavCategory {
     recruitOnly?: boolean;
     /** Inside recruitment: HR and super admins only, not delegates. */
     recruitFullOnly?: boolean;
-    /** Other paths that belong to this item (a position's own page, under Positions). */
-    also?: RegExp;
+    /** Is this the current place? For an item that stands for several pages (its tabs). */
+    active?: (path: string) => boolean;
     /** Active on its own address only, not on the pages beneath it. */
     exact?: boolean;
   }[];
@@ -279,47 +264,18 @@ const REVIEWER_NAV: NavCategory[] = [
  */
 const RECRUITMENT_NAV: NavCategory[] = [
   {
-    // The daily loop: what needs doing, what we are hiring for, who applied, who was shortlisted.
-    category: "Hiring",
-    items: [
-      { href: "/recruitment/today", label: "Today" },
-      { href: "/recruitment/t/rounds", label: "Open Positions" },
-      { href: "/recruitment/applicants", label: "Positions", also: /^\/recruitment\/\d+$/ },
-      { href: "/recruitment/t/pipeline", label: "Candidates" },
-      { href: "/recruitment/t/interviews", label: "Interviews" },
-    ],
-  },
-  {
-    category: "Along the way",
-    items: [
-      { href: "/recruitment/t/assignments", label: "Assignments" },
-      { href: "/recruitment/t/offers", label: "Offers" },
-      { href: "/recruitment/t/onboarding", label: "Onboarding", recruitFullOnly: true },
-      { href: "/recruitment/meetings", label: "Meetings" },
-    ],
-  },
-  {
-    category: "Outreach",
-    items: [
-      { href: "/recruitment/candidates", label: "Search Applicants" },
-      { href: "/recruitment/campaigns", label: "Campaigns" },
-      { href: "/recruitment/templates", label: "Templates" },
-      { href: "/recruitment/activity", label: "Email Activity" },
-    ],
-  },
-  {
-    category: "HR office",
-    items: [
-      { href: "/recruitment/overview", label: "Overview", recruitFullOnly: true },
-      { href: "/recruitment/t/tasks", label: "Founder Tasks", recruitFullOnly: true },
-      { href: "/recruitment/t/log", label: "Daily HR Log", recruitFullOnly: true },
-      { href: "/recruitment/t/projects", label: "HR Projects", recruitFullOnly: true },
-      { href: "/recruitment/t/interns", label: "Interns", recruitFullOnly: true },
-      { href: "/recruitment/t/campus", label: "Campus Connect", recruitFullOnly: true },
-      { href: "/recruitment/access", label: "Access", recruitFullOnly: true },
-    ],
+    category: "Recruitment",
+    items: RECRUIT_SECTIONS.map((s) => ({
+      href: s.href,
+      label: s.label,
+      recruitFullOnly: s.fullOnly,
+      active: (path: string) => inSection(s, path),
+    })),
   },
 ];
+
+const isCurrent = (item: NavCategory["items"][number], path: string) =>
+  item.active ? item.active(path) : path === item.href || (!item.exact && path.startsWith(item.href + "/"));
 
 function getIconForRoute(href: string): LucideIcon {
   return ROUTE_ICONS[href] ?? LayoutGrid;
@@ -421,7 +377,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
           {nav.map((group) => {
             const isOpen = !collapsedCategories.has(group.category);
             const hasActiveItem = group.items.some(
-              (item) => pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/")) || item.also?.test(pathname)
+              (item) => isCurrent(item, pathname)
             );
 
             return (
@@ -451,10 +407,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                 {isOpen && (
                   <div className="mt-0.5 space-y-0.5">
                     {group.items.map((item) => {
-                      const isActive =
-                        pathname === item.href ||
-                        (!item.exact && pathname.startsWith(item.href + "/")) ||
-                        item.also?.test(pathname);
+                      const isActive = isCurrent(item, pathname);
                       const Icon = getIconForRoute(item.href);
                       return (
                         <Link

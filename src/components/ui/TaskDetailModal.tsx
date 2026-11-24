@@ -35,6 +35,7 @@ import {
   Tag as TagIcon,
   AlertTriangle,
   UserPlus,
+  UserSearch,
   Play,
   RotateCcw,
   Lock,
@@ -125,11 +126,16 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   );
 
   const editBriefTeams = graphData?.teams ?? [];
-  const editAllMembers = [
-    ...new Map(
-      editBriefTeams.flatMap((t) => t.members.map((m) => [m.user._id, m.user]))
-    ).values(),
-  ];
+  // A recruitment brief has no teams: its tasks can go to anyone on staff.
+  const hiringTask = detail?.brief?.briefType === "recruitment";
+  const staff = useQuery(api.users.listAllUsers, hiringTask && detail?.manage && user?.role === "admin" ? {} : "skip");
+  const editAllMembers = hiringTask
+    ? (staff ?? []).filter((u) => u.isReviewer !== true)
+    : [
+        ...new Map(
+          editBriefTeams.flatMap((t) => t.members.map((m) => [m.user._id, m.user]))
+        ).values(),
+      ];
 
   const [showEditForm, setShowEditForm] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -242,9 +248,10 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
   const status = task.status;
   const statusInfo = taskStatusMeta(status);
   const isAssignee = user._id === task.assigneeId;
-  const isAdmin = user.role === "admin";
+  // In a recruitment brief the controls go with running it, not with the role.
+  const isAdmin = detail.manage ?? user.role === "admin";
   // Team leads can add helpers from their own team (server enforces which).
-  const canAddHelper = isAdmin || (myTeams ?? []).some((t: any) => t?.leadId === user._id);
+  const canAddHelper = isAdmin || (!hiringTask && (myTeams ?? []).some((t: any) => t?.leadId === user._id));
   // Tasks already in "review" have been submitted by the assignee — the ball
   // is in the reviewer's court, so the overdue flag should clear.
   const isOverdue =
@@ -677,6 +684,13 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   Start Task
                 </Button>
               )}
+              {/* Recruitment tasks have nothing to hand in: whoever has one closes it. */}
+              {hiringTask && canUpdateStatus && isAssignee && !isAdmin && status !== "done" && status !== "pending" && (
+                <Button onClick={() => setStatus("done")}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Mark as done
+                </Button>
+              )}
               {/* Admins: keep full status flow control */}
               {canUpdateStatus && isAdmin && nextStatus && status !== "done" && (
                 <Button onClick={handleStatusUpdate}>
@@ -691,7 +705,7 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
                   Close task
                 </Button>
               )}
-              {isAssignee && !isAdmin && status === "in-progress" && (
+              {isAssignee && !isAdmin && !hiringTask && status === "in-progress" && (
                 <span className="text-[12px] text-[var(--text-muted)]">
                   Submit a deliverable when ready
                 </span>
@@ -858,6 +872,26 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               {task.deadlineExtended && task.originalDeadline && (
                 <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
                   <span>Original deadline: {new Date(task.originalDeadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })} {new Date(task.originalDeadline).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                </div>
+              )}
+              {detail.candidate && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[var(--text-secondary)] min-w-0">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <UserSearch className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                    <span className="truncate">
+                      Candidate: {[detail.candidate.name, detail.candidate.role].filter(Boolean).join(", ")}
+                    </span>
+                  </span>
+                  {detail.candidate.resume && (
+                    <a href={detail.candidate.resume} target="_blank" rel="noreferrer" className="font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2">
+                      Resume
+                    </a>
+                  )}
+                  {detail.candidate.canOpen && (
+                    <a href={`/recruitment/t/pipeline?open=${detail.candidate._id}`} className="font-medium text-[var(--accent-admin-text)] hover:underline underline-offset-2">
+                      Open candidate
+                    </a>
+                  )}
                 </div>
               )}
               {assignedBy && (
@@ -1206,12 +1240,14 @@ export function TaskDetailModal({ taskId, onClose, autoEdit }: TaskDetailModalPr
               <div>
                 <SectionHeader title="Deliverables" className="" />
                 <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
-                  {showCreativeSlots
+                  {hiringTask
+                    ? "Nothing to hand in here. Use the files and discussion below, then mark it done."
+                    : showCreativeSlots
                     ? `${deliverables?.length ?? 0} / ${creativesRequired} creative${creativesRequired !== 1 ? "s" : ""} submitted`
                     : `${deliverables?.length ?? 0} deliverable${(deliverables?.length ?? 0) !== 1 ? "s" : ""} submitted`}
                 </p>
               </div>
-              {isAssignee && status !== "done" && (
+              {isAssignee && status !== "done" && !hiringTask && (
                 <Button variant="secondary" onClick={() => setShowDeliverableForm(!showDeliverableForm)}>
                   <Send className="h-3.5 w-3.5" />
                   Submit deliverable

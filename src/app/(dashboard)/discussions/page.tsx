@@ -54,7 +54,8 @@ export default function DiscussionsPage() {
   // Filter briefs that are not archived and match search
   const filteredBriefs = useMemo(() => {
     if (!briefs) return [];
-    let list = briefs.filter((b) => b.status !== "archived");
+    // Someone with one task in a recruitment brief talks on that task, not here.
+    let list = briefs.filter((b) => b.status !== "archived" && b.manage);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(

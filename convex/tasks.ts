@@ -1,10 +1,10 @@
 import { openBriefsAndTasks } from "./lib/openBriefs";
 import { getAuthUserId } from "./lib/internalAuth";
 import { stopTaskTimers } from "./lib/stopTaskTimers";
-import { canViewBrief } from "./lib/guards";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { canViewBrief, canViewTask, canViewThread, guardRecruitment, myCandidate, recruitAccess, recruitmentBriefView, visibleTasks } from "./lib/guards";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { syncSingleTaskBriefStatus, syncBriefStatusFromTasks, reopenBriefForNewTask } from "./lib/syncBriefStatus";
 import { cascadeDoneToChildren } from "./lib/cascadeTaskStatus";
 import { autoApproveDeliverablesForTaskTree } from "./lib/autoApproveDeliverables";
@@ -40,10 +40,12 @@ export const listTasksForBrief = query({
     if (!meDoc || !(await canViewBrief(ctx, meDoc, briefId))) {
       return { tasks: [], byTeam: {}, users: [] };
     }
-    const tasks = await ctx.db
+    let tasks = await ctx.db
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
+    const listed = await ctx.db.get(briefId);
+    if (listed) tasks = await visibleTasks(ctx, meDoc, listed, tasks);
     const users = await ctx.db.query("users").collect();
     const briefTeams = await ctx.db
       .query("briefTeams")
@@ -84,14 +86,25 @@ export function inheritedDescription(
   return placeholder && parent?.description ? parent.description : own;
 }
 
+/** For someone's own list: who each recruitment task is about, beside its title.
+ *  Tasks they gave out keep the name only while they may still see that candidate. */
+async function nameCandidates(ctx: QueryCtx, tasks: Doc<"tasks">[], me: Id<"users">) {
+  for (const t of tasks) {
+    const row = !t.candidateId ? null : t.assigneeId === me ? await ctx.db.get(t.candidateId) : await myCandidate(ctx, t.candidateId);
+    if (row?.fields.name) t.title = `${t.title} · ${String(row.fields.name)}`;
+  }
+}
+
 export const listTasksForUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    if (!(await getAuthUserId(ctx))) return [];
+    const caller = await getAuthUserId(ctx);
+    if (!caller) return [];
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_assignee_sort", (q) => q.eq("assigneeId", userId))
       .collect();
+    if (caller === userId) await nameCandidates(ctx, tasks, caller);
     // Only this person's briefs and brands — not whole tables, so a write to
     // someone else's brief doesn't re-run this for every open dashboard.
     const briefs = await Promise.all(
@@ -167,6 +180,8 @@ export const listMyWork = query({
       .query("tasks")
       .withIndex("by_assigned_by", (q) => q.eq("assignedBy", userId))
       .collect();
+    await nameCandidates(ctx, mine, userId);
+    await nameCandidates(ctx, delegated, userId);
 
     // Only the briefs these tasks sit in, not the whole table.
     const briefs = await Promise.all(
@@ -312,7 +327,7 @@ export const getTaskDetail = query({
     if (!meDoc) return null;
     const raw = await ctx.db.get(taskId);
     if (!raw) return null;
-    if (!(await canViewBrief(ctx, meDoc, raw.briefId))) return null;
+    if (!(await canViewTask(ctx, meDoc, raw))) return null;
     const parent = raw.parentTaskId ? await ctx.db.get(raw.parentTaskId) : null;
     const task = { ...raw, description: inheritedDescription(raw, parent) };
     const brief = await ctx.db.get(task.briefId);
@@ -322,7 +337,22 @@ export const getTaskDetail = query({
       .query("deliverables")
       .withIndex("by_task", (q) => q.eq("taskId", taskId))
       .collect();
-    return { task, brief, assignee, assignedBy, deliverables };
+    // Who a recruitment task is about. The person doing it gets what an
+    // interviewer gets (name, role, resume); only people hiring get the way in.
+    const row = raw.candidateId ? await ctx.db.get(raw.candidateId) : null;
+    const access = row ? await recruitAccess(ctx) : null;
+    const candidate = row
+      ? {
+          _id: row._id,
+          name: String(row.fields.name ?? ""),
+          role: String(row.fields.roleOriginal ?? ""),
+          resume: String(row.fields.resume ?? ""),
+          canOpen: !!access && !!(await myCandidate(ctx, row._id, access)),
+        }
+      : null;
+    // Whoever runs a recruitment brief runs its tasks, whatever their role; nobody else does.
+    const manage = brief?.briefType === "recruitment" ? (await recruitmentBriefView(ctx, meDoc, brief)) === "all" : null;
+    return { task, brief, assignee, assignedBy, deliverables, candidate, manage };
   },
 });
 
@@ -344,6 +374,8 @@ export const createTask = mutation({
     handoffTargetTeamId: v.optional(v.id("teams")),
     flowX: v.optional(v.number()),
     flowY: v.optional(v.number()),
+    /** Recruitment briefs: who on Candidates this task is about. */
+    candidateId: v.optional(v.id("hrRecords")),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -351,9 +383,23 @@ export const createTask = mutation({
     const brief = await ctx.db.get(args.briefId);
     if (!brief) throw new Error("Brief not found");
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && brief.assignedManagerId !== userId)) {
+    const hiring = brief.briefType === "recruitment";
+    if (
+      !user ||
+      (hiring
+        ? (await recruitmentBriefView(ctx, user, brief)) !== "all"
+        : user.role !== "admin" && brief.assignedManagerId !== userId)
+    ) {
       throw new Error("Not authorized to create tasks");
     }
+    if (hiring) {
+      const assignee = await ctx.db.get(args.assigneeId);
+      if (!assignee || assignee.role === "client" || assignee.isReviewer === true) throw new Error("Pick a team member");
+    }
+    // The name is never put in the title: titles show in work logs and reports
+    // that go wider than recruitment. People allowed to see it get it beside the title.
+    const candidate = args.candidateId && hiring ? await myCandidate(ctx, args.candidateId) : null;
+    if (args.candidateId && !candidate) throw new Error("Candidate not found");
 
     const existingTasks = await ctx.db
       .query("tasks")
@@ -366,6 +412,7 @@ export const createTask = mutation({
       (t) =>
         t.briefId === args.briefId &&
         t.title === args.title &&
+        t.candidateId === args.candidateId &&
         Date.now() - t._creationTime < 30_000
     );
     if (replay) return replay._id;
@@ -398,7 +445,7 @@ export const createTask = mutation({
       recipientId: args.assigneeId,
       type: "task_assigned",
       title: "Task assigned",
-      message: `You were assigned: ${args.title}`,
+      message: `You were assigned: ${args.title}${candidate ? ` (${String(candidate.fields.name ?? "")})` : ""}`,
       briefId: args.briefId,
       taskId,
       triggeredBy: userId,
@@ -461,7 +508,8 @@ export const updateTask = mutation({
     if (!task) throw new Error("Task not found");
     const brief = await ctx.db.get(task.briefId);
     const user = await ctx.db.get(userId);
-    if (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId)) {
+    const hiring = await guardRecruitment(ctx, userId, task.briefId, task);
+    if (!hiring && (!user || (user.role !== "admin" && brief?.assignedManagerId !== userId))) {
       // Employees involved in a brand's content calendar edit its entries too.
       if (!(await canEditCalendarBrief(ctx, userId, task.briefId))) {
         throw new Error("Only admins or assigned managers can edit tasks");
@@ -670,13 +718,18 @@ export const updateTaskStatus = mutation({
     const brief = await ctx.db.get(task.briefId);
     const user = await ctx.db.get(userId);
 
+    const runsHiring = task.assigneeId !== userId && (await guardRecruitment(ctx, userId, task.briefId, task));
     const canUpdate =
       task.assigneeId === userId ||
+      runsHiring ||
       user?.role === "admin" ||
       (await canEditCalendarBrief(ctx, userId, task.briefId));
     if (!canUpdate) throw new Error("Not authorized");
 
-    if (newStatus === "done" && user?.role !== "admin") {
+    // Recruitment tasks (call someone, read a portfolio) have nothing to hand
+    // in for approval: whoever has one, or runs the brief, closes it.
+    const closesHiring = runsHiring || (brief?.briefType === "recruitment" && task.assigneeId === userId);
+    if (newStatus === "done" && user?.role !== "admin" && !closesHiring) {
       throw new Error("Employees cannot mark tasks as done. Submit a deliverable for review.");
     }
     // Review only through a deliverable: that is what notifies the team lead
@@ -816,6 +869,7 @@ export const requestTaskRedo = mutation({
 
     // Authorisation: super admin, admin who manages this brand, or the
     // assigned manager of this brief.
+    await guardRecruitment(ctx, userId, task.briefId, task);
     const isSuperAdmin = (user as any).isSuperAdmin === true;
     let isBrandMgr = false;
     if (brief?.brandId) {
@@ -968,9 +1022,11 @@ export const reassignTask = mutation({
     const user = await ctx.db.get(userId);
     const assignorCanReassign =
       task.assignedBy === userId && brief?.briefType === "single_task";
+    const hiring = await guardRecruitment(ctx, userId, task.briefId, task);
     if (
       !user ||
-      (user.role !== "admin" &&
+      (!hiring &&
+        user.role !== "admin" &&
         brief?.assignedManagerId !== userId &&
         !assignorCanReassign)
     ) {
@@ -1040,7 +1096,8 @@ export const deleteTask = mutation({
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
     const user = await ctx.db.get(userId);
-    if (!user || user.role !== "admin") {
+    const hiring = await guardRecruitment(ctx, userId, task.briefId, task);
+    if (!user || (!hiring && user.role !== "admin")) {
       throw new Error("Only admins can delete tasks");
     }
 
@@ -1097,6 +1154,7 @@ export const bulkUpdateStatus = mutation({
       const canUpdate =
         task.assigneeId === userId || user?.role === "admin";
       if (!canUpdate) continue;
+      if (brief?.briefType === "recruitment" && task.assigneeId !== userId && (!user || !(await canViewTask(ctx, user, task)))) continue;
 
       if (newStatus === "done" && user?.role !== "admin") {
         continue;
@@ -1144,6 +1202,7 @@ export const createSubTask = mutation({
     const parentTask = await ctx.db.get(args.parentTaskId);
     if (!parentTask) throw new Error("Parent task not found");
     if (parentTask.isHelper) throw new Error("Helpers can only be added to a main task");
+    await guardRecruitment(ctx, userId, parentTask.briefId, parentTask);
     const parentBrief = await ctx.db.get(parentTask.briefId);
     if (parentBrief?.status === "on_hold" || parentTask.status === "on-hold") {
       throw new Error("This task is on hold. Resume it before adding helpers.");
@@ -1281,7 +1340,7 @@ export const getSubTasks = query({
   args: { parentTaskId: v.id("tasks") },
   handler: async (ctx, { parentTaskId }) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    if (!userId || !(await canViewThread(ctx, userId, "task", parentTaskId))) return [];
 
     const subTasks = await ctx.db
       .query("tasks")
@@ -1325,6 +1384,7 @@ export const createEmployeeTask = mutation({
 
     const brief = await ctx.db.get(args.briefId);
     if (!brief) throw new Error("Brief not found");
+    if (brief.briefType === "recruitment") throw new Error("Tasks in a recruitment brief are given out by the people hiring");
 
     const existingTasks = await ctx.db
       .query("tasks")
@@ -1519,6 +1579,7 @@ export const extendTaskDeadline = mutation({
 
     const task = await ctx.db.get(taskId);
     if (!task) throw new Error("Task not found");
+    await guardRecruitment(ctx, userId, task.briefId, task);
 
     const originalDeadline = task.originalDeadline ?? task.deadline;
     const normalizedNewDeadline = normalizeDeadlineToEndOfDay(newDeadline);
@@ -1772,7 +1833,10 @@ export const contactManagerForOverdue = mutation({
               .withIndex("by_brand", (q) => q.eq("brandId", brief.brandId!))
               .first()
           )?.managerId
-        : undefined);
+        : // Recruitment has no brand: whoever gave the task out.
+          brief?.briefType === "recruitment"
+          ? task.assignedBy
+          : undefined);
     if (!managerId) throw new Error("No brand manager found for this task");
 
     await ctx.db.patch(taskId, { overdueContacted: true, overdueContactDenied: false });

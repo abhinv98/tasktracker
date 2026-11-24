@@ -125,6 +125,11 @@ async function isTeamLeadOf(ctx: any, leadId: string, memberId: string) {
 // reopened through Request Changes, never by a fresh submission.
 async function assertCanSubmit(ctx: any, userId: Id<"users">, task: any, brief: any) {
   if (task.status === "done") throw new Error("This task is already done");
+  // Handed-in work goes to a team lead's queue, and team leads are not part of
+  // hiring. Notes and files on the task itself stay among the people who are.
+  if (brief?.briefType === "recruitment") {
+    throw new Error("Recruitment tasks are not handed in. Put it in the task's discussion or files, and mark it done.");
+  }
   if (task.assigneeId === userId) return;
   const me = await ctx.db.get(userId);
   if (me?.role === "admin") return;

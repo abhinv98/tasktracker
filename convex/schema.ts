@@ -134,9 +134,12 @@ export default defineSchema({
         v.literal("production"),
         v.literal("content_calendar"),
         v.literal("copywriting"),
-        v.literal("single_task")
+        v.literal("single_task"),
+        v.literal("recruitment")
       )
     ),
+    /** Recruitment briefs: the open position (hrRecords "rounds") they are for. */
+    hiringRoundId: v.optional(v.id("hrRecords")),
     createdBy: v.id("users"),
     assignedManagerId: v.optional(v.id("users")),
     globalPriority: v.number(),
@@ -253,7 +256,10 @@ export default defineSchema({
      *  grid. postDate is preserved so un-staging restores the original day. */
     stagedAt: v.optional(v.number()),
     stagedBy: v.optional(v.id("users")),
+    /** A recruitment task's candidate (hrRecords "pipeline"). */
+    candidateId: v.optional(v.id("hrRecords")),
   })
+    .index("by_candidate", ["candidateId"])
     .index("by_brief", ["briefId"])
     .index("by_assignee", ["assigneeId"])
     .index("by_assignee_sort", ["assigneeId", "sortOrder"])

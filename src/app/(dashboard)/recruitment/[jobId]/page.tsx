@@ -12,100 +12,56 @@ import {
   EmptyState,
   Modal,
   Input,
-  SegmentedTabs,
   Select,
   Textarea,
-  StatusBadge,
   ConfirmModal,
   SkeletonPageHeader,
   SkeletonTable,
   useToast,
 } from "@/components/ui";
-import { STAGES, OPEN_STAGES, stageMeta, type Stage } from "@/lib/recruitStages";
+import { FilterTray, SearchField, StatChips, Tray, TrayItem } from "@/components/ui/Tray";
+import { POSITION_STATUSES, isPositionStatus, positionStatus, type PositionStatus } from "@/lib/recruitStages";
+import { NO_NARROW, narrow, type Narrow } from "@/lib/applicantSearch";
 import { useHrData } from "@/components/recruitment/hrShared";
+import { ApplicantsTable, NarrowTray, placesOf, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
+import { Rounds } from "@/components/recruitment/OpenRound";
 import { EmailPreview } from "@/components/recruitment/TemplateEditor";
 import { valuesFor } from "@/lib/templateHtml";
-import {
-  parseCtcLpa, formatLpa, parseYears, formatYears, parseNoticeDays, formatNotice,
-} from "@/lib/recruitParse";
-import {
-  ArrowLeft,
-  Search,
-  FileText,
-  ExternalLink,
-  Mail,
-  Trash2,
-  UserSearch,
-  UserCheck,
-  Megaphone,
-  ChevronUp,
-  ChevronDown,
-} from "lucide-react";
+import { ArrowLeft, Check, Mail, Megaphone, Pause, RotateCcw, Trash2, UserSearch, X } from "lucide-react";
 
-type SortKey = "name" | "years" | "current" | "expected" | "notice" | "status" | "added";
+type Chip = PositionStatus | "all";
 
-/** Every column is its own column. Numbers sit right-aligned and sortable —
- *  the whole point of a recruitment table is comparing salary and experience
- *  across candidates, which a merged text blob makes impossible. */
-const COLUMNS: { key: SortKey | null; label: string; align?: "right"; cls: string }[] = [
-  { key: "name", label: "Candidate", cls: "min-w-[190px]" },
-  { key: null, label: "Email", cls: "min-w-[210px]" },
-  { key: null, label: "Phone", cls: "min-w-[130px]" },
-  { key: null, label: "Applied for", cls: "min-w-[140px]" },
-  { key: "years", label: "Exp", align: "right", cls: "min-w-[80px]" },
-  { key: "current", label: "Current", align: "right", cls: "min-w-[90px]" },
-  { key: "expected", label: "Expected", align: "right", cls: "min-w-[95px]" },
-  { key: "notice", label: "Notice", align: "right", cls: "min-w-[85px]" },
-  { key: "status", label: "Stage", cls: "min-w-[105px]" },
-  { key: "added", label: "Added", align: "right", cls: "min-w-[90px]" },
-  { key: null, label: "", cls: "min-w-[70px]" },
-];
-
-
-
-function fmt(ts?: number | null) {
-  if (!ts) return "";
-  return new Date(ts).toLocaleDateString("en-GB", {
-    day: "numeric", month: "short", year: "2-digit",
-  });
-}
-
+/**
+ * One position: who applied, and the decision on each of them. The whole list is
+ * here already, so searching and filtering answer on every keystroke.
+ */
 export default function RecruitmentJobPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobSourceId = Number(params.jobId);
   const highlight = searchParams.get("highlight");
+  const asked = searchParams.get("status");
 
   const jobs = useQuery(api.recruitment.listJobs);
-  const [stage, setStage] = useState<Stage | "" | "open">("open");
-  const [openId, setOpenId] = useState<Id<"recruitCandidates"> | null>(null);
-  const [search, setSearch] = useState("");
-  const candidates = useQuery(api.recruitment.listCandidates, {
-    jobSourceId,
-    ...(stage && stage !== "open" ? { stage } : {}),
-    ...(search.trim() ? { search: search.trim() } : {}),
-  });
+  const candidates = useQuery(api.recruitment.listCandidates, { jobSourceId });
   const templates = useQuery(api.recruitment.listTemplates, {});
   const campaigns = useQuery(api.recruitment.listCampaigns, { jobSourceId });
 
-  const setStageMut = useMutation(api.recruitment.setStage);
   const deleteCandidates = useMutation(api.recruitment.deleteCandidates);
   const createCampaign = useMutation(api.recruitment.createCampaign);
   const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
   const addApplicants = useMutation(api.hrOps.addApplicants);
+  const move = useMoveApplicants();
   const hr = useHrData();
-  // Open positions still hiring: where an applicant can be placed straight away.
-  const openRounds = (hr?.book.rounds ?? []).filter(
-    (r) => !String(r.fields.hiringStatus ?? "").startsWith("Closed")
-  );
   const { toast } = useToast();
 
+  const [chip, setChip] = useState<Chip>(isPositionStatus(asked) ? asked : highlight ? "all" : "new");
+  const [filter, setFilter] = useState<Narrow>(NO_NARROW);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Bulk delete/mail/move act on the whole set, so drop picks hidden by a new filter.
-  useEffect(() => setSelected(new Set()), [stage, search, jobSourceId]);
+  const [panel, setPanel] = useState<{ id: Id<"recruitCandidates">; order: Id<"recruitCandidates">[] } | null>(null);
   const [mailOpen, setMailOpen] = useState(false);
   const [campOpen, setCampOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
@@ -114,46 +70,47 @@ export default function RecruitmentJobPage() {
   const [campTarget, setCampTarget] = useState("new");
   const [campName, setCampName] = useState("");
   const [campNotes, setCampNotes] = useState("");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "added", dir: -1 });
+
+  // Bulk delete, mail and move act on every pick, so drop the ones a new filter hides.
+  useEffect(() => setSelected(new Set()), [chip, filter, jobSourceId]);
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
-  const undatedCount = (candidates ?? []).filter((c) => c.createdAt == null).length;
-  const ids = useMemo(() => [...selected] as Id<"recruitCandidates">[], [selected]);
+  const places = useMemo(() => placesOf(hr), [hr]);
+  const narrowed = useMemo(() => narrow((candidates ?? []) as Applicant[], filter), [candidates, filter]);
+  const rows = useMemo(() => (chip === "all" ? narrowed : narrowed.filter((c) => positionStatus(c.stage) === chip)), [narrowed, chip]);
+  const roles = useMemo(
+    () => [...new Set((candidates ?? []).map((c) => c.position.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [candidates]
+  );
+  // Only who is still listed: someone decided on from their own row has left it.
+  const picks = useMemo(() => new Set(rows.filter((r) => selected.has(r._id)).map((r) => r._id as string)), [rows, selected]);
+  const ids = useMemo(() => [...picks] as Id<"recruitCandidates">[], [picks]);
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  if (jobs === undefined || candidates === undefined) {
+    return (
+      <div className="p-4 sm:p-8">
+        <SkeletonPageHeader />
+        <SkeletonTable rows={8} cols={6} what="applicants" />
+      </div>
+    );
   }
 
-  async function applyStage(next: Stage) {
-    if (!ids.length) return;
-    try {
-      const { updated, added } = await setStageMut({ candidateIds: ids, stage: next });
-      toast(
-        "success",
-        [updated && `${updated} moved to ${stageMeta(next).label}`, added && `${added} added to Candidates`]
-          .filter(Boolean)
-          .join(", ") || (next === "screened" ? "Already on Candidates" : "Nothing to change")
-      );
-      setSelected(new Set());
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed");
-    }
+  const openRounds = (hr?.book.rounds ?? []).filter((r) => !String(r.fields.hiringStatus ?? "").startsWith("Closed"));
+  const count = (c: Chip) => (c === "all" ? narrowed.length : narrowed.filter((x) => positionStatus(x.stage) === c).length);
+  const filtersOn = Object.values(filter).some(Boolean);
+  const picked = templates?.find((t) => t._id === templateId);
+  const firstPicked = rows.find((r) => picks.has(r._id) && r.email);
+  const undated = candidates.filter((c) => c.createdAt == null).length;
+
+  async function moveSelected(to: PositionStatus) {
+    if (ids.length && (await move(ids, to))) setSelected(new Set());
   }
 
   async function addToRound(roundId: string) {
-    if (!ids.length) return;
     try {
       const { added, skipped } = await addApplicants({ candidateIds: ids, roundId: roundId as Id<"hrRecords"> });
-      const code = openRounds.find((r) => r._id === roundId)?.code ?? "the open position";
-      toast(
-        "success",
-        `${added} added to ${code}${skipped ? `, ${skipped} already there` : ""}. Find them under Candidates.`
-      );
+      const code = openRounds.find((r) => r._id === roundId)?.code ?? "the hiring round";
+      toast("success", `${added} added to ${code}${skipped ? `, ${skipped} already there` : ""}. Find them under Candidates.`);
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
@@ -189,12 +146,12 @@ export default function RecruitmentJobPage() {
           name: campName.trim(), jobSourceId, candidateIds: ids,
           notes: campNotes.trim() || undefined,
         });
-        toast("success", `Campaign created with ${ids.length} candidates`);
+        toast("success", `Campaign created with ${ids.length} people`);
       } else {
         const { memberCount } = await updateMembers({
           campaignId: campTarget as Id<"recruitCampaigns">, add: ids,
         });
-        toast("success", `Campaign now has ${memberCount} candidates`);
+        toast("success", `Campaign now has ${memberCount} people`);
       }
       setCampOpen(false); setCampName(""); setCampNotes(""); setSelected(new Set());
     } catch (err) {
@@ -204,56 +161,12 @@ export default function RecruitmentJobPage() {
     }
   }
 
-  if (jobs === undefined || candidates === undefined) {
-    return (
-      <div className="p-8">
-        <SkeletonPageHeader />
-        <SkeletonTable rows={8} cols={5} what="candidates" />
-      </div>
-    );
-  }
-
-  // Parse once, then sort on the parsed numbers — sorting the raw strings
-  // would put "900000 LPA" above "9 LPA" despite being the same salary.
-  const visible =
-    stage === "open"
-      ? candidates.filter((c) => OPEN_STAGES.includes((c.stage ?? "applied") as Stage))
-      : candidates;
-
-  const rows = visible
-    .map((c) => ({
-      c,
-      years: parseYears(c.experience),
-      current: parseCtcLpa(c.currentCtc),
-      expected: parseCtcLpa(c.expectedCtc),
-      notice: parseNoticeDays(c.noticePeriod),
-    }))
-    .sort((a, b) => {
-      const dir = sort.dir;
-      // Missing values always sink, whichever way the column is sorted.
-      const nul = (v: number | null | undefined) =>
-        v == null ? (dir === 1 ? Infinity : -Infinity) : v;
-      switch (sort.key) {
-        case "name": return a.c.name.localeCompare(b.c.name) * dir;
-        case "years": return (nul(a.years) - nul(b.years)) * dir;
-        case "current": return (nul(a.current) - nul(b.current)) * dir;
-        case "expected": return (nul(a.expected) - nul(b.expected)) * dir;
-        case "notice": return (nul(a.notice) - nul(b.notice)) * dir;
-        case "status": return (a.c.stage ?? "applied").localeCompare(b.c.stage ?? "applied") * dir;
-        default: return (nul(a.c.createdAt) - nul(b.c.createdAt)) * dir;
-      }
-    });
-
-  const allSelected = rows.length > 0 && selected.size === rows.length;
-  const picked = templates?.find((t) => t._id === templateId);
-  const firstPicked = rows.find((r) => selected.has(r.c._id) && r.c.email)?.c;
-
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
           href="/recruitment/applicants"
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
         >
           <ArrowLeft size={13} />
           All positions
@@ -270,259 +183,130 @@ export default function RecruitmentJobPage() {
             <option key={j._id} value={String(j.sourceId)}>
               {j.parentSourceId != null ? "\u00a0\u00a0\u00a0" : ""}
               {j.name}
+              {j.fresh ? ` (${j.fresh} new)` : ""}
             </option>
           ))}
         </select>
       </div>
 
       <PageHeader
-        title={job?.name ?? "Position"}
+        title={job ? job.name[0].toUpperCase() + job.name.slice(1) : "Position"}
         subtitle={
           job?.parentName
-            ? `Sub-position of ${job.parentName}`
-            : `${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`
+            ? `Under ${job.parentName}`
+            : `${candidates.length.toLocaleString()} ${candidates.length === 1 ? "person has" : "people have"} applied. Shortlisted people carry on under Candidates.`
         }
         icon={UserSearch}
+        actions={job && <Rounds data={hr} job={job} />}
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, email, phone…"
-            className="w-[240px] bg-[var(--bg-input)] border border-[var(--border)] rounded-md pl-8 pr-3 py-1.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-          />
-        </div>
-        {/* "In play" first and selected by default — the closed-out majority
-            is history, and opening a position to 1,437 rejected+applied rows
-            buries the handful actually moving. */}
-        <SegmentedTabs<Stage | "" | "open">
-          value={stage}
-          options={[{ value: "open", label: "In play" }, { value: "", label: "All" }, ...STAGES]}
-          onChange={setStage}
-          className="flex-wrap"
+      <StatChips<Chip>
+        className="mb-3"
+        label="Filter by decision"
+        value={chip}
+        onChange={setChip}
+        options={[
+          ...POSITION_STATUSES.map((s) => ({ value: s.value as Chip, label: s.label, dot: s.color, count: count(s.value) })),
+          { value: "all", label: "All", count: count("all") },
+        ]}
+      />
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <SearchField
+          value={filter.search}
+          onChange={(search) => setFilter((f) => ({ ...f, search }))}
+          placeholder="Name, email, phone or role"
+          label={`Search ${job?.name ?? "this position"}`}
         />
+        {roles.length > 1 && (
+          <FilterTray
+            label="Applied for"
+            allLabel="Any role"
+            value={filter.role}
+            options={roles.map((r) => ({ value: r, label: r }))}
+            onChange={(role) => setFilter((f) => ({ ...f, role }))}
+          />
+        )}
+        <NarrowTray value={filter} onChange={setFilter} />
+        {filtersOn && (
+          <button
+            type="button"
+            onClick={() => setFilter(NO_NARROW)}
+            className="text-[12px] font-medium text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
-      {/* Batch bar. One primary action, a status menu, one secondary, one
-          destructive icon — six competing buttons was the old version. */}
-      {selected.size > 0 && (
+      {picks.size > 0 && (
         <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-strong)] bg-white px-3 py-2 shadow-sm">
-          <span className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">
-            {selected.size} selected
-          </span>
+          <span className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">{picks.size} selected</span>
           <button
+            type="button"
             onClick={() => setSelected(new Set())}
-            className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2"
+            className="text-[12px] font-medium text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]"
           >
             Clear
           </button>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button onClick={() => applyStage("screened")}>
-              <UserCheck size={14} />
+            <Button onClick={() => moveSelected("shortlisted")}>
+              <Check size={14} />
               Shortlist
+            </Button>
+            <Button variant="secondary" onClick={() => moveSelected("on_hold")}>
+              <Pause size={14} />
+              Hold
+            </Button>
+            <Button variant="secondary" onClick={() => moveSelected("rejected")}>
+              <X size={14} />
+              Reject
             </Button>
             <Button variant="secondary" onClick={() => setMailOpen(true)}>
               <Mail size={14} />
-              Send email
+              Email
             </Button>
-            <Button variant="secondary" onClick={() => setCampOpen(true)}>
-              <Megaphone size={14} />
-              Add to campaign
-            </Button>
-            <select
-              value=""
-              onChange={(e) => e.target.value && addToRound(e.target.value)}
-              aria-label="Add to open position"
-              className="max-w-[220px] bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[13px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              <option value="">Add to open position…</option>
-              {openRounds.length === 0 && <option disabled>No open positions yet</option>}
+            <Tray label="More" align="end" width="w-64">
+              <TrayItem label="Back to New" icon={RotateCcw} onSelect={() => moveSelected("new")} />
+              <TrayItem label="Add to an email campaign" icon={Megaphone} onSelect={() => setCampOpen(true)} />
+              {openRounds.length > 0 && (
+                <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Put into a hiring round</p>
+              )}
               {openRounds.map((r) => (
-                <option key={r._id} value={r._id}>
-                  {r.code} · {String(r.fields.role ?? "")}
-                </option>
+                <TrayItem key={r._id} label={`${r.code} · ${String(r.fields.role ?? "")}`} onSelect={() => addToRound(r._id)} />
               ))}
-            </select>
-            <select
-              value=""
-              onChange={(e) => e.target.value && applyStage(e.target.value as Stage)}
-              aria-label="Move to stage"
-              className="bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[13px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-            >
-              <option value="">Move to…</option>
-              {STAGES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => setConfirmDelete(true)}
-              aria-label="Delete selected"
-              className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-            >
-              <Trash2 size={15} />
-            </button>
+              <TrayItem label="Delete for good" icon={Trash2} destructive onSelect={() => setConfirmDelete(true)} />
+            </Tray>
           </div>
         </div>
       )}
 
       {rows.length === 0 ? (
-        <EmptyState icon={UserSearch} title="No candidates match" />
+        filtersOn ? (
+          <EmptyState icon={UserSearch} title="Nobody matches" description="Try fewer letters, or clear the filters." />
+        ) : (
+          <EmptyState
+            icon={UserSearch}
+            title={chip === "new" ? "Nobody is waiting" : "Nobody here"}
+            description={chip === "new" ? "Everyone who applied for this position has been looked at." : "Pick another list above."}
+          />
+        )
       ) : (
         <>
-          <div className="rounded-lg border border-[var(--border)] bg-white overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
-                    <th className="px-3 py-2 w-8">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={() =>
-                          setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.c._id)))
-                        }
-                        aria-label="Select all shown"
-                        className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
-                      />
-                    </th>
-                    {COLUMNS.map((col, i) => {
-                      const active = col.key && sort.key === col.key;
-                      return (
-                        <th
-                          key={col.label || i}
-                          className={`${col.cls} h-8 px-3 font-medium text-[12px] text-[var(--text-muted)] whitespace-nowrap ${
-                            col.align === "right" ? "text-right" : "text-left"
-                          }`}
-                        >
-                          {col.key ? (
-                            <button
-                              onClick={() =>
-                                setSort((p) =>
-                                  p.key === col.key
-                                    ? { key: p.key, dir: p.dir === 1 ? -1 : 1 }
-                                    : { key: col.key as SortKey, dir: 1 }
-                                )
-                              }
-                              className={`inline-flex items-center gap-1 hover:text-[var(--text-primary)] transition-colors ${
-                                active ? "text-[var(--text-primary)]" : ""
-                              }`}
-                            >
-                              {col.label}
-                              {active &&
-                                (sort.dir === 1 ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}
-                            </button>
-                          ) : (
-                            col.label
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(({ c, years, current, expected, notice }) => {
-                    const meta = stageMeta((c.stage ?? "applied") as Stage);
-                    const dash = <span className="text-[var(--text-disabled)]">—</span>;
-                    return (
-                      <tr
-                        key={c._id}
-                        className={`border-b border-[var(--border-subtle)] transition-colors ${
-                          highlight === c._id ? "bg-[var(--accent-admin-dim)]" : "hover:bg-[var(--bg-primary)]"
-                        }`}
-                      >
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(c._id)}
-                            onChange={() => toggle(c._id)}
-                            aria-label={`Select ${c.name}`}
-                            className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
-                          />
-                        </td>
-                        <td className="px-3 py-2">
-                          {/* A handful of applicants pasted a whole paragraph
-                              into the name field (one hit the varchar(255)
-                              ceiling). With auto table layout one of those
-                              widens the column and shoves every other column
-                              off screen, so the cell is capped and the full
-                              text lives in the tooltip. */}
-                          <button
-                            onClick={() => setOpenId(c._id)}
-                            title={c.name}
-                            className="block max-w-[200px] truncate text-left text-[13px] font-medium text-[var(--text-primary)] hover:underline underline-offset-2"
-                          >
-                            {c.name}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-[13px]">
-                          {c.email ? (
-                            <a
-                              href={`mailto:${c.email}`}
-                              title={c.email}
-                              className="block max-w-[220px] truncate text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline underline-offset-2"
-                            >
-                              {c.email}
-                            </a>
-                          ) : dash}
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
-                          {c.number || dash}
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)]">
-                          {/* Blank position = the old form recorded no sub-position,
-                              so they applied for the job itself. */}
-                          <div className="max-w-[160px] truncate" title={c.position || job?.name || ""}>
-                            {c.position || job?.name || dash}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
-                          {years == null ? dash : formatYears(years)}
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
-                          {current == null ? dash : formatLpa(current)}
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-primary)] tabular-nums text-right whitespace-nowrap">
-                          {expected == null ? dash : formatLpa(expected)}
-                        </td>
-                        <td className="px-3 py-2 text-[13px] text-[var(--text-secondary)] tabular-nums text-right whitespace-nowrap">
-                          {notice == null ? dash : formatNotice(notice)}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <StatusBadge color={meta.color} label={meta.label} />
-                        </td>
-                        <td className="px-3 py-2 text-[12px] text-[var(--text-muted)] tabular-nums text-right whitespace-nowrap">
-                          {fmt(c.createdAt) || dash}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <div className="flex items-center gap-1">
-                            {c.resume && (
-                              <a href={c.resume} target="_blank" rel="noreferrer" title="Open résumé" aria-label="Open résumé"
-                                className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                                <FileText size={14} />
-                              </a>
-                            )}
-                            {c.portfolioLink && (
-                              <a href={c.portfolioLink} target="_blank" rel="noreferrer" title="Open portfolio" aria-label="Open portfolio"
-                                className="inline-flex items-center justify-center h-6 w-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-                                <ExternalLink size={14} />
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {undatedCount > 0 && (
+          <ApplicantsTable
+            rows={rows}
+            // Blank means they applied for the position itself.
+            roleColumn={roles.length > 1 ? { label: "Applied for", of: (a) => a.position || job?.name || "" } : null}
+            selected={picks}
+            onSelect={setSelected}
+            onOpen={(id, order) => setPanel({ id, order })}
+            onMove={(a, to) => move([a._id], to, a.name)}
+            places={places}
+            highlight={highlight}
+          />
+          {undated > 0 && (
             <p className="mt-3 text-[12px] text-[var(--text-muted)]">
-              {undatedCount} of these {candidates.length} came through the older
+              {undated.toLocaleString()} of these {candidates.length.toLocaleString()} came through the older
               application form, which didn&apos;t record a date or salary details.
             </p>
           )}
@@ -533,7 +317,7 @@ export default function RecruitmentJobPage() {
       <Modal
         open={mailOpen}
         onClose={() => setMailOpen(false)}
-        title={`Email ${selected.size} candidate${selected.size === 1 ? "" : "s"}`}
+        title={`Email ${picks.size} candidate${picks.size === 1 ? "" : "s"}`}
         icon={Mail}
         size="lg"
         footer={
@@ -571,7 +355,7 @@ export default function RecruitmentJobPage() {
       <Modal
         open={campOpen}
         onClose={() => setCampOpen(false)}
-        title={`Add ${selected.size} to a campaign`}
+        title={`Add ${picks.size} to a campaign`}
         icon={Megaphone}
         footer={
           <>
@@ -622,13 +406,15 @@ export default function RecruitmentJobPage() {
         </div>
       </Modal>
 
-      {openId && (
+      {panel && (
         <CandidatePanel
-          candidateId={openId}
-          onClose={() => setOpenId(null)}
-          onOpenOther={(id, job) => {
-            if (job === jobSourceId) setOpenId(id);
-            else window.location.href = `/recruitment/${job}?highlight=${id}`;
+          candidateId={panel.id}
+          order={panel.order}
+          onGo={(id) => setPanel((p) => p && { ...p, id })}
+          onClose={() => setPanel(null)}
+          onOpenOther={(id, other) => {
+            if (other === jobSourceId) setPanel((p) => p && { ...p, id });
+            else router.push(`/recruitment/${other}?highlight=${id}`);
           }}
         />
       )}
@@ -636,7 +422,7 @@ export default function RecruitmentJobPage() {
       <ConfirmModal
         open={confirmDelete}
         title="Delete candidates"
-        message={`Permanently delete ${selected.size} candidate${selected.size === 1 ? "" : "s"}? Their details and résumé links go too. This cannot be undone.`}
+        message={`Permanently delete ${picks.size} candidate${picks.size === 1 ? "" : "s"}? Their details and résumé links go too. This cannot be undone.`}
         confirmLabel="Delete"
         variant="danger"
         onConfirm={async () => {

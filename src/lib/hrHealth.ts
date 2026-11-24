@@ -24,7 +24,7 @@ const olderThan = (date: string, today: string, limit: number) => date !== "" &&
 export function toBook(rows: Row[]): Book {
   const book = {
     rounds: [], pipeline: [], interviews: [], assignments: [], offers: [], onboarding: [],
-    interns: [], campus: [], projects: [], tasks: [], log: [],
+    interns: [], campus: [], projects: [], log: [],
   } as Book;
   for (const row of rows) book[row.tracker]?.push(row);
   return book;
@@ -98,13 +98,6 @@ export function health(row: Row, book: Book, today: string): string {
       if (past(t("nextDue"), today)) return "Overdue";
       if (!t("nextDue")) return "Needs next date";
       return t("blocker") ? "Blocked" : "On Track";
-    case "tasks":
-      if (["Done", "Cancelled"].includes(t("status"))) return "Complete";
-      if (t("status") === "Blocked") return "Blocked";
-      if (past(t("dueDate"), today)) return "Overdue";
-      if (t("status") === "Waiting Approval" && t("approvalStatus") === "Pending") return "Approval pending";
-      if (past(t("nextDue"), today)) return "Follow-up overdue";
-      return t("dueDate") ? "On Track" : "Set due date";
     default:
       return "";
   }
@@ -121,7 +114,6 @@ export const ATTENTION: Record<TrackerKey, readonly string[]> = {
   interns: ["Review overdue", "End date near"],
   campus: ["Follow-up overdue", "No recent contact", "Needs next date"],
   projects: ["Overdue", "Feedback overdue", "Needs next date"],
-  tasks: ["Overdue", "Blocked", "Approval pending", "Set due date"],
   log: [],
 };
 
@@ -274,13 +266,6 @@ export function radar(book: Book, today: string) {
       check: "Draft, feedback, founder approval, implementation",
     },
     {
-      key: "tasks" as TrackerKey,
-      label: "Founder-assigned tasks",
-      open: count("tasks", (r) => !["Done", "Cancelled"].includes(text(r, "status"))),
-      attention: attention("tasks"),
-      check: "Founder enters the task, HR confirms owner, due date and status",
-    },
-    {
       key: "log" as TrackerKey,
       label: "HR updates (7 days)",
       open: thisWeek.length,
@@ -302,8 +287,7 @@ export function headline(book: Book, today: string) {
     approvals:
       open.filter((r) => ["To Confirm", "Pending"].includes(text(r, "approvalStatus"))).length +
       book.offers.filter((r) => text(r, "approvalStatus") === "Pending").length +
-      book.projects.filter((r) => text(r, "stage") === "Submitted for Approval").length +
-      book.tasks.filter((r) => text(r, "status") === "Waiting Approval").length,
+      book.projects.filter((r) => text(r, "stage") === "Submitted for Approval").length,
     lastLog: logDates.at(-1) ?? "",
     roundsToConfirm: book.rounds.filter((r) => text(r, "hiringStatus") === "To Confirm").length,
     candidatesToVerify: book.pipeline.filter((r) => text(r, "verification") === "To Verify").length,

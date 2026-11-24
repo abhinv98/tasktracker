@@ -14,6 +14,7 @@ import {
   Download,
 } from "lucide-react";
 import { flushSync } from "react-dom";
+import { briefTypeLabel } from "@/lib/briefTypes";
 
 // Labels for the text export only; on screen, statuses come from the lib.
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -274,12 +275,7 @@ export default function HistoryPage() {
                           />
                           {brief.briefType && (
                             <span className="text-[12px] text-[var(--text-muted)] shrink-0">
-                              {brief.briefType === "content_calendar" ? "Content Calendar"
-                                : brief.briefType === "video_editing" ? "Video Editing"
-                                : brief.briefType === "production" ? "Production"
-                                : brief.briefType === "developmental" ? "Developmental"
-                                : brief.briefType === "designing" ? "Designing"
-                                : brief.briefType}
+                              {briefTypeLabel(brief.briefType)}
                             </span>
                           )}
                           <span className="text-[12px] text-[var(--text-muted)] tabular-nums shrink-0">

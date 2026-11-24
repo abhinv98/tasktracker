@@ -1,6 +1,6 @@
 import { getAuthUserId } from "./lib/internalAuth";
 import { stopTaskTimers } from "./lib/stopTaskTimers";
-import { canViewBrief } from "./lib/guards";
+import { canViewBrief, guardRecruitment, guardRecruitmentManager, mayRecruitFor, recruitAccess, recruitmentBriefView, visibleTasks } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
@@ -78,6 +78,13 @@ export const listBriefs = query({
       )
     ).flat();
 
+    // Recruitment briefs have a rule of their own (lib/guards.ts).
+    const hiring: typeof briefs = [];
+    for (const b of briefs) {
+      if (b.briefType === "recruitment" && (await recruitmentBriefView(ctx, user, b))) hiring.push(b);
+    }
+    briefs = briefs.filter((b) => b.briefType !== "recruitment");
+
     if (user.role === "employee") {
       const tasks = await ctx.db
         .query("tasks")
@@ -106,6 +113,7 @@ export const listBriefs = query({
         user.isHR === true ? hrBriefIds.has(b._id) : !hrBriefIds.has(b._id)
       );
     }
+    briefs.push(...hiring);
 
     if (args.managerId) {
       briefs = briefs.filter((b) => b.assignedManagerId === args.managerId);
@@ -125,10 +133,11 @@ export const listBriefs = query({
           .collect();
         const teamIds = bt.map((x) => x.teamId);
         const teamNames = bt.map((x) => teamName.get(x.teamId)).filter(Boolean);
-        const tasksInBrief = await ctx.db
+        let tasksInBrief = await ctx.db
           .query("tasks")
           .withIndex("by_brief", (q) => q.eq("briefId", b._id))
           .collect();
+        tasksInBrief = await visibleTasks(ctx, user, b, tasksInBrief);
         // Content-calendar entries are stored as a parent task plus
         // `[Copy]`/`[Design]` children, and helper sub-tasks hang off their
         // parent on every brief type. Count parents only (matching
@@ -156,6 +165,8 @@ export const listBriefs = query({
           managerName: manager?.name ?? manager?.email,
           teamIds,
           teamNames,
+          // Someone with only a task in a recruitment brief.
+          manage: b.briefType !== "recruitment" || (await recruitmentBriefView(ctx, user, b)) === "all",
           reviewTasks,
           taskCount: countableTasks.length,
           doneCount,
@@ -188,10 +199,11 @@ export const getBrief = query({
     const assignedTeams = briefTeams
       .map((bt) => teams.find((t) => t._id === bt.teamId))
       .filter(Boolean);
-    const tasks = await ctx.db
+    let tasks = await ctx.db
       .query("tasks")
       .withIndex("by_brief", (q) => q.eq("briefId", briefId))
       .collect();
+    tasks = await visibleTasks(ctx, me, brief, tasks);
     // Mirror listBriefs: progress counts parents only, not CC Copy/Design
     // children or helper sub-tasks.
     const countableTasks = tasks.filter((t) => t.parentTaskId === undefined);
@@ -204,6 +216,8 @@ export const getBrief = query({
 
     return {
       ...brief,
+      // Someone with only a task in a recruitment brief does not get its controls.
+      manage: brief.briefType !== "recruitment" || (await recruitmentBriefView(ctx, me, brief)) === "all",
       manager,
       brand,
       assignedTeams,
@@ -251,9 +265,12 @@ export const createBrief = mutation({
         v.literal("production"),
         v.literal("content_calendar"),
         v.literal("copywriting"),
-        v.literal("single_task")
+        v.literal("single_task"),
+        v.literal("recruitment")
       )
     ),
+    /** Recruitment briefs: the open position they are for. */
+    hiringRoundId: v.optional(v.id("hrRecords")),
     // Single task brief: inline task fields
     taskTitle: v.optional(v.string()),
     taskDescription: v.optional(v.string()),
@@ -280,6 +297,19 @@ export const createBrief = mutation({
 
     if (args.brandId && (await ctx.db.get(args.brandId))?.onHold) {
       throw new Error("This brand is on hold. Resume it from the brand page first.");
+    }
+    if (args.briefType === "recruitment") {
+      const access = await recruitAccess(ctx);
+      if (!access) throw new Error("Recruitment briefs are for HR and people hiring");
+      const round = args.hiringRoundId ? await ctx.db.get(args.hiringRoundId) : null;
+      if (args.hiringRoundId && (round?.tracker !== "rounds" || !(access.full || mayRecruitFor(access, Number(round.fields.job))))) {
+        throw new Error("Open position not found");
+      }
+      args.brandId = undefined;
+      // Whoever manages it sees all of it: not something to hand to oneself.
+      if (!access.full) args.assignedManagerId = undefined;
+    } else {
+      args.hiringRoundId = undefined;
     }
 
     const duplicateId = await findRecentDuplicateBrief(ctx, userId, args.title);
@@ -347,7 +377,7 @@ export const createBrief = mutation({
       ...briefArgs,
       ...(assignedManagerId ? { assignedManagerId } : {}),
       ...(creativesRequired !== undefined ? { creativesRequired } : {}),
-      status: args.briefType === "single_task" ? "active" : "draft",
+      status: args.briefType === "single_task" || args.briefType === "recruitment" ? "active" : "draft",
       createdBy: userId,
       globalPriority,
     });
@@ -1137,6 +1167,11 @@ export const updateBrief = mutation({
     if (user?.role === "employee") {
       throw new Error("Employees cannot update briefs");
     }
+    // It names candidates: changing its type would open it to everyone.
+    if ((await guardRecruitment(ctx, userId, briefId)) && fields.briefType !== undefined) {
+      throw new Error("A recruitment brief stays one. Make a new brief instead.");
+    }
+    if (fields.assignedManagerId !== undefined) await guardRecruitmentManager(ctx, userId, briefId);
 
     const updates: Record<string, unknown> = {};
     if (fields.title !== undefined) updates.title = fields.title;
@@ -1288,6 +1323,7 @@ export const assignManagerToBrief = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can assign managers");
     }
+    await guardRecruitmentManager(ctx, userId, briefId);
     await ctx.db.patch(briefId, { assignedManagerId: managerId });
     await ctx.db.insert("activityLog", {
       briefId,
@@ -1442,6 +1478,7 @@ export const archiveBrief = mutation({
     if (!user || (user.role !== "admin" && brief.assignedManagerId !== userId)) {
       throw new Error("Not authorized");
     }
+    await guardRecruitment(ctx, userId, briefId);
     await ctx.db.patch(briefId, {
       status: "archived",
       archivedAt: Date.now(),
@@ -1465,6 +1502,7 @@ export const deleteBrief = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can delete briefs");
     }
+    await guardRecruitment(ctx, userId, briefId);
     const brief = await ctx.db.get(briefId);
     if (!brief) throw new Error("Brief not found");
 
@@ -1539,6 +1577,7 @@ export const restoreBrief = mutation({
     if (!user || user.role !== "admin") {
       throw new Error("Only admins can restore briefs");
     }
+    await guardRecruitment(ctx, userId, briefId);
     const brief = await ctx.db.get(briefId);
     if (!brief) throw new Error("Brief not found");
     if (brief.brandId && (await ctx.db.get(brief.brandId))?.onHold) {
@@ -1763,8 +1802,12 @@ export const getArchivedBriefs = query({
       .order("desc")
       .paginate(paginationOpts);
     const managers = await ctx.db.query("users").collect();
+    const shown = [];
+    for (const b of result.page) {
+      if (b.briefType !== "recruitment" || (await recruitmentBriefView(ctx, user, b))) shown.push(b);
+    }
     const page = await Promise.all(
-      result.page.map(async (b) => {
+      shown.map(async (b) => {
         const manager = managers.find((m) => m._id === b.archivedBy);
         // Parents only, matching listBriefs/getBrief. Only this brief's
         // tasks, not the whole table.

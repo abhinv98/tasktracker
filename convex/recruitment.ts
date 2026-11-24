@@ -10,8 +10,9 @@ import { internal } from "./_generated/api";
 import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
-import { ARCHIVED, addToCandidates, rowsOf } from "./lib/candidates";
+import { mayRecruitFor, myCandidate, recruitAccess, type RecruitAccess } from "./lib/guards";
+import { ARCHIVED, addToCandidates, followApplication, rowsOf, standing } from "./lib/candidates";
+import { matches } from "./lib/applicantMatch";
 import { mailProblem, stopsEverySend } from "./lib/mail";
 
 // ── RECRUITMENT ────────────────────────────────────────────────
@@ -111,29 +112,27 @@ export const listJobs = query({
     const jobs = (await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
     const candidates = await ctx.db.query("recruitCandidates").collect();
 
-    const counts = new Map<number, { total: number; active: number; rejected: number; inPlay: number; moving: number }>();
+    const none = () => ({ total: 0, fresh: 0, shortlisted: 0, onHold: 0, rejected: 0, lastApplied: 0 });
+    const counts = new Map<number, ReturnType<typeof none>>();
     for (const c of candidates) {
-      const acc = counts.get(c.jobSourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0, moving: 0 };
+      const acc = counts.get(c.jobSourceId) ?? none();
       const st = c.stage ?? "applied";
       acc.total++;
-      if (st === "rejected") acc.rejected++;
-      else acc.active++;
-      // "In play" = still in the running. MUST match OPEN_STAGES in
-      // src/lib/recruitStages.ts, which is what the position page's "In play"
-      // tab filters on — when these two disagreed, the overview said "nobody
-      // in play" while the position itself listed 512 people.
-      if (st === "applied" || st === "screened" || st === "interview" || st === "offer") {
-        acc.inPlay++;
-      }
-      // Past first contact — surfaced separately so a position that's actually
-      // moving looks different from one where nobody has been touched yet.
-      if (st === "screened" || st === "interview" || st === "offer") acc.moving++;
+      // MUST match positionStatus in src/lib/recruitStages.ts, which the position page filters by.
+      if (st === "applied") acc.fresh++;
+      else if (st === "on_hold") acc.onHold++;
+      else if (st === "rejected") acc.rejected++;
+      else acc.shortlisted++;
+      acc.lastApplied = Math.max(acc.lastApplied, c.createdAt ?? 0);
       counts.set(c.jobSourceId, acc);
     }
 
     const withCounts = jobs.map((j) => ({
       ...j,
-      ...(counts.get(j.sourceId) ?? { total: 0, active: 0, rejected: 0, inPlay: 0, moving: 0 }),
+      ...(counts.get(j.sourceId) ?? none()),
+      // For tabs opened before the four counts above replaced these.
+      inPlay: (counts.get(j.sourceId)?.fresh ?? 0) + (counts.get(j.sourceId)?.shortlisted ?? 0),
+      moving: counts.get(j.sourceId)?.shortlisted ?? 0,
       parentName:
         j.parentSourceId != null
           ? jobs.find((p) => p.sourceId === j.parentSourceId)?.name ?? null
@@ -179,6 +178,8 @@ export const getStats = query({
     // createdAt, so this is deliberately a floor, not a total.
     const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recent = candidates.filter((c) => c.createdAt != null && c.createdAt > monthAgo).length;
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const thisWeek = candidates.filter((c) => c.createdAt != null && c.createdAt > weekAgo).length;
 
     return {
       totalCandidates: candidates.length,
@@ -186,6 +187,7 @@ export const getStats = query({
       byStatus,
       byStage,
       recent,
+      thisWeek,
       undated: candidates.filter((c) => c.createdAt == null).length,
       emailsSent: logs.filter((l) => l.status === "sent").length,
       emailsFailed: logs.filter((l) => l.status === "failed").length,
@@ -197,65 +199,47 @@ export const getStats = query({
 export const listCandidates = query({
   args: {
     jobSourceId: v.number(),
+    // The page filters what it has. Tabs opened before that still ask for this,
+    // and act on everything they are given, so it is still answered.
     stage: v.optional(stageValidator),
     search: v.optional(v.string()),
-    /** Range filters over the parsed figures, all inclusive. */
-    minYears: v.optional(v.number()),
-    maxExpected: v.optional(v.number()),
-    maxNoticeDays: v.optional(v.number()),
   },
-  handler: async (ctx, { jobSourceId, stage, search, minYears, maxExpected, maxNoticeDays }) => {
+  handler: async (ctx, { jobSourceId, stage, search }) => {
     const access = await recruitAccess(ctx);
     if (!access || !mayRecruitFor(access, jobSourceId)) return [];
-    let rows = await ctx.db
+    const rows = await ctx.db
       .query("recruitCandidates")
       .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
       .collect();
-
-    if (stage) rows = rows.filter((r) => (r.stage ?? "applied") === stage);
-    // Same normalisation the UI uses: values >= 1000 are annual rupees, below
-    // that they're already lakhs. Kept in sync with src/lib/recruitParse.ts.
-    const lpa = (raw: string) => {
-      const m = (raw || "").replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-      if (!m) return null;
-      const n = parseFloat(m[0]);
-      if (!isFinite(n) || n <= 0) return null;
-      return n >= 1000 ? n / 100000 : n;
-    };
-    const yrs = (raw: string) => {
-      const m = (raw || "").match(/-?\d+(\.\d+)?/);
-      return m ? parseFloat(m[0]) : null;
-    };
-    const notice = (raw: string) => {
-      const t = (raw || "").trim().toLowerCase();
-      if (!t) return null;
-      if (t.startsWith("imm")) return 0;
-      const m = t.match(/\d+/);
-      if (!m) return null;
-      const n = parseInt(m[0], 10);
-      return /month/.test(t) ? n * 30 : n;
-    };
-    if (minYears != null) rows = rows.filter((r) => (yrs(r.experience) ?? -1) >= minYears);
-    if (maxExpected != null) rows = rows.filter((r) => {
-      const v = lpa(r.expectedCtc);
-      return v != null && v <= maxExpected;
-    });
-    if (maxNoticeDays != null) rows = rows.filter((r) => {
-      const v = notice(r.noticePeriod);
-      return v != null && v <= maxNoticeDays;
-    });
-    if (search && search.trim()) {
-      const s = search.trim().toLowerCase();
-      rows = rows.filter(
-        (r) =>
-          r.name.toLowerCase().includes(s) ||
-          r.email.toLowerCase().includes(s) ||
-          r.position.toLowerCase().includes(s) ||
-          r.number.includes(s)
-      );
-    }
     rows.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-    return rows;
+    return rows.filter((r) => (!stage || (r.stage ?? "applied") === stage) && (!search || matches(r, search)));
+  },
+});
+
+/** The newest applications across every position the caller works on. */
+export const recentApplicants = query({
+  args: {
+    limit: v.optional(v.number()),
+    /** One of the Positions statuses (src/lib/recruitStages.ts), or all of them. */
+    status: v.optional(v.union(v.literal("new"), v.literal("shortlisted"), v.literal("on_hold"), v.literal("rejected"))),
+    jobSourceId: v.optional(v.number()),
+  },
+  handler: async (ctx, { limit, status, jobSourceId }) => {
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
+    const jobs = new Map((await ctx.db.query("recruitJobs").collect()).map((j) => [j.sourceId, j.name]));
+    const statusOf = (stage: string) =>
+      stage === "applied" ? "new" : stage === "on_hold" || stage === "rejected" ? stage : "shortlisted";
+    return (await ctx.db.query("recruitCandidates").collect())
+      .filter(
+        (r) =>
+          mayRecruitFor(access, r.jobSourceId) &&
+          (jobSourceId === undefined || r.jobSourceId === jobSourceId) &&
+          (!status || statusOf(r.stage ?? "applied") === status)
+      )
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+      .slice(0, Math.min(limit ?? 10, 300))
+      .map((r) => ({ ...r, jobName: jobs.get(r.jobSourceId) ?? "Unknown" }));
   },
 });
 
@@ -265,18 +249,13 @@ export const searchCandidates = query({
   handler: async (ctx, { search, limit }) => {
     const access = await recruitAccess(ctx);
     if (!access) return [];
-    const s = search.trim().toLowerCase();
+    const s = search.trim();
     if (s.length < 2) return [];
     const jobs = await ctx.db.query("recruitJobs").collect();
     const rows = await ctx.db.query("recruitCandidates").collect();
     return rows
-      .filter((r) => mayRecruitFor(access, r.jobSourceId))
-      .filter(
-        (r) =>
-          r.name.toLowerCase().includes(s) ||
-          r.email.toLowerCase().includes(s) ||
-          r.position.toLowerCase().includes(s)
-      )
+      .filter((r) => mayRecruitFor(access, r.jobSourceId) && matches(r, s))
+      .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
       .slice(0, limit ?? 20)
       .map((r) => ({
         ...r,
@@ -500,7 +479,8 @@ const ONTO_CANDIDATES = ["screened", "interview", "offer"];
 /** Move candidates through the funnel. Every move is written to the timeline,
  *  because "when did she reject him and why" is the question HR always asks
  *  three weeks later. Shortlisting someone also puts them on the Candidates
- *  list, even if they were marked Shortlisted before and are not on it. */
+ *  list, even if they were marked Shortlisted before and are not on it, and
+ *  holding or rejecting them closes them there (lib/candidates.ts). */
 export const setStage = mutation({
   args: {
     candidateIds: v.array(v.id("recruitCandidates")),
@@ -514,6 +494,15 @@ export const setStage = mutation({
     const authorName = user.name ?? user.email ?? "HR";
     const now = Date.now();
     let updated = 0;
+    // Before adding: a reopened row is already there, so nobody is added twice.
+    // Only people whose status really changes: pressing Shortlist on someone
+    // shortlisted must not bring back a row HR closed.
+    const changing = [];
+    for (const id of new Set(candidateIds)) {
+      const c = await ctx.db.get(id);
+      if (c && (c.stage ?? "applied") !== stage) changing.push(id);
+    }
+    const reopened = await followApplication(ctx, async (row) => access.full || !!(await myCandidate(ctx, row._id, access)), changing, stage);
     for (const id of candidateIds) {
       const c = await ctx.db.get(id);
       if (!c) continue;
@@ -541,7 +530,7 @@ export const setStage = mutation({
       }
       added = await addToCandidates(ctx, access, people);
     }
-    return { updated, added };
+    return { updated, added: Math.min(added + reopened.size, new Set(candidateIds).size) };
   },
 });
 
@@ -645,12 +634,26 @@ export const getCandidate = query({
           }))
       : [];
 
+    // Where they are on Candidates, if they have been shortlisted.
+    const onCandidates = [];
+    for (const row of await ctx.db.query("hrRecords").withIndex("by_tracker", (q) => q.eq("tracker", "pipeline")).collect()) {
+      if (row.fields.applicantId !== candidateId || !(await myCandidate(ctx, row._id, access))) continue;
+      const roundId = ctx.db.normalizeId("hrRecords", String(row.fields.reqId ?? ""));
+      const round = roundId ? await ctx.db.get(roundId) : null;
+      onCandidates.push({
+        _id: row._id,
+        stage: standing(row.fields) === "Active" ? String(row.fields.stage ?? "") : standing(row.fields),
+        round: round ? `${round.code} · ${String(round.fields.role ?? "")}` : "",
+      });
+    }
+
     return {
       ...c,
       stage: c.stage ?? "applied",
       jobName: jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "Unknown",
       timeline,
       alsoApplied,
+      onCandidates,
     };
   },
 });

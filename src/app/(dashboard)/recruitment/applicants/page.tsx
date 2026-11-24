@@ -1,223 +1,254 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery } from "convex/react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import {
-  PageHeader,
-  SkeletonPageHeader,
-  SkeletonList,
-  StatStrip,
-  StatTile,
-} from "@/components/ui";
-import {
-  UserSearch,
-  Search,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import type { Id } from "@/convex/_generated/dataModel";
+import { EmptyState, PageHeader, Panel, SkeletonPageHeader, SkeletonTable, StatStrip, StatTile, useToast } from "@/components/ui";
+import { SearchField } from "@/components/ui/Tray";
+import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
+import { useLast } from "@/components/recruitment/ApplicantsTable";
+import { Rounds } from "@/components/recruitment/OpenRound";
+import { useHrData } from "@/components/recruitment/hrShared";
+import { POSITION_STATUSES, positionStatus } from "@/lib/recruitStages";
 
-export default function RecruitmentPage() {
+const COUNTS = [
+  ["fresh", "New", "new"],
+  ["shortlisted", "Shortlisted", "shortlisted"],
+  ["onHold", "On hold", "on_hold"],
+  ["rejected", "Rejected", "rejected"],
+] as const;
+
+/**
+ * The roles people apply for on ecultify.com, and where their applications
+ * stand. A number opens the position at that list; a hiring round can be opened
+ * from here as well.
+ */
+export default function PositionsPage() {
   const router = useRouter();
   const jobs = useQuery(api.recruitment.listJobs);
-  const stats = useQuery(api.recruitment.getStats);
+  const data = useHrData();
   const setJobOpen = useMutation(api.recruitment.setJobOpen);
-  // Opening and closing a role on the website is HR's call.
-  const me = useQuery(api.users.getCurrentUser);
-  const full = me?.isHR === true || me?.isSuperAdmin === true;
+  const { toast } = useToast();
   const [q, setQ] = useState("");
-  const results = useQuery(
-    api.recruitment.searchCandidates,
-    q.trim().length >= 2 ? { search: q.trim(), limit: 12 } : "skip"
-  );
+  const [open, setOpen] = useState<Set<number>>(new Set());
+  const [panel, setPanel] = useState<Id<"recruitCandidates"> | null>(null);
+  const needle = q.trim().toLowerCase();
+  const people = useLast(useQuery(api.recruitment.searchCandidates, needle.length >= 2 ? { search: needle, limit: 12 } : "skip"));
 
   if (jobs === undefined) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         <SkeletonPageHeader />
-        <SkeletonList rows={6} what="positions" />
+        <SkeletonTable rows={8} cols={6} what="positions" />
       </div>
     );
   }
 
-  const parents = jobs.filter((j) => j.parentSourceId == null);
+  // Opening and closing a role on the website is HR's call.
+  const full = data?.full === true;
+  const parents = jobs
+    .filter((j) => j.parentSourceId == null || !jobs.some((p) => p.sourceId === j.parentSourceId))
+    .filter((j) => !needle || j.name.toLowerCase().includes(needle) || jobs.some((s) => s.parentSourceId === j.sourceId && s.name.toLowerCase().includes(needle)))
+    // Whoever has people waiting comes first.
+    .sort((a, b) => b.fresh - a.fresh || b.total - a.total);
+  const sum = (key: (typeof COUNTS)[number][0]) => jobs.reduce((n, j) => n + j[key], 0);
+
+  const cells = (j: (typeof jobs)[number]) =>
+    COUNTS.map(([key, label, status]) => (
+      <td key={key} className="px-1 py-1 text-right">
+        {j[key] > 0 ? (
+          <Link
+            href={`/recruitment/${j.sourceId}?status=${status}`}
+            aria-label={`${j.name}: ${j[key]} ${label.toLowerCase()}`}
+            onClick={(e) => e.stopPropagation()}
+            className={`inline-block min-w-[44px] rounded-md px-2 py-1 text-[13px] tabular-nums hover:bg-[var(--bg-hover)] ${
+              key === "fresh" ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+            }`}
+          >
+            {j[key].toLocaleString()}
+          </Link>
+        ) : (
+          <span className="px-2 text-[13px] text-[var(--text-disabled)]">–</span>
+        )}
+      </td>
+    ));
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-8">
       <PageHeader
         title="Positions"
-        subtitle="Everyone who applied through the form on ecultify.com, by position. Open a position and shortlist people: they go straight to Candidates."
-        icon={UserSearch}
+        subtitle="Everyone who applied on ecultify.com, by position. Shortlist, hold or reject here; shortlisted people carry on under Candidates."
       />
 
-      {/* Reference counts, kept quiet — the positions below are the work. */}
-      {stats && (
-        <StatStrip className="mb-4">
-          {/* The funnel, not a pile of totals — this answers "where is everyone". */}
-          {[
-            { label: "Applied", value: stats.byStage?.applied ?? 0 },
-            { label: "Shortlisted", value: stats.byStage?.screened ?? 0 },
-            { label: "On hold", value: stats.byStage?.on_hold ?? 0 },
-            { label: "Rejected", value: stats.byStage?.rejected ?? 0 },
-          ].map(({ label, value }) => (
-            <StatTile key={label} label={label} value={value.toLocaleString()} />
-          ))}
-        </StatStrip>
-      )}
+      <StatStrip className="mb-4">
+        {COUNTS.map(([key, label, status]) => (
+          <StatTile key={key} label={label} value={sum(key).toLocaleString()} href={`/recruitment/candidates?status=${status}`} />
+        ))}
+      </StatStrip>
 
-      {/* Global candidate search */}
-      <div className="relative mb-4 max-w-[460px]">
-        <Search
-          size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-        />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search every candidate by name, email or role…"
-          className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-md pl-9 pr-8 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
-        />
-        {q && (
-          <button
-            onClick={() => setQ("")}
-            aria-label="Clear search"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          >
-            <X size={14} />
-          </button>
-        )}
+      <div className="mb-4 flex">
+        <SearchField value={q} onChange={setQ} placeholder="A position, or anyone's name, email or phone" label="Search positions and people" className="sm:!max-w-md" />
+      </div>
 
-        {q.trim().length >= 2 && (
-          <div className="absolute z-20 mt-1 w-full rounded-lg border border-[var(--border)] bg-white shadow-lg overflow-hidden max-h-[320px] overflow-y-auto">
-            {results === undefined ? (
-              <p className="px-3 py-3 text-[12px] text-[var(--text-muted)]">Searching…</p>
-            ) : results.length === 0 ? (
-              <p className="px-3 py-3 text-[12px] text-[var(--text-muted)]">
-                No candidate matches “{q.trim()}”
-              </p>
-            ) : (
-              results.map((r) => (
+      {needle.length >= 2 && people && people.length > 0 && (
+        <Panel title="People" count={people.length} action={{ label: "See all", href: `/recruitment/candidates?q=${encodeURIComponent(q.trim())}` }} className="mb-4">
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {people.map((p) => (
+              <li key={p._id}>
                 <button
-                  key={r._id}
-                  onClick={() =>
-                    router.push(`/recruitment/${r.jobSourceId}?highlight=${r._id}`)
-                  }
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors"
+                  type="button"
+                  onClick={() => setPanel(p._id)}
+                  className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                      {r.name}
-                    </p>
-                    <p className="text-[12px] text-[var(--text-muted)] truncate">
-                      {r.email}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-[12px] text-[var(--text-muted)]">
-                    {r.position || r.jobName}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{p.name}</span>
+                    <span className="block truncate text-[12px] text-[var(--text-muted)]">{[p.email, p.number].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  <span className="shrink-0 text-right text-[12px] text-[var(--text-secondary)]">
+                    {p.position || p.jobName}
+                    <span className="block text-[var(--text-muted)]">
+                      {POSITION_STATUSES.find((s) => s.value === positionStatus(p.stage))?.label}
+                    </span>
                   </span>
                 </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
-      {/* Positions — sub-positions nested under their parent */}
-      <div className="flex flex-col gap-2">
-        {parents.map((job) => {
-          const subs = jobs.filter((j) => j.parentSourceId === job.sourceId);
-          return (
-            <div
-              key={job._id}
-              className="rounded-lg border border-[var(--border)] bg-white overflow-hidden"
-            >
-              <div className="flex items-center">
-              <Link
-                href={`/recruitment/${job.sourceId}`}
-                className="group flex min-w-0 flex-1 items-center gap-3 px-4 py-3 hover:bg-[var(--bg-primary)] transition-colors"
-              >
-                <span className="font-medium text-[14px] text-[var(--text-primary)] truncate">
-                  {job.name}
-                </span>
-                <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
-                  {job.total} candidate{job.total === 1 ? "" : "s"}
-                </span>
-                <div className="ml-auto flex items-center gap-3 shrink-0">
-                  {job.moving > 0 && (
-                    <span className="text-[12px] font-medium text-[var(--text-primary)] tabular-nums">
-                      {job.moving} moving
-                    </span>
-                  )}
-                  {job.inPlay > 0 ? (
-                    <span className="text-[12px] text-[var(--text-secondary)] tabular-nums">
-                      {job.inPlay} in play
-                    </span>
-                  ) : (
-                    <span className="text-[12px] text-[var(--text-muted)]">all closed out</span>
-                  )}
-                  <ChevronRight
-                    size={15}
-                    className="text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]"
-                  />
-                </div>
-              </Link>
-              {/* Whether the website form offers this role (and its sub-roles). */}
-              {full && <button
-                type="button"
-                role="switch"
-                aria-checked={job.status !== "closed"}
-                aria-label={`${job.name}: accept applications on the website`}
-                title={job.status === "closed" ? "Closed: not on the website form" : "Open: on the website form"}
-                onClick={() => setJobOpen({ jobId: job._id, open: job.status === "closed" })}
-                className={`mr-3 inline-flex h-control shrink-0 items-center gap-1.5 rounded-control border px-2.5 text-[12px] font-medium transition-colors ${
-                  job.status === "closed"
-                    ? "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-                    : "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${job.status === "closed" ? "bg-[var(--text-disabled)]" : "bg-[var(--accent-employee)]"}`}
-                  aria-hidden
-                />
-                {job.status === "closed" ? "Closed" : "Open"}
-              </button>}
-              </div>
-
-              {subs.length > 0 && (
-                <div className="border-t border-[var(--border-subtle)] divide-y divide-[var(--border-subtle)] bg-[var(--bg-primary)]">
-                  {subs.map((s) => (
-                    <Link
-                      key={s._id}
-                      href={`/recruitment/${s.sourceId}`}
-                      className="group flex items-center gap-3 pl-9 pr-4 py-2 hover:bg-[var(--bg-hover)] transition-colors"
+      {parents.length === 0 ? (
+        <EmptyState
+          title={jobs.length === 0 ? "No positions yet" : "No position by that name"}
+          description={jobs.length === 0 ? "HR can give you the ones you are hiring for, under HR Office, Access." : people?.length ? "The people above match, though." : "Nobody by that name either. Try fewer letters."}
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-[var(--border)] bg-white">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--bg-primary)] text-[12px] text-[var(--text-muted)]">
+                <th className="h-8 px-4 text-left font-medium">Position</th>
+                {COUNTS.map(([key, label]) => (
+                  <th key={key} className="whitespace-nowrap px-3 text-right font-medium">
+                    {label}
+                  </th>
+                ))}
+                <th className="whitespace-nowrap px-3 text-left font-medium">Hiring rounds</th>
+                {full && <th className="whitespace-nowrap px-4 text-right font-medium">On the website</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {parents.map((job) => {
+                const subs = jobs.filter((s) => s.parentSourceId === job.sourceId);
+                const shown = open.has(job.sourceId) || (!!needle && !job.name.toLowerCase().includes(needle));
+                const closed = job.status === "closed";
+                return (
+                  <Fragment key={job._id}>
+                    <tr
+                      onClick={() => router.push(`/recruitment/${job.sourceId}`)}
+                      className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-primary)]"
                     >
-                      <span className="text-[12px] text-[var(--text-secondary)] truncate">
-                        {s.name}
-                      </span>
-                      <span className="text-[12px] text-[var(--text-muted)] tabular-nums">
-                        {s.total}
-                      </span>
-                      <ChevronRight
-                        size={13}
-                        className="ml-auto text-[var(--text-disabled)] group-hover:text-[var(--text-primary)] transition-colors"
-                      />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                      <td className="px-4 py-2.5">
+                        <span className="flex items-center gap-1.5">
+                          {subs.length > 0 && (
+                            <button
+                              type="button"
+                              aria-expanded={shown}
+                              aria-label={`${shown ? "Hide" : "Show"} roles under ${job.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpen((was) => {
+                                  const next = new Set(was);
+                                  if (!next.delete(job.sourceId)) next.add(job.sourceId);
+                                  return next;
+                                });
+                              }}
+                              className="-ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                            >
+                              {shown ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </button>
+                          )}
+                          <Link
+                            href={`/recruitment/${job.sourceId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[14px] font-medium text-[var(--text-primary)] underline-offset-2 first-letter:uppercase hover:underline"
+                          >
+                            {job.name}
+                          </Link>
+                        </span>
+                        <span className="block text-[12px] tabular-nums text-[var(--text-muted)]">
+                          {job.total.toLocaleString()} in all
+                          {job.lastApplied > 0 &&
+                            `, last one ${new Date(job.lastApplied).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                        </span>
+                      </td>
+                      {cells(job)}
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Rounds data={data} job={job} />
+                      </td>
+                      {full && (
+                        <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={!closed}
+                            aria-label={`${job.name}: take applications on the website`}
+                            onClick={() =>
+                              setJobOpen({ jobId: job._id, open: closed }).catch((err) =>
+                                toast("error", err instanceof Error ? err.message : "Could not change it")
+                              )
+                            }
+                            className={`inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-medium transition-colors ${
+                              closed
+                                ? "border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+                                : "border-[var(--accent-employee)] bg-[var(--accent-employee-dim)] text-[var(--accent-employee-text)]"
+                            }`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${closed ? "bg-[var(--text-disabled)]" : "bg-[var(--accent-employee)]"}`} aria-hidden />
+                            {closed ? "Closed" : "Open"}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                    {shown &&
+                      subs.map((s) => (
+                        <tr
+                          key={s._id}
+                          onClick={() => router.push(`/recruitment/${s.sourceId}`)}
+                          className="cursor-pointer border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] last:border-0 hover:bg-[var(--bg-hover)]"
+                        >
+                          <td className="py-2 pl-11 pr-4">
+                            <Link href={`/recruitment/${s.sourceId}`} onClick={(e) => e.stopPropagation()} className="text-[13px] text-[var(--text-secondary)] hover:underline">
+                              {s.name}
+                            </Link>
+                          </td>
+                          {cells(s)}
+                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                            <Rounds data={data} job={s} />
+                          </td>
+                          {full && <td />}
+                        </tr>
+                      ))}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      {stats && stats.undated > 0 && (
-        <p className="mt-4 text-[12px] text-[var(--text-muted)]">
-          {stats.undated.toLocaleString()} candidates were imported from the older
-          application form and carry no submission date, so date filters only
-          cover the {(stats.totalCandidates - stats.undated).toLocaleString()} newer records.
-        </p>
+      {panel && (
+        <CandidatePanel
+          candidateId={panel}
+          order={(people ?? []).map((p) => p._id)}
+          onGo={(id) => setPanel((p) => p && id)}
+          onClose={() => setPanel(null)}
+          onOpenOther={setPanel}
+        />
       )}
     </div>
   );

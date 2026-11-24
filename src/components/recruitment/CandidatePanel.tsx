@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Textarea, useToast } from "@/components/ui";
-import {
-  STAGES, stageMeta, type Stage,
-} from "@/lib/recruitStages";
+import { iconButtonClass } from "@/components/ui/classes";
+import { positionStatus, stageMeta, type PositionStatus, type Stage } from "@/lib/recruitStages";
+import { DECISIONS, Decide, useLast, useMoveApplicants } from "./ApplicantsTable";
 import {
   formatLpa, formatYears, formatNotice,
   parseCtcLpa, parseYears, parseNoticeDays,
 } from "@/lib/recruitParse";
 import {
-  X, FileText, ExternalLink, Mail, StickyNote, ArrowRight, Trash2, Phone,
+  X, FileText, ExternalLink, Mail, StickyNote, ArrowRight, Trash2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 function when(ts: number) {
@@ -22,52 +23,84 @@ function when(ts: number) {
   });
 }
 
+const KEYS: Record<string, PositionStatus> = { s: "shortlisted", h: "on_hold", r: "rejected" };
+
 /**
- * Everything about one candidate, in a slide-over. Built because a candidate
- * was previously just a table row — to read a CV you left the app entirely,
- * and there was nowhere to record that you'd spoken to someone.
+ * Everything about one applicant, in a slide-over: who they are, their CV, and
+ * the decision. Given the list it was opened from, it steps through it: S, H or
+ * R decides and moves on to the next person, the arrow keys look without deciding.
  */
 export function CandidatePanel({
   candidateId,
+  order = [],
+  onGo,
   onClose,
   onOpenOther,
 }: {
   candidateId: Id<"recruitCandidates">;
+  /** The list it was opened from, as it stood then. */
+  order?: Id<"recruitCandidates">[];
+  onGo?: (id: Id<"recruitCandidates">) => void;
   onClose: () => void;
   onOpenOther?: (id: Id<"recruitCandidates">, jobSourceId: number) => void;
 }) {
-  const c = useQuery(api.recruitment.getCandidate, { candidateId });
-  const setStage = useMutation(api.recruitment.setStage);
+  // The last person stays on screen while the next one loads, so stepping does not flicker.
+  const c = useLast(useQuery(api.recruitment.getCandidate, { candidateId }));
+  const ready = c?._id === candidateId;
+  const moveApplicants = useMoveApplicants();
   const addNote = useMutation(api.recruitment.addNote);
   const deleteActivity = useMutation(api.recruitment.deleteActivity);
   const { toast } = useToast();
-  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Escape closes, and the page behind shouldn't scroll under the panel.
+  // What is typed belongs to the person it was typed on, also while stepping through the list.
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const note = notes[candidateId] ?? "";
+  const setNote = (text: string) => setNotes((n) => ({ ...n, [candidateId]: text }));
+
+  const at = order.indexOf(candidateId);
+  const before = at > 0 ? order[at - 1] : undefined;
+  const after = at >= 0 ? order[at + 1] : undefined;
+  const go = (id?: Id<"recruitCandidates">) => id && onGo?.(id);
+
+  function decide(to: PositionStatus) {
+    if (!c || !ready) return;
+    // A fresh application is dealt with: on to the next one straight away. If the
+    // save fails, its message names the person.
+    if (positionStatus(c.stage as Stage) === "new") go(after);
+    void moveApplicants([candidateId], to, c.name);
+  }
+
+  // The page behind shouldn't scroll under the panel.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, []);
+
+  // Escape closes, arrows step, S H R decide. Never while typing a note.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onClose();
+      const el = e.target as HTMLElement;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return;
+      if (e.key === "ArrowRight") go(after);
+      else if (e.key === "ArrowLeft") go(before);
+      else {
+        // A key only decides. Taking a decision back is a click, so a second press cannot undo one.
+        const to = KEYS[e.key.toLowerCase()];
+        if (to && c && to !== positionStatus(c.stage as Stage)) decide(to);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
 
   const isPdf = !!c?.resume && /\.pdf($|\?)/i.test(c.resume);
 
-  async function move(stage: Stage) {
-    try {
-      const { added } = await setStage({ candidateIds: [candidateId], stage });
-      toast("success", `Moved to ${stageMeta(stage).label}${added ? " and added to Candidates" : ""}`);
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed");
-    }
-  }
-
   async function saveNote() {
-    if (!note.trim()) return;
+    if (!note.trim() || !ready) return;
     setSaving(true);
     try {
       await addNote({ candidateId, body: note });
@@ -105,42 +138,48 @@ export function CandidatePanel({
                   {c.createdAt ? ` · applied ${when(c.createdAt).split(",")[0]}` : ""}
                 </p>
               </div>
-              <button
-                onClick={onClose}
-                aria-label="Close panel"
-                className="shrink-0 inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                {order.length > 1 && (
+                  <>
+                    <span className="mr-1 text-[12px] tabular-nums text-[var(--text-muted)]">
+                      {at + 1} of {order.length.toLocaleString()}
+                    </span>
+                    <button type="button" aria-label="Previous applicant" disabled={!before} onClick={() => go(before)} className={`${iconButtonClass} disabled:opacity-30`}>
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button type="button" aria-label="Next applicant" disabled={!after} onClick={() => go(after)} className={`${iconButtonClass} disabled:opacity-30`}>
+                      <ChevronRight size={16} />
+                    </button>
+                  </>
+                )}
+                <button type="button" onClick={onClose} aria-label="Close panel" className={iconButtonClass}>
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            {/* Stage rail — the whole funnel, current one filled. Clicking moves. */}
-            <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] px-6 py-3">
-              {STAGES.map((s) => {
-                const active = c.stage === s.value;
-                return (
-                  <button
-                    key={s.value}
-                    onClick={() => move(s.value)}
-                    aria-pressed={active}
-                    className={`inline-flex items-center gap-1.5 h-control px-3 rounded-control border text-[13px] font-medium transition-colors ${
-                      active
-                        ? "border-[var(--border-strong)] bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                        : "border-transparent text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                    }`}
-                  >
-                    {/* The stage colour stays as the same dot the tables use. */}
-                    {active && (
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: s.color }}
-                        aria-hidden
-                      />
-                    )}
-                    {s.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-subtle)] px-6 py-3">
+              <Decide stage={c.stage as Stage} name={c.name} onMove={decide} large />
+              {c.onCandidates.length > 0 ? (
+                <span className="flex flex-wrap gap-x-3 text-[13px]">
+                  {c.onCandidates.map((row) => (
+                    <Link
+                      key={row._id}
+                      href={`/recruitment/t/pipeline?open=${row._id}`}
+                      className="font-medium text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
+                    >
+                      On Candidates: {row.stage}
+                      {row.round ? ` (${row.round})` : ""}
+                    </Link>
+                  ))}
+                </span>
+              ) : (
+                <span className="text-[12px] text-[var(--text-muted)]">
+                  {DECISIONS.includes(positionStatus(c.stage as Stage) as (typeof DECISIONS)[number])
+                    ? ""
+                    : "Shortlisting puts them on Candidates, where interviews, tasks and the offer are."}
+                </span>
+              )}
             </div>
 
             <div className="flex min-h-0 flex-1">
@@ -203,7 +242,7 @@ export function CandidatePanel({
                     className="min-h-[70px] text-[13px]"
                   />
                   <div className="mt-2 flex justify-end">
-                    <Button loading={saving} disabled={!note.trim()} onClick={saveNote}>
+                    <Button loading={saving} disabled={!note.trim() || !ready} onClick={saveNote}>
                       <StickyNote size={14} />
                       Add note
                     </Button>

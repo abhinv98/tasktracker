@@ -103,11 +103,11 @@ export const NAV_COMMANDS: NavCommand[] = [
     href: "/recruitment",
     icon: UserSearch,
     keywords: ["hiring", "candidates", "applicants", "jobs", "cv", "resume"],
-    hint: "Candidates",
+    hint: "Hiring",
     visible: canRecruit,
   },
   {
-    label: "All Candidates",
+    label: "All Applicants",
     href: "/recruitment/candidates",
     icon: UserSearch,
     keywords: ["cv", "resume", "applicants", "talent", "pool", "search"],

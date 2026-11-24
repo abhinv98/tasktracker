@@ -17,6 +17,8 @@ import { CommentThread } from "@/components/comments/CommentThread";
 import { briefUsesCreativeSlots, creativesSlotTarget } from "@/lib/briefCreatives";
 import { useSmartBack } from "@/lib/useSmartBack";
 import { BriefFlowCanvas } from "@/components/BriefFlowCanvas";
+import { RecruitmentBriefView } from "@/components/recruitment/RecruitmentBriefView";
+import { briefTypeLabel } from "@/lib/briefTypes";
 import { fieldBaseClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 
 function parseDuration(str: string): number {
@@ -685,12 +687,14 @@ export default function BriefPage() {
   if (brief === undefined || brief === null) {
     return (
       <div className="p-8">
-        <p className="text-[13px] text-[var(--text-muted)]">Loading...</p>
+        <p className="text-[13px] text-[var(--text-muted)]">
+          {brief === null && user ? "This brief does not exist, or it is not shared with you." : "Loading..."}
+        </p>
       </div>
     );
   }
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" && brief.manage;
 
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -723,11 +727,7 @@ export default function BriefPage() {
           />
           {brief.briefType && (
             <Badge variant="neutral">
-              {brief.briefType === "content_calendar" ? "Content Calendar" :
-               brief.briefType === "video_editing" ? "Video Editing" :
-               brief.briefType === "production" ? "Production" :
-               brief.briefType === "developmental" ? "Developmental" :
-               brief.briefType === "designing" ? "Designing" : brief.briefType}
+              {briefTypeLabel(brief.briefType)}
             </Badge>
           )}
           {brief.deadline && (
@@ -928,7 +928,14 @@ export default function BriefPage() {
       </header>
 
       {/* Content Calendar briefs get a full-width spreadsheet layout */}
-      {brief.briefType === "content_calendar" ? (
+      {brief.briefType === "recruitment" ? (
+        <RecruitmentBriefView
+          briefId={briefId}
+          description={brief.description}
+          archived={brief.status === "archived"}
+          onOpenTask={(taskId) => setSelectedTaskId(taskId)}
+        />
+      ) : brief.briefType === "content_calendar" ? (
         <div className="flex-1 overflow-hidden">
           <ContentCalendarView
             briefId={briefId}

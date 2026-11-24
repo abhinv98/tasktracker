@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import Link from "next/link";
+import { useMutation, useQuery } from "convex/react";
 import { ExternalLink, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Button, useConfirm, useToast } from "@/components/ui";
+import { Button, StatusBadge, useConfirm, useToast } from "@/components/ui";
 import { fieldBaseClass, fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 import { Tray, TrayItem } from "@/components/ui/Tray";
 import { TRACKERS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { health, type Row } from "@/lib/hrHealth";
+import { taskStatusMeta } from "@/lib/status";
+import { AssignTask } from "./AssignTask";
 import { FieldGrid, InlineAdd, toValues, useQuickSave } from "./hrFields";
 import { HealthBadge, addDays, boardValue, fieldsOf, fmtDate, moveFields, show, type HrData } from "./hrShared";
 
@@ -277,6 +280,8 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             </div>
           </form>
 
+          <CandidateTasks row={row} data={data} />
+
           <Related
             title="Interviews"
             rows={interviews}
@@ -374,6 +379,61 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
         </div>
       </aside>
     </>
+  );
+}
+
+/** What people on the team have to do about this candidate. Each is an ordinary task in its owner's list. */
+function CandidateTasks({ row, data }: { row: Row; data: HrData }) {
+  const tasks = useQuery(api.recruitTasks.forCandidate, { candidateId: row._id as Id<"hrRecords"> });
+  const [adding, setAdding] = useState(false);
+  return (
+    <section className="mt-6">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
+          Tasks
+          {!!tasks?.length && <span className="ml-1.5 font-normal tabular-nums text-[var(--text-muted)]">{tasks.length}</span>}
+        </h3>
+        {!adding && (
+          <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(true)}>
+            <Plus size={13} />
+            Assign a task
+          </Button>
+        )}
+      </div>
+      {!!tasks?.length && (
+        <ul className="mb-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
+          {tasks.map((t) => (
+            <li key={t._id}>
+              <TaskLine href={t.canOpenTask ? `/brief/${t.briefId}?task=${t._id}` : null}>
+                <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">
+                  {[t.title, t.assignee, t.deadline && `due ${fmtDate(new Date(t.deadline + 5.5 * 3_600_000).toISOString().slice(0, 10), data.today)}`]
+                    .filter(Boolean)
+                    .join("  ·  ")}
+                </span>
+                <StatusBadge color={taskStatusMeta(t.status).dot} label={taskStatusMeta(t.status).label} />
+              </TaskLine>
+            </li>
+          ))}
+        </ul>
+      )}
+      {tasks?.length === 0 && !adding && <p className="text-[13px] text-[var(--text-muted)]">None yet.</p>}
+      {adding && <AssignTask data={data} candidateId={row._id} onDone={() => setAdding(false)} />}
+    </section>
+  );
+}
+
+/** A link when the task's brief opens for this person, a plain line when it does not. */
+function TaskLine({ href, children }: { href: string | null; children: React.ReactNode }) {
+  const line = "flex items-center gap-3 px-3 py-2";
+  return href ? (
+    <Link
+      href={href}
+      className={`${line} hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]`}
+    >
+      {children}
+    </Link>
+  ) : (
+    <div className={line}>{children}</div>
   );
 }
 

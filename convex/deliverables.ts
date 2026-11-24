@@ -1,7 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "./lib/internalAuth";
-import { canViewBrief } from "./lib/guards";
+import { canViewTask } from "./lib/guards";
 
 export const getDeliverablesForTask = query({
   args: { taskId: v.id("tasks") },
@@ -11,7 +11,7 @@ export const getDeliverablesForTask = query({
     if (!userId) return [];
     const user = await ctx.db.get(userId);
     const task = await ctx.db.get(taskId);
-    if (!user || !task || !(await canViewBrief(ctx, user, task.briefId))) return [];
+    if (!user || !task || !(await canViewTask(ctx, user, task))) return [];
     return await ctx.db
       .query("deliverables")
       .withIndex("by_task", (q) => q.eq("taskId", taskId))

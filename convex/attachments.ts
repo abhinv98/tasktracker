@@ -1,4 +1,5 @@
 import { getAuthUserId } from "./lib/internalAuth";
+import { canViewThread } from "./lib/guards";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -9,7 +10,7 @@ export const getAttachments = query({
   },
   handler: async (ctx, { parentType, parentId }) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
+    if (!userId || !(await canViewThread(ctx, userId, parentType, parentId))) return [];
 
     const attachments = await ctx.db
       .query("attachments")
@@ -46,6 +47,7 @@ export const addAttachment = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+    if (!(await canViewThread(ctx, userId, args.parentType, args.parentId))) throw new Error("Not authorized");
 
     return await ctx.db.insert("attachments", {
       ...args,

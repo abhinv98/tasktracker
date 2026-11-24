@@ -14,7 +14,7 @@ export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" 
 
 export type TrackerKey =
   | "rounds" | "pipeline" | "interviews" | "assignments" | "offers" | "onboarding"
-  | "interns" | "campus" | "projects" | "tasks" | "log";
+  | "interns" | "campus" | "projects" | "log";
 
 export type Field = {
   key: string;
@@ -381,44 +381,6 @@ export const TRACKERS = {
       f("lastUpdate", "Last update", "date", { stamp: true }),
     ],
   },
-  tasks: {
-    label: "Founder Tasks",
-    one: "founder task",
-    prefix: "TASK",
-    blurb: "Founders add a row to hand HR a piece of work. HR keeps the status, next action and dates current.",
-    title: "task",
-    hrOnly: true,
-    board: "status",
-    boardClosed: ["Done", "Cancelled"],
-    fields: [
-      f("task", "Task / deliverable", "text", { required: true, ...col }),
-      f("dateAssigned", "Date assigned", "date", { initial: "@today" }),
-      f("assignedBy", "Assigned by", "user", { initial: "@me" }),
-      f("workstream", "Workstream", "select", {
-        options: ["Hiring", "Interview", "Assignment", "Offer", "Onboarding", "Interns", "Campus", "HR Project", "Policy", "Admin", "Other"],
-        ...col,
-      }),
-      f("linkedId", "Linked record ID", "text"),
-      f("assignedTo", "Assigned to", "user", col),
-      f("priority", "Priority", "select", { options: PRIORITY, ...col }),
-      f("dueDate", "Due date", "date", col),
-      f("status", "Status", "select", {
-        options: ["Not Started", "In Progress", "Waiting Approval", "Blocked", "Done", "Cancelled"],
-        initial: "Not Started",
-        ...col,
-      }),
-      f("approvalNeeded", "Approval needed", "select", { options: YES_NO }),
-      f("approvalStatus", "Approval status", "select", {
-        options: ["Not Required", "Pending", "Approved", "Changes Needed"],
-      }),
-      f("nextAction", "Next action", "text"),
-      f("nextDue", "Next due", "date"),
-      f("blockedBy", "Blocked by / decision", "text"),
-      f("completedDate", "Completed date", "date"),
-      f("notes", "Notes", "long"),
-      f("lastUpdate", "Last update", "date", { stamp: true }),
-    ],
-  },
   log: {
     label: "Daily HR Log",
     one: "log entry",
@@ -430,10 +392,10 @@ export const TRACKERS = {
       f("date", "Date", "date", { required: true, initial: "@today", ...col }),
       f("member", "HR team member", "user", { initial: "@me", ...col }),
       f("workstream", "Workstream", "select", {
-        options: ["Hiring", "Candidate", "Interview", "Assignment", "Offer", "Onboarding", "Interns", "Campus", "HR Project", "Founder Task", "Admin"],
+        options: ["Hiring", "Candidate", "Interview", "Assignment", "Offer", "Onboarding", "Interns", "Campus", "HR Project", "Brief task", "Admin"],
         ...col,
       }),
-      f("linkedId", "Linked req / project / task ID", "text"),
+      f("linkedId", "Linked req / project ID", "text"),
       f("action", "Action completed today", "text", { required: true, ...col }),
       f("outcome", "Outcome / metric", "text", col),
       f("pendingFrom", "Pending from", "text"),

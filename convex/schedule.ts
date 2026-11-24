@@ -354,6 +354,11 @@ export const createBlock = mutation({
 
     const targetUserId = args.userId ?? authId;
 
+    // Other people read this planner. A recruitment task's candidate, shown
+    // beside its title in its owner's own list, is not stored here.
+    const about = args.taskId ? await ctx.db.get(args.taskId) : null;
+    if (about?.candidateId) args.title = about.title;
+
     // Auth: employee can only create for self
     if (targetUserId !== authId && authUser?.role === "employee") {
       throw new Error("Employees can only create their own schedule blocks");

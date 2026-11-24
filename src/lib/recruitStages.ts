@@ -23,8 +23,27 @@ export const STAGES: { value: Stage; label: string; color: string; exit?: boolea
   { value: "rejected", label: "Rejected", color: "#b91c1c", exit: true },
 ];
 
-/** Stages that mean the candidate is still in the running. */
-export const OPEN_STAGES: Stage[] = ["applied", "screened", "interview", "offer"];
+/**
+ * What an application can be on the Positions pages: new, or one of three
+ * decisions. Everything after shortlisting happens on Candidates, so the later
+ * stages read as Shortlisted here.
+ */
+export type PositionStatus = "new" | "shortlisted" | "on_hold" | "rejected";
+
+export const POSITION_STATUSES: { value: PositionStatus; label: string; stage: Stage; color: string }[] = [
+  { value: "new", label: "New", stage: "applied", color: "#6b7280" },
+  { value: "shortlisted", label: "Shortlisted", stage: "screened", color: "#2563eb" },
+  { value: "on_hold", label: "On hold", stage: "on_hold", color: "#a3a199" },
+  { value: "rejected", label: "Rejected", stage: "rejected", color: "#b91c1c" },
+];
+
+/** MUST match the counts in convex/recruitment.ts listJobs. */
+export function positionStatus(stage?: Stage | null): PositionStatus {
+  if (!stage || stage === "applied") return "new";
+  return stage === "on_hold" || stage === "rejected" ? stage : "shortlisted";
+}
+
+export const isPositionStatus = (s: string | null): s is PositionStatus => POSITION_STATUSES.some((p) => p.value === s);
 
 export function stageMeta(s: Stage) {
   return STAGES.find((x) => x.value === s) ?? STAGES[0];
