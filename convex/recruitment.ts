@@ -10,6 +10,8 @@ import { ConvexError, v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
+import { ARCHIVED, addToCandidates, rowsOf } from "./lib/candidates";
+import { mailProblem, stopsEverySend } from "./lib/mail";
 
 // ── RECRUITMENT ────────────────────────────────────────────────
 // Imported from the cultform JobData MySQL app. Rows join on `sourceId`
@@ -395,10 +397,7 @@ export const deleteCandidates = mutation({
     const del = new Set<string>(candidateIds);
     // A pipeline candidate made from this application stays (it has its own
     // history), but stops pointing at an application that no longer exists.
-    for (const row of await ctx.db
-      .query("hrRecords")
-      .withIndex("by_tracker", (q) => q.eq("tracker", "pipeline"))
-      .collect()) {
+    for (const row of [...(await rowsOf(ctx, "pipeline")), ...(await rowsOf(ctx, `${ARCHIVED}pipeline`))]) {
       if (typeof row.fields.applicantId === "string" && del.has(row.fields.applicantId)) {
         const { applicantId: _gone, ...fields } = row.fields;
         void _gone;
@@ -494,9 +493,13 @@ export const deleteTemplate = mutation({
 
 /* ── Stages, notes & the candidate profile ─────────────────── */
 
+/** The stages that put an applicant on the Candidates list. */
+const ONTO_CANDIDATES = ["screened", "interview", "offer"];
+
 /** Move candidates through the funnel. Every move is written to the timeline,
  *  because "when did she reject him and why" is the question HR always asks
- *  three weeks later. */
+ *  three weeks later. Shortlisting someone also puts them on the Candidates
+ *  list, even if they were marked Shortlisted before and are not on it. */
 export const setStage = mutation({
   args: {
     candidateIds: v.array(v.id("recruitCandidates")),
@@ -528,7 +531,16 @@ export const setStage = mutation({
       });
       updated++;
     }
-    return { updated };
+    let added = 0;
+    if (ONTO_CANDIDATES.includes(stage)) {
+      const people = [];
+      for (const id of new Set(candidateIds)) {
+        const c = await ctx.db.get(id);
+        if (c) people.push(c);
+      }
+      added = await addToCandidates(ctx, access, people);
+    }
+    return { updated, added };
   },
 });
 
@@ -798,7 +810,8 @@ function fillPlaceholders(text: string, c: Doc<"recruitCandidates">, jobName: st
     jobname: jobName,
   };
   return text.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (full, key) => {
-    const value = map[String(key).toLowerCase()];
+    const name = String(key).toLowerCase();
+    const value = Object.hasOwn(map, name) ? map[name] : undefined;
     return value === undefined ? full : html ? escapeHtml(value) : value;
   });
 }
@@ -875,7 +888,7 @@ export const sendTemplateEmail = action({
   handler: async (
     ctx,
     { candidateIds, templateId, campaignSourceId }
-  ): Promise<{ sent: number; failed: number }> => {
+  ): Promise<{ sent: number; unsent: Id<"recruitCandidates">[]; reason: string }> => {
     const token = process.env.ZEPTO_API_TOKEN;
     const fromEmail = process.env.ZEPTO_FROM_EMAIL ?? "hr@ecultify.com";
     const fromName = process.env.ZEPTO_FROM_NAME ?? "HR Team";
@@ -886,8 +899,8 @@ export const sendTemplateEmail = action({
       { candidateIds, templateId, campaignSourceId }
     );
 
-    let sent = 0;
-    let failed = 0;
+    const unsent = new Set(recipients.map((r) => r.candidateId));
+    let reason = "";
     for (const r of recipients) {
       let ok = false;
       let errText = "";
@@ -924,10 +937,14 @@ export const sendTemplateEmail = action({
         campaignSourceId: campaignSourceId ?? null,
       });
 
-      if (ok) sent++;
-      else failed++;
+      if (ok) unsent.delete(r.candidateId);
+      else {
+        reason = mailProblem(errText) || reason;
+        // Out of credits, or a refused token: the rest would fail the same way.
+        if (stopsEverySend(errText)) break;
+      }
     }
-    return { sent, failed };
+    return { sent: recipients.length - unsent.size, unsent: [...unsent], reason };
   },
 });
 

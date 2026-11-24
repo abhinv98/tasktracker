@@ -12,18 +12,20 @@ import {
   EmptyState,
   Modal,
   Input,
+  SegmentedTabs,
   Select,
-  Textarea,
   ConfirmModal,
   SkeletonPageHeader,
   SkeletonList,
   useToast,
 } from "@/components/ui";
+import { iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
+import { BodyEditor, EmailPreview, SubjectEditor } from "@/components/recruitment/TemplateEditor";
+import { SAMPLE, TEMPLATE_FIELDS, excerpt, subjectPreview } from "@/lib/templateHtml";
 import { FileText, ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react";
 
-const PLACEHOLDERS = [
-  "name", "email", "number", "position", "currentctc", "expectedctc", "jobname",
-];
+/** A subject for the list: its fields by name rather than as {{code}}. */
+const FIELD_NAMES = Object.fromEntries(TEMPLATE_FIELDS.map((f) => [f.key, `[${f.label}]`]));
 
 type Editing = {
   _id?: Id<"recruitTemplates">;
@@ -41,8 +43,14 @@ export default function RecruitmentTemplatesPage() {
   const { toast } = useToast();
 
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [tab, setTab] = useState<"write" | "preview">("write");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<Id<"recruitTemplates"> | null>(null);
+
+  function open(next: Editing) {
+    setTab("write");
+    setEditing(next);
+  }
 
   async function handleSave() {
     if (!editing) return;
@@ -85,12 +93,12 @@ export default function RecruitmentTemplatesPage() {
 
       <PageHeader
         title="Email Templates"
-        subtitle="Reusable messages for candidate outreach"
+        subtitle="Messages you can send to candidates in a click. Each person's name and details are filled in when it goes out."
         icon={FileText}
         actions={
           <Button
             onClick={() =>
-              setEditing({
+              open({
                 jobSourceId: jobs[0]?.sourceId ?? 0,
                 name: "",
                 subject: "",
@@ -115,44 +123,25 @@ export default function RecruitmentTemplatesPage() {
           {templates.map((t) => (
             <div
               key={t._id}
-              className="group rounded-lg border border-[var(--border)] bg-white px-4 py-2.5"
+              className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-white px-4 py-3 transition-colors hover:border-[var(--border-strong)]"
             >
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-[14px] text-[var(--text-primary)]">
-                      {t.name}
-                    </span>
-                    <Badge>{t.jobName}</Badge>
-                  </div>
-                  <p className="mt-0.5 text-[12px] text-[var(--text-muted)] truncate">
-                    {t.subject}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                  <button
-                    onClick={() =>
-                      setEditing({
-                        _id: t._id,
-                        jobSourceId: t.jobSourceId,
-                        name: t.name,
-                        subject: t.subject,
-                        body: t.body,
-                      })
-                    }
-                    aria-label={`Edit ${t.name}`}
-                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    onClick={() => setDeleting(t._id)}
-                    aria-label={`Delete ${t.name}`}
-                    className="inline-flex items-center justify-center h-control w-control rounded-control text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-dim)] transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+              <button type="button" onClick={() => open({ ...t })} className="min-w-0 flex-1 text-left">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-[14px] font-medium text-[var(--text-primary)]">{t.name}</span>
+                  <Badge>{t.jobName}</Badge>
+                </span>
+                <span className="mt-1 block truncate text-[13px] text-[var(--text-secondary)]">
+                  {subjectPreview(t.subject, FIELD_NAMES)}
+                </span>
+                <span className="mt-0.5 line-clamp-2 block text-[12px] text-[var(--text-muted)]">{excerpt(t.body)}</span>
+              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button onClick={() => open({ ...t })} aria-label={`Edit ${t.name}`} title="Edit" className={iconButtonClass}>
+                  <Pencil size={14} />
+                </button>
+                <button onClick={() => setDeleting(t._id)} aria-label={`Delete ${t.name}`} title="Delete" className={iconButtonDangerClass}>
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
           ))}
@@ -182,52 +171,44 @@ export default function RecruitmentTemplatesPage() {
       >
         {editing && (
           <div className="flex flex-col gap-4">
-            <Select
-              label="Position"
-              value={String(editing.jobSourceId)}
-              onChange={(e) =>
-                setEditing({ ...editing, jobSourceId: Number(e.target.value) })
-              }
-              options={jobs.map((j) => ({ value: String(j.sourceId), label: j.name }))}
+            <SegmentedTabs<"write" | "preview">
+              value={tab}
+              options={[
+                { value: "write", label: "Write" },
+                { value: "preview", label: "Preview" },
+              ]}
+              onChange={setTab}
             />
-            <Input
-              label="Template name"
-              value={editing.name}
-              onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              placeholder="e.g. Interview invite"
-            />
-            <Input
-              label="Subject"
-              value={editing.subject}
-              onChange={(e) => setEditing({ ...editing, subject: e.target.value })}
-              placeholder="Interview for {{position}} at Ecultify"
-            />
-            <Textarea
-              label="Body (HTML allowed)"
-              value={editing.body}
-              onChange={(e) => setEditing({ ...editing, body: e.target.value })}
-              className="min-h-[220px] font-mono text-[12px]"
-              placeholder="<p>Hi {{name}},</p>"
-            />
-            <div>
-              <p className="text-[12px] font-medium text-[var(--text-muted)] mb-1.5">
-                Placeholders
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {PLACEHOLDERS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() =>
-                      setEditing({ ...editing, body: editing.body + `{{${p}}}` })
-                    }
-                    className="h-7 px-2 rounded-md text-[12px] border border-[var(--border)] bg-[var(--bg-primary)] font-mono text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] transition-colors"
-                  >
-                    {`{{${p}}}`}
-                  </button>
-                ))}
+            {/* Hidden rather than removed: the boxes hold what is being typed. */}
+            <div className={tab === "write" ? "flex flex-col gap-4" : "hidden"}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="Template name"
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  placeholder="e.g. Interview invite"
+                />
+                <Select
+                  label="Position"
+                  value={String(editing.jobSourceId)}
+                  onChange={(e) => setEditing({ ...editing, jobSourceId: Number(e.target.value) })}
+                  options={jobs.map((j) => ({ value: String(j.sourceId), label: j.name }))}
+                />
               </div>
+              <SubjectEditor value={editing.subject} onChange={(subject) => setEditing((e) => e && { ...e, subject })} />
+              <BodyEditor value={editing.body} onChange={(body) => setEditing((e) => e && { ...e, body })} />
+              <p className="text-[12px] text-[var(--text-muted)]">
+                Highlighted words are filled in for each candidate when the email is sent. Press Preview to see it with sample details.
+              </p>
             </div>
+            {tab === "preview" && (
+              <EmailPreview
+                subject={editing.subject}
+                body={editing.body}
+                values={{ ...SAMPLE, jobname: jobs.find((j) => j.sourceId === editing.jobSourceId)?.name ?? SAMPLE.jobname, position: jobs.find((j) => j.sourceId === editing.jobSourceId)?.name ?? SAMPLE.position }}
+                to={`${SAMPLE.name}, ${SAMPLE.email}`}
+              />
+            )}
           </div>
         )}
       </Modal>

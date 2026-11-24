@@ -60,8 +60,11 @@ export function TrackerBoard({
     },
   });
   // The second line of a card: what it belongs to, else whose it is.
-  const seconds = fieldsOf(tracker).filter(
-    (f) => (f.type === "ref" || f.type === "user") && f.key !== meta.title && !skip.includes(f.key)
+  // On one open position's board its website position would only repeat itself.
+  const seconds = (["ref", "job", "user"] as const).flatMap((type) =>
+    fieldsOf(tracker).filter(
+      (f) => f.type === type && f.key !== meta.title && !skip.includes(f.key) && !(type === "job" && skip.includes("reqId"))
+    )
   );
   const secondLine = (row: Row) => seconds.map((f) => show(f, row, data)).find(Boolean) ?? "";
   const dueKey = ["nextDue", "dueDate", "plannedJoin"].find((k) => fieldsOf(tracker).some((f) => f.key === k));

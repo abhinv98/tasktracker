@@ -95,15 +95,17 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   }
 
   const columns = fields.filter((f) => f.column);
-  // Filter by the listed dropdowns, and by what a row belongs to (a candidate's round).
+  // Filter by the listed dropdowns, and by what a row belongs to (a candidate's position).
   const filterFields = [
-    ...columns.filter((f) => f.type === "ref"),
+    ...columns.filter((f) => f.type === "ref" || f.type === "job"),
     ...columns.filter((f) => f.type === "select").slice(0, 3),
   ];
   const optionsOf = (f: (typeof fields)[number]) =>
     f.type === "ref"
       ? data.book[f.ref as TrackerKey].map((r) => ({ value: r._id, label: `${r.code} · ${rowTitle(r, data)}` }))
-      : (f.options ?? []).map((o) => ({ value: o, label: o }));
+      : f.type === "job"
+        ? data.jobs.map((j) => ({ value: j.id, label: j.name }))
+        : (f.options ?? []).map((o) => ({ value: o, label: o }));
   const inChip = (label: string, which: Chip) =>
     which === "all" ||
     (which === "attention" && ATTENTION[tracker].includes(label)) ||
@@ -129,7 +131,9 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       draft: startingValues(
         tracker,
         data,
-        Object.fromEntries(fields.filter((f) => f.type === "ref" && picked[f.key]).map((f) => [f.key, picked[f.key]]))
+        Object.fromEntries(
+          fields.filter((f) => (f.type === "ref" || f.type === "job") && picked[f.key]).map((f) => [f.key, picked[f.key]])
+        )
       ),
     });
   const open = (row: Row) => setEditing({ row, draft: draftOf(row) });
@@ -258,8 +262,10 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           <EmptyState
             title={round ? `No candidates in ${String(round.fields.role ?? round.code)} yet` : `No ${meta.label.toLowerCase()} yet`}
             description={
-              round
-                ? "Add the first one here, or go to Website Applicants, tick the people worth a look and use Add to hiring round."
+              tracker === "pipeline" && !round
+                ? "Go to Positions, open one and shortlist people. They show up here, whatever they applied for."
+                : round
+                ? "Add the first one here, or go to Positions, tick the people worth a look and use Add to open position."
                 : meta.blurb
             }
             action={<Button onClick={startNew}>New {meta.one}</Button>}

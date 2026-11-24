@@ -8,7 +8,8 @@
 // not stored: src/lib/hrHealth.ts works them out from the rows.
 
 /** `job` is a position from the website's roles (recruitJobs.sourceId, kept as
- *  text): it is what ties a hiring round to the people allowed to work on it. */
+ *  text): it is what ties an open position, or a candidate shortlisted from the
+ *  website, to the people allowed to work on it. */
 export type FieldType = "text" | "long" | "number" | "date" | "time" | "select" | "user" | "ref" | "job";
 
 export type TrackerKey =
@@ -48,10 +49,10 @@ const col = { column: true } as const;
 
 export const TRACKERS = {
   rounds: {
-    label: "Hiring Rounds",
-    one: "hiring round",
+    label: "Open Positions",
+    one: "open position",
     prefix: "REQ",
-    blurb: "One row is one hiring cycle. When a role reopens, add a new round. Never reuse an old one.",
+    blurb: "One row is one hiring cycle. When a role reopens, add a new row. Never reuse an old one.",
     title: "role",
     hrOnly: false,
     fields: [
@@ -94,14 +95,15 @@ export const TRACKERS = {
     label: "Candidates",
     one: "candidate",
     prefix: "C",
-    blurb: "One row is one candidate in one hiring round. Every live candidate needs an owner and a dated next step.",
+    blurb: "Everyone shortlisted from Positions lands here, whatever they applied for. Every live candidate needs an owner and a dated next step.",
     title: "name",
     hrOnly: false,
     board: "stage",
     boardClosed: ["Joined", "Rejected", "Withdrawn", "On Hold"],
     fields: [
       f("name", "Candidate name", "text", { required: true, ...col }),
-      f("reqId", "Hiring round", "ref", { ref: "rounds", ...col }),
+      f("job", "Position", "job", col),
+      f("reqId", "Open position", "ref", { ref: "rounds", ...col }),
       f("roleOriginal", "Role (original)", "text"),
       f("contact", "Contact / email", "text"),
       f("source", "Source", "select", {

@@ -59,8 +59,8 @@ export function CandidatePanel({
 
   async function move(stage: Stage) {
     try {
-      await setStage({ candidateIds: [candidateId], stage });
-      toast("success", `Moved to ${stageMeta(stage).label}`);
+      const { added } = await setStage({ candidateIds: [candidateId], stage });
+      toast("success", `Moved to ${stageMeta(stage).label}${added ? " and added to Candidates" : ""}`);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
     }

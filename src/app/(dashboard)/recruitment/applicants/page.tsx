@@ -37,7 +37,7 @@ export default function RecruitmentPage() {
     return (
       <div className="p-8">
         <SkeletonPageHeader />
-        <SkeletonList rows={6} what="open positions" />
+        <SkeletonList rows={6} what="positions" />
       </div>
     );
   }
@@ -47,8 +47,8 @@ export default function RecruitmentPage() {
   return (
     <div className="p-8">
       <PageHeader
-        title="Website Applicants"
-        subtitle="Everyone who applied through the form on ecultify.com, by role. Shortlist here, then add people to a hiring round."
+        title="Positions"
+        subtitle="Everyone who applied through the form on ecultify.com, by position. Open a position and shortlist people: they go straight to Candidates."
         icon={UserSearch}
       />
 

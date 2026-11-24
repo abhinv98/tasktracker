@@ -108,7 +108,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
               {[
                 row.code,
-                round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "No hiring round yet",
+                round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "No open position yet",
                 text(row, "contact"),
                 text(row, "source"),
               ]
@@ -134,7 +134,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               onClick={() =>
                 askConfirm({
                   title: `Delete ${text(row, "name")}?`,
-                  message: "The candidate is removed from this hiring round for everyone. It cannot be undone.",
+                  message: "They are taken off Candidates for everyone. It cannot be undone.",
                   onConfirm: async () => {
                     await remove({ id: row._id as Id<"hrRecords"> });
                     onClose();

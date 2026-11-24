@@ -2,7 +2,7 @@
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -24,6 +24,8 @@ import {
 import { STAGES, OPEN_STAGES, stageMeta, type Stage } from "@/lib/recruitStages";
 import { useHrData } from "@/components/recruitment/hrShared";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
+import { EmailPreview } from "@/components/recruitment/TemplateEditor";
+import { valuesFor } from "@/lib/templateHtml";
 import {
   parseCtcLpa, formatLpa, parseYears, formatYears, parseNoticeDays, formatNotice,
 } from "@/lib/recruitParse";
@@ -35,6 +37,7 @@ import {
   Mail,
   Trash2,
   UserSearch,
+  UserCheck,
   Megaphone,
   ChevronUp,
   ChevronDown,
@@ -70,6 +73,7 @@ function fmt(ts?: number | null) {
 
 export default function RecruitmentJobPage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const jobSourceId = Number(params.jobId);
   const highlight = searchParams.get("highlight");
@@ -93,7 +97,7 @@ export default function RecruitmentJobPage() {
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
   const addApplicants = useMutation(api.hrOps.addApplicants);
   const hr = useHrData();
-  // Rounds still hiring: where a shortlisted applicant can go next.
+  // Open positions still hiring: where an applicant can be placed straight away.
   const openRounds = (hr?.book.rounds ?? []).filter(
     (r) => !String(r.fields.hiringStatus ?? "").startsWith("Closed")
   );
@@ -101,7 +105,7 @@ export default function RecruitmentJobPage() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Bulk delete/mail/move act on the whole set, so drop picks hidden by a new filter.
-  useEffect(() => setSelected(new Set()), [stage, search]);
+  useEffect(() => setSelected(new Set()), [stage, search, jobSourceId]);
   const [mailOpen, setMailOpen] = useState(false);
   const [campOpen, setCampOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
@@ -128,8 +132,13 @@ export default function RecruitmentJobPage() {
   async function applyStage(next: Stage) {
     if (!ids.length) return;
     try {
-      const { updated } = await setStageMut({ candidateIds: ids, stage: next });
-      toast("success", `${updated} moved to ${stageMeta(next).label}`);
+      const { updated, added } = await setStageMut({ candidateIds: ids, stage: next });
+      toast(
+        "success",
+        [updated && `${updated} moved to ${stageMeta(next).label}`, added && `${added} added to Candidates`]
+          .filter(Boolean)
+          .join(", ") || (next === "screened" ? "Already on Candidates" : "Nothing to change")
+      );
       setSelected(new Set());
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Failed");
@@ -140,7 +149,7 @@ export default function RecruitmentJobPage() {
     if (!ids.length) return;
     try {
       const { added, skipped } = await addApplicants({ candidateIds: ids, roundId: roundId as Id<"hrRecords"> });
-      const code = openRounds.find((r) => r._id === roundId)?.code ?? "the round";
+      const code = openRounds.find((r) => r._id === roundId)?.code ?? "the open position";
       toast(
         "success",
         `${added} added to ${code}${skipped ? `, ${skipped} already there` : ""}. Find them under Candidates.`
@@ -155,14 +164,15 @@ export default function RecruitmentJobPage() {
     if (!templateId || !ids.length) return;
     setBusy(true);
     try {
-      const { sent, failed } = await sendTemplateEmail({
+      const { sent, unsent, reason } = await sendTemplateEmail({
         candidateIds: ids,
         templateId: templateId as Id<"recruitTemplates">,
       });
-      toast(failed ? "error" : "success",
-        failed ? `${sent} sent, ${failed} failed` : `Sent to ${sent}`);
-      setMailOpen(false);
-      setSelected(new Set());
+      toast(unsent.length ? "error" : "success",
+        unsent.length ? `${sent} sent, ${unsent.length} not sent. ${reason}`.trim() : `Sent to ${sent}`);
+      // Whoever it did not reach stays picked, with the dialog open, to try again.
+      setSelected(new Set(unsent));
+      if (unsent.length === 0) setMailOpen(false);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Send failed");
     } finally {
@@ -235,16 +245,35 @@ export default function RecruitmentJobPage() {
     });
 
   const allSelected = rows.length > 0 && selected.size === rows.length;
+  const picked = templates?.find((t) => t._id === templateId);
+  const firstPicked = rows.find((r) => selected.has(r.c._id) && r.c.email)?.c;
 
   return (
     <div className="p-8">
-      <Link
-        href="/recruitment/applicants"
-        className="inline-flex items-center gap-1.5 mb-4 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-      >
-        <ArrowLeft size={13} />
-        All positions
-      </Link>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Link
+          href="/recruitment/applicants"
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          <ArrowLeft size={13} />
+          All positions
+        </Link>
+        {/* Straight to another position, without going back to the list. */}
+        <select
+          value={String(jobSourceId)}
+          onChange={(e) => router.push(`/recruitment/${e.target.value}`)}
+          aria-label="Switch position"
+          className="max-w-[280px] cursor-pointer rounded-md border border-[var(--border)] bg-white px-2 py-1 text-[12px] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
+        >
+          {!job && <option value={String(jobSourceId)}>Choose a position</option>}
+          {jobs.map((j) => (
+            <option key={j._id} value={String(j.sourceId)}>
+              {j.parentSourceId != null ? "\u00a0\u00a0\u00a0" : ""}
+              {j.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <PageHeader
         title={job?.name ?? "Position"}
@@ -291,7 +320,11 @@ export default function RecruitmentJobPage() {
             Clear
           </button>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button onClick={() => setMailOpen(true)}>
+            <Button onClick={() => applyStage("screened")}>
+              <UserCheck size={14} />
+              Shortlist
+            </Button>
+            <Button variant="secondary" onClick={() => setMailOpen(true)}>
               <Mail size={14} />
               Send email
             </Button>
@@ -302,11 +335,11 @@ export default function RecruitmentJobPage() {
             <select
               value=""
               onChange={(e) => e.target.value && addToRound(e.target.value)}
-              aria-label="Add to hiring round"
+              aria-label="Add to open position"
               className="max-w-[220px] bg-white border border-[var(--border)] rounded-md px-2 py-1.5 text-[13px] font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--accent-admin)]"
             >
-              <option value="">Add to hiring round…</option>
-              {openRounds.length === 0 && <option disabled>No open hiring rounds yet</option>}
+              <option value="">Add to open position…</option>
+              {openRounds.length === 0 && <option disabled>No open positions yet</option>}
               {openRounds.map((r) => (
                 <option key={r._id} value={r._id}>
                   {r.code} · {String(r.fields.role ?? "")}
@@ -502,6 +535,7 @@ export default function RecruitmentJobPage() {
         onClose={() => setMailOpen(false)}
         title={`Email ${selected.size} candidate${selected.size === 1 ? "" : "s"}`}
         icon={Mail}
+        size="lg"
         footer={
           <>
             <Button variant="ghost" onClick={() => setMailOpen(false)}>Cancel</Button>
@@ -518,9 +552,18 @@ export default function RecruitmentJobPage() {
             options={(templates ?? []).map((t) => ({ value: t._id, label: `${t.name} — ${t.jobName}` }))}
           />
           <p className="text-[12px] text-[var(--text-secondary)]">
-            Sends from <strong>HR Team &lt;hr@ecultify.com&gt;</strong>. Placeholders
-            fill per candidate, and every send is recorded.
+            {firstPicked && picked
+              ? `This is how ${firstPicked.name} gets it. The rest get the same with their own details, and every send is recorded.`
+              : "Pick a template to see the email before it goes. Every send is recorded."}
           </p>
+          {firstPicked && picked && (
+            <EmailPreview
+              subject={picked.subject}
+              body={picked.body}
+              values={valuesFor(firstPicked, job?.name ?? "")}
+              to={`${firstPicked.name}, ${firstPicked.email}`}
+            />
+          )}
         </div>
       </Modal>
 

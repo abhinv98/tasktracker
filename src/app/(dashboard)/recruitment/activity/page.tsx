@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
+import { mailProblem } from "@/convex/lib/mail";
 import {
   EmptyState,
   PageHeader,
@@ -103,6 +104,9 @@ export default function RecruitmentActivityPage() {
                         >
                           <span className="inline-block w-2 h-2 rounded-full bg-[var(--danger)]" />
                           Failed
+                          {mailProblem(l.error) && (
+                            <span className="font-normal text-[var(--text-secondary)]">{mailProblem(l.error)}</span>
+                          )}
                         </span>
                       )}
                     </td>

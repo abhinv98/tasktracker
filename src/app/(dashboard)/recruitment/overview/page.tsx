@@ -21,7 +21,7 @@ export default function RecruitmentOverview() {
   const router = useRouter();
 
   // The dashboard is for HR and super admins. Anyone with delegated access
-  // works from the hiring rounds.
+  // works from the open positions.
   useEffect(() => {
     if (data && !data.full) router.replace("/recruitment/today");
   }, [data, router]);
@@ -50,7 +50,7 @@ export default function RecruitmentOverview() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SparkStat label="Active hiring cycles" value={top.activeCycles} hint="Open or on hold" />
-        <SparkStat label="Vacant seats" value={top.vacantSeats} hint="Across those rounds" />
+        <SparkStat label="Vacant seats" value={top.vacantSeats} hint="Across those positions" />
         <SparkStat label="Verified active candidates" value={top.activeCandidates} hint="Excludes unverified history" />
         <SparkStat label="Approvals waiting" value={top.approvals} hint="Waiting on a decision" bad={top.approvals > 0} />
         <SparkStat
@@ -65,7 +65,7 @@ export default function RecruitmentOverview() {
         <p className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--warning-dim)] px-3 py-2 text-[13px] text-[var(--text-primary)]">
           <span className="font-medium">Import check.</span>{" "}
           <Link href="/recruitment/t/rounds" className="underline underline-offset-2">
-            {top.roundsToConfirm} hiring {top.roundsToConfirm === 1 ? "round needs its" : "rounds need their"} status confirmed
+            {top.roundsToConfirm} open {top.roundsToConfirm === 1 ? "position needs its" : "positions need their"} status confirmed
           </Link>{" "}
           and{" "}
           <Link href="/recruitment/t/pipeline" className="underline underline-offset-2">
@@ -155,11 +155,11 @@ export default function RecruitmentOverview() {
 
       <ChartCard
         className="mt-4"
-        title="Hiring rounds"
+        title="Open positions"
         description="Each row is one hiring cycle. A blocker, where there is one, replaces the health label."
       >
         {book.rounds.length === 0 ? (
-          <p className="py-6 text-center text-[13px] text-[var(--text-muted)]">No hiring rounds yet.</p>
+          <p className="py-6 text-center text-[13px] text-[var(--text-muted)]">No open positions yet.</p>
         ) : (
           <div className="-mx-1 overflow-x-auto">
             <table className="w-full border-collapse">

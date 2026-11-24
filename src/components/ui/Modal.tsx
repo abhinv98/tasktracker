@@ -39,6 +39,7 @@ export function Modal({
   children,
 }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const pressed = useRef<EventTarget | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -64,10 +65,12 @@ export function Modal({
     <dialog
       ref={ref}
       aria-labelledby="modal-title"
+      onMouseDown={(e) => (pressed.current = e.target)}
       onClick={(e) => {
         // Clicks land on the dialog element itself only when they hit the
-        // backdrop — anything inside the content div stops here.
-        if (e.target === ref.current) onClose();
+        // backdrop — anything inside the content div stops here. Pressed there
+        // too: selecting text and letting go outside is not a click to close.
+        if (e.target === ref.current && pressed.current === ref.current) onClose();
       }}
       // m-auto is load-bearing: the UA stylesheet centres a modal <dialog>
       // with `margin: auto` inside its inset-0 box, and Tailwind's preflight

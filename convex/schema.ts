@@ -1218,7 +1218,7 @@ export default defineSchema({
   }).index("by_candidate", ["candidateId", "createdAt"]),
 
   // ─── HR TRACKERS ───────────────────────────────
-  // Every row of the HR operating system (hiring rounds, pipeline candidates,
+  // Every row of the HR operating system (open positions, pipeline candidates,
   // interviews, assignments, offers, onboarding, interns, campus, HR projects,
   // founder tasks, daily log). What a tracker's `fields` may hold is defined
   // once in convex/lib/hrTrackers.ts and checked on every save.

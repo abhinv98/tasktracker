@@ -5,6 +5,7 @@ import { getAuthUserId } from "./lib/internalAuth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
+import { ARCHIVED, addToCandidates, nextCode, rowsOf, today } from "./lib/candidates";
 import {
   TRACKERS,
   TRACKER_KEYS,
@@ -23,8 +24,8 @@ import {
 //   full   - HR and super admins: every tracker, the dashboard, and who else
 //            gets in.
 //   scoped - someone they have given positions to (users.recruitJobs): the
-//            hiring rounds for those positions and what hangs off them (their
-//            candidates, interviews, assignments and offers). Nothing else.
+//            open positions tied to them, the people shortlisted for them, and
+//            those people's interviews, assignments and offers. Nothing else.
 
 const fieldsValidator = v.record(v.string(), v.union(v.string(), v.number(), v.null()));
 
@@ -44,8 +45,13 @@ function inScope(row: Omit<Slim, "_id">, access: RecruitAccess, seen: ReadonlySe
   if (row.tracker === "rounds") {
     return typeof row.fields.job === "string" && mayRecruitFor(access, Number(row.fields.job));
   }
-  // Everything else belongs to whatever it points at: a candidate to its round,
-  // an interview to its candidate.
+  // A candidate with no open position yet belongs to the website position they
+  // were shortlisted from. Once they have one, that decides.
+  if (row.tracker === "pipeline" && !row.fields.reqId) {
+    return typeof row.fields.job === "string" && mayRecruitFor(access, Number(row.fields.job));
+  }
+  // Everything else belongs to whatever it points at: a candidate to its open
+  // position, an interview to its candidate.
   return (TRACKERS[row.tracker].fields as readonly Field[]).some(
     (f) => f.type === "ref" && seen.has(String(row.fields[f.key] ?? ""))
   );
@@ -68,25 +74,6 @@ function trackerFor(key: string, full: boolean): TrackerKey {
   if (TRACKERS[key].hrOnly && !full) throw new Error("This tracker is HR only");
   return key;
 }
-
-/** Today's date in India, the way the trackers store dates. */
-const today = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
-
-/** The next workbook-style ID for a tracker, given its rows: REQ-26-013 follows REQ-26-012. */
-function codeAfter(rows: { code: string }[], tracker: TrackerKey) {
-  const head = `${TRACKERS[tracker].prefix}-${today().slice(2, 4)}-`;
-  const last = Math.max(
-    0,
-    ...rows.filter((r) => r.code.startsWith(head)).map((r) => Number(r.code.slice(head.length)) || 0)
-  );
-  return head + String(last + 1).padStart(3, "0");
-}
-
-const rowsOf = (ctx: MutationCtx, tracker: TrackerKey) =>
-  ctx.db
-    .query("hrRecords")
-    .withIndex("by_tracker", (q) => q.eq("tracker", tracker))
-    .collect();
 
 /** A `ref` must point at a row of the right tracker, a `user` at a staff member. */
 async function checkLinks(ctx: MutationCtx, tracker: TrackerKey, fields: Fields) {
@@ -128,7 +115,7 @@ export const all = query({
     const rows = every
       .filter((r) => isTracker(r.tracker) && (seen ? seen.has(r._id) : true))
       .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: r.fields }));
-    // The positions a round can be tied to: all of them for HR, their own for the rest.
+    // The website positions a row can be tied to: all of them for HR, their own for the rest.
     const jobs = (await ctx.db.query("recruitJobs").collect())
       .filter((j) => mayRecruitFor(access, j.sourceId))
       .map((j) => ({ id: String(j.sourceId), name: j.name }))
@@ -161,8 +148,19 @@ export const save = mutation({
       throw new Error(
         tracker === "rounds"
           ? "Pick one of your positions under Website position"
-          : "This must belong to a hiring round for one of your positions"
+          : "This must belong to one of your positions"
       );
+    }
+    // What they point it at, and what they take it away from, must both be theirs.
+    for (const field of TRACKERS[tracker].fields as readonly Field[]) {
+      const [before, after] = [existing?.fields[field.key] ?? "", fields[field.key] ?? ""];
+      if (!seen || before === after || (field.type !== "ref" && field.type !== "job")) continue;
+      for (const value of [before, after]) {
+        if (value === "") continue;
+        if (field.type === "ref" ? !seen.has(String(value)) : !mayRecruitFor(access, Number(value))) {
+          throw new Error(`${field.label}: that one is not yours to change`);
+        }
+      }
     }
     for (const field of TRACKERS[tracker].fields as readonly Field[]) {
       if (field.stamp) fields[field.key] = today();
@@ -175,7 +173,7 @@ export const save = mutation({
     if (!existing) {
       const id = await ctx.db.insert("hrRecords", {
         tracker,
-        code: codeAfter(await rowsOf(ctx, tracker), tracker),
+        code: await nextCode(ctx, tracker),
         fields,
         createdBy: user._id,
         createdAt: now,
@@ -202,9 +200,9 @@ export const remove = mutation({
     const row = await ctx.db.get(id);
     if (!row) return;
     trackerFor(row.tracker, full);
-    const others = await ctx.db.query("hrRecords").collect();
+    const others = (await ctx.db.query("hrRecords").collect()).filter((o) => isTracker(o.tracker));
     if (!full && !scopeOf(others, access).has(id)) return;
-    // A round with candidates, or a candidate with interviews, stays: deleting
+    // An open position with candidates, or a candidate with interviews, stays: deleting
     // it would leave those rows pointing at nothing.
     const user = others.find((o) => Object.values(o.fields).includes(id));
     if (user) {
@@ -218,7 +216,7 @@ export const remove = mutation({
   },
 });
 
-/** Put shortlisted website applicants into a hiring round's pipeline. */
+/** Put website applicants into one open position, as candidates. */
 export const addApplicants = mutation({
   args: { candidateIds: v.array(v.id("recruitCandidates")), roundId: v.id("hrRecords") },
   handler: async (ctx, { candidateIds, roundId }) => {
@@ -226,58 +224,31 @@ export const addApplicants = mutation({
     const { user } = access;
     const round = await ctx.db.get(roundId);
     if (!round || round.tracker !== "rounds" || (!access.full && !inScope(round, access, new Set()))) {
-      throw new Error("Hiring round not found");
+      throw new Error("Open position not found");
     }
-    // Read once: each new row is added to this list, which keeps the IDs
-    // running on and skips an applicant listed twice.
-    const pipeline: { code: string; fields: Fields }[] = await rowsOf(ctx, "pipeline");
-    let added = 0;
-    for (const candidateId of candidateIds) {
-      const c = await ctx.db.get(candidateId);
+    const applicants = [];
+    for (const id of candidateIds) {
+      const c = await ctx.db.get(id);
       if (!c) continue;
       if (!mayRecruitFor(access, c.jobSourceId)) throw new Error("You do not have access to this position");
-      if (pipeline.some((p) => p.fields.applicantId === candidateId && p.fields.reqId === roundId)) continue;
-      const now = Date.now();
-      const code = codeAfter(pipeline, "pipeline");
-      pipeline.push({ code, fields: { applicantId: candidateId, reqId: roundId } });
-      await ctx.db.insert("hrRecords", {
-        tracker: "pipeline",
-        code,
-        fields: {
-          name: c.name,
-          reqId: roundId,
-          roleOriginal: c.position,
-          contact: [c.email, c.number].filter(Boolean).join(" · "),
-          source: "Website",
-          firstContact: today(),
-          stage: "Screening",
-          status: "Active",
-          hrOwner: user._id,
-          verification: "Verified",
-          origin: "New",
-          lastUpdate: today(),
-          applicantId: candidateId,
-          ...(c.resume ? { resume: c.resume } : {}),
-        },
-        createdBy: user._id,
+      applicants.push(c);
+    }
+    const added = await addToCandidates(ctx, access, applicants, round);
+    // The application itself moves to Shortlisted, unless HR already moved it on.
+    const now = Date.now();
+    for (const c of applicants) {
+      if ((c.stage ?? "applied") !== "applied") continue;
+      await ctx.db.patch(c._id, { stage: "screened", stageUpdatedAt: now });
+      await ctx.db.insert("recruitActivity", {
+        candidateId: c._id,
+        kind: "stage",
+        body: `Added to open position ${round.code}`,
+        fromStage: "applied",
+        toStage: "screened",
+        authorId: user._id,
+        authorName: user.name ?? user.email ?? "HR",
         createdAt: now,
-        updatedAt: now,
       });
-      // The application itself moves to Shortlisted, unless HR already moved it on.
-      if ((c.stage ?? "applied") === "applied") {
-        await ctx.db.patch(candidateId, { stage: "screened", stageUpdatedAt: now });
-        await ctx.db.insert("recruitActivity", {
-          candidateId,
-          kind: "stage",
-          body: `Added to hiring round ${round.code}`,
-          fromStage: "applied",
-          toStage: "screened",
-          authorId: user._id,
-          authorName: user.name ?? user.email ?? "HR",
-          createdAt: now,
-        });
-      }
-      added++;
     }
     return { added, skipped: candidateIds.length - added };
   },
@@ -567,6 +538,62 @@ export const setRecruitAccess = mutation({
   },
 });
 
+/* ── Clearing a list ───────────────────────────────────────── */
+
+/**
+ * Empty some trackers without losing them: their rows move under "archived:",
+ * which no screen reads. Run by hand; restoreArchived puts them back.
+ */
+export const archiveTrackers = internalMutation({
+  args: { trackers: v.array(v.string()) },
+  handler: async (ctx, { trackers }) => {
+    const gone = new Set<string>();
+    for (const key of trackers) {
+      if (!isTracker(key)) throw new Error(`Unknown tracker ${key}`);
+      for (const row of await rowsOf(ctx, key)) gone.add(row._id);
+    }
+    // Nothing that stays may be left pointing at a row that goes.
+    for (const row of await ctx.db.query("hrRecords").collect()) {
+      if (gone.has(row._id) || !isTracker(row.tracker)) continue;
+      if (Object.values(row.fields).some((value) => typeof value === "string" && gone.has(value))) {
+        throw new Error(`${row.code} in ${TRACKERS[row.tracker].label} points at a row that would be cleared`);
+      }
+    }
+    const moved: Record<string, number> = {};
+    for (const key of trackers) {
+      const rows = await rowsOf(ctx, key);
+      for (const row of rows) await ctx.db.patch(row._id, { tracker: ARCHIVED + key });
+      moved[key] = rows.length;
+    }
+    return moved;
+  },
+});
+
+export const restoreArchived = internalMutation({
+  args: { trackers: v.array(v.string()) },
+  handler: async (ctx, { trackers }) => {
+    const back = [];
+    for (const key of trackers) {
+      if (!isTracker(key)) throw new Error(`Unknown tracker ${key}`);
+      for (const row of await rowsOf(ctx, ARCHIVED + key)) back.push({ key, row });
+    }
+    const ids = new Set<string>(back.map(({ row }) => row._id));
+    for (const { key, row } of back) {
+      const fields = { ...row.fields };
+      for (const field of TRACKERS[key].fields as readonly Field[]) {
+        const id = field.type === "ref" && typeof fields[field.key] === "string" && ctx.db.normalizeId("hrRecords", fields[field.key] as string);
+        if (!id) continue;
+        const target = await ctx.db.get(id);
+        // What it pointed at may have been deleted while it was away.
+        if (!target) delete fields[field.key];
+        else if (target.tracker !== field.ref && !ids.has(id)) throw new Error(`${row.code}: restore ${field.ref} with it`);
+      }
+      await ctx.db.patch(row._id, { tracker: key, fields });
+    }
+    return back.length;
+  },
+});
+
 /* ── Import from the workbook ──────────────────────────────── */
 
 /**
@@ -580,10 +607,12 @@ export const importRows = internalMutation({
   handler: async (ctx, { rows }) => {
     const existing = await ctx.db.query("hrRecords").collect();
     const idOf = new Map<string, Id<"hrRecords">>(existing.map((r) => [`${r.tracker}:${r.code}`, r._id]));
+    // A row that was cleared out of its list is not brought back by an import.
+    const cleared = new Set(existing.filter((r) => r.tracker.startsWith(ARCHIVED)).map((r) => `${r.tracker.slice(ARCHIVED.length)}:${r.code}`));
     let added = 0;
     for (const row of rows) {
       if (!isTracker(row.tracker)) throw new Error(`Unknown tracker ${row.tracker}`);
-      if (idOf.has(`${row.tracker}:${row.code}`)) continue;
+      if (idOf.has(`${row.tracker}:${row.code}`) || cleared.has(`${row.tracker}:${row.code}`)) continue;
       const input: Record<string, string | number | null> = { ...row.fields };
       for (const field of TRACKERS[row.tracker].fields as readonly Field[]) {
         if (field.type !== "ref" || typeof input[field.key] !== "string") continue;

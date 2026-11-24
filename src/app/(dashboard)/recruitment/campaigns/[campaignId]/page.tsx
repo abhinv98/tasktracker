@@ -22,12 +22,15 @@ import {
   Megaphone, ArrowLeft, Mail, FileText, ExternalLink, UserMinus, Check, RotateCcw,
 } from "lucide-react";
 import { stageMeta, type Stage } from "@/lib/recruitStages";
+import { EmailPreview } from "@/components/recruitment/TemplateEditor";
+import { valuesFor } from "@/lib/templateHtml";
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.campaignId as Id<"recruitCampaigns">;
   const campaign = useQuery(api.recruitment.getCampaign, { campaignId });
   const templates = useQuery(api.recruitment.listTemplates, {});
+  const jobs = useQuery(api.recruitment.listJobs);
   // The server takes the newest N across every job, so a small limit drops
   // this campaign's older sends out of the Mailed column.
   const logs = useQuery(api.recruitment.listEmailLogs, { limit: 100000 });
@@ -60,7 +63,7 @@ export default function CampaignDetailPage() {
   const mailedTo = useMemo(() => {
     const set = new Set<string>();
     for (const l of logs ?? []) {
-      if (campaign?.sourceId != null && l.campaignSourceId === campaign.sourceId) {
+      if (l.status === "sent" && campaign?.sourceId != null && l.campaignSourceId === campaign.sourceId) {
         set.add(l.contactEmail.toLowerCase());
       }
     }
@@ -71,15 +74,16 @@ export default function CampaignDetailPage() {
     if (!templateId || targetIds.length === 0) return;
     setBusy(true);
     try {
-      const { sent, failed } = await sendTemplateEmail({
+      const { sent, unsent, reason } = await sendTemplateEmail({
         candidateIds: targetIds,
         templateId: templateId as Id<"recruitTemplates">,
         ...(campaign?.sourceId != null ? { campaignSourceId: campaign.sourceId } : {}),
       });
-      toast(failed ? "error" : "success",
-        failed ? `${sent} sent, ${failed} failed` : `Sent to ${sent}`);
-      setMailOpen(false);
-      setSelected(new Set());
+      toast(unsent.length ? "error" : "success",
+        unsent.length ? `${sent} sent, ${unsent.length} not sent. ${reason}`.trim() : `Sent to ${sent}`);
+      // Whoever it did not reach stays picked, with the dialog open, to try again.
+      setSelected(new Set(unsent));
+      if (unsent.length === 0) setMailOpen(false);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Send failed");
     } finally {
@@ -100,6 +104,8 @@ export default function CampaignDetailPage() {
   }
 
   const allSelected = members.length > 0 && selected.size === members.length;
+  const picked = templates?.find((t) => t._id === templateId);
+  const first = members.find((m) => m.email && targetIds.includes(m._id));
 
   return (
     <div className="p-8">
@@ -258,6 +264,7 @@ export default function CampaignDetailPage() {
         onClose={() => setMailOpen(false)}
         title={`Email ${targetIds.length} ${targetIds.length === 1 ? "person" : "people"}`}
         icon={Mail}
+        size="lg"
         footer={
           <>
             <Button variant="ghost" onClick={() => setMailOpen(false)}>Cancel</Button>
@@ -278,7 +285,16 @@ export default function CampaignDetailPage() {
               ? `Sending to the ${selected.size} selected.`
               : "Sending to everyone in this campaign."}{" "}
             Results are counted against this campaign.
+            {first && picked ? ` This is how ${first.name} gets it.` : ""}
           </p>
+          {first && picked && (
+            <EmailPreview
+              subject={picked.subject}
+              body={picked.body}
+              values={valuesFor(first, jobs?.find((j) => j.sourceId === first.jobSourceId)?.name ?? "")}
+              to={`${first.name}, ${first.email}`}
+            />
+          )}
         </div>
       </Modal>
 

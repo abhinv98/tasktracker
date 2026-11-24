@@ -123,6 +123,8 @@ interface NavCategory {
     recruitOnly?: boolean;
     /** Inside recruitment: HR and super admins only, not delegates. */
     recruitFullOnly?: boolean;
+    /** Other paths that belong to this item (a position's own page, under Positions). */
+    also?: RegExp;
     /** Active on its own address only, not on the pages beneath it. */
     exact?: boolean;
   }[];
@@ -271,23 +273,22 @@ const REVIEWER_NAV: NavCategory[] = [
 /**
  * Recruitment is its own workspace: once you're inside /recruitment the sidebar
  * becomes recruitment's navigation rather than the whole app's. It earns that
- * because it has five destinations of its own plus a live list of positions —
- * they were previously buttons in a page header, which is not where people
- * look for top-level navigation.
+ * because it has destinations of its own — they were previously buttons in a
+ * page header, which is not where people look for top-level navigation.
  *
  * The escape hatch at the top is not optional. A nested nav without an obvious
  * way out is how people get stranded.
  */
 const RECRUITMENT_NAV: NavCategory[] = [
   {
-    // The daily loop: what needs doing, the rounds, the people in them.
+    // The daily loop: what needs doing, what we are hiring for, who applied, who was shortlisted.
     category: "Hiring",
     items: [
       { href: "/recruitment/today", label: "Today" },
-      { href: "/recruitment/t/rounds", label: "Hiring Rounds" },
+      { href: "/recruitment/t/rounds", label: "Open Positions" },
+      { href: "/recruitment/applicants", label: "Positions", also: /^\/recruitment\/\d+$/ },
       { href: "/recruitment/t/pipeline", label: "Candidates" },
       { href: "/recruitment/t/interviews", label: "Interviews" },
-      { href: "/recruitment/applicants", label: "Website Applicants" },
     ],
   },
   {
@@ -340,13 +341,6 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
   // (recruitJobs) sees those positions only. The backend checks the same.
   const recruitFull = user.isHR === true || user.isSuperAdmin === true;
   const canRecruit = recruitFull || !!user.recruitJobs?.length;
-  // Positions are fetched only inside the workspace — no point paying for the
-  // query on every other page in the app.
-  const jobs = useQuery(
-    api.recruitment.listJobs,
-    inRecruitment && canRecruit ? {} : "skip"
-  );
-
   // Oversight lives as a tab inside Work Log (no standalone nav item).
   const baseNav: NavCategory[] =
     inRecruitment && canRecruit
@@ -437,7 +431,7 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
           {nav.map((group) => {
             const isOpen = !collapsedCategories.has(group.category);
             const hasActiveItem = group.items.some(
-              (item) => pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/"))
+              (item) => pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/")) || item.also?.test(pathname)
             );
 
             return (
@@ -468,7 +462,9 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
                   <div className="mt-0.5 space-y-0.5">
                     {group.items.map((item) => {
                       const isActive =
-                        pathname === item.href || (!item.exact && pathname.startsWith(item.href + "/"));
+                        pathname === item.href ||
+                        (!item.exact && pathname.startsWith(item.href + "/")) ||
+                        item.also?.test(pathname);
                       const Icon = getIconForRoute(item.href);
                       return (
                         <Link
@@ -521,47 +517,6 @@ export function Sidebar({ user, open, onClose }: SidebarProps) {
               </div>
             );
           })}
-          {/* Live positions — jumping straight to a role is the single most
-              common thing HR does in here, so it belongs in the nav rather
-              than two clicks deep behind Overview. */}
-          {inRecruitment && canRecruit && jobs && jobs.length > 0 && (
-            <div className="mb-1 mt-2">
-              <div className="px-2.5 pt-3 pb-1 text-[12px] font-medium text-[var(--text-muted)]">
-                Positions
-              </div>
-              <div className="mt-0.5 space-y-0.5">
-                {jobs
-                  .filter((j) => j.parentSourceId == null)
-                  .map((j) => {
-                    const href = `/recruitment/${j.sourceId}`;
-                    const isActive = pathname === href;
-                    return (
-                      <Link
-                        key={j._id}
-                        href={href}
-                        onClick={onClose}
-                        className={`group flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] transition-colors duration-150 ${
-                          isActive
-                            ? "bg-[var(--bg-hover)] font-medium text-[var(--text-primary)]"
-                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        <span className="flex-1 truncate">{j.name}</span>
-                        {j.moving > 0 ? (
-                          <span className="shrink-0 rounded-full bg-[#c4242a] px-1.5 text-[11px] font-semibold tabular-nums text-white">
-                            {j.moving}
-                          </span>
-                        ) : (
-                          <span className="shrink-0 text-[11px] tabular-nums text-[var(--text-muted)]">
-                            {j.inPlay}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
         </nav>
 
         {/* Footer */}

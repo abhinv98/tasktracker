@@ -16,7 +16,7 @@ export type HrData = {
   byId: Map<string, Row>;
   people: { _id: string; name: string }[];
   personName: (id: string) => string;
-  /** Website positions a hiring round can be tied to (the caller's own, unless HR). */
+  /** Website positions a row can be tied to (the caller's own, unless HR). */
   jobs: { id: string; name: string }[];
   today: string;
 };
