@@ -134,7 +134,7 @@ export function TrackerBoard({
                         <span className="mt-0.5 block truncate text-[12px] text-[var(--text-muted)]">{secondLine(row)}</span>
                       )}
                       {row.fields.nextAction && (
-                        <span className="mt-1 line-clamp-2 block text-[12px] text-[var(--text-secondary)]">{String(row.fields.nextAction)}</span>
+                        <span className="mt-1 line-clamp-2 text-[12px] text-[var(--text-secondary)]">{String(row.fields.nextAction)}</span>
                       )}
                       {(due || tone(label) === "bad" || tone(label) === "warn") && (
                         <span className="mt-1.5 flex items-center justify-between gap-2">

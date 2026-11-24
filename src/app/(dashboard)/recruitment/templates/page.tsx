@@ -133,7 +133,7 @@ export default function RecruitmentTemplatesPage() {
                 <span className="mt-1 block truncate text-[13px] text-[var(--text-secondary)]">
                   {subjectPreview(t.subject, FIELD_NAMES)}
                 </span>
-                <span className="mt-0.5 line-clamp-2 block text-[12px] text-[var(--text-muted)]">{excerpt(t.body)}</span>
+                <span className="mt-0.5 line-clamp-2 text-[12px] text-[var(--text-muted)]">{excerpt(t.body)}</span>
               </button>
               <div className="flex shrink-0 items-center gap-1">
                 <button onClick={() => open({ ...t })} aria-label={`Edit ${t.name}`} title="Edit" className={iconButtonClass}>

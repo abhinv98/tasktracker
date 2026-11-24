@@ -426,7 +426,7 @@ function Related({
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] text-[var(--text-primary)]">{line(r).filter(Boolean).join("  ·  ")}</span>
-                  {detail(r) && <span className="mt-0.5 line-clamp-2 block text-[12px] text-[var(--text-muted)]">{detail(r)}</span>}
+                  {detail(r) && <span className="mt-0.5 line-clamp-2 text-[12px] text-[var(--text-muted)]">{detail(r)}</span>}
                 </span>
                 <HealthBadge label={health(r, data.book, data.today)} />
               </button>
