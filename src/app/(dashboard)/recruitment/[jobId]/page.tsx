@@ -70,9 +70,19 @@ export default function RecruitmentJobPage() {
 
   // Bulk delete, mail and move act on every pick, so drop the ones a new filter hides.
   useEffect(() => setSelected(new Set()), [chip, filter, jobSourceId, teamView]);
-  // A role under this position opens it narrowed to that role.
+  // A role has its own page. An older link that names it on its position's page lands there.
   const roleAsked = searchParams.get("role") ?? "";
-  useEffect(() => setFilter((f) => (roleAsked ? { ...f, role: roleAsked } : f)), [roleAsked]);
+  const rolePage = jobs?.find((j) => j.parentSourceId === jobSourceId && j.name.trim().toLowerCase() === roleAsked.trim().toLowerCase())?.sourceId;
+  useEffect(() => {
+    if (rolePage) {
+      // Whatever else the link said (a status, someone to show) goes along.
+      const rest = new URLSearchParams(searchParams.toString());
+      rest.delete("role");
+      router.replace(`/recruitment/${rolePage}${rest.size ? `?${rest}` : ""}`);
+    }
+    else if (roleAsked) setFilter((f) => ({ ...f, role: roleAsked }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleAsked, rolePage, router]);
 
   const job = jobs?.find((j) => j.sourceId === jobSourceId);
   const places = useMemo(() => placesOf(hr, String(jobSourceId)), [hr, jobSourceId]);
@@ -198,16 +208,20 @@ export default function RecruitmentJobPage() {
         title={`${job ? job.name[0].toUpperCase() + job.name.slice(1) : "Position"}${viewed ? ` for ${viewed.name}` : ""}`}
         subtitle={[
           positionCode(jobSourceId),
-          job?.parentName
-            ? `Under ${job.parentName}`
-            : `${candidates.length.toLocaleString()} ${candidates.length === 1 ? "person has" : "people have"} applied. Shortlisted people carry on under Candidates.`,
-        ].join("  ·  ")}
+          job?.parentName && `Under ${job.parentName}`,
+          `${candidates.length.toLocaleString()} ${candidates.length === 1 ? "person has" : "people have"} applied. ${
+                hr && !hr.full ? "Shortlist who you want to meet. After the interview, open them and give your feedback." : "Shortlisted people carry on under Candidates."
+              }`,
+        ]
+          .filter(Boolean)
+          .join("  ·  ")}
         icon={UserSearch}
         actions={
           job && (
             <div className="flex flex-wrap items-center gap-2">
-              <Rounds data={hr} job={job} team={viewed?._id} />
-              {hr && <ApplyLinks data={hr} job={job} team={viewed?._id} />}
+              {/* Hiring rounds and application links are HR's to run. */}
+              {hr?.full && <Rounds data={hr} job={job} team={viewed?._id} />}
+              {hr?.full && <ApplyLinks data={hr} job={job} team={viewed?._id} />}
               {hr?.full && (
                 <Link
                   href={`/recruitment/setup?job=${jobSourceId}`}
@@ -341,10 +355,14 @@ export default function RecruitmentJobPage() {
               <X size={14} />
               Reject
             </Button>
+            {/* Left to HR: emailing, moving, rounds, and deleting for good (which the server refuses from anyone else). */}
+            {hr?.full && (
             <Button variant="secondary" onClick={() => setMailOpen(true)}>
               <Mail size={14} />
               Email
             </Button>
+            )}
+            {hr?.full && (
             <Tray label="More" align="end" width="w-64">
               <TrayItem label="Back to New" icon={RotateCcw} onSelect={() => moveSelected("new")} />
               <TrayItem label="Move to another position" icon={ArrowLeftRight} onSelect={() => setMoving(true)} />
@@ -359,6 +377,7 @@ export default function RecruitmentJobPage() {
               ))}
               <TrayItem label="Delete for good" icon={Trash2} destructive onSelect={() => setConfirmDelete(true)} />
             </Tray>
+            )}
           </div>
         </div>
       )}
@@ -387,6 +406,7 @@ export default function RecruitmentJobPage() {
             teams={several ? { options: teams, divide: meta?.divide === true, onPick: (a, team) => void putInTeam([a._id], team) } : undefined}
             // The server has left the figures out already; this only drops the empty columns.
             pay={hr?.pay !== false}
+            full={hr?.full !== false}
             highlight={highlight}
           />
           {undated > 0 && (

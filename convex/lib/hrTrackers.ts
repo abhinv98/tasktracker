@@ -128,6 +128,8 @@ export const TRACKERS = {
         options: ["LinkedIn", "Naukri", "Internshala", "Referral", "Campus", "Website", "Agency", "Other"],
       }),
       f("stage", "Stage", "select", { free: true, ...col }),
+      // What the last interviewer said (hrOps.feedbackGiven): "Good fit · Interview 1 · Mayur".
+      f("latestOutcome", "Feedback", "text", col),
       // From their application on the website (hrOps.all). What they earn and expect is for whoever sees pay.
       f("experience", "Experience", "text", { auto: true, as: "years", ...col }),
       f("currentCtc", "Current CTC", "text", { auto: true, pay: true, as: "lpa", ...col }),
@@ -152,7 +154,6 @@ export const TRACKERS = {
         initial: "Verified",
       }),
       f("origin", "Origin", "select", { options: ["New", "Imported"], initial: "New", more: true }),
-      f("latestOutcome", "Latest outcome", "text", { more: true }),
       f("notes", "HR notes", "long"),
       f("lastUpdate", "Last update", "date", { stamp: true }),
     ],

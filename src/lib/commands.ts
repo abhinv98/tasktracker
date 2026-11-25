@@ -48,6 +48,8 @@ const isEmployee = (u: CommandUser) => (u.role ?? "employee") !== "admin";
 const isHR = (u: CommandUser) => u.isHR === true;
 /** Recruitment: HR and super admins, as on the server. */
 const canRecruit = (u: CommandUser) => isHR(u) || u.isSuperAdmin === true || !!u.recruitJobs?.length;
+/** HR and super admins: the rest of Recruitment, beyond one's own positions. */
+const runsRecruitment = (u: CommandUser) => isHR(u) || u.isSuperAdmin === true;
 // HR's view is deliberately stripped of brand work — mirror the route guard in
 // (dashboard)/layout.tsx so the palette can't offer a page that bounces them.
 const adminNotHR = (u: CommandUser) => isAdmin(u) && !isHR(u);
@@ -112,7 +114,7 @@ export const NAV_COMMANDS: NavCommand[] = [
     icon: UserSearch,
     keywords: ["cv", "resume", "applicants", "talent", "pool", "search"],
     hint: "Recruitment",
-    visible: canRecruit,
+    visible: runsRecruitment,
   },
   {
     label: "Email templates",
@@ -120,7 +122,7 @@ export const NAV_COMMANDS: NavCommand[] = [
     icon: UserSearch,
     keywords: ["outreach", "batch", "mail", "recruitment", "campaign"],
     hint: "Recruitment",
-    visible: canRecruit,
+    visible: runsRecruitment,
   },
   {
     label: "History",

@@ -297,7 +297,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                 size="sm"
                 variant="secondary"
                 title={`Everyone who applied for ${roundJob.name}`}
-                onClick={() => router.push(roundJob.parent ? `/recruitment/${roundJob.parent}?role=${encodeURIComponent(roundJob.name)}` : `/recruitment/${roundJob.id}`)}
+                onClick={() => router.push(`/recruitment/${roundJob.id}`)}
               >
                 Applicants
               </Button>

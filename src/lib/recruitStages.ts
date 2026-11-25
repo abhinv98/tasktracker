@@ -48,3 +48,11 @@ export const isPositionStatus = (s: string | null): s is PositionStatus => POSIT
 export function stageMeta(s: Stage) {
   return STAGES.find((x) => x.value === s) ?? STAGES[0];
 }
+
+/** An interviewer's verdict, as it is stored (Proceed, Hold, Reject) and as it is said. */
+export const VERDICTS = {
+  Proceed: { label: "Good fit", tone: "text-[var(--accent-employee-text)]" },
+  Hold: { label: "Hold", tone: "text-[var(--text-secondary)]" },
+  Reject: { label: "Not a fit", tone: "text-[var(--danger)]" },
+} as const;
+export type Verdict = keyof typeof VERDICTS;

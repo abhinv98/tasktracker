@@ -117,7 +117,9 @@ const CLOSED: readonly string[] = TRACKERS.pipeline.boardClosed;
 export const fieldsOf = (tracker: TrackerKey) => TRACKERS[tracker].fields as readonly Field[];
 
 /** The ones this person sees: amounts are for whoever sees pay. */
-export const seenFields = (tracker: TrackerKey, data: HrData | undefined) => fieldsOf(tracker).filter((f) => !f.pay || data?.pay);
+export const seenFields = (tracker: TrackerKey, data: HrData | undefined) =>
+  // Approving a hiring round is HR's and the founders' (hrOps.save keeps it so).
+  fieldsOf(tracker).filter((f) => (!f.pay || data?.pay) && !(tracker === "rounds" && f.key === "approvalStatus" && !data?.full));
 
 /** Mine: I am named on it in any of its people fields (owner, interviewer, reviewer…). */
 export const isMine = (row: Row, data: HrData) =>

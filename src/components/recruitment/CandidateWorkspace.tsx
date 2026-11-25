@@ -15,6 +15,7 @@ import { webLink } from "@/convex/lib/links";
 import { TRACKERS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { health, type Row } from "@/lib/hrHealth";
 import { formatLpa, formatYears, parseCtcLpa, parseYears } from "@/lib/recruitParse";
+import { VERDICTS, type Verdict } from "@/lib/recruitStages";
 import { taskStatusMeta } from "@/lib/status";
 import { AssignTask } from "./AssignTask";
 import { FieldGrid, InlineAdd, toValues, useQuickSave } from "./hrFields";
@@ -513,7 +514,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
               data={data}
               onOpen={openRow}
               line={lineOf}
-              detail={(r) => [text(r, "recommendation") !== "Pending" && text(r, "recommendation"), text(r, "feedback")].filter(Boolean).join(": ")}
+              detail={(r) => [VERDICTS[text(r, "recommendation") as Verdict]?.label, text(r, "feedback")].filter(Boolean).join(": ")}
             />
           )}
           {(assignments.length > 0 || form) && (

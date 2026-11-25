@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Textarea, useToast } from "@/components/ui";
 import { iconButtonClass } from "@/components/ui/classes";
-import { positionStatus, stageMeta, type PositionStatus, type Stage } from "@/lib/recruitStages";
+import { VERDICTS, positionStatus, stageMeta, type PositionStatus, type Stage, type Verdict } from "@/lib/recruitStages";
 import { DECISIONS, Decide, UNDATED, useLast, useMoveApplicants } from "./ApplicantsTable";
 import { MoveApplicants } from "./MoveApplicants";
 import {
@@ -31,6 +31,8 @@ const KEYS: Record<string, PositionStatus> = { s: "shortlisted", h: "on_hold", r
  * the decision. Given the list it was opened from, it steps through it: S, H or
  * R decides and moves on to the next person, the arrow keys look without deciding.
  */
+const fmtDay = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
 export function CandidatePanel({
   candidateId,
   order = [],
@@ -53,6 +55,25 @@ export function CandidatePanel({
   const ready = c?._id === candidateId;
   const moveApplicants = useMoveApplicants();
   const addNote = useMutation(api.recruitment.addNote);
+  const feedbackOn = useMutation(api.hrOps.feedbackOn);
+  // What is being written about each person: a verdict and why.
+  const [verdicts, setVerdicts] = useState<Record<string, { verdict?: Verdict; text: string }>>({});
+  const mine = verdicts[candidateId] ?? { text: "" };
+  const setMine = (change: Partial<{ verdict: Verdict; text: string }>) => setVerdicts((v) => ({ ...v, [candidateId]: { ...mine, ...change } }));
+  const [sending, setSending] = useState(false);
+  async function sendFeedback() {
+    if (!mine.verdict || !mine.text.trim() || !ready) return;
+    setSending(true);
+    try {
+      await feedbackOn({ applicantId: candidateId, recommendation: mine.verdict, feedback: mine.text });
+      toast("success", c?.full ? "Feedback saved" : "Feedback sent to HR");
+      setVerdicts((v) => ({ ...v, [candidateId]: { text: "" } }));
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Could not save your feedback");
+    } finally {
+      setSending(false);
+    }
+  }
   const deleteActivity = useMutation(api.recruitment.deleteActivity);
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
@@ -91,7 +112,8 @@ export function CandidatePanel({
       if (document.querySelector("dialog[open]")) return;
       if (e.key === "Escape") return onClose();
       const el = e.target as HTMLElement;
-      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) return;
+      // Nor while giving feedback: after a verdict is picked, the next keys are the feedback, not a decision.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable || el.closest("[data-feedback]")) return;
       if (e.key === "ArrowRight") go(after);
       else if (e.key === "ArrowLeft") go(before);
       else {
@@ -169,29 +191,40 @@ export function CandidatePanel({
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-[var(--border-subtle)] px-6 py-3">
               <div className="flex flex-wrap gap-1">
                 <Decide stage={c.stage as Stage} name={c.name} onMove={decide} large />
-                <Button type="button" variant="secondary" disabled={!ready} onClick={() => setMoving(true)}>
-                  <ArrowLeftRight size={14} />
-                  Move to another position
-                </Button>
+                {c.full && (
+                  <Button type="button" variant="secondary" disabled={!ready} onClick={() => setMoving(true)}>
+                    <ArrowLeftRight size={14} />
+                    Move to another position
+                  </Button>
+                )}
               </div>
               {c.onCandidates.length > 0 ? (
                 <span className="flex flex-wrap gap-x-3 text-[13px]">
-                  {c.onCandidates.map((row) => (
-                    <Link
-                      key={row._id}
-                      href={`/recruitment/t/pipeline?open=${row._id}`}
-                      className="font-medium text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
-                    >
-                      On Candidates: {row.stage}
-                      {row.round ? ` (${row.round})` : ""}
-                    </Link>
-                  ))}
+                  {c.onCandidates.map((row) =>
+                    c.full ? (
+                      <Link
+                        key={row._id}
+                        href={`/recruitment/t/pipeline?open=${row._id}`}
+                        className="font-medium text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
+                      >
+                        On Candidates: {row.stage}
+                        {row.round ? ` (${row.round})` : ""}
+                      </Link>
+                    ) : (
+                      // Someone hiring for the position sees where HR has them; Candidates itself is HR's.
+                      <span key={row._id} className="text-[var(--text-secondary)]">
+                        With HR at: <span className="font-medium text-[var(--text-primary)]">{row.stage}</span>
+                      </span>
+                    )
+                  )}
                 </span>
               ) : (
                 <span className="text-[12px] text-[var(--text-muted)]">
                   {DECISIONS.includes(positionStatus(c.stage as Stage) as (typeof DECISIONS)[number])
                     ? ""
-                    : `Shortlisting puts them on Candidates${team ? ` for ${team.name}` : ""}, where interviews, tasks and the offer are.`}
+                    : c.full
+                      ? `Shortlisting puts them on Candidates${team ? ` for ${team.name}` : ""}, where interviews, tasks and the offer are.`
+                      : "Shortlist the ones worth meeting. After the interview, your feedback goes here."}
                 </span>
               )}
             </div>
@@ -249,6 +282,70 @@ export function CandidatePanel({
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Interviews, and what each interviewer said. Anyone hiring for the position adds theirs here. */}
+                {(c.interviews.length > 0 || c.onCandidates.some((row) => row.active)) && (
+                  <section aria-label="Interview feedback" data-feedback className="mx-6 mb-4 rounded-lg border border-[var(--border)]">
+                    <h3 className="border-b border-[var(--border-subtle)] px-3 py-2 text-[13px] font-semibold text-[var(--text-primary)]">Interview feedback</h3>
+                    {c.interviews.length > 0 && (
+                      <ul className="divide-y divide-[var(--border-subtle)]">
+                        {c.interviews.map((it) => (
+                          <li key={it._id} className="px-3 py-2">
+                            <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--text-muted)]">
+                              <span>{[it.round || "Interview", it.date && fmtDay(it.date), it.time, it.mine ? "you" : it.by].filter(Boolean).join(" · ")}</span>
+                              {it.verdict in VERDICTS ? (
+                                <span className={`font-semibold ${VERDICTS[it.verdict as Verdict].tone}`}>{VERDICTS[it.verdict as Verdict].label}</span>
+                              ) : (
+                                <span>{it.mine ? "your feedback is awaited" : "no feedback yet"}</span>
+                              )}
+                            </p>
+                            {it.feedback && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-[var(--text-primary)]">{it.feedback}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {c.onCandidates.some((row) => row.active) && (
+                      <div className={`flex flex-col gap-2 px-3 py-2.5 ${c.interviews.length ? "border-t border-[var(--border-subtle)]" : ""}`}>
+                        <p className="text-[12px] font-medium text-[var(--text-secondary)]">After you have met them, how was it?</p>
+                        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Your verdict">
+                          {(Object.keys(VERDICTS) as Verdict[]).map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              aria-pressed={mine.verdict === key}
+                              onClick={() => setMine({ verdict: key })}
+                              className={`h-control rounded-control border px-3 text-[13px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                                mine.verdict === key
+                                  ? "border-[var(--text-primary)] bg-[var(--text-primary)] text-white"
+                                  : "border-[var(--border)] bg-white text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                              }`}
+                            >
+                              {VERDICTS[key].label}
+                            </button>
+                          ))}
+                        </div>
+                        {mine.verdict && (
+                          <>
+                            <Textarea
+                              value={mine.text}
+                              onChange={(e) => setMine({ text: e.target.value })}
+                              aria-label="Your feedback"
+                              autoFocus
+                              placeholder="What stood out, any concerns, and why"
+                              maxLength={5000}
+                              className="min-h-[70px] text-[13px]"
+                            />
+                            <div className="flex justify-end">
+                              <Button loading={sending} disabled={!mine.text.trim() || !ready} onClick={sendFeedback}>
+                                {c.full ? "Save feedback" : "Send to HR"}
+                              </Button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </section>
                 )}
 
                 {/* Note composer */}
@@ -390,7 +487,7 @@ export function CandidatePanel({
         )}
       </aside>
       {moving && c && (
-        <MoveApplicants ids={[candidateId]} who={c.name} from={c.jobSourceId} onClose={() => setMoving(false)} />
+        <MoveApplicants ids={[candidateId]} who={c.name} from={c.positionId} onClose={() => setMoving(false)} />
       )}
     </>
   );

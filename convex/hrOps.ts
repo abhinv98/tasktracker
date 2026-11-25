@@ -3,8 +3,8 @@ import { internalAction, internalMutation, internalQuery, mutation, query } from
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "./lib/internalAuth";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import { mayRecruitFor, recruitAccess, type RecruitAccess } from "./lib/guards";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mayRecruitFor, myCandidate, recruitAccess, type RecruitAccess } from "./lib/guards";
 import { ARCHIVED, GONE, addToCandidates, atStep, followCandidate, nextCode, placeInRound, refit, rowsOf, settleTeams, standing, today, withTeam } from "./lib/candidates";
 import { CLOSING, STANDARD, entryStep, fitStage } from "./lib/hirePipeline";
 import { livePositions, loadPipelines, type Pipelines } from "./lib/pipelines";
@@ -203,6 +203,8 @@ export const save = mutation({
     if (tracker === "interviews" && typeof fields.date === "string" && !fields.feedbackDue) {
       fields.feedbackDue = new Date(Date.parse(fields.date) + 86_400_000).toISOString().slice(0, 10);
     }
+    // Approving a hiring round is for HR and the founders: from anyone else it stays as it was, or starts pending.
+    if (tracker === "rounds" && !full) fields.approvalStatus = existing?.fields.approvalStatus ?? "Pending";
     // What came back says it came back.
     if (tracker === "assignments" && fields.submission && !fields.receivedDate) fields.receivedDate = today();
     const book = tracker === "pipeline" || tracker === "rounds" ? await loadPipelines(ctx) : null;
@@ -478,11 +480,104 @@ export const myInterviews = query({
   },
 });
 
+const VERDICT = { Proceed: "Good fit", Hold: "Hold", Reject: "Not a fit" } as const;
+const recommendation = v.union(v.literal("Proceed"), v.literal("Reject"), v.literal("Hold"));
+/** What was written, checked. */
+function written(feedback: string) {
+  const text = feedback.trim();
+  if (!text) throw new Error("Write a line or two of feedback");
+  if (text.length > 5000) throw new Error("Feedback is too long (5000 characters at most)");
+  return text;
+}
+
+/** Feedback is for HR to act on: the candidate's row says the latest, and HR is told (once, not for a correction). */
+async function feedbackGiven(ctx: MutationCtx, me: Doc<"users">, candidateId: unknown, round: string, verdict: keyof typeof VERDICT, tell = true) {
+  const id = ctx.db.normalizeId("hrRecords", String(candidateId ?? ""));
+  const candidate = id ? await ctx.db.get(id) : null;
+  if (!candidate || candidate.tracker !== "pipeline") return;
+  const by = me.name ?? me.email ?? "The interviewer";
+  await ctx.db.patch(candidate._id, {
+    // Short enough to stay a valid value of its field, whatever the round is called.
+    fields: { ...candidate.fields, latestOutcome: [VERDICT[verdict], round.slice(0, 60), by.slice(0, 60)].filter(Boolean).join(" · "), lastUpdate: today() },
+    updatedAt: Date.now(),
+  });
+  if (!tell) return;
+  // Whoever in HR looks after them. Looked after by nobody in HR (whoever shortlisted them, say), it is HR's, or the founders'.
+  const users = await ctx.db.query("users").collect();
+  const runs = (u: Doc<"users">) => u.isHR === true || u.isSuperAdmin === true;
+  // Writing it themselves, it is the rest of HR who should hear.
+  const owner = users.find((u) => u._id === text(candidate.fields, "hrOwner") && runs(u) && u._id !== me._id);
+  const hr = users.filter((u) => u.isHR === true);
+  const told = owner ? [owner] : hr.length ? hr : users.filter(runs);
+  for (const u of told.filter((u) => u._id !== me._id)) {
+    await ctx.db.insert("notifications", {
+      recipientId: u._id,
+      type: "interview",
+      title: `${VERDICT[verdict]}: ${text(candidate.fields, "name") || "a candidate"}`,
+      message: `${by} gave feedback${round ? ` after ${round.slice(0, 60)}` : ""}. Open them under Candidates to decide what happens next.`,
+      triggeredBy: me._id,
+      read: false,
+      createdAt: Date.now(),
+    });
+  }
+}
+
+/**
+ * Feedback on someone shortlisted, from whoever is hiring for their position:
+ * given from the applicant, with or without an interview on the calendar. It
+ * goes onto their own interview that is waiting for it (the earliest that has
+ * come), corrects what they wrote earlier today for the same round, and
+ * otherwise makes the interview.
+ */
+export const feedbackOn = mutation({
+  args: { applicantId: v.id("recruitCandidates"), recommendation, feedback: v.string() },
+  handler: async (ctx, args) => {
+    const access = await requireAccess(ctx);
+    const applicant = await ctx.db.get(args.applicantId);
+    if (!applicant || !mayRecruitFor(access, applicant.jobSourceId)) throw new Error("Applicant not found");
+    const note = written(args.feedback);
+    const me = access.user._id;
+    // Only someone still in play, and theirs to work on.
+    const live = [];
+    for (const r of await rowsOf(ctx, "pipeline")) {
+      if (r.fields.applicantId === args.applicantId && standing(r.fields) === "Active" && (access.full || (await myCandidate(ctx, r._id, access)))) live.push(r);
+    }
+    if (live.length === 0) throw new Error("Shortlist them first. Feedback goes on someone who is shortlisted.");
+    const ids = new Set<string>(live.map((r) => r._id));
+    const mine = (await rowsOf(ctx, "interviews")).filter((r) => ids.has(text(r.fields, "candidateId")) && r.fields.interviewer === me);
+    // An interview of theirs that has come and still waits for it, earliest first. One still ahead is not it.
+    const awaited = mine
+      .filter((r) => !r.fields.feedbackReceived && ["Planned", "Completed"].includes(text(r.fields, "status")) && text(r.fields, "date") <= today())
+      .sort((a, b) => `${text(a.fields, "date")} ${text(a.fields, "time")}`.localeCompare(`${text(b.fields, "date")} ${text(b.fields, "time")}`))[0];
+    // In two rounds at once, the candidate is the one their interview is in, else the newest.
+    // With none waiting, saying it again the same day corrects what they last said, whichever round that was for.
+    const waiting = awaited;
+    const earlier = waiting ? undefined : mine.filter((r) => r.fields.feedbackReceived === today()).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    const candidate = live.find((r) => r._id === (earlier ?? waiting)?.fields.candidateId) ?? live.sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    const round = earlier || waiting ? text((earlier ?? waiting)!.fields, "round") : text(candidate.fields, "stage");
+    const said = { status: "Completed", recommendation: args.recommendation, feedback: note, feedbackReceived: today(), lastUpdate: today() };
+    const now = Date.now();
+    const onto = waiting ?? earlier;
+    if (onto) await ctx.db.patch(onto._id, { fields: { ...onto.fields, ...said }, updatedAt: now });
+    else {
+      await ctx.db.insert("hrRecords", {
+        tracker: "interviews",
+        code: await nextCode(ctx, "interviews"),
+        fields: { candidateId: candidate._id, round, interviewer: me, date: today(), ...said },
+        createdBy: me,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    await feedbackGiven(ctx, access.user, candidate._id, round, args.recommendation, !earlier);
+  },
+});
+
 /** The interviewer's written feedback. It marks the interview completed. */
 export const giveFeedback = mutation({
   args: {
     id: v.id("hrRecords"),
-    recommendation: v.union(v.literal("Proceed"), v.literal("Reject"), v.literal("Hold")),
+    recommendation,
     feedback: v.string(),
   },
   handler: async (ctx, { id, recommendation, feedback }) => {
@@ -494,20 +589,20 @@ export const giveFeedback = mutation({
     if (row.fields.feedbackReceived || !["Planned", "Completed"].includes(text(row.fields, "status"))) {
       throw new Error("Feedback is closed for this interview. Ask HR if it needs changing.");
     }
-    const written = feedback.trim();
-    if (!written) throw new Error("Write a line or two of feedback");
-    if (written.length > 5000) throw new Error("Feedback is too long (5000 characters at most)");
+    const note = written(feedback);
     await ctx.db.patch(id, {
       fields: {
         ...row.fields,
         status: "Completed",
         recommendation,
-        feedback: written,
+        feedback: note,
         feedbackReceived: today(),
         lastUpdate: today(),
       },
       updatedAt: Date.now(),
     });
+    const user = await ctx.db.get(me);
+    if (user) await feedbackGiven(ctx, user, row.fields.candidateId, text(row.fields, "round"), recommendation);
   },
 });
 

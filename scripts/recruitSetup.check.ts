@@ -573,6 +573,74 @@ async function main() {
   await w.run(H.save, { tracker: "pipeline", id: "p", fields: { notes: "x", currentCtc: "99" } });
   assert.equal(w.f("p").currentCtc, undefined, "never stored on the candidate");
 
+  // Approving a hiring round is HR's and the founders'. From anyone else it starts pending and stays as it was.
+  w = world({ recruitJobs: [job(1, "Design"), job(9, "Finance")], recruitCandidates: [app("a", 1), app("z", 9), app("n", 1, "", "applied")], recruitActivity: [], notifications: [], hrRecords: [round("r1", { job: "1", approvalStatus: "Pending" }), on("p", { job: "1", applicantId: "a", reqId: "r1", stage: "Interview 1", hrOwner: "hr" }), on("pz", { job: "9", applicantId: "z" })] });
+  w.as("del");
+  await w.run(H.save, { tracker: "rounds", id: "r1", fields: { approvalStatus: "Approved", notes: "mine" } });
+  assert.deepEqual([w.f("r1").approvalStatus, w.f("r1").notes], ["Pending", "mine"]);
+  const own = await w.run(H.save, { tracker: "rounds", fields: { role: "More design", job: "1", approvalStatus: "Approved", hiringStatus: "Open" } });
+  assert.equal(w.f(own).approvalStatus, "Pending");
+  w.as("hr");
+  await w.run(H.save, { tracker: "rounds", id: "r1", fields: { approvalStatus: "Approved" } });
+  assert.equal(w.f("r1").approvalStatus, "Approved");
+  w.as("del");
+  await w.run(H.save, { tracker: "rounds", id: "r1", fields: { openings: 4, approvalStatus: "Pending" } });
+  assert.deepEqual([w.f("r1").approvalStatus, w.f("r1").openings], ["Approved", 4], "nor can they take an approval back");
+  w.as("hr");
+  // Feedback from whoever hires for the position: on a shortlisted person only, on their own interview if one waits, and HR is told.
+  w.as("del");
+  await fails(w.run(H.feedbackOn, { applicantId: "n", recommendation: "Proceed", feedback: "Good" }), /Shortlist them first/);
+  await fails(w.run(H.feedbackOn, { applicantId: "z", recommendation: "Proceed", feedback: "Good" }), /not found/);
+  await fails(w.run(H.feedbackOn, { applicantId: "a", recommendation: "Proceed", feedback: "  " }), /Write a line/);
+  await w.run(H.feedbackOn, { applicantId: "a", recommendation: "Proceed", feedback: "Strong portfolio" });
+  const talks = () => w.tables.hrRecords.filter((r) => r.tracker === "interviews");
+  assert.deepEqual([talks().length, talks()[0].fields.interviewer, talks()[0].fields.round, talks()[0].fields.status, talks()[0].fields.recommendation, talks()[0].fields.feedback], [1, "del", "Interview 1", "Completed", "Proceed", "Strong portfolio"]);
+  assert.match(w.f("p").latestOutcome, /^Good fit · Interview 1/);
+  assert.deepEqual(w.tables.notifications.map((n) => [n.recipientId, n.title]), [["hr", "Good fit: p"]]);
+  w.tables.hrRecords.find((r) => r._id === "p")!.fields.hrOwner = "del";
+  await w.run(H.feedbackOn, { applicantId: "a", recommendation: "Reject", feedback: "On reflection, no" });
+  assert.deepEqual([talks().length, talks()[0].fields.recommendation], [1, "Reject"], "said again the same day, it corrects what was said");
+  assert.deepEqual(w.tables.notifications.map((n) => n.recipientId), ["hr"], "a correction does not tell HR again");
+  // Their interview that has come takes it. One still ahead does not, and nor does what they said for another round.
+  w.tables.hrRecords.push(
+    { _id: "ahead", tracker: "interviews", code: "I-8", fields: { candidateId: "p", interviewer: "del", round: "Founder", date: "2099-01-01", status: "Planned", recommendation: "Pending" } },
+    { _id: "iv", tracker: "interviews", code: "I-1", fields: { candidateId: "p", interviewer: "del", round: "Round 2", date: "2026-01-01", status: "Planned", recommendation: "Pending" } }
+  );
+  await new Promise((r) => setTimeout(r, 5)); // Later than what was said before, as it would be.
+  await w.run(H.feedbackOn, { applicantId: "a", recommendation: "Hold", feedback: "Unsure" });
+  assert.deepEqual([talks().length, w.f("iv").status, w.f("iv").recommendation, w.f("iv").feedback, w.f("ahead").status], [3, "Completed", "Hold", "Unsure", "Planned"], "a planned interview of theirs that has come takes it");
+  assert.match(w.f("p").latestOutcome, /^Hold · Round 2/);
+  assert.deepEqual(w.tables.notifications.map((n) => n.recipientId), ["hr", "hr"], "looking after them themselves, HR is told all the same");
+  // What went onto a scheduled interview is corrected there too, whatever its round is called.
+  await new Promise((r) => setTimeout(r, 5)); // The latest of today's is the one corrected.
+  await w.run(H.feedbackOn, { applicantId: "a", recommendation: "Reject", feedback: "Changed my mind" });
+  assert.deepEqual([talks().length, w.f("iv").recommendation, w.f("iv").feedback, w.tables.notifications.length], [3, "Reject", "Changed my mind", 2]);
+  // Not on someone who is out of the running.
+  w.tables.hrRecords.find((r) => r._id === "p")!.fields.status = "Rejected";
+  await fails(w.run(H.feedbackOn, { applicantId: "a", recommendation: "Proceed", feedback: "Too late" }), /Shortlist them first/);
+  w.tables.hrRecords.find((r) => r._id === "p")!.fields.status = "Active";
+  // Deleting for good and emailing applicants are HR's and the founders'.
+  await fails(w.run(R.deleteCandidates, { candidateIds: ["n"] }), /Only HR and super admins/);
+  const shownTo = await w.run(R.getCandidate, { candidateId: "a" });
+  assert.deepEqual([shownTo.full, shownTo.interviews.length, shownTo.interviews.every((i: any) => i.mine), shownTo.interviews.map((i: any) => i.verdict).sort()], [false, 3, true, ["", "Reject", "Reject"]]);
+
+  // A role is a position like any other: its people are counted, listed and filtered under it, and not under the position above it as well.
+  w = world({
+    recruitJobs: [job(1, "Account Manager"), job(16, "Social Media Intern", { parentSourceId: 1 }), job(3, "Copy")],
+    recruitCandidates: [app("am", 1, "Account Manager", "applied"), app("blank", 1, "", "applied"), app("odd", 1, "Something else", "applied"), app("in", 1, "Account Manager", "applied"), app("c", 3, "", "applied")],
+    recruitActivity: [],
+    hrRecords: [],
+  });
+  await w.run(S.moveApplicants, { candidateIds: ["in"], to: 16 });
+  const ids = async (fn: any, args: any) => (await w.run(fn, args)).map((c: any) => c._id).sort();
+  assert.deepEqual([await ids(R.listCandidates, { jobSourceId: 16 }), await ids(R.listCandidates, { jobSourceId: 1 })], [["in"], ["am", "blank", "odd"]]);
+  assert.deepEqual([await ids(R.recentApplicants, { jobSourceId: 16 }), await ids(R.recentApplicants, { jobSourceId: 1 })], [["in"], ["am", "blank", "odd"]]);
+  const said = (await w.run(R.recentApplicants, {})).find((c: any) => c._id === "in");
+  assert.deepEqual([said.jobName, said.positionId, (await w.run(R.searchCandidates, { search: "in@x" }))[0].jobName], ["Social Media Intern", 16, "Social Media Intern"]);
+  assert.deepEqual((await w.run(R.listJobs, {})).map((j: any) => [j.sourceId, j.total, j.fresh]), [[1, 3, 3], [16, 1, 1], [3, 1, 1]]);
+  w.as("del");
+  assert.deepEqual(await ids(R.listCandidates, { jobSourceId: 16 }), ["in"], "whoever has the position has its roles");
+
   // A step's owner who has left is not written onto people: their rows could not be saved again.
   w = world({ recruitPipelines: [pl("own", [step("a", "A", "screening"), step("b", "B", "interview", { owner: "left", days: 2 })])], recruitJobs: [job(1, "Design", { pipeline: "own" })], hrRecords: [on("p", { job: "1", stage: "A" })] });
   await w.run(H.save, { tracker: "pipeline", id: "p", fields: { stage: "B" } });

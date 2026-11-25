@@ -1,16 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { tabsFor } from "@/lib/recruitNav";
+import { forEveryone, tabsFor } from "@/lib/recruitNav";
 
 /** A section's screens as tabs, so the sidebar needs one line for all of them. */
 export default function RecruitmentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const me = useQuery(api.users.getCurrentUser);
-  const tabs = tabsFor(pathname, me?.isHR === true || me?.isSuperAdmin === true);
+  const full = me?.isHR === true || me?.isSuperAdmin === true;
+  const tabs = tabsFor(pathname, full);
+  // Someone hiring for a few positions has those positions and nothing else here: any other address lands on them.
+  const router = useRouter();
+  const away = !forEveryone(pathname) && !full;
+  useEffect(() => {
+    if (away && me) router.replace("/recruitment/applicants");
+  }, [away, me, router]);
+  if (away) return null;
   return (
     <>
       {tabs.length > 1 && (

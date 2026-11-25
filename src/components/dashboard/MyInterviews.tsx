@@ -8,6 +8,7 @@ import { Button, Panel, useToast } from "@/components/ui";
 import { fieldBaseClass, fieldClass } from "@/components/ui/classes";
 import { fmtDate } from "@/components/recruitment/hrShared";
 import { todayIST } from "@/lib/hrHealth";
+import { VERDICTS } from "@/lib/recruitStages";
 
 const DECISIONS = ["Proceed", "Hold", "Reject"] as const;
 
@@ -107,7 +108,9 @@ export function MyInterviews() {
                       className={`${fieldClass} mt-1 block w-full sm:w-48`}
                     >
                       {DECISIONS.map((d) => (
-                        <option key={d}>{d}</option>
+                        <option key={d} value={d}>
+                          {VERDICTS[d].label}
+                        </option>
                       ))}
                     </select>
                   </label>

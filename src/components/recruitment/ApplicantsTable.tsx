@@ -170,12 +170,12 @@ export function placesOf(data: HrData | undefined, job?: string): Map<string, Pl
   const last = (r: Row) => Number(!!job && !!data?.isAt(r, job));
   for (const r of [...(data?.book.pipeline ?? [])].sort((a, b) => last(a) - last(b))) {
     if (typeof r.fields.applicantId !== "string" || boardValue(r) === null) continue;
-    places.set(r.fields.applicantId, { id: r._id, stage: boardValue(r) || "Candidates", team: r.team ?? "", here: !job || !!data?.isAt(r, job) });
+    places.set(r.fields.applicantId, { id: r._id, stage: boardValue(r) || "Candidates", team: r.team ?? "", here: !job || !!data?.isAt(r, job), said: String(r.fields.latestOutcome ?? "") });
   }
   return places;
 }
 /** `here`: for the position asked about, not another one. */
-type Place = { id: string; stage: string; team: string; here: boolean };
+type Place = { id: string; stage: string; team: string; here: boolean; /** The latest interview feedback on them. */ said: string };
 
 /** The old form kept no dates until 22 May 2026. Everyone without one came before that (cultform's ids run in order). */
 export const UNDATED = "Before 22 May 26";
@@ -193,6 +193,7 @@ export function ApplicantsTable({
   places,
   teams,
   pay,
+  full = true,
   highlight,
 }: {
   rows: Applicant[];
@@ -208,6 +209,8 @@ export function ApplicantsTable({
   teams?: { options: { _id: string; name: string }[]; divide: boolean; onPick: (a: Applicant, team: string) => void };
   /** Shows what they earn and expect. Off for whoever HR has not given it to. */
   pay: boolean;
+  /** HR and super admins: Candidates is theirs to open. Anyone else is told where HR has the person. */
+  full?: boolean;
   highlight?: string | null;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "added", dir: -1 });
@@ -377,12 +380,17 @@ export function ApplicantsTable({
                     <Decide stage={a.stage} name={a.name} onMove={(to) => onMove(a, to)} />
                     {place && positionStatus(a.stage) === "shortlisted" && (
                       <span className="mt-1 flex items-center gap-2">
-                        <Link
-                          href={`/recruitment/t/pipeline?open=${place.id}`}
-                          className="text-[12px] text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
-                        >
-                          On Candidates: {place.stage}
-                        </Link>
+                        {full ? (
+                          <Link
+                            href={`/recruitment/t/pipeline?open=${place.id}`}
+                            className="text-[12px] text-[var(--accent-admin-text)] underline-offset-2 hover:underline"
+                          >
+                            On Candidates: {place.stage}
+                          </Link>
+                        ) : (
+                          <span className="text-[12px] text-[var(--text-muted)]">With HR at: {place.stage}</span>
+                        )}
+                        {place.said && <span className="max-w-[220px] truncate text-[12px] font-medium text-[var(--text-secondary)]" title={place.said}>{place.said}</span>}
                         {teams && place.here && (
                           <select
                             value={place.team ?? ""}

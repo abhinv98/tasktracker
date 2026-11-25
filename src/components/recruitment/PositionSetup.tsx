@@ -124,13 +124,9 @@ export function PositionEditor({
                   <span className="tabular-nums">{position.code}</span>
                   {parent && `  ·  under ${parent.name}`}
                   {"  ·  "}
-                  {position.parent === null ? (
-                    <Link href={`/recruitment/${position.id}`} className="underline underline-offset-2 hover:text-[var(--text-primary)]">
-                      {total.toLocaleString()} {total === 1 ? "applicant" : "applicants"}
-                    </Link>
-                  ) : (
-                    "its applicants are listed under the position above it"
-                  )}
+                  <Link href={`/recruitment/${position.id}`} className="underline underline-offset-2 hover:text-[var(--text-primary)]">
+                    {total.toLocaleString()} {total === 1 ? "applicant" : "applicants"}
+                  </Link>
                 </>
               ) : (
                 "It gets its position ID when you create it. An ID is never used twice."

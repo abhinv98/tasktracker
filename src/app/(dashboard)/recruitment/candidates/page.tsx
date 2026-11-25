@@ -56,11 +56,13 @@ function AllApplicants() {
   const list = useLast((searching ? found : newest) as Applicant[] | undefined, searching ? "search" : `${chip} ${job}`);
 
   const places = useMemo(() => placesOf(hr), [hr]);
+  /** The position someone is for: the role they named, where they named one (the server works it out). */
+  const at = (a: Applicant) => String((a as Applicant & { positionId?: number }).positionId ?? a.jobSourceId);
   const rows = useMemo(
     () =>
       // Matched here too: while the next answer loads, the last one is narrowed to what is typed now.
       narrow(list ?? [], searching ? filter : { ...filter, search: "" })
-        .filter((a) => !job || String(a.jobSourceId) === job)
+        .filter((a) => !job || at(a) === job)
         .filter((a) => chip === "all" || positionStatus(a.stage) === chip),
     [list, filter, job, chip, searching]
   );
@@ -77,7 +79,7 @@ function AllApplicants() {
 
   const total = (key: "fresh" | "shortlisted" | "onHold" | "rejected" | "total") =>
     jobs.filter((j) => !job || String(j.sourceId) === job).reduce((n, j) => n + j[key], 0);
-  const matching = narrow(list ?? [], filter).filter((a) => !job || String(a.jobSourceId) === job);
+  const matching = narrow(list ?? [], filter).filter((a) => !job || at(a) === job);
   const found_ = (c: Chip) => (list ? matching.filter((a) => c === "all" || positionStatus(a.stage) === c).length : undefined);
   const ids = [...picks] as Id<"recruitCandidates">[];
   const reset = (fn: () => void) => {
@@ -124,7 +126,8 @@ function AllApplicants() {
           label="Position"
           allLabel="Any position"
           value={job}
-          options={jobs.map((j) => ({ value: String(j.sourceId), label: j.name }))}
+          // A role sits under its position, and is picked like one.
+          options={jobs.map((j) => ({ value: String(j.sourceId), label: `${j.parentSourceId != null ? "\u2003" : ""}${j.name}` }))}
           onChange={(v) => reset(() => setJob(v))}
         />
         <NarrowTray pay={hr?.pay !== false} value={filter} onChange={(n) => reset(() => setFilter(n))} />

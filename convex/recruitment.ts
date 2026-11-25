@@ -113,18 +113,31 @@ function safeLink(value: string | undefined, label: string, strict = true): stri
 }
 
 /** Jobs with their live candidate counts, parents before their sub-positions. */
+/**
+ * The position someone is for. Applications are filed under the main position,
+ * with a role under it as text: this gives the role itself where they named one,
+ * so a role counts, lists and filters like any position.
+ */
+function positionOfApplicant(live: readonly Doc<"recruitJobs">[]) {
+  const roles = new Map(live.filter((j) => j.parentSourceId != null).map((j) => [`${j.parentSourceId} ${j.name.trim().toLowerCase()}`, j.sourceId]));
+  return (c: { jobSourceId: number; position?: string }) => roles.get(`${c.jobSourceId} ${(c.position ?? "").trim().toLowerCase()}`) ?? c.jobSourceId;
+}
+
 export const listJobs = query({
   args: {},
   handler: async (ctx) => {
     const access = await recruitAccess(ctx);
     if (!access) return [];
-    const jobs = livePositions(await ctx.db.query("recruitJobs").collect()).filter((j) => mayRecruitFor(access, j.sourceId));
+    const live = livePositions(await ctx.db.query("recruitJobs").collect());
+    const jobs = live.filter((j) => mayRecruitFor(access, j.sourceId));
     const candidates = await ctx.db.query("recruitCandidates").collect();
+    const at = positionOfApplicant(live);
 
     const none = () => ({ total: 0, fresh: 0, shortlisted: 0, onHold: 0, rejected: 0, lastApplied: 0 });
     const counts = new Map<number, ReturnType<typeof none>>();
     for (const c of candidates) {
-      const acc = counts.get(c.jobSourceId) ?? none();
+      // Each person once, under what they are for: a role's people are the role's, not its position's as well.
+      const acc = counts.get(at(c)) ?? none();
       const st = c.stage ?? "applied";
       acc.total++;
       // MUST match positionStatus in src/lib/recruitStages.ts, which the position page filters by.
@@ -133,7 +146,7 @@ export const listJobs = query({
       else if (st === "rejected") acc.rejected++;
       else acc.shortlisted++;
       acc.lastApplied = Math.max(acc.lastApplied, c.createdAt ?? 0);
-      counts.set(c.jobSourceId, acc);
+      counts.set(at(c), acc);
     }
 
     const withCounts = jobs.map((j) => ({
@@ -218,10 +231,13 @@ export const listCandidates = query({
   handler: async (ctx, { jobSourceId, stage, search }) => {
     const access = await recruitAccess(ctx);
     if (!access || !mayRecruitFor(access, jobSourceId)) return [];
-    const rows = await ctx.db
-      .query("recruitCandidates")
-      .withIndex("by_job", (q) => q.eq("jobSourceId", jobSourceId))
-      .collect();
+    // A role's people are filed under its position; a position's own list leaves its roles' people to them.
+    const live = livePositions(await ctx.db.query("recruitJobs").collect());
+    const at = positionOfApplicant(live);
+    const filedUnder = live.find((j) => j.sourceId === jobSourceId)?.parentSourceId ?? jobSourceId;
+    const under = (id: number) => ctx.db.query("recruitCandidates").withIndex("by_job", (q) => q.eq("jobSourceId", id)).collect();
+    // Also whoever is filed under the role's own number (the old system's import kept those as they were).
+    const rows = [...(await under(filedUnder)), ...(filedUnder === jobSourceId ? [] : await under(jobSourceId))].filter((r) => at(r) === jobSourceId);
     rows.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     return rows.filter((r) => (!stage || (r.stage ?? "applied") === stage) && (!search || matches(r, search))).map((r) => shown(access, r));
   },
@@ -239,7 +255,9 @@ export const recentApplicants = query({
     const access = await recruitAccess(ctx);
     if (!access) return [];
     // Who was left in a removed position is found by searching, not listed as new.
-    const jobs = new Map(livePositions(await ctx.db.query("recruitJobs").collect()).map((j) => [j.sourceId, j.name]));
+    const live = livePositions(await ctx.db.query("recruitJobs").collect());
+    const jobs = new Map(live.map((j) => [j.sourceId, j.name]));
+    const at = positionOfApplicant(live);
     const statusOf = (stage: string) =>
       stage === "applied" ? "new" : stage === "on_hold" || stage === "rejected" ? stage : "shortlisted";
     return (await ctx.db.query("recruitCandidates").collect())
@@ -247,12 +265,13 @@ export const recentApplicants = query({
         (r) =>
           mayRecruitFor(access, r.jobSourceId) &&
           jobs.has(r.jobSourceId) &&
-          (jobSourceId === undefined || r.jobSourceId === jobSourceId) &&
+          (jobSourceId === undefined || at(r) === jobSourceId) &&
           (!status || statusOf(r.stage ?? "applied") === status)
       )
       .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
       .slice(0, Math.min(limit ?? 10, 300))
-      .map((r) => ({ ...shown(access, r), jobName: jobs.get(r.jobSourceId)! }));
+      // The role they are for, where they named one: what the list says and filters by.
+      .map((r) => ({ ...shown(access, r), jobName: jobs.get(at(r))!, positionId: at(r) }));
   },
 });
 
@@ -265,6 +284,7 @@ export const searchCandidates = query({
     const s = search.trim();
     if (s.length < 2) return [];
     const jobs = await ctx.db.query("recruitJobs").collect();
+    const at = positionOfApplicant(livePositions(jobs));
     const rows = await ctx.db.query("recruitCandidates").collect();
     return rows
       .filter((r) => mayRecruitFor(access, r.jobSourceId) && matches(r, s))
@@ -272,7 +292,8 @@ export const searchCandidates = query({
       .slice(0, limit ?? 20)
       .map((r) => ({
         ...shown(access, r),
-        jobName: nameOf(jobs.find((j) => j.sourceId === r.jobSourceId)),
+        jobName: nameOf(jobs.find((j) => j.sourceId === at(r))),
+        positionId: at(r),
       }));
   },
 });
@@ -337,7 +358,10 @@ export const setCandidateStatus = mutation({
 export const deleteCandidates = mutation({
   args: { candidateIds: v.array(v.id("recruitCandidates")) },
   handler: async (ctx, { candidateIds }) => {
-    await requireCandidates(ctx, await requireRecruiter(ctx), candidateIds);
+    const access = await requireRecruiter(ctx);
+    // For good, with their notes and history: HR's and the founders' to do.
+    if (!access.full) throw new ConvexError("Only HR and super admins delete applicants");
+    await requireCandidates(ctx, access, candidateIds);
     for (const id of candidateIds) {
       // Their notes and stage history go with them: nothing can show them once the person is gone.
       const activity = await ctx.db
@@ -622,6 +646,7 @@ export const getCandidate = query({
 
     // Other applications from the same person — the duplicate problem, surfaced
     // where it matters instead of as a cleanup chore.
+    const forPosition = positionOfApplicant(livePositions(jobs));
     const alsoApplied = c.email
       ? (
           await ctx.db
@@ -632,8 +657,9 @@ export const getCandidate = query({
           .filter((o) => o._id !== c._id && mayRecruitFor(access, o.jobSourceId))
           .map((o) => ({
             _id: o._id,
-            jobSourceId: o.jobSourceId,
-            jobName: jobs.find((j) => j.sourceId === o.jobSourceId)?.name ?? "Unknown",
+            // The role they named there, where they named one: that is the page they are on.
+            jobSourceId: forPosition(o),
+            jobName: jobs.find((j) => j.sourceId === forPosition(o))?.name ?? "Unknown",
             stage: o.stage ?? "applied",
             createdAt: o.createdAt ?? null,
           }))
@@ -647,10 +673,34 @@ export const getCandidate = query({
       const round = roundId ? await ctx.db.get(roundId) : null;
       onCandidates.push({
         _id: row._id,
+        active: standing(row.fields) === "Active",
         stage: standing(row.fields) === "Active" ? String(row.fields.stage ?? "") : standing(row.fields),
         round: round ? `${round.code} · ${String(round.fields.role ?? "")}` : "",
       });
     }
+
+    // Their interviews: what is planned, and what each interviewer said afterwards.
+    const mine = new Set<string>(onCandidates.map((row) => row._id));
+    const people = new Map<string, string>();
+    const interviews = [];
+    for (const row of mine.size ? await ctx.db.query("hrRecords").withIndex("by_tracker", (q) => q.eq("tracker", "interviews")).collect() : []) {
+      if (!mine.has(String(row.fields.candidateId ?? "")) || ["Cancelled", "Rescheduled"].includes(String(row.fields.status ?? ""))) continue;
+      const who = String(row.fields.interviewer ?? "");
+      const userId = ctx.db.normalizeId("users", who);
+      if (userId && !people.has(who)) people.set(who, (await ctx.db.get(userId))?.name ?? "");
+      interviews.push({
+        _id: row._id,
+        round: String(row.fields.round ?? ""),
+        date: String(row.fields.date ?? ""),
+        time: String(row.fields.time ?? ""),
+        by: people.get(who) ?? "",
+        mine: who === access.userId,
+        // "" until they have said.
+        verdict: row.fields.feedbackReceived || row.fields.feedback ? String(row.fields.recommendation ?? "") : "",
+        feedback: String(row.fields.feedback ?? ""),
+      });
+    }
+    interviews.sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
 
     // What cultform recorded before this app: when they applied, and when its status was last set.
     const past = (id: string, at: number | null | undefined, body: string) =>
@@ -665,10 +715,15 @@ export const getCandidate = query({
     return {
       ...shown(access, c),
       pay: access.pay,
+      /** HR and super admins: the rest of Recruitment is theirs to open. */
+      full: access.full,
+      interviews,
       /** The hiring round whose link they used. */
       through: link?.tracker === "rounds" && mayRecruitFor(access, Number(link.fields.job)) ? link.code : "",
       stage: c.stage ?? "applied",
       jobName: nameOf(jobs.find((j) => j.sourceId === c.jobSourceId)),
+      /** The position they are for: the role they named, where they named one. */
+      positionId: forPosition(c),
       timeline: [...timeline, ...before].sort((a, b) => b.at - a.at),
       alsoApplied,
       onCandidates,
@@ -862,11 +917,13 @@ export const _loadSendContext = internalQuery({
       requireJob(access, campaign.jobSourceId);
     }
     const jobs = await ctx.db.query("recruitJobs").collect();
+    const at = positionOfApplicant(livePositions(jobs));
     const out = [];
     for (const id of candidateIds) {
       const c = await ctx.db.get(id);
       if (!c || !c.email) continue;
-      const jobName = jobs.find((j) => j.sourceId === c.jobSourceId)?.name ?? "";
+      // The role they are for, as the preview and every list say it.
+      const jobName = jobs.find((j) => j.sourceId === at(c))?.name ?? "";
       out.push({
         candidateId: id,
         jobSourceId: c.jobSourceId,

@@ -4,7 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, Panel, SkeletonPageHeader, SkeletonTable, StatStrip, StatTile, useToast } from "@/components/ui";
@@ -34,7 +34,6 @@ export default function PositionsPage() {
   const setJobOpen = useMutation(api.recruitment.setJobOpen);
   const { toast } = useToast();
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<Set<number>>(new Set());
   const [panel, setPanel] = useState<Id<"recruitCandidates"> | null>(null);
   const needle = q.trim().toLowerCase();
   const people = useLast(useQuery(api.recruitment.searchCandidates, needle.length >= 2 ? { search: needle, limit: 12 } : "skip"));
@@ -60,11 +59,8 @@ export default function PositionsPage() {
     .filter((j) => hit(j) || roles.some((s) => s.parentSourceId === j.sourceId && hit(s)))
     .sort((a, b) => b.fresh - a.fresh || b.total - a.total);
   const sum = (key: (typeof COUNTS)[number][0]) => jobs.reduce((n, j) => n + j[key], 0);
-  /** A role's applicants are filed under its position: that page, narrowed to the role. */
-  const entry = (j: Job, more = "") => {
-    const q = [isRole(j) ? `role=${encodeURIComponent(j.name)}` : "", more].filter(Boolean).join("&");
-    return `/recruitment/${isRole(j) ? j.parentSourceId : j.sourceId}${q ? `?${q}` : ""}`;
-  };
+  /** A role has its own page and its own people, like any position. */
+  const entry = (j: Job, more = "") => `/recruitment/${j.sourceId}${more ? `?${more}` : ""}`;
 
   const cells = (j: Job) =>
     COUNTS.map(([key, label, status]) => (
@@ -90,7 +86,11 @@ export default function PositionsPage() {
     <div className="p-4 sm:p-8">
       <PageHeader
         title="Positions"
-        subtitle="Everyone who applied on ecultify.com, by position. Shortlist, hold or reject here; shortlisted people carry on under Candidates."
+        subtitle={
+          data && !full
+            ? "The positions you are hiring for. Open one to see who applied, shortlist who you want to meet, and give your feedback after the interview."
+            : "Everyone who applied on ecultify.com, by position. Shortlist, hold or reject here; shortlisted people carry on under Candidates."
+        }
         actions={
           full && (
             <Button onClick={() => router.push("/recruitment/setup?new=position")}>
@@ -103,7 +103,7 @@ export default function PositionsPage() {
 
       <StatStrip className="mb-4">
         {COUNTS.map(([key, label, status]) => (
-          <StatTile key={key} label={label} value={sum(key).toLocaleString()} href={`/recruitment/candidates?status=${status}`} />
+          <StatTile key={key} label={label} value={sum(key).toLocaleString()} href={full ? `/recruitment/candidates?status=${status}` : undefined} />
         ))}
       </StatStrip>
 
@@ -112,7 +112,7 @@ export default function PositionsPage() {
       </div>
 
       {needle.length >= 2 && people && people.length > 0 && (
-        <Panel title="People" count={people.length} action={{ label: "See all", href: `/recruitment/candidates?q=${encodeURIComponent(q.trim())}` }} className="mb-4">
+        <Panel title="People" count={people.length} action={full ? { label: "See all", href: `/recruitment/candidates?q=${encodeURIComponent(q.trim())}` } : undefined} className="mb-4">
           <ul className="divide-y divide-[var(--border-subtle)]">
             {people.map((p) => (
               <li key={p._id}>
@@ -154,14 +154,13 @@ export default function PositionsPage() {
                     {label}
                   </th>
                 ))}
-                <th className="whitespace-nowrap px-3 text-left font-medium">Hiring rounds</th>
+                {full && <th className="whitespace-nowrap px-3 text-left font-medium">Hiring rounds</th>}
                 {full && <th className="whitespace-nowrap px-4 text-right font-medium">On the website</th>}
               </tr>
             </thead>
             <tbody>
               {positions.map((job) => {
                 const subs = roles.filter((s) => s.parentSourceId === job.sourceId && (hit(s) || hit(job)));
-                const shown = open.has(job.sourceId) || (!!needle && !job.name.toLowerCase().includes(needle));
                 const closed = job.status === "closed";
                 return (
                   <Fragment key={job._id}>
@@ -171,24 +170,6 @@ export default function PositionsPage() {
                     >
                       <td className="px-4 py-2.5">
                         <span className="flex items-center gap-1.5">
-                          {subs.length > 0 && (
-                            <button
-                              type="button"
-                              aria-expanded={shown}
-                              aria-label={`${shown ? "Hide" : "Show"} roles under ${job.name}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpen((was) => {
-                                  const next = new Set(was);
-                                  if (!next.delete(job.sourceId)) next.add(job.sourceId);
-                                  return next;
-                                });
-                              }}
-                              className="-ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
-                            >
-                              {shown ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </button>
-                          )}
                           <Link
                             href={entry(job)}
                             onClick={(e) => e.stopPropagation()}
@@ -204,9 +185,11 @@ export default function PositionsPage() {
                         </span>
                       </td>
                       {cells(job)}
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Rounds data={data} job={job} />
-                      </td>
+                      {full && (
+                        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Rounds data={data} job={job} />
+                        </td>
+                      )}
                       {full && (
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           <button
@@ -231,8 +214,8 @@ export default function PositionsPage() {
                         </td>
                       )}
                     </tr>
-                    {shown &&
-                      subs.map((s) => (
+                    {/* Its roles, always in sight: each has its own people. */}
+                    {subs.map((s) => (
                         <tr
                           key={s._id}
                           onClick={() => router.push(entry(s))}
@@ -245,9 +228,11 @@ export default function PositionsPage() {
                             </Link>
                           </td>
                           {cells(s)}
-                          <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                            <Rounds data={data} job={s} />
-                          </td>
+                          {full && (
+                            <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <Rounds data={data} job={s} />
+                            </td>
+                          )}
                           {full && <td />}
                         </tr>
                       ))}

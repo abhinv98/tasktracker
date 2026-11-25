@@ -52,11 +52,14 @@ export const overview = query({
       .sort((a, b) => a.name.localeCompare(b.name));
     const onlyLive = (ids: readonly string[]) => teams.filter((t) => ids.includes(t._id)).map((t) => t._id);
     const live = new Set(livePositions(jobs).map((j) => j._id));
+    // Each person under what they are for: a role's are the role's (as recruitment.listJobs counts them).
+    const roleIds = new Map(livePositions(jobs).filter((j) => j.parentSourceId != null).map((j) => [`${j.parentSourceId} ${j.name.trim().toLowerCase()}`, j.sourceId]));
     const counts = new Map<number, Record<Status, number>>();
     for (const c of await ctx.db.query("recruitCandidates").collect()) {
-      const n = counts.get(c.jobSourceId) ?? { new: 0, shortlisted: 0, on_hold: 0, rejected: 0 };
+      const at = roleIds.get(`${c.jobSourceId} ${c.position.trim().toLowerCase()}`) ?? c.jobSourceId;
+      const n = counts.get(at) ?? { new: 0, shortlisted: 0, on_hold: 0, rejected: 0 };
       n[statusOf(c)]++;
-      counts.set(c.jobSourceId, n);
+      counts.set(at, n);
     }
     // People in play, by pipeline and step: what a change to its steps would touch.
     const inPlay = new Map<string, Map<string, number>>();
