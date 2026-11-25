@@ -44,7 +44,7 @@ export const RECRUIT_SECTIONS: Section[] = [
     href: "/recruitment/t/projects",
     fullOnly: true,
     tabs: [
-      { label: "HR projects", href: "/recruitment/t/projects" },
+      { label: "HR tasks", href: "/recruitment/t/projects" },
       { label: "Daily log", href: "/recruitment/t/log" },
       { label: "Interns", href: "/recruitment/t/interns" },
       { label: "Campus connect", href: "/recruitment/t/campus" },

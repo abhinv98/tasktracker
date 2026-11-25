@@ -30,7 +30,7 @@ export function RoundsRail({ data, value, onPick }: { data: HrData; value: strin
         type="button"
         aria-current={value === id ? "true" : undefined}
         onClick={() => onPick(id)}
-        className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+        className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
           value === id ? "bg-white shadow-[inset_0_0_0_1px_var(--border-strong)]" : "hover:bg-[var(--bg-hover)]"
         }`}
       >
@@ -45,11 +45,13 @@ export function RoundsRail({ data, value, onPick }: { data: HrData; value: strin
   const round = ({ r, n }: { r: Row; n: number }) => {
     const label = health(r, data.book, data.today);
     const flag = !isClosed(r) && (!r.fields.job ? "not tied to a position" : ATTENTION.rounds.includes(label) ? label.toLowerCase() : "");
-    return item(r._id, String(r.fields.role ?? r.code), n, [r.code, flag || String(r.fields.hiringStatus ?? "")].filter(Boolean).join(" · "), !!flag);
+    // An open round says nothing more: only what is unusual about it is spelt out.
+    const status = String(r.fields.hiringStatus ?? "");
+    return item(r._id, String(r.fields.role ?? r.code), n, [r.code, flag || (status !== "Open" && status)].filter(Boolean).join(" · "), !!flag);
   };
 
   return (
-    <nav aria-label="Hiring rounds" className="hidden lg:block lg:max-h-[calc(100dvh-150px)] lg:overflow-y-auto">
+    <nav aria-label="Hiring rounds" className="hidden lg:block">
       <ul className="flex flex-col gap-0.5">
         {item("", "All candidates", people.length)}
         {(count("") > 0 || value === NO_ROUND) && item(NO_ROUND, "Not in a round yet", count(""))}

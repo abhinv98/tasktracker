@@ -4,16 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeftRight, ExternalLink, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Check, ExternalLink, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, StatusBadge, useConfirm, useToast } from "@/components/ui";
 import { fieldBaseClass, fieldClass, iconButtonClass, iconButtonDangerClass } from "@/components/ui/classes";
 import { Tray, TrayItem } from "@/components/ui/Tray";
-import { STANDARD, STEP_KINDS, type Step } from "@/convex/lib/hirePipeline";
+import { STANDARD, type Step } from "@/convex/lib/hirePipeline";
 import { webLink } from "@/convex/lib/links";
 import { TRACKERS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { health, type Row } from "@/lib/hrHealth";
+import { formatLpa, formatYears, parseCtcLpa, parseYears } from "@/lib/recruitParse";
 import { taskStatusMeta } from "@/lib/status";
 import { AssignTask } from "./AssignTask";
 import { FieldGrid, InlineAdd, toValues, useQuickSave } from "./hrFields";
@@ -32,11 +33,25 @@ const OWN_FIELDS = ["stage", "nextAction", "actionOwner", "nextDue", "notes", "t
 const NEXT_KEYS = ["nextAction", "nextDue", "actionOwner", "notes"] as const;
 type NextKey = (typeof NEXT_KEYS)[number];
 
+/** What a step asks for, said once, where its pipeline says nothing itself. */
+const HINT: Partial<Record<Step["kind"], string>> = {
+  sourcing: "Reach out to them. Once they answer, move them on.",
+  screening: "Call them and check the basics: notice period, pay and fit. Then move them on, or close them.",
+  interview: "Schedule it. When it is over, open it to write the feedback, then move them on.",
+  assignment: "Send the assignment. When it comes back, paste the link, then move them on.",
+  review: "Look at everything so far and decide.",
+  offer: "Agree the offer and send it. Once they accept, move them to joining.",
+  joining: "Get them onto their team in the task tracker.",
+};
+type Adding = TrackerKey | "tasks" | null;
+/** An interview that did not happen does not count as the step's interview. */
+const OFF = ["Cancelled", "No Show", "Rescheduled"];
+
 /**
- * Everything about one candidate in one place: where they are in the round,
- * the next step, and their interviews, assignments and offer, each of which can
- * be added right here. Replaces the plain form for the Candidates tracker,
- * because a candidate is worked on, not filled in.
+ * Everything about one candidate in one place, in the order it is needed: who
+ * they are, what to do now, what happens next, and what has happened so far.
+ * Replaces the plain form for the Candidates tracker, because a candidate is
+ * worked on, not filled in.
  */
 export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrData; onClose: () => void }) {
   const quickSave = useQuickSave();
@@ -44,7 +59,7 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
   const askConfirm = useConfirm();
   const { toast } = useToast();
   const router = useRouter();
-  const [adding, setAdding] = useState<TrackerKey | null>(null);
+  const [adding, setAdding] = useState<Adding>(null);
   const [moving, setMoving] = useState(false);
   // Only what this person has typed is kept here. Everything else is read from
   // the live row, so a change made elsewhere (or by a button above) is never
@@ -59,6 +74,11 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
     ])
   );
   const nextChanged = Object.keys(nextChanges).length > 0;
+  // A next step with nobody named is whoever wrote it down.
+  const nextSaved = {
+    ...nextChanges,
+    ...(!next.actionOwner && ("nextAction" in nextChanges || "nextDue" in nextChanges) && (next.nextAction.trim() || next.nextDue) ? { actionOwner: data.me } : {}),
+  };
 
   // Someone who applied on the website changes position together with their application (the Move button).
   const applicantId = text(row, "applicantId");
@@ -115,6 +135,48 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
 
   const openRow = (other: Row) => router.push(`/recruitment/t/${other.tracker}?open=${other._id}`);
 
+  // What this step comes down to, what is already there for it, and where they go after it.
+  const action = step ? ACTION[step.kind] : undefined;
+  const forStep = !step
+    ? []
+    : step.kind === "screening" || step.kind === "interview"
+      ? interviews.filter((r) => text(r, "status") === "Planned" || (text(r, "round") === step.name && !OFF.includes(text(r, "status"))))
+      : step.kind === "assignment"
+        ? assignments
+        : step.kind === "offer" && offer
+          ? [offer]
+          : [];
+  const actFirst = !!action && forStep.length === 0;
+  /** Something with a date was just planned: unless a later next step is already down, that is the next step. */
+  const plan = (what: string, due: string, who: string) => {
+    if (!due || due < today || (text(row, "nextDue") >= today && text(row, "nextDue") <= due)) return;
+    void quickSave(row, { nextAction: what, nextDue: due, ...(who ? { actionOwner: who } : {}) });
+  };
+  const after = !closed && at >= 0 ? steps[at + 1] : undefined;
+  const facts = [
+    ["Experience", formatYears(parseYears(text(row, "experience")))],
+    ...(data.pay ? [["Current CTC", formatLpa(parseCtcLpa(text(row, "currentCtc")))], ["Expected CTC", formatLpa(parseCtcLpa(text(row, "expectedCtc")))]] : []),
+    ["Notice", text(row, "noticePeriod")],
+    ["Applied", text(row, "appliedOn") && fmtDate(text(row, "appliedOn"), today)],
+    ["Shortlisted", text(row, "firstContact") && fmtDate(text(row, "firstContact"), today)],
+  ].filter(([, value]) => value);
+  const lineOf = (r: Row): (string | false | undefined)[] =>
+    r.tracker === "interviews"
+      ? [text(r, "round") || "Interview", fmtDate(text(r, "date"), today), text(r, "time"), data.personName(text(r, "interviewer"))]
+      : r.tracker === "assignments"
+        ? [text(r, "task"), text(r, "submissionDue") && `due ${fmtDate(text(r, "submissionDue"), today)}`, data.personName(text(r, "reviewer"))]
+        : [
+            text(r, "stage") || "Offer",
+            text(r, "approvedCtc") ? `₹${text(r, "approvedCtc")} LPA approved` : text(r, "proposedCtc") && `₹${text(r, "proposedCtc")} LPA proposed`,
+            text(r, "plannedJoin") && `joining ${fmtDate(text(r, "plannedJoin"), today)}`,
+          ];
+  const ADD: [Exclude<Adding, null>, string][] = [
+    ["interviews", "Interview"],
+    ["assignments", "Assignment"],
+    ["tasks", "Task"],
+    ...(offer ? [] : ([["offers", "Offer"]] as [Exclude<Adding, null>, string][])),
+  ];
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
@@ -132,9 +194,6 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                 row.code,
                 round ? `${round.code} · ${text(round, "role")}` : text(row, "roleOriginal") || "Not in a hiring round yet",
                 text(row, "contact"),
-                text(row, "source"),
-                text(row, "appliedOn") && `applied ${fmtDate(text(row, "appliedOn"), today)}`,
-                text(row, "firstContact") && `shortlisted ${fmtDate(text(row, "firstContact"), today)}`,
               ]
                 .filter(Boolean)
                 .join("  ·  ")}
@@ -189,16 +248,21 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
             </div>
           )}
 
-          {/* Where they are. One click moves them. */}
-          <section aria-label="Pipeline stage">
-            <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Stage</h3>
-              <HealthBadge label={health(row, data.book, today)} />
-              {row.pipeline && row.pipeline !== STANDARD && <span className="text-[12px] text-[var(--text-muted)]">{data.pipelineName(row.pipeline)} pipeline</span>}
-              {closed && <span className="text-[12px] text-[var(--text-muted)]">Closed as {stage}. Pick a stage to reopen.</span>}
-              {!closed && stage && at < 0 && <span className="text-[12px] text-[var(--text-muted)]">At {stage}, which their pipeline does not have. Pick a stage.</span>}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Who they are, at a glance. */}
+          {facts.length > 0 && (
+            <dl className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
+              {facts.map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[12px] text-[var(--text-muted)]">{label}</dt>
+                  <dd className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {/* Where they are, and the one thing to do about it. */}
+          <section aria-label="Stage" className="rounded-lg border border-[var(--border)]">
+            <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2">
               {steps.map(({ id, name: s }, i) => {
                 const current = !closed && s === stage;
                 const done = !closed && at > i;
@@ -207,95 +271,202 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                     key={id}
                     type="button"
                     aria-pressed={current}
+                    title={current ? "They are here" : `Move to ${s}`}
                     onClick={() => !current && moveTo(s)}
-                    className={`h-7 rounded-control border px-2.5 text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                    className={`inline-flex h-6 items-center gap-1 rounded-full px-2 text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
                       current
-                        ? "border-[var(--accent-admin)] bg-[var(--accent-admin-dim)] font-semibold text-[var(--accent-admin-text)]"
+                        ? "bg-[var(--text-primary)] font-semibold text-white"
                         : done
-                          ? "border-[var(--border)] bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-                          : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                          ? "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                     }`}
                   >
+                    {done && <Check size={11} aria-hidden />}
                     {s}
                   </button>
                 );
               })}
-              <Tray label={closed && stage ? stage : "Close as"} active={closed && !!stage} width="w-44" align="end">
-                {CLOSED.map((s) => (
-                  <TrayItem key={s} label={s} active={s === stage} destructive={s === "Rejected"} onSelect={() => moveTo(s)} />
-                ))}
-              </Tray>
+            </div>
+            <div className="p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{closed ? `Closed: ${stage}` : step ? step.name : stage || "No stage yet"}</h3>
+                <HealthBadge label={health(row, data.book, today)} />
+                {row.pipeline && row.pipeline !== STANDARD && <span className="text-[12px] text-[var(--text-muted)]">{data.pipelineName(row.pipeline)} pipeline</span>}
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-[13px] text-[var(--text-secondary)]">
+                {closed
+                  ? "They are out of the running. Pick a stage above to bring them back."
+                  : !step
+                    ? "Their pipeline has no such stage. Pick one above."
+                    : step.note || HINT[step.kind] || "When this is done, move them on."}
+              </p>
+              {step && (step.owner || step.days) && (
+                <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+                  {[step.owner && `Usually ${data.personName(step.owner)}`, step.days && `takes about ${step.days} ${step.days === 1 ? "day" : "days"}`].filter(Boolean).join(", ")}
+                </p>
+              )}
+              {step?.link && <LinkOut href={step.link} label={step.kind === "assignment" ? "Open the assignment" : "Open the link"} />}
+
+              {/* What is already there for this step: open it to finish it. */}
+              {forStep.length > 0 && (
+                <ul className="mt-3 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
+                  {forStep.map((r) => (
+                    <li key={r._id}>
+                      <button
+                        type="button"
+                        onClick={() => openRow(r)}
+                        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">{lineOf(r).filter(Boolean).join("  ·  ")}</span>
+                        <HealthBadge label={health(r, data.book, today)} />
+                        <span className="shrink-0 text-[12px] font-medium text-[var(--accent-admin-text)]">{r.tracker === "interviews" ? "Add feedback" : "Open"}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {(
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {!closed && action && !(action.tracker === "offers" && offer) && (
+                    <Button type="button" variant={actFirst ? "primary" : "secondary"} onClick={() => setAdding(action.tracker)}>
+                      {actFirst ? action.label : action.again}
+                    </Button>
+                  )}
+                  {!closed && after && (
+                    <Button type="button" variant={actFirst ? "secondary" : "primary"} onClick={() => moveTo(after.name)}>
+                      Move to {after.name}
+                      <ArrowRight size={14} aria-hidden />
+                    </Button>
+                  )}
+                  {!closed && !after && step?.kind === "joining" && (
+                    <Button type="button" onClick={() => moveTo("Joined")}>
+                      <Check size={14} aria-hidden />
+                      They have joined
+                    </Button>
+                  )}
+                  <span className="ml-auto flex items-center gap-1">
+                    {/* Also for someone closed: held can still be rejected, without bringing them back first. */}
+                    {stage !== "On Hold" && (
+                      <Button type="button" variant="ghost" onClick={() => moveTo("On Hold")}>
+                        Hold
+                      </Button>
+                    )}
+                    {stage !== "Rejected" && (
+                      <Button type="button" variant="ghost" className="!text-[var(--danger)]" onClick={() => moveTo("Rejected")}>
+                        Reject
+                      </Button>
+                    )}
+                    <Tray label="More" width="w-44" align="end">
+                      {CLOSED.filter((c) => c !== "Rejected" && c !== "On Hold" && c !== stage).map((c) => (
+                        <TrayItem key={c} label={c} onSelect={() => moveTo(c)} />
+                      ))}
+                    </Tray>
+                  </span>
+                </div>
+              )}
+
+              {/* Anything else that needs adding, whatever the stage. */}
+              {!adding && (
+                <p className="mt-3 flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-[var(--border-subtle)] pt-2.5 text-[12px] text-[var(--text-muted)]">
+                  Add
+                  {ADD.map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAdding(key)}
+                      className="inline-flex h-6 items-center gap-1 rounded-full border border-[var(--border)] bg-white px-2 font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)]"
+                    >
+                      <Plus size={11} aria-hidden />
+                      {label}
+                    </button>
+                  ))}
+                </p>
+              )}
+
+              {adding && (
+                <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
+                  <h4 className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">{ADDING[adding]}</h4>
+                  {adding === "interviews" && (
+                    <InlineAdd
+                      tracker="interviews"
+                      keys={["round", "interviewer", "date", "time", "mode"]}
+                      required={["interviewer", "date"]}
+                      preset={{ candidateId: row._id, ...(interviewStep ? { round: interviewStep.name, ...(interviewStep.owner ? { interviewer: interviewStep.owner } : {}) } : {}) }}
+                      data={data}
+                      submitLabel="Schedule and tell the interviewer"
+                      onSaved={(v) => plan(v.round || "Interview", v.date ?? "", v.interviewer ?? "")}
+                      onDone={() => setAdding(null)}
+                    />
+                  )}
+                  {adding === "assignments" && (
+                    <InlineAdd
+                      tracker="assignments"
+                      keys={["task", "link", "submissionDue", "reviewer", "reviewDue"]}
+                      preset={{
+                        candidateId: row._id,
+                        ...(assignmentStep?.note ? { task: assignmentStep.note.split("\n")[0].slice(0, 300) } : {}),
+                        ...(assignmentStep?.link ? { link: assignmentStep.link } : {}),
+                        ...(assignmentStep?.owner ? { reviewer: assignmentStep.owner } : {}),
+                        ...(assignmentStep?.days ? { submissionDue: addDays(today, assignmentStep.days) } : {}),
+                      }}
+                      data={data}
+                      submitLabel="Add assignment"
+                      onSaved={(v) => plan("Assignment due back", v.submissionDue ?? "", v.reviewer ?? "")}
+                      onDone={() => setAdding(null)}
+                    />
+                  )}
+                  {adding === "offers" && (
+                    <InlineAdd
+                      tracker="offers"
+                      keys={["proposedCtc", "approvalOwner", "designation", "plannedJoin"]}
+                      preset={{ candidateId: row._id, approvalRequested: today }}
+                      data={data}
+                      submitLabel="Start offer"
+                      onDone={() => setAdding(null)}
+                    />
+                  )}
+                  {adding === "tasks" && <AssignTask data={data} candidateId={row._id} onDone={() => setAdding(null)} />}
+                </div>
+              )}
             </div>
           </section>
 
-          {/* What this step is for, as set up in their pipeline, and the one thing to do in it. */}
-          {step && (step.note || step.link || step.owner || step.days || ACTION[step.kind]) && (
-            <div className="mt-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-lg bg-[var(--bg-primary)] px-3 py-2.5">
-              <div className="min-w-0 flex-1 text-[12px] text-[var(--text-muted)]">
-                <span className="font-medium text-[var(--text-primary)]">{step.name}</span>
-                {[STEP_KINDS[step.kind] !== step.name && STEP_KINDS[step.kind], step.owner && data.personName(step.owner), step.days && `${step.days} ${step.days === 1 ? "day" : "days"}`]
-                  .filter(Boolean)
-                  .map((x) => `  ·  ${x}`)
-                  .join("")}
-                {step.note && <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-[var(--text-secondary)]">{step.note}</p>}
-                {step.link && <LinkOut href={step.link} label={step.kind === "assignment" ? "Open the assignment" : "Open the link"} />}
-              </div>
-              {ACTION[step.kind] && !(step.kind === "offer" && offer) && (
-                <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(ACTION[step.kind]!.tracker)}>
-                  {ACTION[step.kind]!.label}
-                </Button>
-              )}
-            </div>
-          )}
-
           {/* What happens next, and when. Most visits change only this. */}
           <form
-            className="mt-5 rounded-lg border border-[var(--border)] p-3"
+            className="mt-4 rounded-lg border border-[var(--border)] p-3"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (await quickSave(row, nextChanges, "Saved")) setNextEdits({});
+              if (await quickSave(row, nextSaved, "Saved")) setNextEdits({});
             }}
           >
-            <h3 className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">Next step</h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_170px]">
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">What happens next</span>
-                <input
-                  value={next.nextAction}
-                  maxLength={300}
-                  onChange={(e) => setNext("nextAction", e.target.value)}
-                  placeholder="Call to check notice period"
-                  className={`${fieldClass} w-full`}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">Who</span>
-                <select
-                  value={next.actionOwner}
-                  onChange={(e) => setNext("actionOwner", e.target.value)}
-                  className={`${fieldClass} w-full`}
-                >
-                  <option value="">–</option>
-                  {data.people.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Next step</h3>
+            <p className="mb-2 text-[12px] text-[var(--text-muted)]">
+              {closed ? "Nothing is expected while they are closed." : text(row, "nextDue") ? "What you will do next, and by when." : "Say what you will do next and by when, so nobody is forgotten."}
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_170px]">
+              <input
+                value={next.nextAction}
+                maxLength={300}
+                aria-label="What happens next"
+                onChange={(e) => setNext("nextAction", e.target.value)}
+                placeholder="What happens next, e.g. call to check notice period"
+                className={`${fieldClass} w-full`}
+              />
+              <select value={next.actionOwner} aria-label="Who does it" onChange={(e) => setNext("actionOwner", e.target.value)} className={`${fieldClass} w-full`}>
+                <option value="">Me</option>
+                {data.people.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="mt-3 flex flex-wrap items-end gap-2">
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">By when</span>
-                <input
-                  type="date"
-                  value={next.nextDue}
-                  onChange={(e) => setNext("nextDue", e.target.value)}
-                  className={`${fieldClass} w-[150px]`}
-                />
-              </label>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[12px] text-[var(--text-muted)]">By</span>
               {(
                 [
+                  ["Today", 0],
                   ["Tomorrow", 1],
                   ["In 3 days", 3],
                   ["Next week", 7],
@@ -304,107 +475,69 @@ export function CandidateWorkspace({ row, data, onClose }: { row: Row; data: HrD
                 <button
                   key={label}
                   type="button"
+                  aria-pressed={next.nextDue === addDays(today, days)}
                   onClick={() => setNext("nextDue", addDays(today, days))}
-                  className="h-control rounded-control border border-[var(--border)] px-2.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  className={`h-7 rounded-full border px-2.5 text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-admin)] ${
+                    next.nextDue === addDays(today, days)
+                      ? "border-[var(--text-primary)] bg-[var(--text-primary)] font-medium text-white"
+                      : "border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  }`}
                 >
                   {label}
                 </button>
               ))}
+              <input type="date" value={next.nextDue} aria-label="By when" onChange={(e) => setNext("nextDue", e.target.value)} className={`${fieldClass} !h-7 w-[140px] text-[12px]`} />
             </div>
-            <label className="mt-3 block">
-              <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">Notes</span>
-              <textarea
-                value={next.notes}
-                rows={2}
-                maxLength={5000}
-                onChange={(e) => setNext("notes", e.target.value)}
-                className={`${fieldBaseClass} w-full py-2`}
-              />
-            </label>
-            <div className="mt-3 flex justify-end">
+            <textarea
+              value={next.notes}
+              rows={2}
+              maxLength={5000}
+              aria-label="Notes"
+              placeholder="Notes: what was said, what to remember"
+              onChange={(e) => setNext("notes", e.target.value)}
+              className={`${fieldBaseClass} mt-2 w-full py-2`}
+            />
+            <div className="mt-2 flex justify-end">
               <Button type="submit" size="sm" disabled={!nextChanged}>
-                Save next step
+                Save
               </Button>
             </div>
           </form>
 
+          {/* What has happened so far. Empty kinds take no room. */}
           <CandidateTasks row={row} data={data} />
-
-          <Related
-            title="Interviews"
-            rows={interviews}
-            data={data}
-            onOpen={openRow}
-            line={(r) => [text(r, "round") || "Interview", fmtDate(text(r, "date"), today), text(r, "time"), data.personName(text(r, "interviewer"))]}
-            detail={(r) => [text(r, "recommendation") !== "Pending" && text(r, "recommendation"), text(r, "feedback")].filter(Boolean).join(": ")}
-            addLabel="Schedule interview"
-            adding={adding === "interviews"}
-            onAdd={() => setAdding("interviews")}
-          >
-            <InlineAdd
-              tracker="interviews"
-              keys={["round", "interviewer", "date", "time", "mode"]}
-              required={["interviewer", "date"]}
-              preset={{ candidateId: row._id, ...(interviewStep ? { round: interviewStep.name, ...(interviewStep.owner ? { interviewer: interviewStep.owner } : {}) } : {}) }}
+          {interviews.length > 0 && (
+            <Related
+              title="Interviews"
+              rows={interviews}
               data={data}
-              submitLabel="Schedule and tell the interviewer"
-              onDone={() => setAdding(null)}
+              onOpen={openRow}
+              line={lineOf}
+              detail={(r) => [text(r, "recommendation") !== "Pending" && text(r, "recommendation"), text(r, "feedback")].filter(Boolean).join(": ")}
             />
-          </Related>
-
-          <Related
-            title="Assignments"
-            rows={assignments}
-            data={data}
-            onOpen={openRow}
-            line={(r) => [text(r, "task"), text(r, "submissionDue") && `due ${fmtDate(text(r, "submissionDue"), today)}`, data.personName(text(r, "reviewer"))]}
-            detail={(r) => (text(r, "decision") !== "Pending" ? text(r, "decision") : "")}
-            top={form && <LinkOut href={form} label={`Submission form for ${round!.code}`} />}
-            under={(r) => <AssignmentLinks row={r} />}
-            addLabel="Send an assignment"
-            adding={adding === "assignments"}
-            onAdd={() => setAdding("assignments")}
-          >
-            <InlineAdd
-              tracker="assignments"
-              keys={["task", "link", "submissionDue", "reviewer", "reviewDue"]}
-              preset={{
-                candidateId: row._id,
-                ...(assignmentStep?.note ? { task: assignmentStep.note.split("\n")[0].slice(0, 300) } : {}),
-                ...(assignmentStep?.link ? { link: assignmentStep.link } : {}),
-                ...(assignmentStep?.owner ? { reviewer: assignmentStep.owner } : {}),
-                ...(assignmentStep?.days ? { submissionDue: addDays(today, assignmentStep.days) } : {}),
-              }}
+          )}
+          {(assignments.length > 0 || form) && (
+            <Related
+              title="Assignments"
+              rows={assignments}
               data={data}
-              submitLabel="Add assignment"
-              onDone={() => setAdding(null)}
+              onOpen={openRow}
+              line={lineOf}
+              detail={(r) => (text(r, "decision") !== "Pending" ? text(r, "decision") : "")}
+              top={form && <LinkOut href={form} label={`Submission form for ${round!.code}`} />}
+              under={(r) => <AssignmentLinks row={r} />}
             />
-          </Related>
-
-          <Related
-            title="Offer"
-            rows={offer ? [offer] : []}
-            data={data}
-            onOpen={openRow}
-            line={(r) => [
-              text(r, "stage") || "Offer",
-              text(r, "approvedCtc") ? `₹${text(r, "approvedCtc")} LPA approved` : text(r, "proposedCtc") && `₹${text(r, "proposedCtc")} LPA proposed`,
-              text(r, "plannedJoin") && `joining ${fmtDate(text(r, "plannedJoin"), today)}`,
-            ]}
-            detail={() => (data.pay ? "Open it to approve, edit or download the appointment letter." : "Open it to follow it along.")}
-            addLabel={offer ? "" : "Start an offer"}
-            adding={adding === "offers"}
-            onAdd={() => setAdding("offers")}
-          >
-            <InlineAdd
-              tracker="offers"
-              keys={["proposedCtc", "approvalOwner", "designation", "plannedJoin"]}
-              preset={{ candidateId: row._id, approvalRequested: today }}
+          )}
+          {offer && (
+            <Related
+              title="Offer"
+              rows={[offer]}
               data={data}
-              submitLabel="Start offer"
-              onDone={() => setAdding(null)}
+              onOpen={openRow}
+              line={lineOf}
+              detail={() => (data.pay ? "Open it to approve, edit or download the appointment letter." : "Open it to follow it along.")}
             />
-          </Related>
+          )}
 
           {/* Which team they join, and getting them onto it once they are hired. */}
           {data.teams.length > 0 && (hiring || team || teams.length > 1) && (
@@ -542,50 +675,38 @@ function AssignmentLinks({ row }: { row: Row }) {
   );
 }
 
-/** The one thing most steps come down to, and the part of this panel that does it. */
-const ACTION: Partial<Record<Step["kind"], { label: string; tracker: TrackerKey }>> = {
-  screening: { label: "Schedule the call", tracker: "interviews" },
-  interview: { label: "Schedule interview", tracker: "interviews" },
-  assignment: { label: "Send the assignment", tracker: "assignments" },
-  offer: { label: "Start an offer", tracker: "offers" },
+/** The one thing most steps come down to, and what it is called when there is one already. */
+const ACTION: Partial<Record<Step["kind"], { label: string; again: string; tracker: TrackerKey }>> = {
+  screening: { label: "Schedule the call", again: "Another call", tracker: "interviews" },
+  interview: { label: "Schedule interview", again: "Another interview", tracker: "interviews" },
+  assignment: { label: "Send the assignment", again: "Another assignment", tracker: "assignments" },
+  offer: { label: "Start an offer", again: "Start an offer", tracker: "offers" },
 };
+const ADDING: Record<string, string> = { interviews: "Schedule an interview", assignments: "Send an assignment", offers: "Start an offer", tasks: "Assign a task" };
 
 /** What people on the team have to do about this candidate. Each is an ordinary task in its owner's list. */
 function CandidateTasks({ row, data }: { row: Row; data: HrData }) {
   const tasks = useQuery(api.recruitTasks.forCandidate, { candidateId: row._id as Id<"hrRecords"> });
-  const [adding, setAdding] = useState(false);
+  if (!tasks?.length) return null;
   return (
-    <section className="mt-6">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-          Tasks
-          {!!tasks?.length && <span className="ml-1.5 font-normal tabular-nums text-[var(--text-muted)]">{tasks.length}</span>}
-        </h3>
-        {!adding && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(true)}>
-            <Plus size={13} />
-            Assign a task
-          </Button>
-        )}
-      </div>
-      {!!tasks?.length && (
-        <ul className="mb-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
-          {tasks.map((t) => (
-            <li key={t._id}>
-              <TaskLine href={t.canOpenTask ? `/brief/${t.briefId}?task=${t._id}` : null}>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">
-                  {[t.title, t.assignee, t.deadline && `due ${fmtDate(new Date(t.deadline + 5.5 * 3_600_000).toISOString().slice(0, 10), data.today)}`]
-                    .filter(Boolean)
-                    .join("  ·  ")}
-                </span>
-                <StatusBadge color={taskStatusMeta(t.status).dot} label={taskStatusMeta(t.status).label} />
-              </TaskLine>
-            </li>
-          ))}
-        </ul>
-      )}
-      {tasks?.length === 0 && !adding && <p className="text-[13px] text-[var(--text-muted)]">None yet.</p>}
-      {adding && <AssignTask data={data} candidateId={row._id} onDone={() => setAdding(false)} />}
+    <section className="mt-5">
+      <h3 className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">
+        Tasks <span className="ml-1 font-normal tabular-nums text-[var(--text-muted)]">{tasks.length}</span>
+      </h3>
+      <ul className="divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
+        {tasks.map((t) => (
+          <li key={t._id}>
+            <TaskLine href={t.canOpenTask ? `/brief/${t.briefId}?task=${t._id}` : null}>
+              <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--text-primary)]">
+                {[t.title, t.assignee, t.deadline && `due ${fmtDate(new Date(t.deadline + 5.5 * 3_600_000).toISOString().slice(0, 10), data.today)}`]
+                  .filter(Boolean)
+                  .join("  ·  ")}
+              </span>
+              <StatusBadge color={taskStatusMeta(t.status).dot} label={taskStatusMeta(t.status).label} />
+            </TaskLine>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -605,7 +726,7 @@ function TaskLine({ href, children }: { href: string | null; children: React.Rea
   );
 }
 
-/** One kind of thing that hangs off the candidate: its rows, and a way to add one in place. */
+/** One kind of thing that hangs off the candidate: what there is of it. Adding is done from the stage, above. */
 function Related({
   title,
   rows,
@@ -615,10 +736,6 @@ function Related({
   top,
   under,
   onOpen,
-  addLabel,
-  adding,
-  onAdd,
-  children,
 }: {
   title: string;
   rows: Row[];
@@ -630,33 +747,16 @@ function Related({
   /** More about one row, outside the button that opens it. */
   under?: (row: Row) => React.ReactNode;
   onOpen: (row: Row) => void;
-  addLabel: string;
-  adding: boolean;
-  onAdd: () => void;
-  children: React.ReactNode;
 }) {
-  // Opened by the step's own button, further up: bring it into view.
-  const form = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (adding) form.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [adding]);
   return (
-    <section ref={form} className="mt-6">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">
-          {title}
-          {rows.length > 0 && <span className="ml-1.5 font-normal tabular-nums text-[var(--text-muted)]">{rows.length}</span>}
-        </h3>
-        {addLabel && !adding && (
-          <Button type="button" size="sm" variant="secondary" onClick={onAdd}>
-            <Plus size={13} />
-            {addLabel}
-          </Button>
-        )}
-      </div>
+    <section className="mt-5">
+      <h3 className="mb-2 text-[13px] font-semibold text-[var(--text-primary)]">
+        {title}
+        {rows.length > 0 && <span className="ml-1.5 font-normal tabular-nums text-[var(--text-muted)]">{rows.length}</span>}
+      </h3>
       {top && <div className="mb-2">{top}</div>}
       {rows.length > 0 && (
-        <ul className="mb-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
+        <ul className="divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border)]">
           {rows.map((r) => (
             <li key={r._id}>
               <button
@@ -675,8 +775,6 @@ function Related({
           ))}
         </ul>
       )}
-      {rows.length === 0 && !adding && <p className="text-[13px] text-[var(--text-muted)]">None yet.</p>}
-      {adding && children}
     </section>
   );
 }

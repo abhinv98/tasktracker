@@ -14,12 +14,13 @@ import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
 import { TRACKERS, TRACKER_KEYS, type TrackerKey } from "@/convex/lib/hrTrackers";
 import { webLink } from "@/convex/lib/links";
 import { ATTENTION, derived, health, isLive, type Row } from "@/lib/hrHealth";
+import { parseCtcLpa, parseYears } from "@/lib/recruitParse";
 import { CandidateWorkspace } from "./CandidateWorkspace";
 import { CopyLink } from "./CopyLink";
 import { OpenRoundModal, noLink } from "./OpenRound";
 import { NO_ROUND, RoundsRail } from "./RoundsRail";
 import { FieldGrid, toValues } from "./hrFields";
-import { HealthBadge, fieldsOf, fmtDate, isMine, rowTitle, seenFields, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
+import { HealthBadge, boardValue, fieldsOf, fmtDate, isMine, rowTitle, seenFields, show, startingValues, stepNames, useHrData, type HrData } from "./hrShared";
 import { looseRounds } from "./RoundsMatch";
 import { TrackerBoard } from "./TrackerBoard";
 
@@ -29,6 +30,9 @@ type Editing = { row: Row | null; draft: Draft };
 
 /** ponytail: the list draws at most this many rows; add paging if a tracker outgrows it. */
 const MAX_ROWS = 400;
+
+/** A label inside a sentence: "candidates", but still "HR tasks". */
+const lower = (label: string) => label.split(" ").map((w) => (w === w.toUpperCase() ? w : w.toLowerCase())).join(" ");
 
 const draftOf = (row: Row): Draft =>
   Object.fromEntries(Object.entries(row.fields).map(([key, value]) => [key, value === null ? "" : String(value)]));
@@ -152,6 +156,9 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
               : [...new Set(data.book[tracker].map((r) => String(r.fields[f.key] ?? "")))].filter(Boolean)
             ).map((o) => ({ value: o, label: o }))
           : (f.options ?? []).map((o) => ({ value: o, label: o }));
+  /** What a row is filtered by. A candidate held or rejected from Positions keeps their stage: they are filed under how they were closed. */
+  const filedAt = (f: (typeof fields)[number], row: Row) =>
+    f.type === "team" ? row.team || NO_ROUND : hiring && f.key === "stage" ? (boardValue(row) ?? "") : (row.fields[f.key] ?? "") || (chosen[f.key] === NO_ROUND ? NO_ROUND : "");
   const inChip = (label: string, which: Chip) =>
     which === "all" ||
     (which === "attention" && ATTENTION[tracker].includes(label)) ||
@@ -162,7 +169,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const narrowed = rows.filter(
     ({ row }) =>
       (!mine || isMine(row, data)) &&
-      filterFields.every((f) => !chosen[f.key] || (f.type === "team" || chosen[f.key] === NO_ROUND ? (f.type === "team" ? row.team : row.fields[f.key]) || NO_ROUND : row.fields[f.key]) === chosen[f.key]) &&
+      filterFields.every((f) => !chosen[f.key] || filedAt(f, row) === chosen[f.key]) &&
       (!needle ||
         `${row.code} ${columns.map((f) => show(f, row, data)).join(" ")}`.toLowerCase().includes(needle))
   );
@@ -170,7 +177,14 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   const keyed = narrowed.filter(({ label }) => inChip(label, chip));
   const visible = sorting
     ? keyed
-        .map((r) => ({ r, v: sorting.type === "date" || sorting.type === "number" ? (r.row.fields[sorting.key] ?? "") : show(sorting, r.row, data).toLowerCase() }))
+        .map((r) => ({
+          r,
+          v: sorting.as
+            ? ((sorting.as === "lpa" ? parseCtcLpa : parseYears)(String(r.row.fields[sorting.key] ?? "")) ?? "")
+            : sorting.type === "date" || sorting.type === "number"
+              ? (r.row.fields[sorting.key] ?? "")
+              : show(sorting, r.row, data).toLowerCase(),
+        }))
         .sort((a, b) =>
           // Blank last, whichever way it is sorted.
           a.v === "" || b.v === "" ? Number(a.v === "") - Number(b.v === "") : (typeof a.v === "number" && typeof b.v === "number" ? a.v - b.v : String(a.v).localeCompare(String(b.v))) * sort.dir
@@ -201,8 +215,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
   // Running and tied to nothing, as Setup lists them. A closed one, or one whose position was removed, is not that.
   const untied = !!round && looseRounds(data).some((r) => r._id === round._id);
   const unplaced = hiring && data.book.pipeline.some((r) => !r.fields.reqId);
-  // In one round's list its own name would only repeat itself.
-  const shown = columns.filter((f) => !(round && f.key === "reqId"));
+  // On Candidates the round is picked at the side, and the stage says Rejected or On Hold: neither is a column.
+  const shown = columns.filter((f) => !(hiring && (f.key === "reqId" || f.key === "status")));
   const toFill = round && data.full ? derived(round, data.book, data.today).find((d) => d.label === "Vacancies left")?.value : undefined;
   // Empty because nothing exists yet, not because a filter hid it: the tracker
   // has no rows, or the only thing narrowing the list is the round.
@@ -297,7 +311,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
 
       {tracker !== "log" && (
         <StatChips<Chip>
-          label={`Filter ${meta.label.toLowerCase()} by health`}
+          label={`Filter ${lower(meta.label)} by health`}
           className="mb-3"
           value={chip}
           onChange={setChip}
@@ -313,7 +327,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <SearchField value={search} onChange={setSearch} placeholder={`Search ${meta.label.toLowerCase()}`} label={`Search ${meta.label}`} />
+        <SearchField value={search} onChange={setSearch} placeholder={`Search ${lower(meta.label)}`} label={`Search ${meta.label}`} />
         {filterFields.map((f) => {
           // Hiring: on a wide screen the rounds are down the side instead.
           const rounds = hiring && f.key === "reqId";
@@ -390,7 +404,7 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           // Nothing has been added here yet (to this tracker, or to the round
           // being looked at): say so and offer the first one.
           <EmptyState
-            title={round ? `Nobody in ${String(round.fields.role ?? round.code)} yet` : `No ${meta.label.toLowerCase()} yet`}
+            title={round ? `Nobody in ${String(round.fields.role ?? round.code)} yet` : `No ${lower(meta.label)} yet`}
             description={
               hiring && !round
                 ? "Go to Positions, open one and shortlist people. They show up here, whatever they applied for."
@@ -425,12 +439,12 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-[12px] text-[var(--text-muted)]">
-                <th className="whitespace-nowrap px-3 py-2 font-medium">ID</th>
+                {!hiring && <th className="whitespace-nowrap px-3 py-2 font-medium">ID</th>}
                 {shown.map((f) => (
                   <th
                     key={f.key}
                     aria-sort={sort?.key === f.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}
-                    className="whitespace-nowrap px-3 py-2 font-medium"
+                    className={`whitespace-nowrap px-3 py-2 font-medium ${hiring && f.key === "name" ? "sticky left-0 z-10 bg-white" : ""}`}
                   >
                     {/* Newest first for a date, A to Z for the rest; a second press turns it round, a third clears it. */}
                     <button
@@ -462,15 +476,17 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                     e.preventDefault();
                     open(row);
                   }}
-                  className="cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
+                  className="group cursor-pointer border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-admin)]"
                 >
-                  <td className="whitespace-nowrap px-3 py-2 tabular-nums text-[var(--text-muted)]">{row.code}</td>
+                  {!hiring && <td className="whitespace-nowrap px-3 py-2 tabular-nums text-[var(--text-muted)]">{row.code}</td>}
                   {shown.map((f, i) => (
                     <td
                       key={f.key}
                       className={`max-w-[260px] truncate px-3 py-2 ${
                         i === 0 ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
-                      } ${f.type === "date" || f.type === "time" || f.type === "number" ? "whitespace-nowrap tabular-nums" : ""}`}
+                      } ${f.type === "date" || f.type === "time" || f.type === "number" || f.as ? "whitespace-nowrap tabular-nums" : ""} ${
+                        hiring && f.key === "name" ? "sticky left-0 z-10 bg-white group-hover:bg-[var(--bg-hover)]" : ""
+                      }`}
                     >
                       {f.type === "link" && webLink(show(f, row, data)) ? (
                         <a
@@ -484,7 +500,8 @@ export function TrackerView({ tracker }: { tracker: TrackerKey }) {
                           Open <ExternalLink size={12} aria-hidden />
                         </a>
                       ) : (
-                        show(f, row, data) || <span className="text-[var(--text-disabled)]">–</span>
+                        // On Candidates the stage column also says On Hold or Rejected: there is no status column.
+                        (hiring && f.key === "stage" && boardValue(row)) || show(f, row, data) || <span className="text-[var(--text-disabled)]">–</span>
                       )}
                     </td>
                   ))}

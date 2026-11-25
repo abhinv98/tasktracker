@@ -556,6 +556,23 @@ async function main() {
   assert.deepEqual([w.row(then002).code, await w.run(R.openPositions, { opening: `REQ-${year}-001` })], [`REQ-${year}-002`, []]);
   assert.equal((await w.run(H.all, {})).rows.length, 1, "and nothing else is left of it");
 
+  // The Candidates list says what the application says. What they earn and expect only to whoever sees pay.
+  w = world({
+    recruitJobs: [job(1, "Design")],
+    recruitCandidates: [{ ...app("a", 1), experience: "2", noticePeriod: "30 days", currentCtc: "4 LPA", expectedCtc: "600000", createdAt: Date.parse("2026-11-10T06:00:00Z") }],
+    hrRecords: [on("p", { job: "1", applicantId: "a" }), on("hand", { job: "1", expectedCtc: "9" })],
+  });
+  const listed = async () => (await w.run(H.all, {})).rows.find((r: any) => r._id === "p").fields;
+  assert.deepEqual([(await listed()).experience, (await listed()).noticePeriod, (await listed()).currentCtc, (await listed()).expectedCtc, (await listed()).appliedOn], ["2", "30 days", "4 LPA", "600000", "2026-11-10"]);
+  w.as("del");
+  assert.deepEqual([(await listed()).experience, (await listed()).currentCtc, (await listed()).expectedCtc], ["2", undefined, undefined], "hidden from someone without CTC switched on");
+  assert.equal((await w.run(H.all, {})).rows.find((r: any) => r._id === "hand").fields.expectedCtc, undefined, "also one that somehow sits on the row itself");
+  w.tables.users.find((u) => u._id === "del")!.recruitPay = true;
+  assert.equal((await listed()).currentCtc, "4 LPA", "and shown once it is");
+  w.as("hr");
+  await w.run(H.save, { tracker: "pipeline", id: "p", fields: { notes: "x", currentCtc: "99" } });
+  assert.equal(w.f("p").currentCtc, undefined, "never stored on the candidate");
+
   // A step's owner who has left is not written onto people: their rows could not be saved again.
   w = world({ recruitPipelines: [pl("own", [step("a", "A", "screening"), step("b", "B", "interview", { owner: "left", days: 2 })])], recruitJobs: [job(1, "Design", { pipeline: "own" })], hrRecords: [on("p", { job: "1", stage: "A" })] });
   await w.run(H.save, { tracker: "pipeline", id: "p", fields: { stage: "B" } });

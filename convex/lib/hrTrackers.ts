@@ -40,6 +40,8 @@ export type Field = {
   pay?: boolean;
   /** Worked out by the server (hrOps.all): shown, never typed or stored. */
   auto?: boolean;
+  /** What applicants typed, in whatever form: shown as lakhs a year, or as years. */
+  as?: "lpa" | "years";
 };
 
 import { webLink } from "./links";
@@ -125,11 +127,15 @@ export const TRACKERS = {
       f("source", "Source", "select", {
         options: ["LinkedIn", "Naukri", "Internshala", "Referral", "Campus", "Website", "Agency", "Other"],
       }),
-      // When they applied on the website.
+      f("stage", "Stage", "select", { free: true, ...col }),
+      // From their application on the website (hrOps.all). What they earn and expect is for whoever sees pay.
+      f("experience", "Experience", "text", { auto: true, as: "years", ...col }),
+      f("currentCtc", "Current CTC", "text", { auto: true, pay: true, as: "lpa", ...col }),
+      f("expectedCtc", "Expected CTC", "text", { auto: true, pay: true, as: "lpa", ...col }),
+      f("noticePeriod", "Notice", "text", { auto: true, ...col }),
       f("appliedOn", "Applied on", "date", { auto: true, ...col }),
       // Set the day they were shortlisted or added (lib/candidates.ts).
       f("firstContact", "Shortlisted on", "date", { initial: "@today", ...col }),
-      f("stage", "Pipeline stage", "select", { free: true, ...col }),
       f("status", "Candidate status", "select", {
         options: ["Active", "On Hold", "Rejected", "Withdrawn", "Joined", "Archived"],
         initial: "Active",
@@ -360,23 +366,20 @@ export const TRACKERS = {
     ],
   },
   projects: {
-    label: "HR Projects",
-    one: "HR project",
+    // Things HR has to get done. What kinds there are is still to be decided, so it is a plain task list.
+    label: "HR tasks",
+    one: "HR task",
     prefix: "P",
-    blurb: "One row is one long-running HR process: submit a draft, get feedback, get approval, implement.",
+    blurb: "What HR has to get done. Give each one a person and a date.",
     title: "name",
     hrOnly: true,
     board: "stage",
     boardClosed: ["Implemented", "On Hold"],
     fields: [
-      f("name", "Process / initiative", "text", { required: true, ...col }),
-      f("deliverable", "Deliverable / success criteria", "long"),
-      f("owner", "Owner", "user", col),
-      f("requestedBy", "Requested by", "user"),
-      f("priority", "Priority", "select", { options: PRIORITY }),
-      f("kickoff", "Kickoff date", "date"),
-      f("draftDue", "Draft due", "date"),
-      f("stage", "Project stage", "select", {
+      f("name", "Task", "text", { required: true, ...col }),
+      f("owner", "Assigned to", "user", { initial: "@me", ...col }),
+      f("nextDue", "Due", "date", col),
+      f("stage", "Status", "select", {
         options: [
           "Not Started", "Research", "Drafting", "Submitted for Approval", "Feedback Pending",
           "Revision", "Approved", "Implemented", "On Hold",
@@ -384,17 +387,21 @@ export const TRACKERS = {
         initial: "Not Started",
         ...col,
       }),
-      f("approver", "Approver", "user"),
-      f("draftSubmitted", "Draft submitted", "date"),
-      f("feedbackDue", "Feedback due", "date"),
-      f("feedbackReceived", "Feedback received", "date"),
-      f("approvalDate", "Approval date", "date"),
-      f("implementationDue", "Implementation due", "date"),
-      f("implementedDate", "Implemented date", "date"),
-      f("nextAction", "Next action", "text", col),
-      f("nextDue", "Next due", "date", col),
-      f("blocker", "Blocker / decision", "text"),
+      f("nextAction", "Next step", "text", col),
       f("notes", "Notes", "long"),
+      f("deliverable", "Deliverable / success criteria", "long", { more: true }),
+      f("requestedBy", "Requested by", "user", { more: true }),
+      f("priority", "Priority", "select", { options: PRIORITY, more: true }),
+      f("approver", "Approver", "user", { more: true }),
+      f("kickoff", "Kickoff date", "date", { more: true }),
+      f("draftDue", "Draft due", "date", { more: true }),
+      f("draftSubmitted", "Draft submitted", "date", { more: true }),
+      f("feedbackDue", "Feedback due", "date", { more: true }),
+      f("feedbackReceived", "Feedback received", "date", { more: true }),
+      f("approvalDate", "Approval date", "date", { more: true }),
+      f("implementationDue", "Implementation due", "date", { more: true }),
+      f("implementedDate", "Implemented date", "date", { more: true }),
+      f("blocker", "Blocker / decision", "text", { more: true }),
       f("lastUpdate", "Last update", "date", { stamp: true }),
     ],
   },

@@ -16,7 +16,9 @@ import { CopyLink } from "./CopyLink";
 import { FieldGrid, toValues } from "./hrFields";
 import { seenFields, startingValues, type HrData } from "./hrShared";
 
-const KEYS = ["role", "job", "pipeline", "team", "submitLink", "openings", "employmentType", "priority", "hiringManager", "targetJoinDate", "budgetLpa"];
+/** All it takes to open one. The rest is there for whoever wants it. */
+const BASIC = ["job", "openings"];
+const MORE = ["role", "employmentType", "hiringManager", "targetJoinDate", "priority", "pipeline", "team", "submitLink", "budgetLpa"];
 const isOpen = (r: Row) => !String(r.fields.hiringStatus ?? "").startsWith("Closed");
 
 /** Who a position's setup says it is hired by. */
@@ -109,15 +111,34 @@ export function OpenRoundModal({
   const place = useMutation(api.hrOps.placeShortlisted);
   const { toast } = useToast();
   const [draft, setDraft] = useState(() =>
-    startingValues("rounds", data, job ? { role: job.name, job: String(job.sourceId), ...peopleOf(data, job.sourceId), ...(team ? { team } : {}) } : {})
+    // Opened by HR or a founder, it is approved.
+    startingValues("rounds", data, {
+      ...(data.full ? { approvalStatus: "Approved" } : {}),
+      openings: "1",
+      ...(job ? { role: job.name, job: String(job.sourceId), ...peopleOf(data, job.sourceId), ...(team ? { team } : {}) } : {}),
+    })
   );
+  const nameOf = (id: string) => data.jobs.find((j) => j.id === id)?.name ?? "";
+  /** Picking a position names the round after it, unless it was given a name of its own. */
+  const change = (key: string, value: string) =>
+    setDraft((d) => ({
+      ...d,
+      // Another position: its team is not the old one's.
+      ...(key === "job" ? { team: "", ...peopleOf(data, Number(value)), ...(!d.role || d.role === nameOf(d.job ?? "") ? { role: nameOf(value) } : {}) } : {}),
+      [key]: value,
+    }));
   const [existing, setExisting] = useState("");
   const [bring, setBring] = useState(true);
   const [saving, setSaving] = useState(false);
   const [opened, setOpened] = useState<{ id: string; placed: number } | null>(null);
   const made = opened ? data.byId.get(opened.id) : undefined;
   const loose = job ? data.book.rounds.filter((r) => !r.fields.job && isOpen(r)) : [];
-  const fields = KEYS.flatMap((key) => seenFields("rounds", data).find((f) => f.key === key) ?? []).filter((f) => !(job && f.key === "job"));
+  const pick = (keys: string[]) =>
+    keys
+      .flatMap((key) => seenFields("rounds", data).find((f) => f.key === key) ?? [])
+      .filter((f) => !(job && f.key === "job") && !(f.key === "team" && (data.jobs.find((j) => j.id === draft.job)?.teams?.length ?? 0) < 2))
+      // Without a position nobody shortlisted would ever land in it.
+      .map((f) => (f.key === "job" ? { ...f, label: "Position", required: true } : f.key === "openings" ? { ...f, label: "How many to hire" } : f.key === "role" ? { ...f, label: "Name of the round", required: false } : f));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,7 +146,7 @@ export function OpenRoundModal({
     try {
       const id = existing
         ? await save({ tracker: "rounds", id: existing as Id<"hrRecords">, fields: { job: draft.job, ...(team ? { team } : {}), ...(reopen(existing) ? { hiringStatus: "Open" } : {}) } })
-        : await save({ tracker: "rounds", fields: toValues(seenFields("rounds", data), draft) });
+        : await save({ tracker: "rounds", fields: toValues(seenFields("rounds", data), { ...draft, role: draft.role?.trim() || nameOf(draft.job ?? "") }) });
       const { placed } = bring && draft.job ? await place({ roundId: id }) : { placed: 0 };
       // Stays up with the round's application link. A toast would be behind it.
       setOpened({ id: String(id), placed });
@@ -169,7 +190,7 @@ export function OpenRoundModal({
       onClose={onClose}
       title={job ? `Hiring round: ${job.name}${team ? ` for ${data.teamName(team)}` : ""}` : "Open a hiring round"}
       icon={Briefcase}
-      size="lg"
+      size="md"
       footer={
         <>
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -195,7 +216,28 @@ export function OpenRoundModal({
             </select>
           </label>
         )}
-        {!existing && <FieldGrid fields={fields} draft={draft} onChange={(key, value) => setDraft((d) => ({ ...d, ...(key === "job" ? peopleOf(data, Number(value)) : {}), [key]: value }))} data={data} />}
+        {!existing && (
+          <>
+            <FieldGrid fields={pick(BASIC)} draft={draft} onChange={change} data={data} />
+            {!job && data.full && (
+              <p className="-mt-2 text-[12px] text-[var(--text-muted)]">
+                Not on the list? Add the position first, under{" "}
+                <Link href="/recruitment/setup?new=position" className="font-medium underline underline-offset-2">
+                  Positions, Setup
+                </Link>
+                .
+              </p>
+            )}
+            <details>
+              <summary className="cursor-pointer select-none text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                More options
+              </summary>
+              <div className="mt-3">
+                <FieldGrid fields={pick(MORE)} draft={draft} onChange={change} data={data} />
+              </div>
+            </details>
+          </>
+        )}
         {draft.job && (
           <label className="flex cursor-pointer select-none items-start gap-2.5">
             <input

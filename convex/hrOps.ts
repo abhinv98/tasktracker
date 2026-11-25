@@ -105,18 +105,26 @@ export const all = query({
     const teams = (await ctx.db.query("teams").collect())
       .map((t) => ({ _id: t._id as string, name: t.name, color: t.color }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    /** When each candidate applied: their application knows. ponytail: one read per candidate; store it on the row past ~3,000 of them. */
-    const applied = new Map<string, string>();
+    /** What each candidate's application says: when they applied, their experience and notice, and for whoever
+     *  sees pay what they earn and expect. ponytail: one read per candidate; store it on the row past ~3,000 of them. */
+    const applied = new Map<string, Record<string, string>>();
     for (const r of every) {
       if (r.tracker !== "pipeline" || (seen && !seen.has(r._id))) continue;
       const id = ctx.db.normalizeId("recruitCandidates", text(r.fields, "applicantId"));
-      const at = id ? (await ctx.db.get(id))?.createdAt : null;
-      if (at) applied.set(r._id, today(at));
+      const a = id ? await ctx.db.get(id) : null;
+      if (!a) continue;
+      const said = {
+        appliedOn: a.createdAt ? today(a.createdAt) : "",
+        experience: a.experience ?? "",
+        noticePeriod: a.noticePeriod ?? "",
+        ...(access.pay ? { currentCtc: a.currentCtc ?? "", expectedCtc: a.expectedCtc ?? "" } : {}),
+      };
+      applied.set(r._id, Object.fromEntries(Object.entries(said).filter(([, value]) => value)));
     }
     const rows = every
       .filter((r) => isTracker(r.tracker) && (seen ? seen.has(r._id) : true))
       .map((r) => ({ _id: r._id, tracker: r.tracker as TrackerKey, code: r.code, fields: access.pay ? r.fields : withoutPay(r.tracker as TrackerKey, r.fields) }))
-      .map((r) => (applied.has(r._id) ? { ...r, fields: { ...r.fields, appliedOn: applied.get(r._id)! } } : r))
+      .map((r) => (applied.has(r._id) ? { ...r, fields: { ...r.fields, ...applied.get(r._id)! } } : r))
       // Which pipeline a candidate, or a hiring round, is on, and whose they are.
       .map((r) =>
         r.tracker === "pipeline"

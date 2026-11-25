@@ -269,7 +269,7 @@ export function radar(book: Book, today: string) {
     },
     {
       key: "projects" as TrackerKey,
-      label: "HR projects",
+      label: "HR tasks",
       open: count("projects", (r) => text(r, "stage") !== "Implemented"),
       attention: attention("projects"),
       check: "Draft, feedback, founder approval, implementation",

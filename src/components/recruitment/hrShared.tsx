@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui";
 import { STANDARD, STANDARD_STEPS, mergeNames, type Step } from "@/convex/lib/hirePipeline";
 import { TRACKERS, type Field, type TrackerKey } from "@/convex/lib/hrTrackers";
 import type { Team } from "@/lib/recruitTeams";
+import { formatLpa, formatYears, parseCtcLpa, parseYears } from "@/lib/recruitParse";
 import { toBook, todayIST, tone, type Book, type Row } from "@/lib/hrHealth";
 
 /** What every HR tracker screen needs: the rows by tracker, the staff list and today's date. */
@@ -205,6 +206,8 @@ export function show(field: Field, row: Row, data: HrData): string {
   if (field.type === "pipeline") return data.pipelineName(String(value));
   if (field.type === "team") return data.teamName(String(value));
   if (field.type === "date") return fmtDate(String(value), data.today);
+  if (field.as === "lpa") return formatLpa(parseCtcLpa(String(value)));
+  if (field.as === "years") return formatYears(parseYears(String(value)));
   return String(value);
 }
 

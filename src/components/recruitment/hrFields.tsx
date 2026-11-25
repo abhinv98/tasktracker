@@ -190,6 +190,7 @@ export function InlineAdd({
   preset,
   data,
   submitLabel,
+  onSaved,
   onDone,
 }: {
   tracker: TrackerKey;
@@ -199,6 +200,8 @@ export function InlineAdd({
   preset: Record<string, string>;
   data: HrData;
   submitLabel: string;
+  /** With what was typed, once it is saved and before the form goes. */
+  onSaved?: (values: Record<string, string>) => void;
   onDone: () => void;
 }) {
   const fields = keys
@@ -219,6 +222,7 @@ export function InlineAdd({
         try {
           await save({ tracker, fields: toValues(seenFields(tracker, data), draft) });
           toast("success", "Added");
+          onSaved?.(draft);
           onDone();
         } catch (err) {
           toast("error", err instanceof Error ? err.message : "Could not save");
