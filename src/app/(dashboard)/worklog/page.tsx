@@ -168,7 +168,7 @@ function WorkLogPageInner() {
               ? [
                   {
                     value: "managerlog" as const,
-                    label: "Manager Worklog",
+                    label: user?.isSuperAdmin ? "Everyone's worklogs" : "My team's worklogs",
                     icon: UsersRound,
                   },
                 ]

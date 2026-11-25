@@ -26,7 +26,9 @@ import {
   X,
   Tag as TagIcon,
   ClipboardList,
+  UsersRound,
 } from "lucide-react";
+import ManagerWorklogPanel from "@/components/worklog/ManagerWorklogPanel";
 
 const NOTE_COLORS = [
   { name: "Default", value: "" },
@@ -80,7 +82,11 @@ type Note = {
 
 export default function NotebookPage() {
   const user = useQuery(api.users.getCurrentUser);
-  const [tab, setTab] = useState<"notes" | "worklog">("notes");
+  const [tab, setTab] = useState<"notes" | "worklog" | "team">("notes");
+  // Whose daily worklogs this person may read: their team's if they lead one, every manager's for a super admin
+  // (the server decides, managerWorklog.listSupervisableManagers). Nobody but themselves: no tab.
+  const supervised = useQuery(api.managerWorklog.listSupervisableManagers);
+  const leads = (supervised ?? []).some((m) => m._id !== user?._id);
 
   if (user === undefined) {
     return (
@@ -104,7 +110,7 @@ export default function NotebookPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="My Notebook"
-        subtitle="Private notes & your brand-wise daily worklog. Only you can see this."
+        subtitle="Your notes are private. Your daily worklog is also read by your team lead and the super admins."
       />
 
       <div className="mb-4">
@@ -113,12 +119,13 @@ export default function NotebookPage() {
           options={[
             { value: "notes", label: "Notes", icon: NotebookPen },
             { value: "worklog", label: "Daily Worklog", icon: ClipboardList },
+            ...(leads ? [{ value: "team" as const, label: user.isSuperAdmin ? "Everyone's worklogs" : "My team's worklogs", icon: UsersRound }] : []),
           ]}
           onChange={setTab}
         />
       </div>
 
-      {tab === "notes" ? <NotesTab /> : <WorklogTab />}
+      {tab === "notes" ? <NotesTab /> : tab === "team" && leads ? <ManagerWorklogPanel /> : <WorklogTab />}
     </div>
   );
 }
