@@ -32,9 +32,8 @@ export const RECRUIT_SECTIONS: Section[] = [
   },
   {
     label: "Outreach",
-    href: "/recruitment/campaigns",
+    href: "/recruitment/templates",
     tabs: [
-      { label: "Campaigns", href: "/recruitment/campaigns" },
       { label: "Templates", href: "/recruitment/templates" },
       { label: "Email activity", href: "/recruitment/activity" },
     ],

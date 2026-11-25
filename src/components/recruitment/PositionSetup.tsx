@@ -490,7 +490,7 @@ function RemovePosition({ setup, position, onClose, onRemoved }: { setup: Setup;
                     {[
                       "They keep their status and history, and take the matching step of that position's pipeline.",
                       info.rounds.length > 0 && `${info.rounds.length === 1 ? "Hiring round" : "Hiring rounds"} ${list(info.rounds)} ${info.rounds.length === 1 ? "goes" : "go"} along.`,
-                      info.templates + info.campaigns > 0 && "Its email templates and campaigns go along.",
+                      info.templates > 0 && "Its email templates go along.",
                       info.total > n && `The other ${(info.total - n).toLocaleString()} stay ${info.under ? `under ${info.under}` : "with the removed position"}.`,
                     ]
                       .filter(Boolean)

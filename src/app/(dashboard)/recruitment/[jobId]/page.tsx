@@ -11,9 +11,7 @@ import {
   Button,
   EmptyState,
   Modal,
-  Input,
   Select,
-  Textarea,
   ConfirmModal,
   SkeletonPageHeader,
   SkeletonTable,
@@ -30,7 +28,7 @@ import { EmailPreview } from "@/components/recruitment/TemplateEditor";
 import { valuesFor } from "@/lib/templateHtml";
 import { positionCode } from "@/convex/lib/hirePipeline";
 import { MoveApplicants } from "@/components/recruitment/MoveApplicants";
-import { ArrowLeft, ArrowLeftRight, Check, Mail, Megaphone, Pause, RotateCcw, SlidersHorizontal, Trash2, UserSearch, X } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Check, Mail, Pause, RotateCcw, SlidersHorizontal, Trash2, UserSearch, X } from "lucide-react";
 
 type Chip = PositionStatus | "all";
 
@@ -49,11 +47,8 @@ export default function RecruitmentJobPage() {
   const jobs = useQuery(api.recruitment.listJobs);
   const candidates = useQuery(api.recruitment.listCandidates, { jobSourceId });
   const templates = useQuery(api.recruitment.listTemplates, {});
-  const campaigns = useQuery(api.recruitment.listCampaigns, { jobSourceId });
 
   const deleteCandidates = useMutation(api.recruitment.deleteCandidates);
-  const createCampaign = useMutation(api.recruitment.createCampaign);
-  const updateMembers = useMutation(api.recruitment.updateCampaignMembers);
   const sendTemplateEmail = useAction(api.recruitment.sendTemplateEmail);
   const addApplicants = useMutation(api.hrOps.addApplicants);
   const setTeam = useMutation(api.recruitSetup.setTeam);
@@ -68,14 +63,10 @@ export default function RecruitmentJobPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<{ id: Id<"recruitCandidates">; order: Id<"recruitCandidates">[] } | null>(null);
   const [mailOpen, setMailOpen] = useState(false);
-  const [campOpen, setCampOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [campTarget, setCampTarget] = useState("new");
-  const [campName, setCampName] = useState("");
-  const [campNotes, setCampNotes] = useState("");
 
   // Bulk delete, mail and move act on every pick, so drop the ones a new filter hides.
   useEffect(() => setSelected(new Set()), [chip, filter, jobSourceId, teamView]);
@@ -170,30 +161,6 @@ export default function RecruitmentJobPage() {
       if (unsent.length === 0) setMailOpen(false);
     } catch (err) {
       toast("error", err instanceof Error ? err.message : "Send failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCampaign() {
-    setBusy(true);
-    try {
-      if (campTarget === "new") {
-        if (!campName.trim()) return;
-        await createCampaign({
-          name: campName.trim(), jobSourceId, candidateIds: ids,
-          notes: campNotes.trim() || undefined,
-        });
-        toast("success", `Campaign created with ${ids.length} people`);
-      } else {
-        const { memberCount } = await updateMembers({
-          campaignId: campTarget as Id<"recruitCampaigns">, add: ids,
-        });
-        toast("success", `Campaign now has ${memberCount} people`);
-      }
-      setCampOpen(false); setCampName(""); setCampNotes(""); setSelected(new Set());
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(false);
     }
@@ -384,7 +351,6 @@ export default function RecruitmentJobPage() {
               {several && <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Team of the shortlisted ones</p>}
               {several &&
                 [...teams, ...(meta?.divide ? [] : [{ _id: "", name: "Not decided" }])].map((t) => <TrayItem key={t._id} label={t.name} onSelect={() => void putInTeam(ids, t._id).then(() => setSelected(new Set()))} />)}
-              <TrayItem label="Add to an email campaign" icon={Megaphone} onSelect={() => setCampOpen(true)} />
               {openRounds.length > 0 && (
                 <p className="px-2 pb-1 pt-2 text-[12px] font-medium text-[var(--text-muted)]">Put into a hiring round</p>
               )}
@@ -467,61 +433,6 @@ export default function RecruitmentJobPage() {
               to={`${firstPicked.name}, ${firstPicked.email}`}
             />
           )}
-        </div>
-      </Modal>
-
-      {/* Campaign */}
-      <Modal
-        open={campOpen}
-        onClose={() => setCampOpen(false)}
-        title={`Add ${picks.size} to a campaign`}
-        icon={Megaphone}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setCampOpen(false)}>Cancel</Button>
-            <Button
-              loading={busy}
-              disabled={campTarget === "new" && !campName.trim()}
-              onClick={handleCampaign}
-            >
-              {campTarget === "new" ? "Create campaign" : "Add to campaign"}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <Select
-            label="Campaign"
-            value={campTarget}
-            onChange={(e) => setCampTarget(e.target.value)}
-            options={[
-              { value: "new", label: "＋ New campaign" },
-              ...(campaigns ?? [])
-                .filter((c) => c.isOpen)
-                .map((c) => ({ value: c._id, label: `${c.name} (${c.memberCount})` })),
-            ]}
-          />
-          {campTarget === "new" && (
-            <>
-              <Input
-                label="Campaign name"
-                value={campName}
-                onChange={(e) => setCampName(e.target.value)}
-                placeholder="e.g. Video Editor shortlist — August"
-              />
-              <Textarea
-                label="Notes (optional)"
-                value={campNotes}
-                onChange={(e) => setCampNotes(e.target.value)}
-                placeholder="What this round is for…"
-                className="min-h-[80px]"
-              />
-            </>
-          )}
-          <p className="text-[12px] text-[var(--text-secondary)]">
-            A campaign is just a saved group. You can mail everyone in it from the
-            Campaigns page whenever you like.
-          </p>
         </div>
       </Modal>
 

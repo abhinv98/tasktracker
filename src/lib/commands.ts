@@ -115,10 +115,10 @@ export const NAV_COMMANDS: NavCommand[] = [
     visible: canRecruit,
   },
   {
-    label: "Campaigns",
-    href: "/recruitment/campaigns",
+    label: "Email templates",
+    href: "/recruitment/templates",
     icon: UserSearch,
-    keywords: ["outreach", "batch", "mail", "recruitment"],
+    keywords: ["outreach", "batch", "mail", "recruitment", "campaign"],
     hint: "Recruitment",
     visible: canRecruit,
   },

@@ -12,6 +12,7 @@ import { positionCode } from "@/convex/lib/hirePipeline";
 import { fieldClass } from "@/components/ui/classes";
 import type { Row } from "@/lib/hrHealth";
 import { applyLink } from "@/lib/applyLink";
+import { guessPosition } from "@/lib/recruitTeams";
 import { CopyLink } from "./CopyLink";
 import { FieldGrid, toValues } from "./hrFields";
 import { seenFields, startingValues, type HrData } from "./hrShared";
@@ -38,11 +39,18 @@ export function noLink(data: HrData, round: Row): string | undefined {
 export const roundsFor = (data: HrData | undefined, jobId: number, team?: string) =>
   (data?.book.rounds ?? []).filter((r) => r.fields.job === String(jobId) && isOpen(r) && (!team || !r.team || r.team === team));
 
-/** The rounds running for a position, each leading to its candidates, and a way to open one. */
+/** The rounds a position has been through and closed. One from the old log that was never tied counts by its name. */
+export const earlierRounds = (data: HrData | undefined, jobId: number) =>
+  (data?.book.rounds ?? []).filter(
+    (r) => !isOpen(r) && (r.fields.job ? r.fields.job === String(jobId) : guessPosition(String(r.fields.role ?? ""), data!.jobs)?.id === String(jobId))
+  );
+
+/** The rounds running for a position, each leading to its candidates, how many it has had, and a way to open or continue one. */
 export function Rounds({ data, job, team }: { data: HrData | undefined; job: { sourceId: number; name: string }; team?: string }) {
   const [adding, setAdding] = useState(false);
   if (!data) return null;
   const rounds = roundsFor(data, job.sourceId, team);
+  const earlier = earlierRounds(data, job.sourceId);
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       {rounds.map((r) => (
@@ -62,6 +70,14 @@ export function Rounds({ data, job, team }: { data: HrData | undefined; job: { s
       >
         <Plus size={12} aria-hidden /> Hiring round
       </button>
+      {earlier.length > 0 && (
+        <span
+          title={`Closed: ${earlier.map((r) => `${r.code} ${String(r.fields.role ?? "")}`).join(", ")}. Use "Hiring round" to continue one.`}
+          className="whitespace-nowrap text-[12px] tabular-nums text-[var(--text-muted)]"
+        >
+          {earlier.length} earlier
+        </span>
+      )}
       {adding && <OpenRoundModal data={data} job={job} team={team} onClose={() => setAdding(false)} />}
     </span>
   );
@@ -132,7 +148,8 @@ export function OpenRoundModal({
   const [saving, setSaving] = useState(false);
   const [opened, setOpened] = useState<{ id: string; placed: number } | null>(null);
   const made = opened ? data.byId.get(opened.id) : undefined;
-  const loose = job ? data.book.rounds.filter((r) => !r.fields.job && isOpen(r)) : [];
+  // What can be taken up again instead of starting afresh: one tied to nothing yet, or one this position closed.
+  const loose = job ? [...data.book.rounds.filter((r) => !r.fields.job && isOpen(r)), ...earlierRounds(data, job.sourceId)] : [];
   const pick = (keys: string[]) =>
     keys
       .flatMap((key) => seenFields("rounds", data).find((f) => f.key === key) ?? [])
@@ -197,7 +214,7 @@ export function OpenRoundModal({
             Cancel
           </Button>
           <Button type="submit" form="open-round" loading={saving}>
-            {existing ? "Use this one" : "Open round"}
+            {existing ? "Continue this round" : "Open round"}
           </Button>
         </>
       }
@@ -205,9 +222,9 @@ export function OpenRoundModal({
       <form id="open-round" onSubmit={submit} className="flex flex-col gap-4">
         {loose.length > 0 && (
           <label className="block">
-            <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">New, or a round that is tied to no position yet</span>
+            <span className="mb-1 block text-[12px] font-medium text-[var(--text-secondary)]">Start a new round, or continue an earlier one</span>
             <select value={existing} onChange={(e) => setExisting(e.target.value)} className={`${fieldClass} w-full`}>
-              <option value="">Start a new one</option>
+              <option value="">Start a new round</option>
               {loose.map((r) => (
                 <option key={r._id} value={r._id}>
                   {r.code} · {String(r.fields.role ?? "")} ({String(r.fields.hiringStatus ?? "")})
