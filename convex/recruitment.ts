@@ -275,6 +275,22 @@ export const recentApplicants = query({
   },
 });
 
+/** These applicants as they are now, for a list that keeps who was just acted on in sight. Whoever is deleted, or not the caller's, is left out. */
+export const applicantsById = query({
+  args: { ids: v.array(v.id("recruitCandidates")) },
+  handler: async (ctx, { ids }) => {
+    const access = await recruitAccess(ctx);
+    if (!access) return [];
+    const jobs = await ctx.db.query("recruitJobs").collect();
+    const at = positionOfApplicant(livePositions(jobs));
+    const rows = await Promise.all(ids.slice(0, 300).map((id) => ctx.db.get(id)));
+    return rows
+      .filter((r) => r !== null)
+      .filter((r) => mayRecruitFor(access, r.jobSourceId))
+      .map((r) => ({ ...shown(access, r), jobName: nameOf(jobs.find((j) => j.sourceId === at(r))), positionId: at(r) }));
+  },
+});
+
 /** Global candidate search across every job. */
 export const searchCandidates = query({
   args: { search: v.string(), limit: v.optional(v.number()) },

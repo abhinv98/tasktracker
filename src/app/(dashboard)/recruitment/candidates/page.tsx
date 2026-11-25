@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button, EmptyState, PageHeader, SkeletonPageHeader, SkeletonTable } from "@/components/ui";
 import { FilterTray, SearchField, StatChips } from "@/components/ui/Tray";
-import { ApplicantsTable, NarrowTray, placesOf, useLast, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
+import { ApplicantsTable, useChanged, NarrowTray, placesOf, useLast, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { MoveApplicants } from "@/components/recruitment/MoveApplicants";
 import { useHrData } from "@/components/recruitment/hrShared";
@@ -58,13 +58,14 @@ function AllApplicants() {
   const places = useMemo(() => placesOf(hr), [hr]);
   /** The position someone is for: the role they named, where they named one (the server works it out). */
   const at = (a: Applicant) => String((a as Applicant & { positionId?: number }).positionId ?? a.jobSourceId);
+  // Whoever was just decided on, or moved, stays on this list, marked, until it is changed.
+  const changed = useChanged(`${chip} ${job} ${JSON.stringify(filter)}`);
   const rows = useMemo(
     () =>
       // Matched here too: while the next answer loads, the last one is narrowed to what is typed now.
-      narrow(list ?? [], searching ? filter : { ...filter, search: "" })
-        .filter((a) => !job || at(a) === job)
-        .filter((a) => chip === "all" || positionStatus(a.stage) === chip),
-    [list, filter, job, chip, searching]
+      changed.keep(narrow(list ?? [], searching ? filter : { ...filter, search: "" }), (a) => (!job || at(a) === job) && (chip === "all" || positionStatus(a.stage) === chip)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [list, filter, job, chip, searching, changed.map, changed.live]
   );
   const picks = useMemo(() => new Set(rows.filter((r) => selected.has(r._id)).map((r) => r._id as string)), [rows, selected]);
 
@@ -86,8 +87,19 @@ function AllApplicants() {
     fn();
     setSelected(new Set());
   };
+  /** Their row says what was done, and they are no longer among the ticked. */
+  function decided(id: string, to: PositionStatus) {
+    changed.decided(rows.filter((r) => r._id === id), to);
+    setSelected((was) => new Set([...was].filter((x) => x !== id)));
+  }
+  /** How many are on this list, without those just dealt with that stay in sight. */
+  const listed = found_(chip) ?? 0;
   async function moveSelected(to: PositionStatus) {
-    if (ids.length && (await move(ids, to))) setSelected(new Set());
+    const people = rows.filter((r) => picks.has(r._id));
+    if (ids.length && (await move(ids, to))) {
+      changed.decided(people, to);
+      setSelected(new Set());
+    }
   }
 
   return (
@@ -135,10 +147,10 @@ function AllApplicants() {
           {list === undefined
             ? "Looking…"
             : searching
-            ? `${rows.length}${list.length === 300 ? "+" : ""} ${rows.length === 1 ? "match" : "matches"}`
+            ? `${listed}${list.length === 300 ? "+" : ""} ${listed === 1 ? "match" : "matches"}`
             : list.length === NEWEST
               ? `The newest ${NEWEST}. Search to reach everyone.`
-              : `${rows.length}`}
+              : `${listed}`}
         </span>
       </div>
 
@@ -181,7 +193,8 @@ function AllApplicants() {
           selected={picks}
           onSelect={setSelected}
           onOpen={(id, order) => setPanel({ id, order })}
-          onMove={(a, to) => move([a._id], to, a.name)}
+          onMove={(a, to) => void move([a._id], to, a.name).then((ok) => ok && decided(a._id, to))}
+          changed={changed.map}
           places={places}
           // The server has left the figures out already; this only drops the empty columns.
           pay={hr?.pay !== false}
@@ -193,7 +206,10 @@ function AllApplicants() {
           ids={ids}
           who={ids.length === 1 ? rows.find((r) => r._id === ids[0])?.name : undefined}
           onClose={() => setMoving(false)}
-          onMoved={() => setSelected(new Set())}
+          onMoved={(to) => {
+            changed.moved(rows.filter((r) => picks.has(r._id)), to);
+            setSelected(new Set());
+          }}
         />
       )}
 
@@ -203,6 +219,8 @@ function AllApplicants() {
           order={panel.order}
           onGo={(id) => setPanel((p) => p && { ...p, id })}
           onClose={() => setPanel(null)}
+          onDecided={decided}
+          onMoved={(id, to) => changed.moved(rows.filter((r) => r._id === id), to)}
           onOpenOther={(id) => setPanel((p) => p && { ...p, id })}
         />
       )}

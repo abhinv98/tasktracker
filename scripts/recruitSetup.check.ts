@@ -189,6 +189,7 @@ async function main() {
       await w.run(R.recentApplicants, {}),
       await w.run(R.searchCandidates, { search: "a@x" }),
       [await w.run(R.getCandidate, { candidateId: "a" })],
+      await w.run(R.applicantsById, { ids: ["a"] }),
       (await w.run(R.getCampaign, { campaignId: "camp" })).members,
     ];
     assert.ok(lists.every((l) => l.length === 1), "they still see the person");
@@ -640,6 +641,13 @@ async function main() {
   assert.deepEqual((await w.run(R.listJobs, {})).map((j: any) => [j.sourceId, j.total, j.fresh]), [[1, 3, 3], [16, 1, 1], [3, 1, 1]]);
   w.as("del");
   assert.deepEqual(await ids(R.listCandidates, { jobSourceId: 16 }), ["in"], "whoever has the position has its roles");
+  // A list that keeps someone in sight asks for them as they are now: deleted or not the caller's, they are left out.
+  w.tables.recruitCandidates.push(app("fin", 9));
+  assert.deepEqual(await ids(R.applicantsById, { ids: ["in", "fin", "deleted"] }), ["in"]);
+  w.as("left");
+  assert.deepEqual(await w.run(R.applicantsById, { ids: ["in"] }), [], "nobody without access is told anything");
+  w.as("hr");
+  assert.deepEqual((await w.run(R.applicantsById, { ids: ["in", "fin"] })).map((c: any) => [c._id, c.positionId, c.jobName]), [["in", 16, "Social Media Intern"], ["fin", 9, "Unknown"]]);
 
   // A step's owner who has left is not written onto people: their rows could not be saved again.
   w = world({ recruitPipelines: [pl("own", [step("a", "A", "screening"), step("b", "B", "interview", { owner: "left", days: 2 })])], recruitJobs: [job(1, "Design", { pipeline: "own" })], hrRecords: [on("p", { job: "1", stage: "A" })] });

@@ -21,7 +21,7 @@ import { FilterTray, SearchField, StatChips, Tray, TrayItem } from "@/components
 import { POSITION_STATUSES, isPositionStatus, positionStatus, type PositionStatus } from "@/lib/recruitStages";
 import { NO_NARROW, narrow, type Narrow } from "@/lib/applicantSearch";
 import { useHrData } from "@/components/recruitment/hrShared";
-import { ApplicantsTable, NarrowTray, placesOf, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
+import { ApplicantsTable, NarrowTray, placesOf, useChanged, useMoveApplicants, type Applicant } from "@/components/recruitment/ApplicantsTable";
 import { CandidatePanel } from "@/components/recruitment/CandidatePanel";
 import { ApplyLinks, Rounds } from "@/components/recruitment/OpenRound";
 import { EmailPreview } from "@/components/recruitment/TemplateEditor";
@@ -100,12 +100,18 @@ export default function RecruitmentJobPage() {
       ),
     [candidates, filter, only, places]
   );
-  const rows = useMemo(() => (chip === "all" ? narrowed : narrowed.filter((c) => positionStatus(c.stage) === chip)), [narrowed, chip]);
+  // Whoever was just decided on, or moved away, stays on this list, marked, until it is changed.
+  const changed = useChanged(`${jobSourceId} ${chip} ${JSON.stringify(filter)} ${teamView}`);
+  const rows = useMemo(
+    () => changed.keep(narrowed, (c) => chip === "all" || positionStatus(c.stage) === chip),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [narrowed, chip, changed.map, changed.live]
+  );
   const roles = useMemo(
     () => [...new Set((candidates ?? []).map((c) => c.position.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [candidates]
   );
-  // Only who is still listed: someone decided on from their own row has left it.
+  // Only who is listed. Someone decided on from their own row is unticked (see `decided`).
   const picks = useMemo(() => new Set(rows.filter((r) => selected.has(r._id)).map((r) => r._id as string)), [rows, selected]);
   const ids = useMemo(() => [...picks] as Id<"recruitCandidates">[], [picks]);
 
@@ -128,8 +134,18 @@ export default function RecruitmentJobPage() {
   /** Where the team is an either-or, shortlisting from a team's entry gives them to it. */
   const gives = viewed && !meta?.divide ? viewed : undefined;
 
+  /** Their row says what was done, and they are no longer among the ticked. */
+  function decided(id: string, to: PositionStatus) {
+    changed.decided(rows.filter((r) => r._id === id), to);
+    setSelected((was) => new Set([...was].filter((x) => x !== id)));
+  }
+
   async function moveSelected(to: PositionStatus, team = gives?._id) {
-    if (ids.length && (await move(ids, to, undefined, team))) setSelected(new Set());
+    const people = rows.filter((r) => picks.has(r._id));
+    if (ids.length && (await move(ids, to, undefined, team))) {
+      changed.decided(people, to);
+      setSelected(new Set());
+    }
   }
 
   async function putInTeam(people: Id<"recruitCandidates">[], team: string) {
@@ -401,7 +417,8 @@ export default function RecruitmentJobPage() {
             selected={picks}
             onSelect={setSelected}
             onOpen={(id, order) => setPanel({ id, order })}
-            onMove={(a, to) => move([a._id], to, a.name, gives?._id)}
+            onMove={(a, to) => void move([a._id], to, a.name, gives?._id).then((ok) => ok && decided(a._id, to))}
+            changed={changed.map}
             places={places}
             teams={several ? { options: teams, divide: meta?.divide === true, onPick: (a, team) => void putInTeam([a._id], team) } : undefined}
             // The server has left the figures out already; this only drops the empty columns.
@@ -463,6 +480,8 @@ export default function RecruitmentJobPage() {
           team={gives}
           onGo={(id) => setPanel((p) => p && { ...p, id })}
           onClose={() => setPanel(null)}
+          onDecided={decided}
+          onMoved={(id, to) => changed.moved(rows.filter((r) => r._id === id), to)}
           onOpenOther={(id, other) => {
             if (other === jobSourceId) setPanel((p) => p && { ...p, id });
             else router.push(`/recruitment/${other}?highlight=${id}`);
@@ -476,7 +495,10 @@ export default function RecruitmentJobPage() {
           who={ids.length === 1 ? rows.find((r) => r._id === ids[0])?.name : undefined}
           from={jobSourceId}
           onClose={() => setMoving(false)}
-          onMoved={() => setSelected(new Set())}
+          onMoved={(to) => {
+            changed.moved(rows.filter((r) => picks.has(r._id)), to);
+            setSelected(new Set());
+          }}
         />
       )}
 

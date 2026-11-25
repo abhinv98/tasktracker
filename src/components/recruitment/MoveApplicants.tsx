@@ -39,7 +39,8 @@ export function MoveApplicants({
   /** The position they are all in, if they are in one. */
   from?: number;
   onClose: () => void;
-  onMoved?: () => void;
+  /** With where they went, once they have. */
+  onMoved?: (to: { id: number; name: string }) => void;
 }) {
   const jobs = useQuery(api.recruitment.listJobs);
   const move = useMutation(api.recruitSetup.moveApplicants);
@@ -65,7 +66,7 @@ export function MoveApplicants({
           ? `Already in ${name}`
           : `${subject} moved to ${name}${twice ? `. ${who ? "They" : twice} had applied there too, so there are two applications` : ""}`
       );
-      onMoved?.();
+      if (moved > 0) onMoved?.({ id: Number(to), name });
       onClose();
     } catch (err) {
       // Over the dialog a toast would sit behind it.

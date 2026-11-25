@@ -7,7 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button, Textarea, useToast } from "@/components/ui";
 import { iconButtonClass } from "@/components/ui/classes";
-import { VERDICTS, positionStatus, stageMeta, type PositionStatus, type Stage, type Verdict } from "@/lib/recruitStages";
+import { POSITION_STATUSES, VERDICTS, positionStatus, stageMeta, type PositionStatus, type Stage, type Verdict } from "@/lib/recruitStages";
 import { DECISIONS, Decide, UNDATED, useLast, useMoveApplicants } from "./ApplicantsTable";
 import { MoveApplicants } from "./MoveApplicants";
 import {
@@ -39,6 +39,8 @@ export function CandidatePanel({
   onGo,
   onClose,
   onOpenOther,
+  onDecided,
+  onMoved,
   team,
 }: {
   candidateId: Id<"recruitCandidates">;
@@ -49,6 +51,9 @@ export function CandidatePanel({
   onGo?: (id: Id<"recruitCandidates">) => void;
   onClose: () => void;
   onOpenOther?: (id: Id<"recruitCandidates">, jobSourceId: number) => void;
+  /** Told what was done from here, so the list behind can show it on their row. */
+  onDecided?: (id: Id<"recruitCandidates">, to: PositionStatus) => void;
+  onMoved?: (id: Id<"recruitCandidates">, to: { id: number; name: string }) => void;
 }) {
   // The last person stays on screen while the next one loads, so stepping does not flicker.
   const c = useLast(useQuery(api.recruitment.getCandidate, { candidateId }));
@@ -94,7 +99,7 @@ export function CandidatePanel({
     // A fresh application is dealt with: on to the next one straight away. If the
     // save fails, its message names the person.
     if (positionStatus(c.stage as Stage) === "new") go(after);
-    void moveApplicants([candidateId], to, c.name, team?._id);
+    void moveApplicants([candidateId], to, c.name, team?._id).then((ok) => ok && onDecided?.(candidateId, to));
   }
 
   // The page behind shouldn't scroll under the panel.
@@ -127,6 +132,9 @@ export function CandidatePanel({
   });
 
   const isPdf = !!c?.resume && /\.pdf($|\?)/i.test(c.resume);
+  /** The step they are at on Candidates, while they are in the running. */
+  const inPlay = c?.onCandidates.find((row) => row.active)?.stage;
+  const standing = POSITION_STATUSES.find((s) => s.value === positionStatus(c?.stage as Stage))!;
 
   async function saveNote() {
     if (!note.trim() || !ready) return;
@@ -159,8 +167,17 @@ export function CandidatePanel({
             {/* Header */}
             <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-6 py-4">
               <div className="min-w-0">
-                <h2 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
-                  {c.name}
+                <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--text-primary)]">
+                  <span className="truncate">{c.name}</span>
+                  {/* Where they stand, in one look. It changes the moment something is done. */}
+                  <span
+                    className="inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] px-2 text-[12px] font-medium text-[var(--text-secondary)]"
+                    aria-label={`Status: ${standing.label}`}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: standing.color }} aria-hidden />
+                    {standing.label}
+                    {standing.value === "shortlisted" && inPlay ? ` · ${inPlay}` : ""}
+                  </span>
                 </h2>
                 <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
                   {c.position || c.jobName}
@@ -487,7 +504,7 @@ export function CandidatePanel({
         )}
       </aside>
       {moving && c && (
-        <MoveApplicants ids={[candidateId]} who={c.name} from={c.positionId} onClose={() => setMoving(false)} />
+        <MoveApplicants ids={[candidateId]} who={c.name} from={c.positionId} onClose={() => setMoving(false)} onMoved={(to) => onMoved?.(candidateId, to)} />
       )}
     </>
   );

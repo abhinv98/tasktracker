@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { Check, ChevronDown, ChevronUp, ExternalLink, FileText, Pause, SlidersHorizontal, X } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -46,12 +46,65 @@ export function useMoveApplicants() {
           ? `${subject} ${DONE[to]}${to === "shortlisted" && added ? `. ${added === 1 ? "Now" : `${added} now`} on Candidates` : ""}`
           : "Nothing to change"
       );
-      return true;
+      // False when nothing was there to change (someone else got to them first, or they are gone).
+      return !!(updated || added || teamed);
     } catch (err) {
       const why = err instanceof ConvexError ? String(err.data) : plainMessage(err instanceof Error ? err.message : "");
       toast("error", who && !why.includes(who) ? `${who}: ${why}` : why);
       return false;
     }
+  };
+}
+
+/* ── What was just done stays in sight ─────────────────────── */
+
+/** Someone acted on in this list a moment ago: what was done, where they went, and the row as it was.
+ *  `to`: the status they were given. Once they have another one, the mark no longer holds. */
+export type Changed = { text: string; to?: PositionStatus; href?: string; row: Applicant };
+const JUST: Record<PositionStatus, string> = { new: "Back to New", shortlisted: "Shortlisted just now", on_hold: "Put on hold just now", rejected: "Rejected just now" };
+const NONE: ReadonlyMap<string, Changed> = new Map();
+
+/**
+ * A list that keeps whoever was just acted on where they were, marked with what
+ * happened, instead of letting them vanish into another list. `of` names the
+ * list: a different one (another status, another search) starts clean.
+ */
+export function useChanged(of: string) {
+  const [state, setState] = useState<{ of: string; map: ReadonlyMap<string, Changed> }>({ of, map: NONE });
+  // Another list: forgotten for good, so coming back to this one finds it clean (set during render, as useLast does).
+  if (state.of !== of) setState({ of, map: NONE });
+  const map = state.of === of ? state.map : NONE;
+  const add = (rows: readonly Applicant[], change: (a: Applicant) => Omit<Changed, "row"> & { row?: Partial<Applicant> }) =>
+    setState((s) => {
+      // An answer that comes back after the list was left belongs to nothing on screen.
+      if (s.of !== of) return s;
+      const next = new Map(s.map);
+      for (const a of rows) {
+        const { row, ...said } = change(a);
+        next.set(a._id, { ...said, row: { ...(next.get(a._id)?.row ?? a), ...row } });
+      }
+      return { of, map: next };
+    });
+  // As they are now, whoever changed them since: a row kept in sight is never an old copy, and goes when the person does.
+  const kept = useMemo(() => [...map.values()].map((c) => c.row._id), [map]);
+  const live = useQuery(api.recruitment.applicantsById, kept.length ? { ids: kept } : "skip") as Applicant[] | undefined;
+  return {
+    map,
+    /** Changes when the kept rows do. */
+    live,
+    /** They were given another status. */
+    decided: (rows: readonly Applicant[], to: PositionStatus) =>
+      add(rows, () => ({ text: JUST[to], to, row: { stage: POSITION_STATUSES.find((s) => s.value === to)!.stage } })),
+    /** They went to another position. */
+    moved: (rows: readonly Applicant[], to: { id: number; name: string }) =>
+      add(rows, (a) => ({ text: `Moved to ${to.name}`, href: `/recruitment/${to.id}?highlight=${a._id}`, row: { jobName: to.name } })),
+    /** The list, with them still in it: those `showing` would have dropped, and those the server no longer sends. */
+    keep: (list: readonly Applicant[], showing: (a: Applicant) => boolean): Applicant[] => {
+      const ids = new Set<string>(list.map((a) => a._id));
+      // Until the answer is in, as they were when they were acted on.
+      const gone = (live ?? [...map.values()].map((c) => c.row)).filter((a) => map.has(a._id) && !ids.has(a._id));
+      return [...list.filter((a) => showing(a) || map.has(a._id)), ...gone];
+    },
   };
 }
 
@@ -194,6 +247,7 @@ export function ApplicantsTable({
   teams,
   pay,
   full = true,
+  changed,
   highlight,
 }: {
   rows: Applicant[];
@@ -211,6 +265,8 @@ export function ApplicantsTable({
   pay: boolean;
   /** HR and super admins: Candidates is theirs to open. Anyone else is told where HR has the person. */
   full?: boolean;
+  /** Whoever was just acted on here: their row is marked and says what happened. */
+  changed?: ReadonlyMap<string, Changed>;
   highlight?: string | null;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "added", dir: -1 });
@@ -239,7 +295,9 @@ export function ApplicantsTable({
 
   const shown = sorted.slice(0, showing);
   const order = sorted.map((r) => r.a._id);
-  const allOn = rows.length > 0 && rows.every((r) => selected.has(r._id));
+  // Select all is for who is still on this list, not who was just dealt with. Those can be ticked one by one.
+  const open = rows.filter((r) => !changed?.has(r._id));
+  const allOn = open.length > 0 && open.every((r) => selected.has(r._id));
   const heads: { key: SortKey | null; label: string; right?: boolean }[] = [
     { key: "name", label: "Applicant" },
     ...(roleColumn ? [{ key: null, label: roleColumn.label }] : []),
@@ -268,8 +326,8 @@ export function ApplicantsTable({
                 <input
                   type="checkbox"
                   checked={allOn}
-                  onChange={() => onSelect(allOn ? new Set() : new Set(rows.map((r) => r._id)))}
-                  aria-label={`Select all ${rows.length}`}
+                  onChange={() => onSelect(allOn ? new Set() : new Set(open.map((r) => r._id)))}
+                  aria-label={`Select all ${open.length}`}
                   className="h-3.5 w-3.5 cursor-pointer accent-[var(--text-primary)]"
                 />
               </th>
@@ -301,11 +359,13 @@ export function ApplicantsTable({
           <tbody>
             {shown.map(({ a, years, current, expected, notice }) => {
               const place = places.get(a._id);
+              const mark = changed?.get(a._id);
+              const did = mark && (!mark.to || mark.to === positionStatus(a.stage)) ? mark : undefined;
               return (
                 <tr
                   key={a._id}
                   className={`border-b border-[var(--border-subtle)] transition-colors last:border-0 ${
-                    highlight === a._id ? "bg-[var(--accent-admin-dim)]" : selected.has(a._id) ? "bg-[var(--bg-hover)]" : "hover:bg-[var(--bg-primary)]"
+                    highlight === a._id ? "bg-[var(--accent-admin-dim)]" : selected.has(a._id) ? "bg-[var(--bg-hover)]" : did ? "bg-[var(--accent-employee-dim)]" : "hover:bg-[var(--bg-primary)]"
                   }`}
                 >
                   <td className="px-3 py-2">
@@ -378,6 +438,18 @@ export function ApplicantsTable({
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <Decide stage={a.stage} name={a.name} onMove={(to) => onMove(a, to)} />
+                    {did && (
+                      <span className="mt-1 flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-employee-text)]">
+                        <Check size={12} aria-hidden />
+                        {did.href ? (
+                          <Link href={did.href} className="underline underline-offset-2">
+                            {did.text}
+                          </Link>
+                        ) : (
+                          did.text
+                        )}
+                      </span>
+                    )}
                     {place && positionStatus(a.stage) === "shortlisted" && (
                       <span className="mt-1 flex items-center gap-2">
                         {full ? (
